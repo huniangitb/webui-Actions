@@ -5,7 +5,7 @@ import { exec, toast } from 'kernelsu';
 import i18next from './i18n.js';
 
 // --- 常量和全局变量 ---
-const MODULE_ID = "kcal-tuner";
+const MODULE_ID = "miuicx_color_tuner";
 const MODULE_PATH = `/data/adb/modules/${MODULE_ID}`;
 const CONFIG_PATH = `${MODULE_PATH}/config.txt`;
 const BRIGHTNESS_CONFIG_FILE = `${MODULE_PATH}/bright`;

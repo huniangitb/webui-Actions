@@ -2,48 +2,35 @@
 
 name: Build WebUI
 
-# 触发工作流的事件
 on:
   push:
     branches:
-      - main  # 当代码推送到 main 分支时触发
-  workflow_dispatch: # 允许手动触发
+      - main
+  workflow_dispatch:
 
-# 定义工作流中的任务
 jobs:
   build:
-    # 指定运行器环境
     runs-on: ubuntu-24.04
 
-    # 定义任务中的步骤
     steps:
-      # 步骤 1: 检出代码
-      # 使用 actions/checkout@v4 拉取您的仓库代码
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 步骤 2: 设置 Node.js 环境
-      # 使用 actions/setup-node@v4 安装指定版本的 Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # 推荐使用 LTS 版本，例如 20.x
-          cache: 'yarn' # 缓存 yarn 的依赖
+          node-version: '20'
+          # [修改] 移除 cache: 'yarn' 这一行
+          # cache: 'yarn' 
 
-      # 步骤 3: 安装依赖
-      # 运行 yarn install 来安装 package.json 中定义的所有依赖
       - name: Install dependencies
         run: yarn install
 
-      # 步骤 4: 构建项目
-      # 运行 package.json 中定义的 build 脚本 (parcel build)
       - name: Build project
         run: yarn build
 
-      # 步骤 5: 上传构建产物
-      # 使用 actions/upload-artifact@v4 将打包好的 dist 目录保存为构建产物
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: webui-dist # 构建产物的名称
-          path: dist/ # 要上传的目录路径
+          name: webui-dist
+          path: dist/

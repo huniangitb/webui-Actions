@@ -5,12 +5,18 @@ import { exec, toast } from 'kernelsu';
 import i18next from './i18n.js';
 
 // --- 常量和全局变量 ---
+// [修改] 模块ID已更新
 const MODULE_ID = "miuicx_color_tuner";
 const MODULE_PATH = `/data/adb/modules/${MODULE_ID}`;
 const CONFIG_PATH = `${MODULE_PATH}/config.txt`;
-const BRIGHTNESS_CONFIG_FILE = `${MODULE_PATH}/bright`;
+// [修改] 移除 BRIGHTNESS_CONFIG_FILE，因为路径已固定
+// const BRIGHTNESS_CONFIG_FILE = `${MODULE_PATH}/bright`;
 const KCAL_CONTROL_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal";
 const RANGE_CONFIG_KEY = 'kcalWebUIRanges';
+
+// [修改] 背光路径已硬编码
+const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
+const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
 
 const FIXED_PRECISION = 100;
 const defaultConfig = { "intercept": 255.0, "slope": 0.0, "offset": 0 };
@@ -21,8 +27,6 @@ const defaultRanges = {
     offset: { min: -100, max: 100 }
 };
 
-let BACKLIGHT_PATH = '';
-let MAX_BRIGHTNESS_PATH = '';
 let globalConfig = {};
 let maxBrightness = 4095;
 let currentRefreshRate = 60;
@@ -401,21 +405,8 @@ async function fetchRefreshRate() {
     updateChart();
 }
 
-async function getBacklightPaths() {
-    try {
-        const { stdout } = await exec(`cat ${BRIGHTNESS_CONFIG_FILE}`);
-        const basePath = stdout.trim();
-        if (!basePath) throw new Error("配置文件为空");
-        BACKLIGHT_PATH = `${basePath}/brightness`;
-        MAX_BRIGHTNESS_PATH = `${basePath}/max_brightness`;
-        return true;
-    } catch (e) {
-        toast(i18next.t('toast.backlightPathError'), 'error');
-        brightnessValue.innerText = i18next.t('status.brightnessPathError');
-        brightnessSlider.disabled = true;
-        return false;
-    }
-}
+// [修改] 移除 getBacklightPaths 函数
+// async function getBacklightPaths() { ... }
 
 async function init() {
     await i18next.ready;
@@ -430,20 +421,20 @@ async function init() {
 
     await fetchRefreshRate();
 
-    if (await getBacklightPaths()) {
-        try {
-            const { stdout: max } = await exec(`cat ${MAX_BRIGHTNESS_PATH}`);
-            maxBrightness = parseInt(max.trim());
-            const { stdout: cur } = await exec(`cat ${BACKLIGHT_PATH}`);
-            const currentSystemVal = parseInt(cur.trim());
-            brightnessSlider.disabled = false;
-            const percentage = Math.round(((currentSystemVal - 1) / (maxBrightness - 1)) * 100);
-            brightnessSlider.value = percentage;
-            brightnessValue.innerText = i18next.t('status.brightnessValue', { value: currentSystemVal, percent: percentage });
-        } catch (e) {
-            brightnessValue.innerText = i18next.t('status.brightnessReadError');
-            brightnessSlider.disabled = true;
-        }
+    // [修改] 简化背光路径处理逻辑
+    try {
+        const { stdout: max } = await exec(`cat ${MAX_BRIGHTNESS_PATH}`);
+        maxBrightness = parseInt(max.trim());
+        const { stdout: cur } = await exec(`cat ${BACKLIGHT_PATH}`);
+        const currentSystemVal = parseInt(cur.trim());
+        brightnessSlider.disabled = false;
+        const percentage = Math.round(((currentSystemVal - 1) / (maxBrightness - 1)) * 100);
+        brightnessSlider.value = percentage;
+        brightnessValue.innerText = i18next.t('status.brightnessValue', { value: currentSystemVal, percent: percentage });
+    } catch (e) {
+        brightnessValue.innerText = i18next.t('status.brightnessReadError');
+        brightnessSlider.disabled = true;
+        toast(i18next.t('toast.backlightPathError'), 'error');
     }
     
     await loadConfigAndRender();

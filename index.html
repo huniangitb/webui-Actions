@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<!-- lang 属性将由JS动态设置 -->
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="title">Kcal Color Tuner</title>
+    
+    <!-- [修改] 从 CDN 引用 MDB-UI-Kit CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.min.css" rel="stylesheet" />
+    <!-- Font Awesome 仍然从 CDN 引用 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    
+    <!-- 您的自定义样式，现在不再需要导入 MDB 的 SCSS -->
+    <link rel="stylesheet" href="main.scss">
+</head>
+<body>
+    <div class="container mt-4 mb-5">
+        <header class="text-center mb-4">
+            <h1 data-i18n="title"></h1>
+            <p class="text-muted" data-i18n="subtitle"></p>
+        </header>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title" data-i18n="status.cardTitle"></h5>
+                <p class="mb-1"><span data-i18n="status.refreshRate"></span> <span id="refreshRateValue" class="badge bg-primary" data-i18n="status.reading"></span></p>
+                <label for="brightnessSlider" class="form-label mt-2" data-i18n="status.brightness"></label>
+                <div class="range"><input type="range" class="form-range" id="brightnessSlider" min="0" max="100" step="1" disabled /></div>
+                <div id="brightnessValue" class="form-text" data-i18n="status.reading"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title mb-0" data-i18n="config.cardTitle"></h5>
+                    <div class="config-actions-group">
+                        <button id="toggleEditModeButton" type="button" class="btn btn-success btn-sm" data-mdb-ripple-init></button>
+                        <button id="customizeRangeButton" type="button" class="btn btn-info btn-sm" data-mdb-ripple-init data-i18n="buttons.customizeRanges"></button>
+                        <button id="readNodeButton" type="button" class="btn btn-secondary btn-sm" data-mdb-ripple-init data-i18n="buttons.readNode"></button>
+                        <button id="resetConfigButton" type="button" class="btn btn-warning btn-sm" data-mdb-ripple-init data-i18n="buttons.reset"></button>
+                        <button id="saveButton" type="button" class="btn btn-primary btn-sm" data-mdb-ripple-init data-i18n="buttons.save"></button>
+                    </div>
+                </div>
+                <p class="text-muted small" data-i18n="config.description"></p>
+                <hr/>
+                <div id="global-config-editor">
+                    <div class="param-row">
+                        <label for="interceptSlider" class="param-label" data-i18n="params.intercept"></label>
+                        <div class="slider-input-group">
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="interceptSlider" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="interceptInput" class="form-control param-input" step="0.01" /></div>
+                        </div>
+                    </div>
+
+                    <div class="param-row">
+                        <label for="slopeSlider" class="param-label" data-i18n="params.slope"></label>
+                        <div class="slider-input-group">
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="slopeSlider" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="slopeInput" class="form-control param-input" step="0.01" /></div>
+                        </div>
+                    </div>
+
+                    <div class="param-row">
+                        <label for="offsetSlider" class="param-label" data-i18n="params.offset"></label>
+                        <div class="slider-input-group">
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="offsetSlider" step="1" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="offsetInput" class="form-control param-input" step="1" /></div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container mt-4">
+                        <canvas id="colorCurveChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <footer class="text-center mt-4">
+            <p class="text-muted small" data-i18n="footer.author"></p>
+        </footer>
+    </div>
+    
+    <div class="modal fade" id="nodeStatusModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title" data-i18n="modals.nodeStatus.title"></h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <h6 data-i18n="modals.nodeStatus.raw"></h6><pre><code id="rawNodeOutput"></code></pre><hr/>
+                    <h6 data-i18n="modals.nodeStatus.parsed"></h6><div id="parsedNodeOutput"></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-mdb-dismiss="modal" data-i18n="modals.nodeStatus.close"></button></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="rangeConfigModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title" data-i18n="modals.range.title"></h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <p class="text-muted" data-i18n="modals.range.description"></p>
+                    
+                    <p class="fw-bold mt-3 mb-1" data-i18n="modals.range.intercept"></p>
+                    <div class="row g-3">
+                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="interceptRangeMin" class="form-control" step="any" /><label class="form-label" for="interceptRangeMin" data-i18n="modals.range.min"></label></div></div>
+                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="interceptRangeMax" class="form-control" step="any" /><label class="form-label" for="interceptRangeMax" data-i18n="modals.range.max"></label></div></div>
+                    </div>
+
+                    <p class="fw-bold mt-3 mb-1" data-i18n="modals.range.slope"></p>
+                    <div class="row g-3">
+                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="slopeRangeMin" class="form-control" step="any" /><label class="form-label" for="slopeRangeMin" data-i18n="modals.range.min"></label></div></div>
+                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="slopeRangeMax" class="form-control" step="any" /><label class="form-label" for="slopeRangeMax" data-i18n="modals.range.max"></label></div></div>
+                    </div>
+
+                    <p class="fw-bold mt-3 mb-1" data-i18n="modals.range.offset"></p>
+                    <div class="row g-3">
+                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="offsetRangeMin" class="form-control" step="1" /><label class="form-label" for="offsetRangeMin" data-i18n="modals.range.min"></label></div></div>
+                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="offsetRangeMax" class="form-control" step="1" /><label class="form-label" for="offsetRangeMax" data-i18n="modals.range.max"></label></div></div>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal" data-i18n="modals.range.cancel"></button>
+                    <button type="button" id="saveRangeButton" class="btn btn-primary" data-i18n="modals.range.save"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- [修改] 从 CDN 引用 MDB-UI-Kit JS -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.min.js"></script>
+    <script type="module" src="main.js"></script>
+</body>
+</html>

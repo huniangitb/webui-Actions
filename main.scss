@@ -1,0 +1,73 @@
+// @use "../node_modules/mdb-ui-kit/src/scss/mdb.free.scss"; // [修改] 移除或注释掉这一行
+@import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css");
+
+body {
+  font-size: 16px; 
+  padding-bottom: 150px;
+}
+
+.card-title {
+  font-weight: 400;
+}
+
+.param-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem; /* 增加行间距 */
+}
+.param-label {
+    font-weight: 500;
+    width: 120px;
+    text-align: right;
+    flex-shrink: 0;
+}
+.slider-input-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+}
+
+/* 正确的规则：目标是 MDB 的外层容器 .form-outline，而不是输入框本身 */
+.slider-input-group .form-outline {
+    width: 80px;      /* 设置容器的宽度 */
+    flex-shrink: 0;   /* 防止在 flex 布局中被压缩，确保宽度固定 */
+}
+
+.config-actions-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.chart-container {
+    position: relative;
+    height: 220px;
+    width: 100%;
+    padding: 0.5rem;
+    margin-top: 1rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--mdb-body-color-rgb, 0.1);
+}
+
+#rawNodeOutput {
+  background-color: rgba(var(--mdb-body-color-rgb), 0.05);
+  padding: 0.75rem;
+  border-radius: 0.25rem;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 768px) {
+  .param-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .param-label {
+    width: auto;
+    text-align: left;
+  }
+}

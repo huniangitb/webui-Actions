@@ -1,18 +1,17 @@
 // 导入 MDB-UI-Kit 组件 和 Chart.js
 import Chart from 'chart.js/auto';
-// import { Ripple, Range, Input, Modal, initMDB } from 'mdb-ui-kit';
+import { Ripple, Range, Input, Modal, initMDB } from 'mdb-ui-kit';
 import { exec, toast } from 'kernelsu';
 import i18next from './i18n.js';
 
 // --- 常量和全局变量 ---
-const MODULE_ID = "miuicx_color_tuner";
+const MODULE_ID = "kcal-tuner";
 const MODULE_PATH = `/data/adb/modules/${MODULE_ID}`;
 const CONFIG_PATH = `${MODULE_PATH}/config.txt`;
 const BRIGHTNESS_CONFIG_FILE = `${MODULE_PATH}/bright`;
 const KCAL_CONTROL_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal";
 const RANGE_CONFIG_KEY = 'kcalWebUIRanges';
 
-// [修改] 精度固定为100，此常量用于UI与整数值之间的换算
 const FIXED_PRECISION = 100;
 const defaultConfig = { "intercept": 255.0, "slope": 0.0, "offset": 0 };
 
@@ -26,7 +25,7 @@ let BACKLIGHT_PATH = '';
 let MAX_BRIGHTNESS_PATH = '';
 let globalConfig = {};
 let maxBrightness = 4095;
-let currentRefreshRate = 60; // 默认值，会被实时获取的值覆盖
+let currentRefreshRate = 60;
 let colorChart = null;
 let nodeStatusModal = null;
 let rangeConfigModal = null;
@@ -171,19 +170,15 @@ function saveRanges() {
 }
 
 // --- Chart.js 函数 ---
-/**
- * [修改] 移除刷新率偏移计算，逻辑简化
- */
 function calculateChartData(params) {
     const labels = [];
     const dataR = [];
     const dataG = [];
     const { intercept, slope, offset } = params;
     for (let p = 0; p <= 100; p += 2) {
-        const systemBrightness = scaleToSystemBrightness(p);
-        const safeBrightness = Math.max(1, systemBrightness);
-        const log_b = Math.log(safeBrightness);
-        const green_final = intercept + (slope * log_b); // 移除 refreshOffset
+        const systemBrightness = Math.max(1, scaleToSystemBrightness(p));
+        const log_b = Math.log(systemBrightness);
+        const green_final = intercept + (slope * log_b);
         const red_final = 128 + offset + (green_final / 2);
         labels.push(p);
         dataG.push(green_final);
@@ -245,16 +240,11 @@ function updateChart() {
 }
 
 // --- 核心逻辑 ---
-
-/**
- * [修改] 应用Kcal，使用新的四参数格式和固定精度
- */
 async function applyKcal(params) {
     if (!params) return;
     const int_intercept = Math.round(params.intercept * FIXED_PRECISION);
     const int_slope = Math.round(params.slope * FIXED_PRECISION);
     const int_offset = Math.round(params.offset);
-    // 第四个参数是当前实时刷新率
     const command = `echo "${int_intercept} ${int_slope} ${int_offset} ${currentRefreshRate}" > ${KCAL_CONTROL_PATH}`;
     try {
         await exec(command);
@@ -263,36 +253,27 @@ async function applyKcal(params) {
     }
 }
 
-/**
- * [修改] 解析配置，适配新的四参数格式
- */
 function parseConfig(text) {
     const content = text.trim();
     if (!content) return null;
     const parts = content.split(/\s+/);
     if (parts.length === 4) {
         const [i, s, o, r] = parts.map(p => parseInt(p, 10));
-        if ([i, s, o, r].some(isNaN)) return null; // 确保所有部分都是数字
+        if ([i, s, o, r].some(isNaN)) return null;
         
-        // 成功解析新格式
         return {
             intercept: i / FIXED_PRECISION,
             slope: s / FIXED_PRECISION,
             offset: o
-            // 第四个参数r (refresh_rate) 被忽略，因为我们总是使用实时的currentRefreshRate
         };
     }
-    return null; // 格式不符
+    return null;
 }
 
-/**
- * [修改] 序列化配置，使用新的四参数格式
- */
 function serializeConfig(params) {
     const int_intercept = Math.round(params.intercept * FIXED_PRECISION);
     const int_slope = Math.round(params.slope * FIXED_PRECISION);
     const int_offset = Math.round(params.offset);
-    // 第四个参数是当前实时刷新率
     return `${int_intercept} ${int_slope} ${int_offset} ${currentRefreshRate}`;
 }
 
@@ -366,9 +347,6 @@ function resetGlobalConfig() {
     toast(i18next.t('toast.reset'), 'info');
 }
 
-/**
- * [修改] 读取并显示新的四参数节点状态
- */
 async function readAndShowNodeStatus() {
     const rawOutputElem = document.getElementById('rawNodeOutput');
     const parsedOutputElem = document.getElementById('parsedNodeOutput');
@@ -379,7 +357,7 @@ async function readAndShowNodeStatus() {
         const { stdout } = await exec(`cat ${KCAL_CONTROL_PATH}`);
         rawOutputElem.textContent = stdout.trim();
         const parts = stdout.trim().split(/\s+/);
-        if (parts.length >= 4) {
+        if (parts.length === 4) {
             const [i, s, o, r] = parts.map(p => parseInt(p, 10));
             if (![i, s, o, r].some(isNaN)) {
                 parsedOutputElem.innerHTML = `<ul>
@@ -388,7 +366,6 @@ async function readAndShowNodeStatus() {
                     <li><strong>Offset:</strong> ${o}</li>
                     <li><strong data-i18n="modals.nodeStatus.refreshRate"></strong> ${r} Hz</li>
                 </ul>`;
-                // 手动翻译模态框内的动态内容
                 const strongEl = parsedOutputElem.querySelector('strong[data-i18n]');
                 if(strongEl) strongEl.innerHTML = i18next.t(strongEl.dataset.i18n);
             } else {
@@ -408,11 +385,9 @@ async function fetchRefreshRate() {
     try {
         const { stdout } = await exec('settings get system peak_refresh_rate');
         let rate = Math.round(parseFloat(stdout.trim()));
-        // 确保刷新率是支持的值之一
         if (![60, 75, 90].includes(rate)) {
-            // 如果不是，则回退到最接近的支持值或默认值
-            if (rate > 82) rate = 90;
-            else if (rate > 67) rate = 75;
+            if (rate >= 82) rate = 90;
+            else if (rate >= 67) rate = 75;
             else rate = 60;
         }
         currentRefreshRate = rate;

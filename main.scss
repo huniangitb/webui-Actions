@@ -1,4 +1,4 @@
-// @use "../node_modules/mdb-ui-kit/src/scss/mdb.free.scss"; // [修改] 移除或注释掉这一行
+@use "../node_modules/mdb-ui-kit/src/scss/mdb.free.scss";
 @import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css");
 
 body {
@@ -14,7 +14,7 @@ body {
     display: flex;
     align-items: center;
     gap: 1rem;
-    margin-bottom: 1.5rem; /* 增加行间距 */
+    margin-bottom: 1.5rem;
 }
 .param-label {
     font-weight: 500;
@@ -29,10 +29,9 @@ body {
     width: 100%;
 }
 
-/* 正确的规则：目标是 MDB 的外层容器 .form-outline，而不是输入框本身 */
 .slider-input-group .form-outline {
-    width: 80px;      /* 设置容器的宽度 */
-    flex-shrink: 0;   /* 防止在 flex 布局中被压缩，确保宽度固定 */
+    width: 80px;
+    flex-shrink: 0;
 }
 
 .config-actions-group {

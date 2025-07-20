@@ -18,7 +18,7 @@ const resources = {
       "status.brightnessPathError": "Backlight path not set",
       "status.refreshRateReadError": "Unavailable",
       // Config Card
-      "config.cardTitle": "Kcal Settings",
+      "config.cardTitle": "Settings",
       "config.description": "Click 'Edit' to adjust parameters.",
       // Buttons
       "buttons.editMode.enter": '<i class="fas fa-edit me-2"></i>Edit',
@@ -37,10 +37,10 @@ const resources = {
       // Footer
       "footer.author": "Author: 囫碾 | WebUI by Gemini Pro",
       // Node Status Modal
-      "modals.nodeStatus.title": "Kcal Node Status",
+      "modals.nodeStatus.title": "Node Status",
       "modals.nodeStatus.raw": "Raw Data",
       "modals.nodeStatus.parsed": "Parsed Values",
-      "modals.nodeStatus.refreshRate": "Refresh Rate:", // [新增]
+      "modals.nodeStatus.refreshRate": "Refresh Rate:",
       "modals.nodeStatus.close": "Close",
       // Range Config Modal
       "modals.range.title": "Set Slider Ranges",
@@ -53,12 +53,12 @@ const resources = {
       "modals.range.cancel": "Cancel",
       "modals.range.save": "Save Ranges",
       // Toasts
-      "toast.configLoaded": "Config loaded.",
-      "toast.configLoadFailed": "Config file not found. Reading from node...",
+      "toast.configLoaded": "Loaded config for {{file}}.", // [修改]
+      "toast.configLoadFailed": "Config '{{file}}' not found. Reading from node...", // [修改]
       "toast.configLoadFromNode": "Loaded values from node.",
       "toast.configLoadFromNodeFailed": "Can't read node. Using defaults.",
       "toast.configLoadFromDefault": "Using default config.",
-      "toast.saved": "Config saved.",
+      "toast.saved": "Config saved to {{file}}.", // [修改]
       "toast.saveFailed": "Save failed: {{error}}",
       "toast.reset": "Settings reset to default.",
       "toast.rangeSaved": "Slider ranges saved.",
@@ -109,7 +109,7 @@ const resources = {
       "modals.nodeStatus.title": "节点状态",
       "modals.nodeStatus.raw": "原始数据",
       "modals.nodeStatus.parsed": "解析值",
-      "modals.nodeStatus.refreshRate": "刷新率:", // [新增]
+      "modals.nodeStatus.refreshRate": "刷新率:",
       "modals.nodeStatus.close": "关闭",
       // Range Config Modal
       "modals.range.title": "设置滑块范围",
@@ -122,12 +122,12 @@ const resources = {
       "modals.range.cancel": "取消",
       "modals.range.save": "保存",
       // Toasts
-      "toast.configLoaded": "配置已加载",
-      "toast.configLoadFailed": "未找到配置，读取节点中...",
+      "toast.configLoaded": "已加载配置: {{file}}", // [修改]
+      "toast.configLoadFailed": "未找到配置 '{{file}}'，正从节点读取...", // [修改]
       "toast.configLoadFromNode": "已从节点加载",
       "toast.configLoadFromNodeFailed": "节点读取失败，使用默认值",
       "toast.configLoadFromDefault": "使用默认配置",
-      "toast.saved": "配置已保存",
+      "toast.saved": "配置已保存至 {{file}}", // [修改]
       "toast.saveFailed": "保存失败: {{error}}",
       "toast.reset": "已重置",
       "toast.rangeSaved": "范围设置已保存",
@@ -148,7 +148,7 @@ i18next
   .init({
     resources,
     fallbackLng: 'en',
-    debug: false, // Set to false in production
+    debug: false,
     detection: {
       order: ['navigator'],
       caches: []

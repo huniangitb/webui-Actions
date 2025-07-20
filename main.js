@@ -5,16 +5,13 @@ import { exec, toast } from 'kernelsu';
 import i18next from './i18n.js';
 
 // --- 常量和全局变量 ---
-// [修改] 模块ID已更新
 const MODULE_ID = "miuicx_color_tuner";
 const MODULE_PATH = `/data/adb/modules/${MODULE_ID}`;
-const CONFIG_PATH = `${MODULE_PATH}/config.txt`;
-// [修改] 移除 BRIGHTNESS_CONFIG_FILE，因为路径已固定
-// const BRIGHTNESS_CONFIG_FILE = `${MODULE_PATH}/bright`;
+// [修改] CONFIG_PATH 不再是常量，将根据刷新率动态生成
+let currentConfigPath = ''; 
 const KCAL_CONTROL_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal";
 const RANGE_CONFIG_KEY = 'kcalWebUIRanges';
 
-// [修改] 背光路径已硬编码
 const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
 const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
 
@@ -257,13 +254,17 @@ async function applyKcal(params) {
     }
 }
 
+/**
+ * [修改] 解析3参数格式，并兼容旧的4参数格式
+ */
 function parseConfig(text) {
     const content = text.trim();
     if (!content) return null;
     const parts = content.split(/\s+/);
-    if (parts.length === 4) {
-        const [i, s, o, r] = parts.map(p => parseInt(p, 10));
-        if ([i, s, o, r].some(isNaN)) return null;
+    // 优先匹配新的3参数格式，也兼容旧的4参数格式（忽略第四个参数）
+    if (parts.length === 3 || parts.length === 4) {
+        const [i, s, o] = parts.map(p => parseInt(p, 10));
+        if ([i, s, o].some(isNaN)) return null;
         
         return {
             intercept: i / FIXED_PRECISION,
@@ -274,17 +275,31 @@ function parseConfig(text) {
     return null;
 }
 
+/**
+ * [修改] 序列化为3参数格式
+ */
 function serializeConfig(params) {
     const int_intercept = Math.round(params.intercept * FIXED_PRECISION);
     const int_slope = Math.round(params.slope * FIXED_PRECISION);
     const int_offset = Math.round(params.offset);
-    return `${int_intercept} ${int_slope} ${int_offset} ${currentRefreshRate}`;
+    return `${int_intercept} ${int_slope} ${int_offset}`;
 }
 
 async function readKcalNodeAsConfig() {
     try {
         const { stdout } = await exec(`cat ${KCAL_CONTROL_PATH}`);
-        return parseConfig(stdout);
+        // 注意：节点总是返回4个参数，所以我们需要一个特殊的解析器
+        const parts = stdout.trim().split(/\s+/);
+        if (parts.length === 4) {
+            const [i, s, o] = parts.map(p => parseInt(p, 10));
+            if ([i, s, o].some(isNaN)) return null;
+            return {
+                intercept: i / FIXED_PRECISION,
+                slope: s / FIXED_PRECISION,
+                offset: o
+            };
+        }
+        return null;
     } catch (e) {
         console.error("读取Kcal节点作为默认值失败:", e);
         return null;
@@ -293,16 +308,17 @@ async function readKcalNodeAsConfig() {
 
 async function loadConfigAndRender() {
     let loadedConfig = null;
+    const filename = currentConfigPath.split('/').pop();
     try {
-        const { stdout } = await exec(`cat ${CONFIG_PATH}`);
+        const { stdout } = await exec(`cat ${currentConfigPath}`);
         loadedConfig = parseConfig(stdout);
     } catch (e) { /* 文件不存在或读取失败，忽略错误 */ }
 
     if (loadedConfig) {
         globalConfig = loadedConfig;
-        toast(i18next.t('toast.configLoaded'), 'success');
+        toast(i18next.t('toast.configLoaded', { file: filename }), 'success');
     } else {
-        toast(i18next.t('toast.configLoadFailed'), 'info');
+        toast(i18next.t('toast.configLoadFailed', { file: filename }), 'info');
         const nodeConfig = await readKcalNodeAsConfig();
         if (nodeConfig) {
             globalConfig = nodeConfig;
@@ -333,10 +349,11 @@ function renderUI(params) {
 // --- 事件处理器 ---
 async function saveConfig() {
     const configString = serializeConfig(globalConfig);
-    const command = `echo '${configString}' > ${CONFIG_PATH}`;
+    const command = `echo '${configString}' > ${currentConfigPath}`;
+    const filename = currentConfigPath.split('/').pop();
     try {
         await exec(command);
-        toast(i18next.t('toast.saved'), 'success');
+        toast(i18next.t('toast.saved', { file: filename }), 'success');
     }
     catch (e) {
         toast(i18next.t('toast.saveFailed', { error: e.message }), 'error');
@@ -385,28 +402,23 @@ async function readAndShowNodeStatus() {
 }
 
 // --- 初始化 ---
+/**
+ * [修改] 支持任意刷新率，不再限制
+ */
 async function fetchRefreshRate() {
     try {
         const { stdout } = await exec('settings get system peak_refresh_rate');
-        let rate = Math.round(parseFloat(stdout.trim()));
-        if (![60, 75, 90].includes(rate)) {
-            if (rate >= 82) rate = 90;
-            else if (rate >= 67) rate = 75;
-            else rate = 60;
-        }
-        currentRefreshRate = rate;
-        refreshRateValue.innerText = `${rate} Hz`;
+        const rate = Math.round(parseFloat(stdout.trim()));
+        currentRefreshRate = rate > 0 ? rate : 60; // 如果读取失败或为0，则默认为60
+        refreshRateValue.innerText = `${currentRefreshRate} Hz`;
         refreshRateValue.className = 'badge bg-success';
     } catch (e) {
+        currentRefreshRate = 60; // 失败时默认为60
         refreshRateValue.innerText = i18next.t('status.refreshRateReadError');
         refreshRateValue.className = 'badge bg-danger';
         console.error("获取刷新率失败:", e);
     }
-    updateChart();
 }
-
-// [修改] 移除 getBacklightPaths 函数
-// async function getBacklightPaths() { ... }
 
 async function init() {
     await i18next.ready;
@@ -419,9 +431,10 @@ async function init() {
     
     loadAndApplyRanges();
 
+    // [修改] 初始化顺序调整：必须先获取刷新率，再确定配置文件路径，最后加载配置
     await fetchRefreshRate();
+    currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
 
-    // [修改] 简化背光路径处理逻辑
     try {
         const { stdout: max } = await exec(`cat ${MAX_BRIGHTNESS_PATH}`);
         maxBrightness = parseInt(max.trim());

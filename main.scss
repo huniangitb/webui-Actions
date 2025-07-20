@@ -1,4 +1,6 @@
-@use "../node_modules/mdb-ui-kit/src/scss/mdb.free.scss";
+@use "mdb-ui-kit/src/scss/mdb.free.scss";
+
+// Font Awesome 仍然从 CDN 引用，这部分不变
 @import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css");
 
 body {

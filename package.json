@@ -1,0 +1,21 @@
+{
+  "name": "kcal-tuner-webui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Web UI for Kcal Color Tuner Magisk Module",
+  "main": "main.js",
+  "scripts": {
+    "start": "parcel index.html",  
+    "build": "parcel build index.html --public-url ./" 
+  },
+  "dependencies": {
+    "chart.js": "^4.4.1",
+    "i18next": "^23.7.16",
+    "i18next-browser-languagedetector": "^7.2.0"
+
+  },
+  "devDependencies": {
+    "parcel": "^2.11.0",
+    "sass": "^1.69.7"
+  }
+}

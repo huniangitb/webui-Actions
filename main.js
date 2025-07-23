@@ -5,12 +5,14 @@ import { exec, toast } from 'kernelsu';
 import i18next from './i18n.js';
 
 // --- 常量和全局变量 ---
-const MODULE_ID = "kcal-tuner";
+const MODULE_ID = "miuicx_color_tuner";
 const MODULE_PATH = `/data/adb/modules/${MODULE_ID}`;
-const CONFIG_PATH = `${MODULE_PATH}/config.txt`;
-const BRIGHTNESS_CONFIG_FILE = `${MODULE_PATH}/bright`;
+let currentConfigPath = ''; 
 const KCAL_CONTROL_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal";
 const RANGE_CONFIG_KEY = 'kcalWebUIRanges';
+
+const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
+const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
 
 const FIXED_PRECISION = 100;
 const defaultConfig = { "intercept": 255.0, "slope": 0.0, "offset": 0 };
@@ -21,8 +23,6 @@ const defaultRanges = {
     offset: { min: -100, max: 100 }
 };
 
-let BACKLIGHT_PATH = '';
-let MAX_BRIGHTNESS_PATH = '';
 let globalConfig = {};
 let maxBrightness = 4095;
 let currentRefreshRate = 60;
@@ -30,6 +30,10 @@ let colorChart = null;
 let nodeStatusModal = null;
 let rangeConfigModal = null;
 let isEditMode = false;
+
+// [新增] 用于轮询的状态变量
+let lastKnownRefreshRate = 0;
+let lastKnownBrightness = -1;
 
 // --- DOM 元素 ---
 const brightnessSlider = document.getElementById('brightnessSlider');
@@ -57,6 +61,48 @@ const slopeRangeMax = document.getElementById('slopeRangeMax');
 const offsetRangeMin = document.getElementById('offsetRangeMin');
 const offsetRangeMax = document.getElementById('offsetRangeMax');
 const saveRangeButton = document.getElementById('saveRangeButton');
+
+// --- [新增] 轮询函数 ---
+async function pollSystemStatus() {
+    // 检查刷新率
+    try {
+        const { stdout } = await exec('settings get system peak_refresh_rate');
+        const newRate = Math.round(parseFloat(stdout.trim())) || 60;
+        if (newRate !== lastKnownRefreshRate) {
+            console.log(`Refresh rate changed: ${lastKnownRefreshRate} -> ${newRate}`);
+            lastKnownRefreshRate = newRate;
+            currentRefreshRate = newRate;
+            
+            // 更新UI和配置文件路径
+            refreshRateValue.innerText = `${currentRefreshRate} Hz`;
+            currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
+            
+            // 提示用户并重新加载配置
+            toast(i18next.t('toast.refreshRateChanged', { rate: newRate }), 'info');
+            await loadConfigAndRender();
+        }
+    } catch (e) {
+        // 忽略读取错误，避免频繁报错
+    }
+
+    // 检查亮度
+    try {
+        const { stdout } = await exec(`cat ${BACKLIGHT_PATH}`);
+        const newBrightness = parseInt(stdout.trim());
+        if (newBrightness !== lastKnownBrightness) {
+            console.log(`Brightness changed: ${lastKnownBrightness} -> ${newBrightness}`);
+            lastKnownBrightness = newBrightness;
+            
+            // 更新UI
+            const percentage = Math.round(((newBrightness - 1) / (maxBrightness - 1)) * 100);
+            brightnessValue.innerText = i18next.t('status.brightnessValue', { value: newBrightness, percent: percentage });
+            brightnessSlider.value = percentage;
+        }
+    } catch (e) {
+        // 忽略读取错误
+    }
+}
+
 
 // --- 多语言UI更新 ---
 function updateUIText() {
@@ -110,8 +156,9 @@ async function setSystemBrightness(percentage) {
     const systemValue = scaleToSystemBrightness(percentage);
     try {
         await exec(`echo ${systemValue} > ${BACKLIGHT_PATH}`);
-        brightnessSlider.value = percentage;
+        // 更新UI文本和缓存值
         brightnessValue.innerText = i18next.t('status.brightnessValue', { value: systemValue, percent: percentage });
+        lastKnownBrightness = systemValue;
     } catch (e) {
         toast(i18next.t('toast.brightness.setFailed', { error: e.message }), 'error');
     }
@@ -257,9 +304,9 @@ function parseConfig(text) {
     const content = text.trim();
     if (!content) return null;
     const parts = content.split(/\s+/);
-    if (parts.length === 4) {
-        const [i, s, o, r] = parts.map(p => parseInt(p, 10));
-        if ([i, s, o, r].some(isNaN)) return null;
+    if (parts.length === 3 || parts.length === 4) {
+        const [i, s, o] = parts.map(p => parseInt(p, 10));
+        if ([i, s, o].some(isNaN)) return null;
         
         return {
             intercept: i / FIXED_PRECISION,
@@ -274,13 +321,23 @@ function serializeConfig(params) {
     const int_intercept = Math.round(params.intercept * FIXED_PRECISION);
     const int_slope = Math.round(params.slope * FIXED_PRECISION);
     const int_offset = Math.round(params.offset);
-    return `${int_intercept} ${int_slope} ${int_offset} ${currentRefreshRate}`;
+    return `${int_intercept} ${int_slope} ${int_offset}`;
 }
 
 async function readKcalNodeAsConfig() {
     try {
         const { stdout } = await exec(`cat ${KCAL_CONTROL_PATH}`);
-        return parseConfig(stdout);
+        const parts = stdout.trim().split(/\s+/);
+        if (parts.length === 4) {
+            const [i, s, o] = parts.map(p => parseInt(p, 10));
+            if ([i, s, o].some(isNaN)) return null;
+            return {
+                intercept: i / FIXED_PRECISION,
+                slope: s / FIXED_PRECISION,
+                offset: o
+            };
+        }
+        return null;
     } catch (e) {
         console.error("读取Kcal节点作为默认值失败:", e);
         return null;
@@ -289,16 +346,17 @@ async function readKcalNodeAsConfig() {
 
 async function loadConfigAndRender() {
     let loadedConfig = null;
+    const filename = currentConfigPath.split('/').pop();
     try {
-        const { stdout } = await exec(`cat ${CONFIG_PATH}`);
+        const { stdout } = await exec(`cat ${currentConfigPath}`);
         loadedConfig = parseConfig(stdout);
     } catch (e) { /* 文件不存在或读取失败，忽略错误 */ }
 
     if (loadedConfig) {
         globalConfig = loadedConfig;
-        toast(i18next.t('toast.configLoaded'), 'success');
+        toast(i18next.t('toast.configLoaded', { file: filename }), 'success');
     } else {
-        toast(i18next.t('toast.configLoadFailed'), 'info');
+        toast(i18next.t('toast.configLoadFailed', { file: filename }), 'info');
         const nodeConfig = await readKcalNodeAsConfig();
         if (nodeConfig) {
             globalConfig = nodeConfig;
@@ -329,10 +387,11 @@ function renderUI(params) {
 // --- 事件处理器 ---
 async function saveConfig() {
     const configString = serializeConfig(globalConfig);
-    const command = `echo '${configString}' > ${CONFIG_PATH}`;
+    const command = `echo '${configString}' > ${currentConfigPath}`;
+    const filename = currentConfigPath.split('/').pop();
     try {
         await exec(command);
-        toast(i18next.t('toast.saved'), 'success');
+        toast(i18next.t('toast.saved', { file: filename }), 'success');
     }
     catch (e) {
         toast(i18next.t('toast.saveFailed', { error: e.message }), 'error');
@@ -381,40 +440,20 @@ async function readAndShowNodeStatus() {
 }
 
 // --- 初始化 ---
-async function fetchRefreshRate() {
+async function fetchInitialRefreshRate() {
     try {
         const { stdout } = await exec('settings get system peak_refresh_rate');
-        let rate = Math.round(parseFloat(stdout.trim()));
-        if (![60, 75, 90].includes(rate)) {
-            if (rate >= 82) rate = 90;
-            else if (rate >= 67) rate = 75;
-            else rate = 60;
-        }
-        currentRefreshRate = rate;
-        refreshRateValue.innerText = `${rate} Hz`;
+        const rate = Math.round(parseFloat(stdout.trim()));
+        currentRefreshRate = rate > 0 ? rate : 60;
+        refreshRateValue.innerText = `${currentRefreshRate} Hz`;
         refreshRateValue.className = 'badge bg-success';
     } catch (e) {
+        currentRefreshRate = 60;
         refreshRateValue.innerText = i18next.t('status.refreshRateReadError');
         refreshRateValue.className = 'badge bg-danger';
         console.error("获取刷新率失败:", e);
     }
-    updateChart();
-}
-
-async function getBacklightPaths() {
-    try {
-        const { stdout } = await exec(`cat ${BRIGHTNESS_CONFIG_FILE}`);
-        const basePath = stdout.trim();
-        if (!basePath) throw new Error("配置文件为空");
-        BACKLIGHT_PATH = `${basePath}/brightness`;
-        MAX_BRIGHTNESS_PATH = `${basePath}/max_brightness`;
-        return true;
-    } catch (e) {
-        toast(i18next.t('toast.backlightPathError'), 'error');
-        brightnessValue.innerText = i18next.t('status.brightnessPathError');
-        brightnessSlider.disabled = true;
-        return false;
-    }
+    lastKnownRefreshRate = currentRefreshRate; // 初始化缓存值
 }
 
 async function init() {
@@ -428,22 +467,23 @@ async function init() {
     
     loadAndApplyRanges();
 
-    await fetchRefreshRate();
+    await fetchInitialRefreshRate();
+    currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
 
-    if (await getBacklightPaths()) {
-        try {
-            const { stdout: max } = await exec(`cat ${MAX_BRIGHTNESS_PATH}`);
-            maxBrightness = parseInt(max.trim());
-            const { stdout: cur } = await exec(`cat ${BACKLIGHT_PATH}`);
-            const currentSystemVal = parseInt(cur.trim());
-            brightnessSlider.disabled = false;
-            const percentage = Math.round(((currentSystemVal - 1) / (maxBrightness - 1)) * 100);
-            brightnessSlider.value = percentage;
-            brightnessValue.innerText = i18next.t('status.brightnessValue', { value: currentSystemVal, percent: percentage });
-        } catch (e) {
-            brightnessValue.innerText = i18next.t('status.brightnessReadError');
-            brightnessSlider.disabled = true;
-        }
+    try {
+        const { stdout: max } = await exec(`cat ${MAX_BRIGHTNESS_PATH}`);
+        maxBrightness = parseInt(max.trim());
+        const { stdout: cur } = await exec(`cat ${BACKLIGHT_PATH}`);
+        const currentSystemVal = parseInt(cur.trim());
+        lastKnownBrightness = currentSystemVal; // 初始化缓存值
+        brightnessSlider.disabled = false;
+        const percentage = Math.round(((currentSystemVal - 1) / (maxBrightness - 1)) * 100);
+        brightnessSlider.value = percentage;
+        brightnessValue.innerText = i18next.t('status.brightnessValue', { value: currentSystemVal, percent: percentage });
+    } catch (e) {
+        brightnessValue.innerText = i18next.t('status.brightnessReadError');
+        brightnessSlider.disabled = true;
+        toast(i18next.t('toast.backlightPathError'), 'error');
     }
     
     await loadConfigAndRender();
@@ -517,6 +557,9 @@ async function init() {
     i18next.on('languageChanged', () => updateUIText());
 
     toggleEditMode(false);
+
+    // [新增] 启动轮询
+    setInterval(pollSystemStatus, 1000);
 }
 
 document.addEventListener('DOMContentLoaded', init);

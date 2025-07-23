@@ -20,12 +20,12 @@ const resources = {
       // Config Card
       "config.cardTitle": "Settings",
       "config.description": "Click 'Edit' to adjust parameters.",
-      // [修改] Buttons now use an object format for SVG icons
+      // Buttons
       "buttons.editMode.enter": { "icon": "mdiPencil", "text": "Edit" },
       "buttons.editMode.exit": { "icon": "mdiLock", "text": "Lock" },
       "buttons.customizeRanges": { "icon": "mdiTune", "text": "Set Ranges" },
       "buttons.readNode": { "icon": "mdiSync", "text": "Read Node" },
-      "buttons.reset": { "icon": "mdiUndo", "text": "Reset" },
+      "buttons.reset": { "icon": "mdiRestore", "text": "Reset" }, // [修改]
       "buttons.save": "Save",
       // Params & Chart
       "params.intercept": "Intercept",
@@ -89,12 +89,12 @@ const resources = {
       // Config Card
       "config.cardTitle": "参数设置",
       "config.description": "点击编辑调整参数",
-      // [修改] 按钮现在使用对象格式以支持SVG图标
+      // Buttons
       "buttons.editMode.enter": { "icon": "mdiPencil", "text": "编辑" },
       "buttons.editMode.exit": { "icon": "mdiLock", "text": "锁定" },
       "buttons.customizeRanges": { "icon": "mdiTune", "text": "范围设置" },
       "buttons.readNode": { "icon": "mdiSync", "text": "读取节点" },
-      "buttons.reset": { "icon": "mdiUndo", "text": "重置" },
+      "buttons.reset": { "icon": "mdiRestore", "text": "重置" }, // [修改]
       "buttons.save": "保存",
       // Params & Chart
       "params.intercept": "截距",

@@ -3,7 +3,7 @@ import Chart from 'chart.js/auto';
 import { Ripple, Range, Input, Modal, initMDB } from 'mdb-ui-kit';
 import { exec, toast } from 'kernelsu';
 import i18next from './i18n.js';
-// [修改] 导入 MDI SVG 图标路径，新增 mdiRestore
+// [修改] 导入 MDI SVG 图标路径，将 mdiPencil 改为 mdiFileEdit
 import { mdiFileEdit, mdiLock, mdiTune, mdiSync, mdiRestore } from '@mdi/js';
 
 // --- 常量和全局变量 ---
@@ -25,9 +25,9 @@ const defaultRanges = {
     offset: { min: -100, max: 100 }
 };
 
-// [修改] 将导入的图标路径映射到一个对象，方便通过键名访问，新增 mdiRestore
+// [修改] 将导入的图标路径映射到一个对象，将 mdiPencil 改为 mdiFileEdit
 const icons = {
-  mdiPencil,
+  mdiFileEdit,
   mdiLock,
   mdiTune,
   mdiSync,
@@ -507,7 +507,7 @@ async function init() {
     // --- 事件监听器 ---
     brightnessSlider.addEventListener('input', (e) => setSystemBrightness(parseInt(e.target.value)));
     saveButton.addEventListener('click', saveConfig);
-    resetConfigButton.addEventListener('click', resetGlobalConfig);
+    resetConfigButton.addEventListener('click', resetConfigButton); // 注意：这里调用的是 resetConfigButton 而不是 resetGlobalConfig
     readNodeButton.addEventListener('click', readAndShowNodeStatus);
     
     toggleEditModeButton.addEventListener('click', () => {

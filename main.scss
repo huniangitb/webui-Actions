@@ -1,7 +1,11 @@
-// [修改] 导入 MDBootstrap
+// 导入 MDBootstrap
 @use "mdb-ui-kit/src/scss/mdb.free.scss";
 
-// [修改] 从 node_modules 导入 Material Design Icons
+// [修改] 在导入 MDI SCSS 之前，覆盖字体路径变量
+// 使用 '~' 告诉 Sass/Parcel 从 node_modules 的根目录开始查找
+$mdi-font-path: "~@mdi/font/fonts/";
+
+// 从 node_modules 导入 Material Design Icons
 @import "@mdi/font/scss/materialdesignicons.scss";
 
 body {

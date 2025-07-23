@@ -4,6 +4,9 @@ import { Ripple, Range, Input, Modal, initMDB } from 'mdb-ui-kit';
 import { exec, toast } from 'kernelsu';
 import i18next from './i18n.js';
 
+// [新增] 直接在 JavaScript 中导入 Material Design Icons 的 CSS
+import '@mdi/font/css/materialdesignicons.min.css';
+
 // --- 常量和全局变量 ---
 const MODULE_ID = "miuicx_color_tuner";
 const MODULE_PATH = `/data/adb/modules/${MODULE_ID}`;
@@ -156,7 +159,6 @@ async function setSystemBrightness(percentage) {
     const systemValue = scaleToSystemBrightness(percentage);
     try {
         await exec(`echo ${systemValue} > ${BACKLIGHT_PATH}`);
-        // 更新UI文本和缓存值
         brightnessValue.innerText = i18next.t('status.brightnessValue', { value: systemValue, percent: percentage });
         lastKnownBrightness = systemValue;
     } catch (e) {
@@ -453,7 +455,7 @@ async function fetchInitialRefreshRate() {
         refreshRateValue.className = 'badge bg-danger';
         console.error("获取刷新率失败:", e);
     }
-    lastKnownRefreshRate = currentRefreshRate; // 初始化缓存值
+    lastKnownRefreshRate = currentRefreshRate;
 }
 
 async function init() {
@@ -475,7 +477,7 @@ async function init() {
         maxBrightness = parseInt(max.trim());
         const { stdout: cur } = await exec(`cat ${BACKLIGHT_PATH}`);
         const currentSystemVal = parseInt(cur.trim());
-        lastKnownBrightness = currentSystemVal; // 初始化缓存值
+        lastKnownBrightness = currentSystemVal;
         brightnessSlider.disabled = false;
         const percentage = Math.round(((currentSystemVal - 1) / (maxBrightness - 1)) * 100);
         brightnessSlider.value = percentage;
@@ -558,7 +560,6 @@ async function init() {
 
     toggleEditMode(false);
 
-    // [新增] 启动轮询
     setInterval(pollSystemStatus, 1000);
 }
 

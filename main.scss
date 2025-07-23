@@ -1,9 +1,7 @@
 // 导入 MDBootstrap
 @use "mdb-ui-kit/src/scss/mdb.free.scss";
 
-// [修改] 使用 url() 明确告诉 Sass 这是一个 CSS 文件导入
-// 这是最可靠的从 node_modules 导入 CSS 的方法
-@import url("@mdi/font/css/materialdesignicons.min.css");
+// [修改] 移除 Material Design Icons 的 @import，现在在 main.js 中导入
 
 body {
   font-size: 16px; 

@@ -4,7 +4,7 @@ import { Ripple, Range, Input, Modal, initMDB } from 'mdb-ui-kit';
 import { exec, toast } from 'kernelsu';
 import i18next from './i18n.js';
 // [修改] 导入 MDI SVG 图标路径，新增 mdiRestore
-import { mdiPencil, mdiLock, mdiTune, mdiSync, mdiRestore } from '@mdi/js';
+import { mdiFileEdit, mdiLock, mdiTune, mdiSync, mdiRestore } from '@mdi/js';
 
 // --- 常量和全局变量 ---
 const MODULE_ID = "miuicx_color_tuner";

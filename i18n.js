@@ -21,7 +21,7 @@ const resources = {
       "config.cardTitle": "Settings",
       "config.description": "Click 'Edit' to adjust parameters.",
       // Buttons
-      "buttons.editMode.enter": { "icon": "mdiPencil", "text": "Edit" },
+      "buttons.editMode.enter": { "icon": "mdiFileEdit", "text": "Edit" },
       "buttons.editMode.exit": { "icon": "mdiLock", "text": "Lock" },
       "buttons.customizeRanges": { "icon": "mdiTune", "text": "Set Ranges" },
       "buttons.readNode": { "icon": "mdiSync", "text": "Read Node" },
@@ -90,7 +90,7 @@ const resources = {
       "config.cardTitle": "参数设置",
       "config.description": "点击编辑调整参数",
       // Buttons
-      "buttons.editMode.enter": { "icon": "mdiPencil", "text": "编辑" },
+      "buttons.editMode.enter": { "icon": "mdiFileEdit", "text": "编辑" },
       "buttons.editMode.exit": { "icon": "mdiLock", "text": "锁定" },
       "buttons.customizeRanges": { "icon": "mdiTune", "text": "范围设置" },
       "buttons.readNode": { "icon": "mdiSync", "text": "读取节点" },

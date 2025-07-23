@@ -1,5 +1,9 @@
-@use "../node_modules/mdb-ui-kit/src/scss/mdb.free.scss";
-@import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css");
+// [修改] 从 node_modules 导入 Font Awesome
+@import "@fortawesome/fontawesome-free/scss/fontawesome.scss";
+@import "@fortawesome/fontawesome-free/scss/solid.scss"; // 只导入我们需要的 solid 样式
+
+// 从 node_modules 导入 MDBootstrap
+@use "mdb-ui-kit/src/scss/mdb.free.scss";
 
 body {
   font-size: 16px; 

@@ -2,26 +2,34 @@
 
 name: Build WebUI
 
+# 仅在手动触发时运行
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+    # 添加输入参数，用于在手动触发时选择分支
+    inputs:
+      branch:
+        description: '要构建的仓库分支 (The branch to build)'
+        required: true
+        default: 'main' # 默认使用 main 分支
+        type: string
 
 jobs:
   build:
     runs-on: ubuntu-24.04
 
     steps:
+      # 检出代码时，使用手动输入的分支
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # 使用 github.event.inputs.branch 来获取用户输入的分支名
+          ref: ${{ github.event.inputs.branch }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          # [修改] 移除 cache: 'yarn' 这一行
-          # cache: 'yarn' 
+          # 移除 yarn 缓存，根据您的要求
 
       - name: Install dependencies
         run: yarn install

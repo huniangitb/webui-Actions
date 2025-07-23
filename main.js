@@ -3,9 +3,8 @@ import Chart from 'chart.js/auto';
 import { Ripple, Range, Input, Modal, initMDB } from 'mdb-ui-kit';
 import { exec, toast } from 'kernelsu';
 import i18next from './i18n.js';
-
-// [新增] 直接在 JavaScript 中导入 Material Design Icons 的 CSS
-import '@mdi/font/css/materialdesignicons.min.css';
+// [新增] 导入 MDI SVG 图标路径
+import { mdiPencil, mdiLock, mdiTune, mdiSync, mdiUndo } from '@mdi/js';
 
 // --- 常量和全局变量 ---
 const MODULE_ID = "miuicx_color_tuner";
@@ -26,6 +25,15 @@ const defaultRanges = {
     offset: { min: -100, max: 100 }
 };
 
+// [新增] 将导入的图标路径映射到一个对象，方便通过键名访问
+const icons = {
+  mdiPencil,
+  mdiLock,
+  mdiTune,
+  mdiSync,
+  mdiUndo
+};
+
 let globalConfig = {};
 let maxBrightness = 4095;
 let currentRefreshRate = 60;
@@ -33,12 +41,11 @@ let colorChart = null;
 let nodeStatusModal = null;
 let rangeConfigModal = null;
 let isEditMode = false;
-
-// [新增] 用于轮询的状态变量
 let lastKnownRefreshRate = 0;
 let lastKnownBrightness = -1;
 
 // --- DOM 元素 ---
+// ... (DOM 元素部分保持不变)
 const brightnessSlider = document.getElementById('brightnessSlider');
 const brightnessValue = document.getElementById('brightnessValue');
 const refreshRateValue = document.getElementById('refreshRateValue');
@@ -49,14 +56,12 @@ const customizeRangeButton = document.getElementById('customizeRangeButton');
 const chartCanvas = document.getElementById('colorCurveChart');
 const toggleEditModeButton = document.getElementById('toggleEditModeButton');
 const configEditorContainer = document.getElementById('global-config-editor');
-
 const interceptSlider = document.getElementById('interceptSlider');
 const interceptInput = document.getElementById('interceptInput');
 const slopeSlider = document.getElementById('slopeSlider');
 const slopeInput = document.getElementById('slopeInput');
 const offsetSlider = document.getElementById('offsetSlider');
 const offsetInput = document.getElementById('offsetInput');
-
 const interceptRangeMin = document.getElementById('interceptRangeMin');
 const interceptRangeMax = document.getElementById('interceptRangeMax');
 const slopeRangeMin = document.getElementById('slopeRangeMin');
@@ -65,9 +70,20 @@ const offsetRangeMin = document.getElementById('offsetRangeMin');
 const offsetRangeMax = document.getElementById('offsetRangeMax');
 const saveRangeButton = document.getElementById('saveRangeButton');
 
-// --- [新增] 轮询函数 ---
+
+// --- [新增] SVG 图标创建函数 ---
+/**
+ * Creates an SVG icon element string from an MDI path.
+ * @param {string} path - The SVG path data from @mdi/js.
+ * @returns {string} The complete SVG element as an HTML string.
+ */
+function createIcon(path) {
+  if (!path) return '';
+  return `<svg class="svg-icon me-2" viewBox="0 0 24 24"><path d="${path}" /></svg>`;
+}
+
+// --- 轮询函数 ---
 async function pollSystemStatus() {
-    // 检查刷新率
     try {
         const { stdout } = await exec('settings get system peak_refresh_rate');
         const newRate = Math.round(parseFloat(stdout.trim())) || 60;
@@ -75,44 +91,44 @@ async function pollSystemStatus() {
             console.log(`Refresh rate changed: ${lastKnownRefreshRate} -> ${newRate}`);
             lastKnownRefreshRate = newRate;
             currentRefreshRate = newRate;
-            
-            // 更新UI和配置文件路径
             refreshRateValue.innerText = `${currentRefreshRate} Hz`;
             currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
-            
-            // 提示用户并重新加载配置
             toast(i18next.t('toast.refreshRateChanged', { rate: newRate }), 'info');
             await loadConfigAndRender();
         }
-    } catch (e) {
-        // 忽略读取错误，避免频繁报错
-    }
+    } catch (e) { /* 忽略错误 */ }
 
-    // 检查亮度
     try {
         const { stdout } = await exec(`cat ${BACKLIGHT_PATH}`);
         const newBrightness = parseInt(stdout.trim());
         if (newBrightness !== lastKnownBrightness) {
             console.log(`Brightness changed: ${lastKnownBrightness} -> ${newBrightness}`);
             lastKnownBrightness = newBrightness;
-            
-            // 更新UI
             const percentage = Math.round(((newBrightness - 1) / (maxBrightness - 1)) * 100);
             brightnessValue.innerText = i18next.t('status.brightnessValue', { value: newBrightness, percent: percentage });
             brightnessSlider.value = percentage;
         }
-    } catch (e) {
-        // 忽略读取错误
-    }
+    } catch (e) { /* 忽略错误 */ }
 }
 
-
 // --- 多语言UI更新 ---
+/**
+ * [修改] 更新UI文本，现在支持SVG图标
+ */
 function updateUIText() {
     const elements = document.querySelectorAll('[data-i18n]');
     elements.forEach(el => {
         const key = el.getAttribute('data-i18n');
-        el.innerHTML = i18next.t(key);
+        const translation = i18next.t(key, { returnObjects: true });
+
+        if (typeof translation === 'object' && translation.icon && translation.text) {
+            // 处理带图标的按钮
+            const iconPath = icons[translation.icon];
+            el.innerHTML = `${createIcon(iconPath)}${translation.text}`;
+        } else {
+            // 处理普通文本
+            el.innerHTML = translation;
+        }
     });
     document.documentElement.lang = i18next.language;
     document.title = i18next.t('title');
@@ -133,27 +149,30 @@ function toggleEditMode(enable) {
     saveButton.disabled = !enable;
     resetConfigButton.disabled = !enable;
 
+    const key = enable ? 'buttons.editMode.exit' : 'buttons.editMode.enter';
+    const translation = i18next.t(key, { returnObjects: true });
+    if (typeof translation === 'object') {
+        toggleEditModeButton.innerHTML = `${createIcon(icons[translation.icon])}${translation.text}`;
+    }
+    
     if (enable) {
-        toggleEditModeButton.innerHTML = i18next.t('buttons.editMode.exit');
         toggleEditModeButton.classList.remove('btn-success');
         toggleEditModeButton.classList.add('btn-danger');
     } else {
-        toggleEditModeButton.innerHTML = i18next.t('buttons.editMode.enter');
         toggleEditModeButton.classList.remove('btn-danger');
         toggleEditModeButton.classList.add('btn-success');
     }
 }
 
+// ... (其他函数保持不变，这里省略以保持简洁)
 // --- 主题管理 ---
 function updateTheme() {
     const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     document.documentElement.setAttribute('data-mdb-theme', isDarkMode ? 'dark' : 'light');
     updateChart();
 }
-
 // --- 工具函数 ---
 const scaleToSystemBrightness = (percentage) => Math.round(1 + (percentage / 100) * (maxBrightness - 1));
-
 async function setSystemBrightness(percentage) {
     if (!BACKLIGHT_PATH) return;
     const systemValue = scaleToSystemBrightness(percentage);
@@ -165,7 +184,6 @@ async function setSystemBrightness(percentage) {
         toast(i18next.t('toast.brightness.setFailed', { error: e.message }), 'error');
     }
 }
-
 // --- 范围管理 ---
 function applyRanges(ranges) {
     interceptSlider.min = ranges.intercept.min * FIXED_PRECISION;
@@ -175,7 +193,6 @@ function applyRanges(ranges) {
     offsetSlider.min = ranges.offset.min;
     offsetSlider.max = ranges.offset.max;
 }
-
 function loadAndApplyRanges() {
     let ranges = { ...defaultRanges };
     try {
@@ -191,7 +208,6 @@ function loadAndApplyRanges() {
     }
     applyRanges(ranges);
 }
-
 function saveRanges() {
     const iMin = parseFloat(interceptRangeMin.value);
     const iMax = parseFloat(interceptRangeMax.value);
@@ -199,14 +215,12 @@ function saveRanges() {
     const sMax = parseFloat(slopeRangeMax.value);
     const oMin = parseInt(offsetRangeMin.value, 10);
     const oMax = parseInt(offsetRangeMax.value, 10);
-
     if ([iMin, iMax, sMin, sMax, oMin, oMax].some(isNaN)) {
         toast(i18next.t('toast.rangeError.nan'), 'error'); return;
     }
     if (iMin >= iMax || sMin >= sMax || oMin >= oMax) {
         toast(i18next.t('toast.rangeError.minMax'), 'error'); return;
     }
-
     const newRanges = {
         intercept: { min: iMin, max: iMax },
         slope: { min: sMin, max: sMax },
@@ -217,7 +231,6 @@ function saveRanges() {
     rangeConfigModal.hide();
     toast(i18next.t('toast.rangeSaved'), 'success');
 }
-
 // --- Chart.js 函数 ---
 function calculateChartData(params) {
     const labels = [];
@@ -241,7 +254,6 @@ function calculateChartData(params) {
         ]
     };
 }
-
 function initChart() {
     if (colorChart) colorChart.destroy();
     const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
@@ -263,7 +275,6 @@ function initChart() {
         }
     });
 }
-
 function updateChart() {
     if (!chartCanvas) return;
     if (colorChart) {
@@ -287,7 +298,6 @@ function updateChart() {
         initChart();
     }
 }
-
 // --- 核心逻辑 ---
 async function applyKcal(params) {
     if (!params) return;
@@ -301,7 +311,6 @@ async function applyKcal(params) {
         console.warn(`应用Kcal失败: ${e.message}`);
     }
 }
-
 function parseConfig(text) {
     const content = text.trim();
     if (!content) return null;
@@ -318,14 +327,12 @@ function parseConfig(text) {
     }
     return null;
 }
-
 function serializeConfig(params) {
     const int_intercept = Math.round(params.intercept * FIXED_PRECISION);
     const int_slope = Math.round(params.slope * FIXED_PRECISION);
     const int_offset = Math.round(params.offset);
     return `${int_intercept} ${int_slope} ${int_offset}`;
 }
-
 async function readKcalNodeAsConfig() {
     try {
         const { stdout } = await exec(`cat ${KCAL_CONTROL_PATH}`);
@@ -345,7 +352,6 @@ async function readKcalNodeAsConfig() {
         return null;
     }
 }
-
 async function loadConfigAndRender() {
     let loadedConfig = null;
     const filename = currentConfigPath.split('/').pop();
@@ -353,7 +359,6 @@ async function loadConfigAndRender() {
         const { stdout } = await exec(`cat ${currentConfigPath}`);
         loadedConfig = parseConfig(stdout);
     } catch (e) { /* 文件不存在或读取失败，忽略错误 */ }
-
     if (loadedConfig) {
         globalConfig = loadedConfig;
         toast(i18next.t('toast.configLoaded', { file: filename }), 'success');
@@ -368,12 +373,10 @@ async function loadConfigAndRender() {
             toast(i18next.t('toast.configLoadFromNodeFailed'), 'warning');
         }
     }
-
     renderUI(globalConfig);
     applyKcal(globalConfig);
     updateChart();
 }
-
 function renderUI(params) {
     interceptInput.value = params.intercept.toFixed(2);
     interceptSlider.value = Math.max(interceptSlider.min, Math.min(params.intercept * FIXED_PRECISION, interceptSlider.max));
@@ -385,7 +388,6 @@ function renderUI(params) {
         new Input(formOutline).update();
     });
 }
-
 // --- 事件处理器 ---
 async function saveConfig() {
     const configString = serializeConfig(globalConfig);
@@ -399,7 +401,6 @@ async function saveConfig() {
         toast(i18next.t('toast.saveFailed', { error: e.message }), 'error');
     }
 }
-
 function resetGlobalConfig() {
     globalConfig = { ...defaultConfig };
     renderUI(globalConfig);
@@ -407,7 +408,6 @@ function resetGlobalConfig() {
     updateChart();
     toast(i18next.t('toast.reset'), 'info');
 }
-
 async function readAndShowNodeStatus() {
     const rawOutputElem = document.getElementById('rawNodeOutput');
     const parsedOutputElem = document.getElementById('parsedNodeOutput');
@@ -440,7 +440,6 @@ async function readAndShowNodeStatus() {
         parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeReadPermission')}</p>`;
     }
 }
-
 // --- 初始化 ---
 async function fetchInitialRefreshRate() {
     try {
@@ -457,7 +456,6 @@ async function fetchInitialRefreshRate() {
     }
     lastKnownRefreshRate = currentRefreshRate;
 }
-
 async function init() {
     await i18next.ready;
     

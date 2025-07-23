@@ -1,9 +1,9 @@
-// [修改] 从 node_modules 导入 Font Awesome
-@import "@fortawesome/fontawesome-free/scss/fontawesome.scss";
-@import "@fortawesome/fontawesome-free/scss/solid.scss"; // 只导入我们需要的 solid 样式
-
-// 从 node_modules 导入 MDBootstrap
+// [修改] 将 @use 规则移到文件最顶部
 @use "mdb-ui-kit/src/scss/mdb.free.scss";
+
+// @import 规则可以跟在 @use 之后
+@import "@fortawesome/fontawesome-free/scss/fontawesome.scss";
+@import "@fortawesome/fontawesome-free/scss/solid.scss";
 
 body {
   font-size: 16px; 

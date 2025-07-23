@@ -5,7 +5,7 @@
   "description": "Web UI for Kcal Color Tuner Magisk Module",
   "scripts": {
     "start": "parcel index.html",
-    "build": "parcel build index.html --public-url ./"
+    "build": "parcel build index.html --no-source-maps --public-url ./"
   },
   "dependencies": {
     "chart.js": "^4.4.3",

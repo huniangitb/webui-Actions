@@ -5,19 +5,19 @@
   "description": "Web UI for Kcal Color Tuner Magisk Module",
   "scripts": {
     "start": "parcel index.html",
-    "build": "parcel build index.html --no-source-maps --public-url ./"
+    "build": "parcel build index.html --public-url ./"
   },
   "dependencies": {
-    "chart.js": "^4.4.1",
-    "i18next": "^23.7.16",
+    "chart.js": "^4.4.3",
+    "i18next": "^23.11.5",
     "i18next-browser-languagedetector": "^7.2.0",
     "kernelsu": "^1.0.6",
-    "mdb-ui-kit": "^7.1.0"
+    "mdb-ui-kit": "^7.3.0"
   },
   "devDependencies": {
-    "@fortawesome/fontawesome-free": "^6.5.1",
-    "@parcel/transformer-sass": "^2.11.0",
-    "parcel": "^2.11.0",
-    "sass": "^1.69.7"
+    "@mdi/font": "^7.4.47",
+    "@parcel/transformer-sass": "^2.12.0",
+    "parcel": "^2.12.0",
+    "sass": "^1.77.4"
   }
 }

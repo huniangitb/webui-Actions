@@ -20,12 +20,12 @@ const resources = {
       // Config Card
       "config.cardTitle": "Settings",
       "config.description": "Click 'Edit' to adjust parameters.",
-      // Buttons
-      "buttons.editMode.enter": '<i class="mdi mdi-pencil me-2"></i>Edit',
-      "buttons.editMode.exit": '<i class="mdi mdi-lock me-2"></i>Lock',
-      "buttons.customizeRanges": '<i class="mdi mdi-tune me-2"></i>Set Ranges',
-      "buttons.readNode": '<i class="mdi mdi-sync me-2"></i>Read Node',
-      "buttons.reset": '<i class="mdi mdi-undo me-2"></i>Reset',
+      // [修改] Buttons now use an object format for SVG icons
+      "buttons.editMode.enter": { "icon": "mdiPencil", "text": "Edit" },
+      "buttons.editMode.exit": { "icon": "mdiLock", "text": "Lock" },
+      "buttons.customizeRanges": { "icon": "mdiTune", "text": "Set Ranges" },
+      "buttons.readNode": { "icon": "mdiSync", "text": "Read Node" },
+      "buttons.reset": { "icon": "mdiUndo", "text": "Reset" },
       "buttons.save": "Save",
       // Params & Chart
       "params.intercept": "Intercept",
@@ -36,13 +36,12 @@ const resources = {
       "chart.yAxisTitle": "Calculated Value",
       // Footer
       "footer.author": "Author: 囫碾 | WebUI by Gemini Pro",
-      // Node Status Modal
+      // Modals
       "modals.nodeStatus.title": "Node Status",
       "modals.nodeStatus.raw": "Raw Data",
       "modals.nodeStatus.parsed": "Parsed Values",
       "modals.nodeStatus.refreshRate": "Refresh Rate:",
       "modals.nodeStatus.close": "Close",
-      // Range Config Modal
       "modals.range.title": "Set Slider Ranges",
       "modals.range.description": "Define the min/max for each slider. This only changes the adjustment range.",
       "modals.range.intercept": "Intercept Range",
@@ -90,12 +89,12 @@ const resources = {
       // Config Card
       "config.cardTitle": "参数设置",
       "config.description": "点击编辑调整参数",
-      // Buttons
-      "buttons.editMode.enter": '<i class="mdi mdi-pencil me-2"></i>编辑',
-      "buttons.editMode.exit": '<i class="mdi mdi-lock me-2"></i>锁定',
-      "buttons.customizeRanges": '<i class="mdi mdi-tune me-2"></i>范围设置',
-      "buttons.readNode": '<i class="mdi mdi-sync me-2"></i>读取节点',
-      "buttons.reset": '<i class="mdi mdi-undo me-2"></i>重置',
+      // [修改] 按钮现在使用对象格式以支持SVG图标
+      "buttons.editMode.enter": { "icon": "mdiPencil", "text": "编辑" },
+      "buttons.editMode.exit": { "icon": "mdiLock", "text": "锁定" },
+      "buttons.customizeRanges": { "icon": "mdiTune", "text": "范围设置" },
+      "buttons.readNode": { "icon": "mdiSync", "text": "读取节点" },
+      "buttons.reset": { "icon": "mdiUndo", "text": "重置" },
       "buttons.save": "保存",
       // Params & Chart
       "params.intercept": "截距",
@@ -106,13 +105,12 @@ const resources = {
       "chart.yAxisTitle": "计算值",
       // Footer
       "footer.author": "作者: 囫碾 | WebUI by Gemini2.5 Pro",
-      // Node Status Modal
+      // Modals
       "modals.nodeStatus.title": "节点状态",
       "modals.nodeStatus.raw": "原始数据",
       "modals.nodeStatus.parsed": "解析值",
       "modals.nodeStatus.refreshRate": "刷新率:",
       "modals.nodeStatus.close": "关闭",
-      // Range Config Modal
       "modals.range.title": "设置滑块范围",
       "modals.range.description": "定义各滑块的最小/最大值（仅影响调节范围）",
       "modals.range.intercept": "截距范围",

@@ -21,11 +21,11 @@ const resources = {
       "config.cardTitle": "Settings",
       "config.description": "Click 'Edit' to adjust parameters.",
       // Buttons
-      "buttons.editMode.enter": '<i class="fas fa-edit me-2"></i>Edit',
-      "buttons.editMode.exit": '<i class="fas fa-lock me-2"></i>Lock',
-      "buttons.customizeRanges": '<i class="fas fa-sliders-h me-2"></i>Set Ranges',
-      "buttons.readNode": '<i class="fas fa-sync-alt me-2"></i>Read Node',
-      "buttons.reset": '<i class="fas fa-undo me-2"></i>Reset',
+      "buttons.editMode.enter": '<i class="mdi mdi-pencil me-2"></i>Edit',
+      "buttons.editMode.exit": '<i class="mdi mdi-lock me-2"></i>Lock',
+      "buttons.customizeRanges": '<i class="mdi mdi-tune me-2"></i>Set Ranges',
+      "buttons.readNode": '<i class="mdi mdi-sync me-2"></i>Read Node',
+      "buttons.reset": '<i class="mdi mdi-undo me-2"></i>Reset',
       "buttons.save": "Save",
       // Params & Chart
       "params.intercept": "Intercept",
@@ -66,7 +66,7 @@ const resources = {
       "toast.rangeError.minMax": "Min must be less than max.",
       "toast.editMode": "Edit mode enabled.",
       "toast.backlightPathError": "Backlight path error.",
-      "toast.refreshRateChanged": "Refresh rate changed to {{rate}}Hz. Switched profile.", // [新增]
+      "toast.refreshRateChanged": "Refresh rate changed to {{rate}}Hz. Switched profile.",
       // Errors
       "errors.nodeParseError": "Invalid node format.",
       "errors.nodeReadFailed": "Read failed: {{error}}",
@@ -91,11 +91,11 @@ const resources = {
       "config.cardTitle": "参数设置",
       "config.description": "点击编辑调整参数",
       // Buttons
-      "buttons.editMode.enter": '<i class="fas fa-edit me-2"></i>编辑',
-      "buttons.editMode.exit": '<i class="fas fa-lock me-2"></i>锁定',
-      "buttons.customizeRanges": '<i class="fas fa-sliders-h me-2"></i>范围设置',
-      "buttons.readNode": '<i class="fas fa-sync-alt me-2"></i>读取节点',
-      "buttons.reset": '<i class="fas fa-undo me-2"></i>重置',
+      "buttons.editMode.enter": '<i class="mdi mdi-pencil me-2"></i>编辑',
+      "buttons.editMode.exit": '<i class="mdi mdi-lock me-2"></i>锁定',
+      "buttons.customizeRanges": '<i class="mdi mdi-tune me-2"></i>范围设置',
+      "buttons.readNode": '<i class="mdi mdi-sync me-2"></i>读取节点',
+      "buttons.reset": '<i class="mdi mdi-undo me-2"></i>重置',
       "buttons.save": "保存",
       // Params & Chart
       "params.intercept": "截距",
@@ -136,7 +136,7 @@ const resources = {
       "toast.rangeError.minMax": "最小值需小于最大值",
       "toast.editMode": "进入编辑模式",
       "toast.backlightPathError": "背光路径错误",
-      "toast.refreshRateChanged": "刷新率变为 {{rate}}Hz，已切换配置文件。", // [新增]
+      "toast.refreshRateChanged": "刷新率变为 {{rate}}Hz，已切换配置文件。",
       // Errors
       "errors.nodeParseError": "节点格式无效",
       "errors.nodeReadFailed": "读取失败: {{error}}",

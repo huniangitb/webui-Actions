@@ -21,7 +21,7 @@ const resources = {
       "config.cardTitle": "Settings",
       "config.description": "Click 'Edit' to adjust parameters.",
       // Buttons
-      "buttons.editMode.enter": { "icon": "mdiFileEdit", "text": "Edit" }, // [修改]
+      "buttons.editMode.enter": { "icon": "mdiFileEdit", "text": "Edit" },
       "buttons.editMode.exit": { "icon": "mdiLock", "text": "Lock" },
       "buttons.customizeRanges": { "icon": "mdiTune", "text": "Set Ranges" },
       "buttons.readNode": { "icon": "mdiSync", "text": "Read Node" },
@@ -30,23 +30,18 @@ const resources = {
       // Params & Chart
       "params.intercept": "Intercept",
       "params.slope": "Slope",
-      "params.offset": "Offset",
       "params.red": "Red",
       "params.green": "Green",
+      "params.blue": "Blue", // [新增]
       "chart.yAxisTitle": "Calculated Value",
       // Footer
       "footer.author": "Author: 囫碾 | WebUI by Gemini Pro",
       // Modals
       "modals.nodeStatus.title": "Node Status",
-      "modals.nodeStatus.raw": "Raw Data",
-      "modals.nodeStatus.parsed": "Parsed Values",
       "modals.nodeStatus.refreshRate": "Refresh Rate:",
       "modals.nodeStatus.close": "Close",
       "modals.range.title": "Set Slider Ranges",
       "modals.range.description": "Define the min/max for each slider. This only changes the adjustment range.",
-      "modals.range.intercept": "Intercept Range",
-      "modals.range.slope": "Slope Range",
-      "modals.range.offset": "Offset Range",
       "modals.range.min": "Min",
       "modals.range.max": "Max",
       "modals.range.cancel": "Cancel",
@@ -56,7 +51,6 @@ const resources = {
       "toast.configLoadFailed": "Config '{{file}}' not found. Reading from node...",
       "toast.configLoadFromNode": "Loaded values from node.",
       "toast.configLoadFromNodeFailed": "Can't read node. Using defaults.",
-      "toast.configLoadFromDefault": "Using default config.",
       "toast.saved": "Config saved to {{file}}.",
       "toast.saveFailed": "Save failed: {{error}}",
       "toast.reset": "Settings reset to default.",
@@ -90,7 +84,7 @@ const resources = {
       "config.cardTitle": "参数设置",
       "config.description": "点击编辑调整参数",
       // Buttons
-      "buttons.editMode.enter": { "icon": "mdiFileEdit", "text": "编辑" }, // [修改]
+      "buttons.editMode.enter": { "icon": "mdiFileEdit", "text": "编辑" },
       "buttons.editMode.exit": { "icon": "mdiLock", "text": "锁定" },
       "buttons.customizeRanges": { "icon": "mdiTune", "text": "范围设置" },
       "buttons.readNode": { "icon": "mdiSync", "text": "读取节点" },
@@ -99,23 +93,18 @@ const resources = {
       // Params & Chart
       "params.intercept": "截距",
       "params.slope": "斜率",
-      "params.offset": "偏移",
       "params.red": "红色",
       "params.green": "绿色",
+      "params.blue": "蓝色", // [新增]
       "chart.yAxisTitle": "计算值",
       // Footer
       "footer.author": "作者: 囫碾 | WebUI by Gemini2.5 Pro",
       // Modals
       "modals.nodeStatus.title": "节点状态",
-      "modals.nodeStatus.raw": "原始数据",
-      "modals.nodeStatus.parsed": "解析值",
       "modals.nodeStatus.refreshRate": "刷新率:",
       "modals.nodeStatus.close": "关闭",
       "modals.range.title": "设置滑块范围",
       "modals.range.description": "定义各滑块的最小/最大值（仅影响调节范围）",
-      "modals.range.intercept": "截距范围",
-      "modals.range.slope": "斜率范围",
-      "modals.range.offset": "偏移范围",
       "modals.range.min": "最小值",
       "modals.range.max": "最大值",
       "modals.range.cancel": "取消",
@@ -125,7 +114,6 @@ const resources = {
       "toast.configLoadFailed": "未找到配置 '{{file}}'，正从节点读取...",
       "toast.configLoadFromNode": "已从节点加载",
       "toast.configLoadFromNodeFailed": "节点读取失败，使用默认值",
-      "toast.configLoadFromDefault": "使用默认配置",
       "toast.saved": "配置已保存至 {{file}}",
       "toast.saveFailed": "保存失败: {{error}}",
       "toast.reset": "已重置",

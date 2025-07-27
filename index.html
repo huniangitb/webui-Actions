@@ -1,13 +1,9 @@
 <!DOCTYPE html>
-<!-- lang 属性将由JS动态设置 -->
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="title">Kcal Color Tuner</title>
-    
-    
-    <!-- 您的自定义样式，现在不再需要导入 MDB 的 SCSS -->
+    <title data-i18n="title">MiuiCX Color Tuner</title>
     <link rel="stylesheet" href="main.scss">
 </head>
 <body>
@@ -42,27 +38,54 @@
                 <p class="text-muted small" data-i18n="config.description"></p>
                 <hr/>
                 <div id="global-config-editor">
+                    <!-- Red Channel -->
+                    <h6 class="text-danger" data-i18n="params.red"></h6>
                     <div class="param-row">
-                        <label for="interceptSlider" class="param-label" data-i18n="params.intercept"></label>
+                        <label for="redInterceptSlider" class="param-label" data-i18n="params.intercept"></label>
                         <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="interceptSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="interceptInput" class="form-control param-input" step="0.01" /></div>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redInterceptSlider" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="redInterceptInput" class="form-control param-input" step="0.01" /></div>
+                        </div>
+                    </div>
+                    <div class="param-row">
+                        <label for="redSlopeSlider" class="param-label" data-i18n="params.slope"></label>
+                        <div class="slider-input-group">
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redSlopeSlider" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="redSlopeInput" class="form-control param-input" step="0.01" /></div>
                         </div>
                     </div>
 
+                    <!-- Green Channel -->
+                    <h6 class="text-success mt-4" data-i18n="params.green"></h6>
                     <div class="param-row">
-                        <label for="slopeSlider" class="param-label" data-i18n="params.slope"></label>
+                        <label for="greenInterceptSlider" class="param-label" data-i18n="params.intercept"></label>
                         <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="slopeSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="slopeInput" class="form-control param-input" step="0.01" /></div>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenInterceptSlider" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenInterceptInput" class="form-control param-input" step="0.01" /></div>
+                        </div>
+                    </div>
+                    <div class="param-row">
+                        <label for="greenSlopeSlider" class="param-label" data-i18n="params.slope"></label>
+                        <div class="slider-input-group">
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenSlopeSlider" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenSlopeInput" class="form-control param-input" step="0.01" /></div>
                         </div>
                     </div>
 
+                    <!-- Blue Channel -->
+                    <h6 class="text-primary mt-4" data-i18n="params.blue"></h6>
                     <div class="param-row">
-                        <label for="offsetSlider" class="param-label" data-i18n="params.offset"></label>
+                        <label for="blueInterceptSlider" class="param-label" data-i18n="params.intercept"></label>
                         <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="offsetSlider" step="1" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="offsetInput" class="form-control param-input" step="1" /></div>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueInterceptSlider" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueInterceptInput" class="form-control param-input" step="0.01" /></div>
+                        </div>
+                    </div>
+                    <div class="param-row">
+                        <label for="blueSlopeSlider" class="param-label" data-i18n="params.slope"></label>
+                        <div class="slider-input-group">
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueSlopeSlider" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueSlopeInput" class="form-control param-input" step="0.01" /></div>
                         </div>
                     </div>
 
@@ -81,10 +104,7 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header"><h5 class="modal-title" data-i18n="modals.nodeStatus.title"></h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <h6 data-i18n="modals.nodeStatus.raw"></h6><pre><code id="rawNodeOutput"></code></pre><hr/>
-                    <h6 data-i18n="modals.nodeStatus.parsed"></h6><div id="parsedNodeOutput"></div>
-                </div>
+                <div class="modal-body" id="parsedNodeOutput"></div>
                 <div class="modal-footer"><button type="button" class="btn btn-secondary" data-mdb-dismiss="modal" data-i18n="modals.nodeStatus.close"></button></div>
             </div>
         </div>
@@ -97,24 +117,17 @@
                 <div class="modal-body">
                     <p class="text-muted" data-i18n="modals.range.description"></p>
                     
-                    <p class="fw-bold mt-3 mb-1" data-i18n="modals.range.intercept"></p>
+                    <p class="fw-bold mt-3 mb-1" data-i18n="params.intercept"></p>
                     <div class="row g-3">
                         <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="interceptRangeMin" class="form-control" step="any" /><label class="form-label" for="interceptRangeMin" data-i18n="modals.range.min"></label></div></div>
                         <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="interceptRangeMax" class="form-control" step="any" /><label class="form-label" for="interceptRangeMax" data-i18n="modals.range.max"></label></div></div>
                     </div>
 
-                    <p class="fw-bold mt-3 mb-1" data-i18n="modals.range.slope"></p>
+                    <p class="fw-bold mt-3 mb-1" data-i18n="params.slope"></p>
                     <div class="row g-3">
                         <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="slopeRangeMin" class="form-control" step="any" /><label class="form-label" for="slopeRangeMin" data-i18n="modals.range.min"></label></div></div>
                         <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="slopeRangeMax" class="form-control" step="any" /><label class="form-label" for="slopeRangeMax" data-i18n="modals.range.max"></label></div></div>
                     </div>
-
-                    <p class="fw-bold mt-3 mb-1" data-i18n="modals.range.offset"></p>
-                    <div class="row g-3">
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="offsetRangeMin" class="form-control" step="1" /><label class="form-label" for="offsetRangeMin" data-i18n="modals.range.min"></label></div></div>
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="offsetRangeMax" class="form-control" step="1" /><label class="form-label" for="offsetRangeMax" data-i18n="modals.range.max"></label></div></div>
-                    </div>
-
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal" data-i18n="modals.range.cancel"></button>
@@ -124,7 +137,6 @@
         </div>
     </div>
     
-    <!-- [修改] 从 CDN 引用 MDB-UI-Kit JS -->
     <script type="module" src="main.js"></script>
 </body>
 </html>

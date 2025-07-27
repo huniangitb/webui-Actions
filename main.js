@@ -3,45 +3,43 @@ import Chart from 'chart.js/auto';
 import { Ripple, Range, Input, Modal, initMDB } from 'mdb-ui-kit';
 import { exec, toast } from 'kernelsu';
 import i18next from './i18n.js';
-// [修改] 导入 MDI SVG 图标路径，将 mdiPencil 改为 mdiFileEdit
 import { mdiFileEdit, mdiLock, mdiTune, mdiSync, mdiRestore } from '@mdi/js';
 
 // --- 常量和全局变量 ---
 const MODULE_ID = "miuicx_color_tuner";
 const MODULE_PATH = `/data/adb/modules/${MODULE_ID}`;
 let currentConfigPath = ''; 
-const KCAL_CONTROL_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal";
+// [修改] 新的节点路径
+const KCAL_RED_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_red";
+const KCAL_GREEN_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_green";
+const KCAL_BLUE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_blue";
 const RANGE_CONFIG_KEY = 'kcalWebUIRanges';
 
 const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
 const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
 
 const FIXED_PRECISION = 100;
-const defaultConfig = { "intercept": 255.0, "slope": 0.0, "offset": 0 };
+// [修改] 新的默认配置结构
+const defaultConfig = {
+    red: { intercept: 256.0, slope: 0.0 },
+    green: { intercept: 256.0, slope: 0.0 },
+    blue: { intercept: 256.0, slope: 0.0 },
+};
 
 const defaultRanges = {
-    intercept: { min: 100, max: 255 },
+    intercept: { min: 0, max: 256 },
     slope: { min: -50, max: 50 },
-    offset: { min: -100, max: 100 }
 };
 
-// [修改] 将导入的图标路径映射到一个对象，将 mdiPencil 改为 mdiFileEdit
-const icons = {
-  mdiFileEdit,
-  mdiLock,
-  mdiTune,
-  mdiSync,
-  mdiRestore
-};
+const icons = { mdiFileEdit, mdiLock, mdiTune, mdiSync, mdiRestore };
 
-let globalConfig = {};
+let globalConfig = JSON.parse(JSON.stringify(defaultConfig)); // 深拷贝
 let maxBrightness = 4095;
 let currentRefreshRate = 60;
 let colorChart = null;
 let nodeStatusModal = null;
 let rangeConfigModal = null;
 let isEditMode = false;
-
 let lastKnownRefreshRate = 0;
 let lastKnownBrightness = -1;
 
@@ -57,19 +55,32 @@ const chartCanvas = document.getElementById('colorCurveChart');
 const toggleEditModeButton = document.getElementById('toggleEditModeButton');
 const configEditorContainer = document.getElementById('global-config-editor');
 
-const interceptSlider = document.getElementById('interceptSlider');
-const interceptInput = document.getElementById('interceptInput');
-const slopeSlider = document.getElementById('slopeSlider');
-const slopeInput = document.getElementById('slopeInput');
-const offsetSlider = document.getElementById('offsetSlider');
-const offsetInput = document.getElementById('offsetInput');
+// [修改] 新的UI元素
+const uiElements = {
+    red: {
+        interceptSlider: document.getElementById('redInterceptSlider'),
+        interceptInput: document.getElementById('redInterceptInput'),
+        slopeSlider: document.getElementById('redSlopeSlider'),
+        slopeInput: document.getElementById('redSlopeInput'),
+    },
+    green: {
+        interceptSlider: document.getElementById('greenInterceptSlider'),
+        interceptInput: document.getElementById('greenInterceptInput'),
+        slopeSlider: document.getElementById('greenSlopeSlider'),
+        slopeInput: document.getElementById('greenSlopeInput'),
+    },
+    blue: {
+        interceptSlider: document.getElementById('blueInterceptSlider'),
+        interceptInput: document.getElementById('blueInterceptInput'),
+        slopeSlider: document.getElementById('blueSlopeSlider'),
+        slopeInput: document.getElementById('blueSlopeInput'),
+    },
+};
 
 const interceptRangeMin = document.getElementById('interceptRangeMin');
 const interceptRangeMax = document.getElementById('interceptRangeMax');
 const slopeRangeMin = document.getElementById('slopeRangeMin');
 const slopeRangeMax = document.getElementById('slopeRangeMax');
-const offsetRangeMin = document.getElementById('offsetRangeMin');
-const offsetRangeMax = document.getElementById('offsetRangeMax');
 const saveRangeButton = document.getElementById('saveRangeButton');
 
 // --- SVG 图标创建函数 ---
@@ -87,10 +98,8 @@ async function pollSystemStatus() {
             console.log(`Refresh rate changed: ${lastKnownRefreshRate} -> ${newRate}`);
             lastKnownRefreshRate = newRate;
             currentRefreshRate = newRate;
-            
             refreshRateValue.innerText = `${currentRefreshRate} Hz`;
             currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
-            
             toast(i18next.t('toast.refreshRateChanged', { rate: newRate }), 'info');
             await loadConfigAndRender();
         }
@@ -102,7 +111,6 @@ async function pollSystemStatus() {
         if (newBrightness !== lastKnownBrightness) {
             console.log(`Brightness changed: ${lastKnownBrightness} -> ${newBrightness}`);
             lastKnownBrightness = newBrightness;
-            
             const percentage = Math.round(((newBrightness - 1) / (maxBrightness - 1)) * 100);
             brightnessValue.innerText = i18next.t('status.brightnessValue', { value: newBrightness, percent: percentage });
             brightnessSlider.value = percentage;
@@ -182,12 +190,12 @@ async function setSystemBrightness(percentage) {
 
 // --- 范围管理 ---
 function applyRanges(ranges) {
-    interceptSlider.min = ranges.intercept.min * FIXED_PRECISION;
-    interceptSlider.max = ranges.intercept.max * FIXED_PRECISION;
-    slopeSlider.min = ranges.slope.min * FIXED_PRECISION;
-    slopeSlider.max = ranges.slope.max * FIXED_PRECISION;
-    offsetSlider.min = ranges.offset.min;
-    offsetSlider.max = ranges.offset.max;
+    for (const color in uiElements) {
+        uiElements[color].interceptSlider.min = ranges.intercept.min * FIXED_PRECISION;
+        uiElements[color].interceptSlider.max = ranges.intercept.max * FIXED_PRECISION;
+        uiElements[color].slopeSlider.min = ranges.slope.min * FIXED_PRECISION;
+        uiElements[color].slopeSlider.max = ranges.slope.max * FIXED_PRECISION;
+    }
 }
 
 function loadAndApplyRanges() {
@@ -198,7 +206,6 @@ function loadAndApplyRanges() {
             const parsed = JSON.parse(savedRanges);
             if (parsed.intercept) ranges.intercept = { ...ranges.intercept, ...parsed.intercept };
             if (parsed.slope) ranges.slope = { ...ranges.slope, ...parsed.slope };
-            if (parsed.offset) ranges.offset = { ...ranges.offset, ...parsed.offset };
         }
     } catch (e) {
         console.error("加载范围配置失败:", e);
@@ -211,20 +218,17 @@ function saveRanges() {
     const iMax = parseFloat(interceptRangeMax.value);
     const sMin = parseFloat(slopeRangeMin.value);
     const sMax = parseFloat(slopeRangeMax.value);
-    const oMin = parseInt(offsetRangeMin.value, 10);
-    const oMax = parseInt(offsetRangeMax.value, 10);
 
-    if ([iMin, iMax, sMin, sMax, oMin, oMax].some(isNaN)) {
+    if ([iMin, iMax, sMin, sMax].some(isNaN)) {
         toast(i18next.t('toast.rangeError.nan'), 'error'); return;
     }
-    if (iMin >= iMax || sMin >= sMax || oMin >= oMax) {
+    if (iMin >= iMax || sMin >= sMax) {
         toast(i18next.t('toast.rangeError.minMax'), 'error'); return;
     }
 
     const newRanges = {
         intercept: { min: iMin, max: iMax },
         slope: { min: sMin, max: sMax },
-        offset: { min: oMin, max: oMax }
     };
     localStorage.setItem(RANGE_CONFIG_KEY, JSON.stringify(newRanges));
     applyRanges(newRanges);
@@ -235,25 +239,35 @@ function saveRanges() {
 // --- Chart.js 函数 ---
 function calculateChartData(params) {
     const labels = [];
-    const dataR = [];
-    const dataG = [];
-    const { intercept, slope, offset } = params;
-    for (let p = 0; p <= 100; p += 2) {
-        const systemBrightness = Math.max(1, scaleToSystemBrightness(p));
-        const log_b = Math.log(systemBrightness);
-        const green_final = intercept + (slope * log_b);
-        const red_final = 128 + offset + (green_final / 2);
-        labels.push(p);
-        dataG.push(green_final);
-        dataR.push(red_final);
-    }
-    return {
-        labels: labels,
-        datasets: [
-            { label: i18next.t('params.red'), data: dataR, borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 0.2)', tension: 0.4, borderWidth: 2, pointRadius: 0 },
-            { label: i18next.t('params.green'), data: dataG, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 0.2)', tension: 0.4, borderWidth: 2, pointRadius: 0 }
-        ]
+    const datasets = [];
+    const colors = {
+        red: 'rgba(255, 99, 132, 1)',
+        green: 'rgba(75, 192, 192, 1)',
+        blue: 'rgba(54, 162, 235, 1)',
     };
+
+    for (const color in params) {
+        const data = [];
+        const { intercept, slope } = params[color];
+        for (let p = 0; p <= 100; p += 2) {
+            const systemBrightness = Math.max(1, scaleToSystemBrightness(p));
+            const log_b = Math.log(systemBrightness);
+            const final_val = intercept + (slope * log_b);
+            if (p === 0) labels.push(0);
+            data.push(final_val);
+        }
+        datasets.push({
+            label: i18next.t(`params.${color}`),
+            data: data,
+            borderColor: colors[color],
+            backgroundColor: colors[color].replace('1)', '0.2)'),
+            tension: 0.4,
+            borderWidth: 2,
+            pointRadius: 0
+        });
+    }
+    
+    return { labels: Array.from({length: 51}, (_, i) => i * 2), datasets };
 }
 
 function initChart() {
@@ -305,12 +319,17 @@ function updateChart() {
 // --- 核心逻辑 ---
 async function applyKcal(params) {
     if (!params) return;
-    const int_intercept = Math.round(params.intercept * FIXED_PRECISION);
-    const int_slope = Math.round(params.slope * FIXED_PRECISION);
-    const int_offset = Math.round(params.offset);
-    const command = `echo "${int_intercept} ${int_slope} ${int_offset} ${currentRefreshRate}" > ${KCAL_CONTROL_PATH}`;
     try {
-        await exec(command);
+        const red_i = Math.round(params.red.intercept * FIXED_PRECISION);
+        const red_s = Math.round(params.red.slope * FIXED_PRECISION);
+        const green_i = Math.round(params.green.intercept * FIXED_PRECISION);
+        const green_s = Math.round(params.green.slope * FIXED_PRECISION);
+        const blue_i = Math.round(params.blue.intercept * FIXED_PRECISION);
+        const blue_s = Math.round(params.blue.slope * FIXED_PRECISION);
+
+        await exec(`echo "${red_i} ${red_s} ${currentRefreshRate}" > ${KCAL_RED_PATH}`);
+        await exec(`echo "${green_i} ${green_s} ${currentRefreshRate}" > ${KCAL_GREEN_PATH}`);
+        await exec(`echo "${blue_i} ${blue_s} ${currentRefreshRate}" > ${KCAL_BLUE_PATH}`);
     } catch (e) {
         console.warn(`应用Kcal失败: ${e.message}`);
     }
@@ -320,40 +339,46 @@ function parseConfig(text) {
     const content = text.trim();
     if (!content) return null;
     const parts = content.split(/\s+/);
-    if (parts.length === 3 || parts.length === 4) {
-        const [i, s, o] = parts.map(p => parseInt(p, 10));
-        if ([i, s, o].some(isNaN)) return null;
+    if (parts.length === 6) { // 新的6参数格式
+        const [ri, rs, gi, gs, bi, bs] = parts.map(p => parseInt(p, 10));
+        if ([ri, rs, gi, gs, bi, bs].some(isNaN)) return null;
         
         return {
-            intercept: i / FIXED_PRECISION,
-            slope: s / FIXED_PRECISION,
-            offset: o
+            red: { intercept: ri / FIXED_PRECISION, slope: rs / FIXED_PRECISION },
+            green: { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION },
+            blue: { intercept: bi / FIXED_PRECISION, slope: bs / FIXED_PRECISION },
         };
     }
     return null;
 }
 
 function serializeConfig(params) {
-    const int_intercept = Math.round(params.intercept * FIXED_PRECISION);
-    const int_slope = Math.round(params.slope * FIXED_PRECISION);
-    const int_offset = Math.round(params.offset);
-    return `${int_intercept} ${int_slope} ${int_offset}`;
+    const ri = Math.round(params.red.intercept * FIXED_PRECISION);
+    const rs = Math.round(params.red.slope * FIXED_PRECISION);
+    const gi = Math.round(params.green.intercept * FIXED_PRECISION);
+    const gs = Math.round(params.green.slope * FIXED_PRECISION);
+    const bi = Math.round(params.blue.intercept * FIXED_PRECISION);
+    const bs = Math.round(params.blue.slope * FIXED_PRECISION);
+    return `${ri} ${rs} ${gi} ${gs} ${bi} ${bs}`;
 }
 
 async function readKcalNodeAsConfig() {
     try {
-        const { stdout } = await exec(`cat ${KCAL_CONTROL_PATH}`);
-        const parts = stdout.trim().split(/\s+/);
-        if (parts.length === 4) {
-            const [i, s, o] = parts.map(p => parseInt(p, 10));
-            if ([i, s, o].some(isNaN)) return null;
-            return {
-                intercept: i / FIXED_PRECISION,
-                slope: s / FIXED_PRECISION,
-                offset: o
-            };
-        }
-        return null;
+        const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`);
+        const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`);
+        const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`);
+
+        const [ri, rs] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
+        const [gi, gs] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
+        const [bi, bs] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
+
+        if ([ri, rs, gi, gs, bi, bs].some(isNaN)) return null;
+
+        return {
+            red: { intercept: ri / FIXED_PRECISION, slope: rs / FIXED_PRECISION },
+            green: { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION },
+            blue: { intercept: bi / FIXED_PRECISION, slope: bs / FIXED_PRECISION },
+        };
     } catch (e) {
         console.error("读取Kcal节点作为默认值失败:", e);
         return null;
@@ -378,7 +403,7 @@ async function loadConfigAndRender() {
             globalConfig = nodeConfig;
             toast(i18next.t('toast.configLoadFromNode'), 'success');
         } else {
-            globalConfig = { ...defaultConfig };
+            globalConfig = JSON.parse(JSON.stringify(defaultConfig));
             toast(i18next.t('toast.configLoadFromNodeFailed'), 'warning');
         }
     }
@@ -389,12 +414,14 @@ async function loadConfigAndRender() {
 }
 
 function renderUI(params) {
-    interceptInput.value = params.intercept.toFixed(2);
-    interceptSlider.value = Math.max(interceptSlider.min, Math.min(params.intercept * FIXED_PRECISION, interceptSlider.max));
-    slopeInput.value = params.slope.toFixed(2);
-    slopeSlider.value = Math.max(slopeSlider.min, Math.min(params.slope * FIXED_PRECISION, slopeSlider.max));
-    offsetInput.value = Math.round(params.offset).toFixed(0);
-    offsetSlider.value = Math.max(offsetSlider.min, Math.min(Math.round(params.offset), offsetSlider.max));
+    for (const color in uiElements) {
+        const { intercept, slope } = params[color];
+        const elements = uiElements[color];
+        elements.interceptInput.value = intercept.toFixed(2);
+        elements.interceptSlider.value = Math.max(elements.interceptSlider.min, Math.min(intercept * FIXED_PRECISION, elements.interceptSlider.max));
+        elements.slopeInput.value = slope.toFixed(2);
+        elements.slopeSlider.value = Math.max(elements.slopeSlider.min, Math.min(slope * FIXED_PRECISION, elements.slopeSlider.max));
+    }
     document.querySelectorAll('.form-outline').forEach((formOutline) => {
         new Input(formOutline).update();
     });
@@ -415,7 +442,7 @@ async function saveConfig() {
 }
 
 function resetGlobalConfig() {
-    globalConfig = { ...defaultConfig };
+    globalConfig = JSON.parse(JSON.stringify(defaultConfig));
     renderUI(globalConfig);
     applyKcal(globalConfig);
     updateChart();
@@ -423,34 +450,46 @@ function resetGlobalConfig() {
 }
 
 async function readAndShowNodeStatus() {
-    const rawOutputElem = document.getElementById('rawNodeOutput');
     const parsedOutputElem = document.getElementById('parsedNodeOutput');
-    rawOutputElem.textContent = i18next.t('status.reading');
-    parsedOutputElem.innerHTML = '';
+    parsedOutputElem.innerHTML = i18next.t('status.reading');
     nodeStatusModal.show();
     try {
-        const { stdout } = await exec(`cat ${KCAL_CONTROL_PATH}`);
-        rawOutputElem.textContent = stdout.trim();
-        const parts = stdout.trim().split(/\s+/);
-        if (parts.length === 4) {
-            const [i, s, o, r] = parts.map(p => parseInt(p, 10));
-            if (![i, s, o, r].some(isNaN)) {
-                parsedOutputElem.innerHTML = `<ul>
-                    <li><strong>Intercept:</strong> ${(i / FIXED_PRECISION).toFixed(2)} (raw: ${i})</li>
-                    <li><strong>Slope:</strong> ${(s / FIXED_PRECISION).toFixed(2)} (raw: ${s})</li>
-                    <li><strong>Offset:</strong> ${o}</li>
-                    <li><strong data-i18n="modals.nodeStatus.refreshRate"></strong> ${r} Hz</li>
-                </ul>`;
-                const strongEl = parsedOutputElem.querySelector('strong[data-i18n]');
-                if(strongEl) strongEl.innerHTML = i18next.t(strongEl.dataset.i18n);
-            } else {
-                 parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeParseError')}</p>`;
-            }
-        } else {
+        const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`);
+        const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`);
+        const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`);
+
+        const [ri, rs, rr] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
+        const [gi, gs, gr] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
+        const [bi, bs, br] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
+
+        if ([ri, rs, rr, gi, gs, gr, bi, bs, br].some(isNaN)) {
             parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeParseError')}</p>`;
+            return;
         }
+
+        parsedOutputElem.innerHTML = `
+            <h6 class="text-danger">${i18next.t('params.red')}</h6>
+            <ul>
+                <li><strong>Intercept:</strong> ${(ri / FIXED_PRECISION).toFixed(2)} (raw: ${ri})</li>
+                <li><strong>Slope:</strong> ${(rs / FIXED_PRECISION).toFixed(2)} (raw: ${rs})</li>
+                <li><strong>Refresh Rate:</strong> ${rr} Hz</li>
+            </ul>
+            <hr/>
+            <h6 class="text-success">${i18next.t('params.green')}</h6>
+            <ul>
+                <li><strong>Intercept:</strong> ${(gi / FIXED_PRECISION).toFixed(2)} (raw: ${gi})</li>
+                <li><strong>Slope:</strong> ${(gs / FIXED_PRECISION).toFixed(2)} (raw: ${gs})</li>
+                <li><strong>Refresh Rate:</strong> ${gr} Hz</li>
+            </ul>
+            <hr/>
+            <h6 class="text-primary">${i18next.t('params.blue')}</h6>
+            <ul>
+                <li><strong>Intercept:</strong> ${(bi / FIXED_PRECISION).toFixed(2)} (raw: ${bi})</li>
+                <li><strong>Slope:</strong> ${(bs / FIXED_PRECISION).toFixed(2)} (raw: ${bs})</li>
+                <li><strong>Refresh Rate:</strong> ${br} Hz</li>
+            </ul>
+        `;
     } catch (e) {
-        rawOutputElem.textContent = i18next.t('errors.nodeReadFailed', { error: e.message });
         parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeReadPermission')}</p>`;
     }
 }
@@ -507,7 +546,7 @@ async function init() {
     // --- 事件监听器 ---
     brightnessSlider.addEventListener('input', (e) => setSystemBrightness(parseInt(e.target.value)));
     saveButton.addEventListener('click', saveConfig);
-    resetConfigButton.addEventListener('click', resetConfigButton); // 注意：这里调用的是 resetConfigButton 而不是 resetGlobalConfig
+    resetConfigButton.addEventListener('click', resetGlobalConfig);
     readNodeButton.addEventListener('click', readAndShowNodeStatus);
     
     toggleEditModeButton.addEventListener('click', () => {
@@ -519,55 +558,41 @@ async function init() {
     });
 
     customizeRangeButton.addEventListener('click', () => {
-        interceptRangeMin.value = interceptSlider.min / FIXED_PRECISION;
-        interceptRangeMax.value = interceptSlider.max / FIXED_PRECISION;
-        slopeRangeMin.value = slopeSlider.min / FIXED_PRECISION;
-        slopeRangeMax.value = slopeSlider.max / FIXED_PRECISION;
-        offsetRangeMin.value = offsetSlider.min;
-        offsetRangeMax.value = offsetSlider.max;
+        interceptRangeMin.value = defaultRanges.intercept.min;
+        interceptRangeMax.value = defaultRanges.intercept.max;
+        slopeRangeMin.value = defaultRanges.slope.min;
+        slopeRangeMax.value = defaultRanges.slope.max;
         initMDB({ Input });
         rangeConfigModal.show();
     });
     saveRangeButton.addEventListener('click', saveRanges);
 
-    const handleParamChange = () => {
+    const handleParamChange = (color, param, value) => {
+        globalConfig[color][param] = value;
         renderUI(globalConfig);
         applyKcal(globalConfig);
         updateChart();
     };
-
-    interceptSlider.addEventListener('input', () => {
-        const val = parseInt(interceptSlider.value, 10) / FIXED_PRECISION;
-        globalConfig.intercept = val;
-        handleParamChange();
-    });
-    interceptInput.addEventListener('change', () => {
-        const val = parseFloat(interceptInput.value) || 0;
-        globalConfig.intercept = val;
-        handleParamChange();
-    });
-
-    slopeSlider.addEventListener('input', () => {
-        const val = parseInt(slopeSlider.value, 10) / FIXED_PRECISION;
-        globalConfig.slope = val;
-        handleParamChange();
-    });
-    slopeInput.addEventListener('change', () => {
-        const val = parseFloat(slopeInput.value) || 0;
-        globalConfig.slope = val;
-        handleParamChange();
-    });
-
-    offsetSlider.addEventListener('input', () => {
-        const val = parseInt(offsetSlider.value, 10);
-        globalConfig.offset = val;
-        handleParamChange();
-    });
-    offsetInput.addEventListener('change', () => {
-        const val = parseInt(offsetInput.value, 10) || 0;
-        globalConfig.offset = val;
-        handleParamChange();
-    });
+    
+    for (const color in uiElements) {
+        const elements = uiElements[color];
+        elements.interceptSlider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10) / FIXED_PRECISION;
+            handleParamChange(color, 'intercept', val);
+        });
+        elements.interceptInput.addEventListener('change', (e) => {
+            const val = parseFloat(e.target.value) || 0;
+            handleParamChange(color, 'intercept', val);
+        });
+        elements.slopeSlider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10) / FIXED_PRECISION;
+            handleParamChange(color, 'slope', val);
+        });
+        elements.slopeInput.addEventListener('change', (e) => {
+            const val = parseFloat(e.target.value) || 0;
+            handleParamChange(color, 'slope', val);
+        });
+    }
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateTheme);
     i18next.on('languageChanged', () => updateUIText());

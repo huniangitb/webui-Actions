@@ -442,7 +442,9 @@ async function init() {
             handleParamChange('slope', clampedVal);
         });
         
-        setupIncrementer(document.getElementById(`${color}Intercept_minus`), document.getElementById(`${color}Intercept_plus`), elements.interceptInput, elements.interceptSlider, 0.01, 0, 256, false);
+        // 高级模式截距步长为1，保留小数显示
+        setupIncrementer(document.getElementById(`${color}Intercept_minus`), document.getElementById(`${color}Intercept_plus`), elements.interceptInput, elements.interceptSlider, 1, 0, 256, false);
+        // 高级模式斜率步长为0.1，保留小数显示
         setupIncrementer(document.getElementById(`${color}Slope_minus`), document.getElementById(`${color}Slope_plus`), elements.slopeInput, elements.slopeSlider, 0.1, -50, 50, false);
     }
     
@@ -452,6 +454,7 @@ async function init() {
             const { slider, input } = wizardControls[stepKey][colorKey];
             slider.addEventListener('input', () => { input.value = slider.value; handleWizardColorPreview(stepNum); });
             input.addEventListener('change', () => { const val = parseInt(input.value) || 0; const clampedValue = Math.max(0, Math.min(val, 256)); if (val !== clampedValue) { input.value = clampedValue; } slider.value = clampedValue; handleWizardColorPreview(stepNum); });
+            // 向导模式截距步长为1，显示整数
             setupIncrementer(document.getElementById(`wizardColor${colorKey.charAt(0).toUpperCase()}${stepNum}_minus`), document.getElementById(`wizardColor${colorKey.charAt(0).toUpperCase()}${stepNum}_plus`), input, slider, 1, 0, 256, true);
         }
     }

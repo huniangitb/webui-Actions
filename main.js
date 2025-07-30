@@ -17,7 +17,6 @@ const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
 const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
 
 const FIXED_PRECISION = 100;
-const NUM_CHART_POINTS = 50; // 定义图表数据点的数量
 
 const defaultConfig = {
     red: { intercept: 256.0, slope: 0.0 },
@@ -172,72 +171,46 @@ async function setSystemBrightness(percentage) {
 }
 
 // --- Chart.js 函数 ---
-// [修改] 重写此函数以生成对数分布的数据点
+// [修正] 生成线性数据，让Chart.js用对数轴渲染
 function calculateChartData(params) {
     const labels = [];
-    const colorData = {
-        red: [],
-        green: [],
-        blue: []
-    };
+    const colorData = { red: [], green: [], blue: [] };
 
-    const logMin = Math.log(1);
-    const logMax = Math.log(maxBrightness);
+    // 为对数轴生成从 1% 到 100% 的数据点
+    for (let p = 1; p <= 100; p++) {
+        labels.push(p);
+        const systemBrightness = scaleToSystemBrightness(p);
+        const log_b = Math.log(systemBrightness);
 
-    for (let i = 0; i < NUM_CHART_POINTS; i++) {
-        // 在对数空间中生成一个均匀分布的点
-        const logPoint = logMin + (logMax - logMin) * (i / (NUM_CHART_POINTS - 1));
-        
-        // 将该点转换回线性系统亮度值
-        const systemBrightness = Math.exp(logPoint);
-
-        // 计算对应的百分比，作为X轴标签
-        const percentage = ((systemBrightness - 1) / (maxBrightness - 1)) * 100;
-        labels.push(percentage.toFixed(0));
-
-        // 使用这个对数点来计算Y轴的值 (Kcal value)
         for (const color in params) {
             const { intercept, slope } = params[color];
-            const final_val = intercept + (slope * logPoint);
+            const final_val = intercept + (slope * log_b);
             colorData[color].push(final_val);
         }
     }
     
     const datasets = [{
-        label: i18next.t('params.red'),
-        data: colorData.red,
-        borderColor: 'rgba(255, 99, 132, 1)',
-        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-        tension: 0.1, // 使用较小的张力使曲线更贴近数据点
-        borderWidth: 2,
-        pointRadius: 0
+        label: i18next.t('params.red'), data: colorData.red, borderColor: 'rgba(255, 99, 132, 1)',
+        backgroundColor: 'rgba(255, 99, 132, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0
     }, {
-        label: i18next.t('params.green'),
-        data: colorData.green,
-        borderColor: 'rgba(75, 192, 192, 1)',
-        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-        tension: 0.1,
-        borderWidth: 2,
-        pointRadius: 0
+        label: i18next.t('params.green'), data: colorData.green, borderColor: 'rgba(75, 192, 192, 1)',
+        backgroundColor: 'rgba(75, 192, 192, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0
     }, {
-        label: i18next.t('params.blue'),
-        data: colorData.blue,
-        borderColor: 'rgba(54, 162, 235, 1)',
-        backgroundColor: 'rgba(54, 162, 235, 0.2)',
-        tension: 0.1,
-        borderWidth: 2,
-        pointRadius: 0
+        label: i18next.t('params.blue'), data: colorData.blue, borderColor: 'rgba(54, 162, 235, 1)',
+        backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0
     }];
     
     return { labels, datasets };
 }
 
+// [修正] 配置Chart.js使用对数坐标轴
 function initChart() {
     if (colorChart) colorChart.destroy();
     const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
     const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
     const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
     const chartData = calculateChartData(globalConfig);
+    
     colorChart = new Chart(chartCanvas.getContext('2d'), { 
         type: 'line', 
         data: chartData, 
@@ -246,11 +219,24 @@ function initChart() {
             maintainAspectRatio: false, 
             scales: { 
                 x: { 
+                    type: 'logarithmic', // <--- 关键修改：使用对数轴
                     title: { display: true, text: i18next.t('status.brightness'), color: tickColor }, 
+                    min: 1, // 对数轴不能从0开始
+                    max: 100,
                     ticks: { 
                         color: tickColor,
-                        // 自动跳过一些标签，避免拥挤
-                        maxTicksLimit: 10 
+                        // 自定义刻度标签格式
+                        callback: function(value, index, ticks) {
+                            // 只显示 1, 2, 5, 10, 20, 50, 100 这些关键刻度
+                            const shown_ticks = [1, 2, 5, 10, 20, 50, 100];
+                            if (shown_ticks.includes(Number(value))) {
+                                return value + '%';
+                            }
+                        },
+                        // 强制显示我们想要的关键刻度
+                        generateTicks: function(axis) {
+                            return [{value: 1}, {value: 2}, {value: 5}, {value: 10}, {value: 20}, {value: 50}, {value: 100}];
+                        }
                     }, 
                     grid: { color: gridColor } 
                 }, 
@@ -273,6 +259,8 @@ function updateChart() {
         const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
         const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
         const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+        
+        // 更新数据和通用选项
         colorChart.data = calculateChartData(globalConfig);
         colorChart.options.scales.x.title.text = i18next.t('status.brightness');
         colorChart.options.scales.x.title.color = tickColor;
@@ -283,7 +271,8 @@ function updateChart() {
         colorChart.options.scales.y.ticks.color = tickColor;
         colorChart.options.scales.y.grid.color = gridColor;
         colorChart.options.plugins.legend.labels.color = tickColor;
-        colorChart.update('none');
+        
+        colorChart.update(); // 使用 'default' 更新以重绘所有内容，包括轴
     } else { 
         initChart(); 
     }

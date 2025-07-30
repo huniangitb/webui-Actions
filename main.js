@@ -70,6 +70,13 @@ const wizardColorSliders = {
     step1: { red: document.getElementById('wizardColorR1'), green: document.getElementById('wizardColorG1'), blue: document.getElementById('wizardColorB1') },
     step2: { red: document.getElementById('wizardColorR2'), green: document.getElementById('wizardColorG2'), blue: document.getElementById('wizardColorB2') }
 };
+
+// [新增] 向导中输入框的引用
+const wizardColorInputs = {
+    step1: { red: document.getElementById('wizardColorR1_input'), green: document.getElementById('wizardColorG1_input'), blue: document.getElementById('wizardColorB1_input') },
+    step2: { red: document.getElementById('wizardColorR2_input'), green: document.getElementById('wizardColorG2_input'), blue: document.getElementById('wizardColorB2_input') }
+};
+
 let wizardData = {};
 
 // --- SVG 图标创建函数 ---
@@ -115,33 +122,24 @@ function updateUIText() {
         const translation = i18next.t(key, { returnObjects: true });
         if (typeof translation === 'object' && translation.icon && translation.text) {
             el.innerHTML = `${createIcon(icons[translation.icon])}${translation.text}`;
-        } else {
-            el.innerHTML = translation;
-        }
+        } else { el.innerHTML = translation; }
     });
-    document.documentElement.lang = i18next.language;
-    document.title = i18next.t('title');
+    document.documentElement.lang = i18next.language; document.title = i18next.t('title');
     document.querySelectorAll('.form-outline').forEach(formOutline => new Input(formOutline).update());
-    updateChart();
-    toggleAdvancedMode(isAdvancedMode, false);
+    updateChart(); toggleAdvancedMode(isAdvancedMode, false);
 }
 
 // --- UI模式切换 ---
 function toggleAdvancedMode(enable, showToast = true) {
-    isAdvancedMode = enable;
-    advancedConfigEditor.style.display = enable ? 'block' : 'none';
+    isAdvancedMode = enable; advancedConfigEditor.style.display = enable ? 'block' : 'none';
     const key = enable ? 'buttons.advancedMode.exit' : 'buttons.advancedMode.enter';
     const translation = i18next.t(key, { returnObjects: true });
-    if (typeof translation === 'object') {
-        advancedModeButton.innerHTML = `${createIcon(icons[translation.icon])}${translation.text}`;
-    }
+    if (typeof translation === 'object') { advancedModeButton.innerHTML = `${createIcon(icons[translation.icon])}${translation.text}`; }
     if (enable) {
-        advancedModeButton.classList.remove('btn-secondary');
-        advancedModeButton.classList.add('btn-primary');
+        advancedModeButton.classList.remove('btn-secondary'); advancedModeButton.classList.add('btn-primary');
         if (showToast) toast(i18next.t('toast.advancedMode.on'), 'info');
     } else {
-        advancedModeButton.classList.remove('btn-primary');
-        advancedModeButton.classList.add('btn-secondary');
+        advancedModeButton.classList.remove('btn-primary'); advancedModeButton.classList.add('btn-secondary');
         if (showToast) toast(i18next.t('toast.advancedMode.off'), 'info');
     }
 }
@@ -155,7 +153,6 @@ function updateTheme() {
 
 // --- 工具函数 ---
 const scaleToSystemBrightness = (percentage) => Math.max(1, Math.round(1 + (percentage / 100) * (maxBrightness - 1)));
-
 async function setSystemBrightness(percentage) {
     if (!BACKLIGHT_PATH) return;
     const systemValue = scaleToSystemBrightness(percentage);
@@ -171,96 +168,36 @@ async function setSystemBrightness(percentage) {
 }
 
 // --- Chart.js 函数 ---
-// [修正] 生成线性数据，让Chart.js用对数轴渲染
 function calculateChartData(params) {
     const labels = [];
     const colorData = { red: [], green: [], blue: [] };
-
-    // 为对数轴生成从 1% 到 100% 的数据点
     for (let p = 1; p <= 100; p++) {
         labels.push(p);
         const systemBrightness = scaleToSystemBrightness(p);
         const log_b = Math.log(systemBrightness);
-
         for (const color in params) {
             const { intercept, slope } = params[color];
             const final_val = intercept + (slope * log_b);
             colorData[color].push(final_val);
         }
     }
-    
-    const datasets = [{
-        label: i18next.t('params.red'), data: colorData.red, borderColor: 'rgba(255, 99, 132, 1)',
-        backgroundColor: 'rgba(255, 99, 132, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0
-    }, {
-        label: i18next.t('params.green'), data: colorData.green, borderColor: 'rgba(75, 192, 192, 1)',
-        backgroundColor: 'rgba(75, 192, 192, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0
-    }, {
-        label: i18next.t('params.blue'), data: colorData.blue, borderColor: 'rgba(54, 162, 235, 1)',
-        backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0
-    }];
-    
+    const datasets = [{ label: i18next.t('params.red'), data: colorData.red, borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 }, { label: i18next.t('params.green'), data: colorData.green, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 }, { label: i18next.t('params.blue'), data: colorData.blue, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 }];
     return { labels, datasets };
 }
-
-// [修正] 配置Chart.js使用对数坐标轴
 function initChart() {
     if (colorChart) colorChart.destroy();
     const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
     const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
     const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
     const chartData = calculateChartData(globalConfig);
-    
-    colorChart = new Chart(chartCanvas.getContext('2d'), { 
-        type: 'line', 
-        data: chartData, 
-        options: { 
-            responsive: true, 
-            maintainAspectRatio: false, 
-            scales: { 
-                x: { 
-                    type: 'logarithmic', // <--- 关键修改：使用对数轴
-                    title: { display: true, text: i18next.t('status.brightness'), color: tickColor }, 
-                    min: 1, // 对数轴不能从0开始
-                    max: 100,
-                    ticks: { 
-                        color: tickColor,
-                        // 自定义刻度标签格式
-                        callback: function(value, index, ticks) {
-                            // 只显示 1, 2, 5, 10, 20, 50, 100 这些关键刻度
-                            const shown_ticks = [1, 2, 5, 10, 20, 50, 100];
-                            if (shown_ticks.includes(Number(value))) {
-                                return value + '%';
-                            }
-                        },
-                        // 强制显示我们想要的关键刻度
-                        generateTicks: function(axis) {
-                            return [{value: 1}, {value: 2}, {value: 5}, {value: 10}, {value: 20}, {value: 50}, {value: 100}];
-                        }
-                    }, 
-                    grid: { color: gridColor } 
-                }, 
-                y: { 
-                    title: { display: true, text: i18next.t('chart.yAxisTitle'), color: tickColor }, 
-                    ticks: { color: tickColor }, 
-                    grid: { color: gridColor } 
-                } 
-            }, 
-            plugins: { 
-                legend: { display: true, labels: { color: tickColor } } 
-            } 
-        } 
-    });
+    colorChart = new Chart(chartCanvas.getContext('2d'), { type: 'line', data: chartData, options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'logarithmic', title: { display: true, text: i18next.t('status.brightness'), color: tickColor }, min: 1, max: 100, ticks: { color: tickColor, callback: function(value, index, ticks) { const shown_ticks = [1, 2, 5, 10, 20, 50, 100]; if (shown_ticks.includes(Number(value))) { return value + '%'; } }, generateTicks: function(axis) { return [{value: 1}, {value: 2}, {value: 5}, {value: 10}, {value: 20}, {value: 50}, {value: 100}]; } }, grid: { color: gridColor } }, y: { title: { display: true, text: i18next.t('chart.yAxisTitle'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } } }, plugins: { legend: { display: true, labels: { color: tickColor } } } } });
 }
-
 function updateChart() {
     if (!chartCanvas) return;
     if (colorChart) {
         const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
         const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
         const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-        
-        // 更新数据和通用选项
         colorChart.data = calculateChartData(globalConfig);
         colorChart.options.scales.x.title.text = i18next.t('status.brightness');
         colorChart.options.scales.x.title.color = tickColor;
@@ -271,178 +208,75 @@ function updateChart() {
         colorChart.options.scales.y.ticks.color = tickColor;
         colorChart.options.scales.y.grid.color = gridColor;
         colorChart.options.plugins.legend.labels.color = tickColor;
-        
-        colorChart.update(); // 使用 'default' 更新以重绘所有内容，包括轴
-    } else { 
-        initChart(); 
-    }
+        colorChart.update();
+    } else { initChart(); }
 }
 
-// --- 核心逻辑 (无修改) ---
-async function applyKcal(params, useRefreshRate = currentRefreshRate) {
-    if (!params) return;
-    try {
-        const cmds = Object.entries(params).map(([color, { intercept, slope }]) => {
-            const i = Math.round(intercept * FIXED_PRECISION);
-            const s = Math.round(slope * FIXED_PRECISION);
-            const path = color === 'red' ? KCAL_RED_PATH : color === 'green' ? KCAL_GREEN_PATH : KCAL_BLUE_PATH;
-            return `echo "${i} ${s} ${useRefreshRate}" > ${path}`;
-        });
-        await exec(cmds.join(' && '));
-    } catch (e) { console.warn(`应用Kcal失败: ${e.message}`); }
-}
-function parseConfig(text) {
-    const parts = text.trim().split(/\s+/);
-    if (parts.length !== 6) return null;
-    const [ri, rs, gi, gs, bi, bs] = parts.map(p => parseInt(p, 10));
-    if ([ri, rs, gi, gs, bi, bs].some(isNaN)) return null;
-    return { red: { intercept: ri / FIXED_PRECISION, slope: rs / FIXED_PRECISION }, green: { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION }, blue: { intercept: bi / FIXED_PRECISION, slope: bs / FIXED_PRECISION } };
-}
-function serializeConfig(params) {
-    const ri = Math.round(params.red.intercept * FIXED_PRECISION);
-    const rs = Math.round(params.red.slope * FIXED_PRECISION);
-    const gi = Math.round(params.green.intercept * FIXED_PRECISION);
-    const gs = Math.round(params.green.slope * FIXED_PRECISION);
-    const bi = Math.round(params.blue.intercept * FIXED_PRECISION);
-    const bs = Math.round(params.blue.slope * FIXED_PRECISION);
-    return `${ri} ${rs} ${gi} ${gs} ${bi} ${bs}`;
-}
-async function readKcalNodeAsConfig() {
-    try {
-        const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`);
-        const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`);
-        const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`);
-        const [ri, rs] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        const [gi, gs] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        const [bi, bs] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        if ([ri, rs, gi, gs, bi, bs].some(isNaN)) return null;
-        return { red: { intercept: ri / FIXED_PRECISION, slope: rs / FIXED_PRECISION }, green: { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION }, blue: { intercept: bi / FIXED_PRECISION, slope: bs / FIXED_PRECISION } };
-    } catch (e) { return null; }
-}
-async function loadConfigAndRender() {
-    let loadedConfig = null;
-    const filename = currentConfigPath.split('/').pop();
-    try {
-        const { stdout } = await exec(`cat ${currentConfigPath}`);
-        loadedConfig = parseConfig(stdout);
-    } catch (e) { /* 文件不存在或读取失败 */ }
-    if (loadedConfig) {
-        globalConfig = loadedConfig;
-        toast(i18next.t('toast.configLoaded', { file: filename }), 'success');
-    } else {
-        toast(i18next.t('toast.configLoadFailed', { file: filename }), 'info');
-        const nodeConfig = await readKcalNodeAsConfig();
-        if (nodeConfig) {
-            globalConfig = nodeConfig;
-            toast(i18next.t('toast.configLoadFromNode'), 'success');
-        } else {
-            globalConfig = JSON.parse(JSON.stringify(defaultConfig));
-            toast(i18next.t('toast.configLoadFromNodeFailed'), 'warning');
-        }
-    }
-    renderUI(globalConfig);
-    applyKcal(globalConfig);
-    updateChart();
-}
-function renderUI(params) {
-    for (const color in uiElements) {
-        const { intercept, slope } = params[color];
-        uiElements[color].interceptInput.value = intercept.toFixed(2);
-        uiElements[color].interceptSlider.value = intercept * FIXED_PRECISION;
-        uiElements[color].slopeInput.value = slope.toFixed(2);
-        uiElements[color].slopeSlider.value = slope * FIXED_PRECISION;
-    }
-    document.querySelectorAll('.form-outline').forEach(formOutline => new Input(formOutline).update());
-}
+// --- 核心逻辑 ---
+async function applyKcal(params, useRefreshRate = currentRefreshRate) { if (!params) return; try { const cmds = Object.entries(params).map(([color, { intercept, slope }]) => { const i = Math.round(intercept * FIXED_PRECISION); const s = Math.round(slope * FIXED_PRECISION); const path = color === 'red' ? KCAL_RED_PATH : color === 'green' ? KCAL_GREEN_PATH : KCAL_BLUE_PATH; return `echo "${i} ${s} ${useRefreshRate}" > ${path}`; }); await exec(cmds.join(' && ')); } catch (e) { console.warn(`应用Kcal失败: ${e.message}`); } }
+function parseConfig(text) { const parts = text.trim().split(/\s+/); if (parts.length !== 6) return null; const [ri, rs, gi, gs, bi, bs] = parts.map(p => parseInt(p, 10)); if ([ri, rs, gi, gs, bi, bs].some(isNaN)) return null; return { red: { intercept: ri / FIXED_PRECISION, slope: rs / FIXED_PRECISION }, green: { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION }, blue: { intercept: bi / FIXED_PRECISION, slope: bs / FIXED_PRECISION } }; }
+function serializeConfig(params) { const ri = Math.round(params.red.intercept * FIXED_PRECISION); const rs = Math.round(params.red.slope * FIXED_PRECISION); const gi = Math.round(params.green.intercept * FIXED_PRECISION); const gs = Math.round(params.green.slope * FIXED_PRECISION); const bi = Math.round(params.blue.intercept * FIXED_PRECISION); const bs = Math.round(params.blue.slope * FIXED_PRECISION); return `${ri} ${rs} ${gi} ${gs} ${bi} ${bs}`; }
+async function readKcalNodeAsConfig() { try { const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`); const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`); const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`); const [ri, rs] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [gi, gs] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [bi, bs] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); if ([ri, rs, gi, gs, bi, bs].some(isNaN)) return null; return { red: { intercept: ri / FIXED_PRECISION, slope: rs / FIXED_PRECISION }, green: { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION }, blue: { intercept: bi / FIXED_PRECISION, slope: bs / FIXED_PRECISION } }; } catch (e) { return null; } }
+async function loadConfigAndRender() { let loadedConfig = null; const filename = currentConfigPath.split('/').pop(); try { const { stdout } = await exec(`cat ${currentConfigPath}`); loadedConfig = parseConfig(stdout); } catch (e) { /* 文件不存在或读取失败 */ } if (loadedConfig) { globalConfig = loadedConfig; toast(i18next.t('toast.configLoaded', { file: filename }), 'success'); } else { toast(i18next.t('toast.configLoadFailed', { file: filename }), 'info'); const nodeConfig = await readKcalNodeAsConfig(); if (nodeConfig) { globalConfig = nodeConfig; toast(i18next.t('toast.configLoadFromNode'), 'success'); } else { globalConfig = JSON.parse(JSON.stringify(defaultConfig)); toast(i18next.t('toast.configLoadFromNodeFailed'), 'warning'); } } renderUI(globalConfig); applyKcal(globalConfig); updateChart(); }
+function renderUI(params) { for (const color in uiElements) { const { intercept, slope } = params[color]; uiElements[color].interceptInput.value = intercept.toFixed(2); uiElements[color].interceptSlider.value = intercept * FIXED_PRECISION; uiElements[color].slopeInput.value = slope.toFixed(2); uiElements[color].slopeSlider.value = slope * FIXED_PRECISION; } document.querySelectorAll('.form-outline').forEach(formOutline => new Input(formOutline).update()); }
 
-// --- 事件处理器 (无修改) ---
-async function saveConfig() {
-    const configString = serializeConfig(globalConfig);
-    const filename = currentConfigPath.split('/').pop();
-    try {
-        await exec(`echo '${configString}' > ${currentConfigPath}`);
-        toast(i18next.t('toast.saved', { file: filename }), 'success');
-    } catch (e) {
-        toast(i18next.t('toast.saveFailed', { error: e.message }), 'error');
-    }
-}
-function resetGlobalConfig() {
-    globalConfig = JSON.parse(JSON.stringify(defaultConfig));
-    renderUI(globalConfig);
-    applyKcal(globalConfig);
-    updateChart();
-    toast(i18next.t('toast.reset'), 'info');
-}
-async function readAndShowNodeStatus() {
-    const parsedOutputElem = document.getElementById('parsedNodeOutput');
-    parsedOutputElem.innerHTML = i18next.t('status.reading');
-    nodeStatusModal.show();
-    try {
-        const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`);
-        const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`);
-        const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`);
-        const [ri, rs, rr] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        const [gi, gs, gr] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        const [bi, bs, br] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        if ([ri, rs, rr, gi, gs, gr, bi, bs, br].some(isNaN)) {
-            parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeParseError')}</p>`; return;
-        }
-        parsedOutputElem.innerHTML = `<h6 class="text-danger">${i18next.t('params.red')}</h6><ul><li>I: ${(ri / FIXED_PRECISION).toFixed(2)} (${ri})</li><li>S: ${(rs / FIXED_PRECISION).toFixed(2)} (${rs})</li><li>Hz: ${rr}</li></ul><hr/><h6 class="text-success">${i18next.t('params.green')}</h6><ul><li>I: ${(gi / FIXED_PRECISION).toFixed(2)} (${gi})</li><li>S: ${(gs / FIXED_PRECISION).toFixed(2)} (${gs})</li><li>Hz: ${gr}</li></ul><hr/><h6 class="text-primary">${i18next.t('params.blue')}</h6><ul><li>I: ${(bi / FIXED_PRECISION).toFixed(2)} (${bi})</li><li>S: ${(bs / FIXED_PRECISION).toFixed(2)} (${bs})</li><li>Hz: ${br}</li></ul>`;
-    } catch (e) {
-        parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeReadPermission')}</p>`;
-    }
-}
+// --- 事件处理器 ---
+async function saveConfig() { const configString = serializeConfig(globalConfig); const filename = currentConfigPath.split('/').pop(); try { await exec(`echo '${configString}' > ${currentConfigPath}`); toast(i18next.t('toast.saved', { file: filename }), 'success'); } catch (e) { toast(i18next.t('toast.saveFailed', { error: e.message }), 'error'); } }
+function resetGlobalConfig() { globalConfig = JSON.parse(JSON.stringify(defaultConfig)); renderUI(globalConfig); applyKcal(globalConfig); updateChart(); toast(i18next.t('toast.reset'), 'info'); }
+async function readAndShowNodeStatus() { const parsedOutputElem = document.getElementById('parsedNodeOutput'); parsedOutputElem.innerHTML = i18next.t('status.reading'); nodeStatusModal.show(); try { const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`); const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`); const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`); const [ri, rs, rr] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [gi, gs, gr] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [bi, bs, br] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); if ([ri, rs, rr, gi, gs, gr, bi, bs, br].some(isNaN)) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeParseError')}</p>`; return; } parsedOutputElem.innerHTML = `<h6 class="text-danger">${i18next.t('params.red')}</h6><ul><li>I: ${(ri / FIXED_PRECISION).toFixed(2)} (${ri})</li><li>S: ${(rs / FIXED_PRECISION).toFixed(2)} (${rs})</li><li>Hz: ${rr}</li></ul><hr/><h6 class="text-success">${i18next.t('params.green')}</h6><ul><li>I: ${(gi / FIXED_PRECISION).toFixed(2)} (${gi})</li><li>S: ${(gs / FIXED_PRECISION).toFixed(2)} (${gs})</li><li>Hz: ${gr}</li></ul><hr/><h6 class="text-primary">${i18next.t('params.blue')}</h6><ul><li>I: ${(bi / FIXED_PRECISION).toFixed(2)} (${bi})</li><li>S: ${(bs / FIXED_PRECISION).toFixed(2)} (${bs})</li><li>Hz: ${br}</li></ul>`; } catch (e) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeReadPermission')}</p>`; } }
 
-// --- 向导逻辑 (无修改) ---
+// --- 向导逻辑 ---
 function calculateFit(point1, point2) {
-    const x1 = Math.log(point1.brightness);
-    const x2 = Math.log(point2.brightness);
-    const y1 = point1.value;
-    const y2 = point2.value;
+    const x1 = Math.log(point1.brightness); const x2 = Math.log(point2.brightness); const y1 = point1.value; const y2 = point2.value;
     if (Math.abs(x1 - x2) < 1e-6) { return { intercept: y1, slope: 0 }; }
-    const slope = (y2 - y1) / (x2 - x1);
-    const intercept = y1 - slope * x1;
+    const slope = (y2 - y1) / (x2 - x1); const intercept = y1 - slope * x1;
     return { intercept, slope };
 }
+
 function startWizard() {
     originalConfigForWizard = JSON.parse(JSON.stringify(globalConfig));
     brightnessBeforeWizard = lastKnownBrightness;
     wizardData = {
-        step1: { brightnessPercent: 10, red: 256, green: 256, blue: 256 },
-        step2: { brightnessPercent: 80, red: 256, green: 256, blue: 256 }
+        step1: { brightnessPercent: 10, red: 256.00, green: 256.00, blue: 256.00 },
+        step2: { brightnessPercent: 80, red: 256.00, green: 256.00, blue: 256.00 }
     };
+    
     wizardBrightness1.value = wizardData.step1.brightnessPercent;
-    wizardColorSliders.step1.red.value = wizardData.step1.red * 100;
-    wizardColorSliders.step1.green.value = wizardData.step1.green * 100;
-    wizardColorSliders.step1.blue.value = wizardData.step1.blue * 100;
     wizardBrightness2.value = wizardData.step2.brightnessPercent;
-    wizardColorSliders.step2.red.value = wizardData.step2.red * 100;
-    wizardColorSliders.step2.green.value = wizardData.step2.green * 100;
-    wizardColorSliders.step2.blue.value = wizardData.step2.blue * 100;
-    wizardStep1.style.display = 'block';
-    wizardStep2.style.display = 'none';
-    wizardNextButton.style.display = 'block';
-    wizardFinishButton.style.display = 'none';
+
+    for (const step in wizardColorInputs) {
+        for (const color in wizardColorInputs[step]) {
+            const val = wizardData[step.replace('step', 'step')][color];
+            wizardColorInputs[step][color].value = val.toFixed(2);
+            wizardColorSliders[step][color].value = val * FIXED_PRECISION;
+            new Input(wizardColorInputs[step][color].parentNode).update();
+        }
+    }
+
+    wizardStep1.style.display = 'block'; wizardStep2.style.display = 'none';
+    wizardNextButton.style.display = 'block'; wizardFinishButton.style.display = 'none';
     wizardModal.show();
     setSystemBrightness(wizardData.step1.brightnessPercent);
 }
+
 function handleWizardNext() {
+    for (const color in wizardColorInputs.step1) {
+        wizardData.step1[color] = parseFloat(wizardColorInputs.step1[color].value);
+    }
     wizardData.step1.brightnessPercent = parseInt(wizardBrightness1.value);
-    wizardData.step1.red = parseInt(wizardColorSliders.step1.red.value) / 100;
-    wizardData.step1.green = parseInt(wizardColorSliders.step1.green.value) / 100;
-    wizardData.step1.blue = parseInt(wizardColorSliders.step1.blue.value) / 100;
-    wizardStep1.style.display = 'none';
-    wizardStep2.style.display = 'block';
-    wizardNextButton.style.display = 'none';
-    wizardFinishButton.style.display = 'block';
+
+    wizardStep1.style.display = 'none'; wizardStep2.style.display = 'block';
+    wizardNextButton.style.display = 'none'; wizardFinishButton.style.display = 'block';
     setSystemBrightness(wizardData.step2.brightnessPercent);
     handleWizardColorPreview(2);
 }
+
 function handleWizardFinish() {
+    for (const color in wizardColorInputs.step2) {
+        wizardData.step2[color] = parseFloat(wizardColorInputs.step2[color].value);
+    }
     wizardData.step2.brightnessPercent = parseInt(wizardBrightness2.value);
-    wizardData.step2.red = parseInt(wizardColorSliders.step2.red.value) / 100;
-    wizardData.step2.green = parseInt(wizardColorSliders.step2.green.value) / 100;
-    wizardData.step2.blue = parseInt(wizardColorSliders.step2.blue.value) / 100;
+
     const b1 = scaleToSystemBrightness(wizardData.step1.brightnessPercent);
     const b2 = scaleToSystemBrightness(wizardData.step2.brightnessPercent);
     globalConfig = {
@@ -450,24 +284,41 @@ function handleWizardFinish() {
         green: calculateFit({ brightness: b1, value: wizardData.step1.green }, { brightness: b2, value: wizardData.step2.green }),
         blue: calculateFit({ brightness: b1, value: wizardData.step1.blue }, { brightness: b2, value: wizardData.step2.blue }),
     };
-    renderUI(globalConfig);
-    applyKcal(globalConfig);
-    updateChart();
-    wizardModal.hide();
-    toast(i18next.t('toast.wizardComplete'), 'success');
+    renderUI(globalConfig); applyKcal(globalConfig); updateChart();
+    wizardModal.hide(); toast(i18next.t('toast.wizardComplete'), 'success');
 }
+
 function handleWizardCancel() {
     applyKcal(originalConfigForWizard); 
     wizardModal.hide();
     toast(i18next.t('toast.wizardCancelled'), 'info');
 }
+
 function handleWizardColorPreview(step) {
     const brightnessPercent = parseInt(step === 1 ? wizardBrightness1.value : wizardBrightness2.value);
     setSystemBrightness(brightnessPercent);
-    const r = parseInt(wizardColorSliders[`step${step}`].red.value) / 100;
-    const g = parseInt(wizardColorSliders[`step${step}`].green.value) / 100;
-    const b = parseInt(wizardColorSliders[`step${step}`].blue.value) / 100;
+    const r = parseFloat(wizardColorInputs[`step${step}`].red.value);
+    const g = parseFloat(wizardColorInputs[`step${step}`].green.value);
+    const b = parseFloat(wizardColorInputs[`step${step}`].blue.value);
     applyKcal({ red: { intercept: r, slope: 0 }, green: { intercept: g, slope: 0 }, blue: { intercept: b, slope: 0 } });
+}
+
+// 用于同步向导中滑块和输入框的函数
+function syncWizardSliderInput(color, stepNum, source) {
+    const step = `step${stepNum}`;
+    const slider = wizardColorSliders[step][color];
+    const input = wizardColorInputs[step][color];
+
+    if (source === 'slider') {
+        const val = parseInt(slider.value) / FIXED_PRECISION;
+        input.value = val.toFixed(2);
+    } else { // source === 'input'
+        let val = parseFloat(input.value) || 0;
+        val = Math.max(0, Math.min(val, 256)); // Clamp value
+        input.value = val.toFixed(2); // Update input in case it was clamped
+        slider.value = val * FIXED_PRECISION;
+    }
+    handleWizardColorPreview(stepNum);
 }
 
 // --- 初始化 ---
@@ -555,8 +406,13 @@ async function init() {
     
     wizardBrightness1.addEventListener('input', () => setSystemBrightness(parseInt(wizardBrightness1.value)));
     wizardBrightness2.addEventListener('input', () => setSystemBrightness(parseInt(wizardBrightness2.value)));
-    Object.values(wizardColorSliders.step1).forEach(slider => slider.addEventListener('input', () => handleWizardColorPreview(1)));
-    Object.values(wizardColorSliders.step2).forEach(slider => slider.addEventListener('input', () => handleWizardColorPreview(2)));
+    
+    for (const stepNum of [1, 2]) {
+        for (const color in wizardColorSliders[`step${stepNum}`]) {
+            wizardColorSliders[`step${stepNum}`][color].addEventListener('input', () => syncWizardSliderInput(color, stepNum, 'slider'));
+            wizardColorInputs[`step${stepNum}`][color].addEventListener('change', () => syncWizardSliderInput(color, stepNum, 'input'));
+        }
+    }
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateTheme);
     i18next.on('languageChanged', () => updateUIText());

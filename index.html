@@ -28,70 +28,76 @@
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="card-title mb-0" data-i18n="config.cardTitle"></h5>
                     <div class="config-actions-group">
-                        <button id="toggleEditModeButton" type="button" class="btn btn-success btn-sm" data-mdb-ripple-init></button>
-                        <button id="customizeRangeButton" type="button" class="btn btn-info btn-sm" data-mdb-ripple-init data-i18n="buttons.customizeRanges"></button>
-                        <button id="readNodeButton" type="button" class="btn btn-secondary btn-sm" data-mdb-ripple-init data-i18n="buttons.readNode"></button>
-                        <button id="resetConfigButton" type="button" class="btn btn-warning btn-sm" data-mdb-ripple-init data-i18n="buttons.reset"></button>
-                        <button id="saveButton" type="button" class="btn btn-primary btn-sm" data-mdb-ripple-init data-i18n="buttons.save"></button>
+                        <button id="wizardButton" type="button" class="btn btn-success btn-rounded" data-mdb-ripple-init data-i18n="buttons.wizard"></button>
                     </div>
                 </div>
                 <p class="text-muted small" data-i18n="config.description"></p>
                 <hr/>
-                <div id="global-config-editor">
+                <!-- Advanced Mode Editor (hidden by default) -->
+                <div id="advanced-config-editor" style="display: none;">
+                    <div class="d-flex justify-content-end align-items-center mb-3">
+                         <div class="config-actions-group">
+                            <button id="readNodeButton" type="button" class="btn btn-sm btn-light" data-mdb-ripple-init data-i18n="buttons.readNode"></button>
+                            <button id="resetConfigButton" type="button" class="btn btn-sm btn-warning" data-mdb-ripple-init data-i18n="buttons.reset"></button>
+                            <button id="saveButton" type="button" class="btn btn-sm btn-primary" data-mdb-ripple-init data-i18n="buttons.save"></button>
+                        </div>
+                    </div>
                     <!-- Red Channel -->
                     <h6 class="text-danger" data-i18n="params.red"></h6>
                     <div class="param-row">
-                        <label for="redLowSlider" class="param-label" data-i18n="params.low"></label>
+                        <label class="param-label" data-i18n="params.intercept"></label>
                         <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redLowSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="redLowInput" class="form-control param-input" step="0.01" /></div>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redInterceptSlider" min="0" max="51200" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="redInterceptInput" class="form-control param-input" step="0.01" /></div>
                         </div>
                     </div>
                     <div class="param-row">
-                        <label for="redHighSlider" class="param-label" data-i18n="params.high"></label>
+                        <label class="param-label" data-i18n="params.slope"></label>
                         <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redHighSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="redHighInput" class="form-control param-input" step="0.01" /></div>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redSlopeSlider" min="-5000" max="5000" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="redSlopeInput" class="form-control param-input" step="0.01" /></div>
                         </div>
                     </div>
-
                     <!-- Green Channel -->
                     <h6 class="text-success mt-4" data-i18n="params.green"></h6>
                     <div class="param-row">
-                        <label for="greenLowSlider" class="param-label" data-i18n="params.low"></label>
+                        <label class="param-label" data-i18n="params.intercept"></label>
                         <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenLowSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenLowInput" class="form-control param-input" step="0.01" /></div>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenInterceptSlider" min="0" max="51200" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenInterceptInput" class="form-control param-input" step="0.01" /></div>
                         </div>
                     </div>
                     <div class="param-row">
-                        <label for="greenHighSlider" class="param-label" data-i18n="params.high"></label>
+                        <label class="param-label" data-i18n="params.slope"></label>
                         <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenHighSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenHighInput" class="form-control param-input" step="0.01" /></div>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenSlopeSlider" min="-5000" max="5000" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenSlopeInput" class="form-control param-input" step="0.01" /></div>
                         </div>
                     </div>
-
                     <!-- Blue Channel -->
                     <h6 class="text-primary mt-4" data-i18n="params.blue"></h6>
                     <div class="param-row">
-                        <label for="blueLowSlider" class="param-label" data-i18n="params.low"></label>
+                        <label class="param-label" data-i18n="params.intercept"></label>
                         <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueLowSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueLowInput" class="form-control param-input" step="0.01" /></div>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueInterceptSlider" min="0" max="51200" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueInterceptInput" class="form-control param-input" step="0.01" /></div>
                         </div>
                     </div>
                     <div class="param-row">
-                        <label for="blueHighSlider" class="param-label" data-i18n="params.high"></label>
+                        <label class="param-label" data-i18n="params.slope"></label>
                         <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueHighSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueHighInput" class="form-control param-input" step="0.01" /></div>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueSlopeSlider" min="-5000" max="5000" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueSlopeInput" class="form-control param-input" step="0.01" /></div>
                         </div>
                     </div>
+                </div>
+                
+                <div class="chart-container mt-4">
+                    <canvas id="colorCurveChart"></canvas>
+                </div>
 
-                    <div class="chart-container mt-4">
-                        <canvas id="colorCurveChart"></canvas>
-                    </div>
+                <div class="text-center mt-4">
+                    <button id="advancedModeButton" type="button" class="btn btn-secondary btn-sm" data-mdb-ripple-init></button>
                 </div>
             </div>
         </div>
@@ -100,6 +106,7 @@
         </footer>
     </div>
     
+    <!-- Modals -->
     <div class="modal fade" id="nodeStatusModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -110,28 +117,42 @@
         </div>
     </div>
 
-    <div class="modal fade" id="rangeConfigModal" tabindex="-1">
+    <div class="modal fade" id="wizardModal" tabindex="-1" data-mdb-backdrop="static" data-mdb-keyboard="false">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" data-i18n="modals.range.title"></h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
+                <div class="modal-header">
+                    <h5 class="modal-title" data-i18n="modals.wizard.title"></h5>
+                    <button type="button" id="wizardCancelButton" class="btn-close"></button>
+                </div>
                 <div class="modal-body">
-                    <p class="text-muted" data-i18n="modals.range.description"></p>
-                    
-                    <p class="fw-bold mt-3 mb-1" data-i18n="params.low"></p>
-                    <div class="row g-3">
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="lowRangeMin" class="form-control" step="any" /><label class="form-label" for="lowRangeMin" data-i18n="modals.range.min"></label></div></div>
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="lowRangeMax" class="form-control" step="any" /><label class="form-label" for="lowRangeMax" data-i18n="modals.range.max"></label></div></div>
+                    <!-- Step 1: Low Brightness -->
+                    <div id="wizardStep1">
+                        <h6 data-i18n="modals.wizard.step1.title"></h6>
+                        <p class="text-muted small" data-i18n="modals.wizard.step1.description"></p>
+                        <label class="form-label mt-3" data-i18n="modals.wizard.brightness"></label>
+                        <div class="range"><input type="range" class="form-range" id="wizardBrightness1" min="1" max="50" value="10" /></div>
+                        
+                        <label class="form-label mt-4" data-i18n="modals.wizard.colorValue"></label>
+                        <div class="range"><input type="range" class="form-range range-danger" id="wizardColorR1" min="0" max="51200" value="25600" /></div>
+                        <div class="range"><input type="range" class="form-range range-success" id="wizardColorG1" min="0" max="51200" value="25600" /></div>
+                        <div class="range"><input type="range" class="form-range range-info" id="wizardColorB1" min="0" max="51200" value="25600" /></div>
                     </div>
-
-                    <p class="fw-bold mt-3 mb-1" data-i18n="params.high"></p>
-                    <div class="row g-3">
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="highRangeMin" class="form-control" step="any" /><label class="form-label" for="highRangeMin" data-i18n="modals.range.min"></label></div></div>
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="highRangeMax" class="form-control" step="any" /><label class="form-label" for="highRangeMax" data-i18n="modals.range.max"></label></div></div>
+                    <!-- Step 2: High Brightness -->
+                    <div id="wizardStep2" style="display: none;">
+                        <h6 data-i18n="modals.wizard.step2.title"></h6>
+                        <p class="text-muted small" data-i18n="modals.wizard.step2.description"></p>
+                        <label class="form-label mt-3" data-i18n="modals.wizard.brightness"></label>
+                        <div class="range"><input type="range" class="form-range" id="wizardBrightness2" min="51" max="100" value="80" /></div>
+                        
+                        <label class="form-label mt-4" data-i18n="modals.wizard.colorValue"></label>
+                        <div class="range"><input type="range" class="form-range range-danger" id="wizardColorR2" min="0" max="51200" value="25600" /></div>
+                        <div class="range"><input type="range" class="form-range range-success" id="wizardColorG2" min="0" max="51200" value="25600" /></div>
+                        <div class="range"><input type="range" class="form-range range-info" id="wizardColorB2" min="0" max="51200" value="25600" /></div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal" data-i18n="modals.range.cancel"></button>
-                    <button type="button" id="saveRangeButton" class="btn btn-primary" data-i18n="modals.range.save"></button>
+                    <button type="button" id="wizardNextButton" class="btn btn-primary" data-i18n="modals.wizard.next"></button>
+                    <button type="button" id="wizardFinishButton" class="btn btn-success" data-i18n="modals.wizard.finish" style="display: none;"></button>
                 </div>
             </div>
         </div>

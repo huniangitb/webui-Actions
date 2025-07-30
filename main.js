@@ -34,7 +34,8 @@ let wizardModal = null;
 let isAdvancedMode = false;
 let lastKnownRefreshRate = 0;
 let lastKnownBrightness = -1;
-let originalConfigForWizard = null; // 用于在向导取消时恢复配置
+let originalConfigForWizard = null;
+let brightnessBeforeWizard = -1;
 
 // --- DOM 元素 ---
 const brightnessSlider = document.getElementById('brightnessSlider');
@@ -65,16 +66,8 @@ const wizardFinishButton = document.getElementById('wizardFinishButton');
 const wizardCancelButton = document.getElementById('wizardCancelButton');
 
 const wizardColorSliders = {
-    step1: {
-        red: document.getElementById('wizardColorR1'),
-        green: document.getElementById('wizardColorG1'),
-        blue: document.getElementById('wizardColorB1'),
-    },
-    step2: {
-        red: document.getElementById('wizardColorR2'),
-        green: document.getElementById('wizardColorG2'),
-        blue: document.getElementById('wizardColorB2'),
-    }
+    step1: { red: document.getElementById('wizardColorR1'), green: document.getElementById('wizardColorG1'), blue: document.getElementById('wizardColorB1') },
+    step2: { red: document.getElementById('wizardColorR2'), green: document.getElementById('wizardColorG2'), blue: document.getElementById('wizardColorB2') }
 };
 let wizardData = {};
 
@@ -100,8 +93,8 @@ async function pollSystemStatus() {
     } catch (e) { /* 忽略错误 */ }
 
     try {
-        // 在向导打开时，不通过轮询更新亮度值，避免干扰用户操作
-        if (wizardModal && wizardModal.getInstance() && wizardModal.getInstance()._isShown) {
+        // [修正] 使用正确的 'wizardModal._isShown' 来检查模态框是否可见
+        if (wizardModal && wizardModal._isShown) {
             return;
         }
         const { stdout } = await exec(`cat ${BACKLIGHT_PATH}`);
@@ -130,7 +123,7 @@ function updateUIText() {
     document.title = i18next.t('title');
     document.querySelectorAll('.form-outline').forEach(formOutline => new Input(formOutline).update());
     updateChart();
-    toggleAdvancedMode(isAdvancedMode, false); // Update button text without toast
+    toggleAdvancedMode(isAdvancedMode, false);
 }
 
 // --- UI模式切换 ---
@@ -168,17 +161,18 @@ async function setSystemBrightness(percentage) {
     const systemValue = scaleToSystemBrightness(percentage);
     try {
         await exec(`echo ${systemValue} > ${BACKLIGHT_PATH}`);
-        // Only update main UI if wizard is not open
-        if (!wizardModal || !wizardModal.getInstance() || !wizardModal.getInstance()._isShown) {
+        // [修正] 使用正确的 'wizardModal._isShown'
+        if (!wizardModal || !wizardModal._isShown) {
              brightnessValue.innerText = i18next.t('status.brightnessValue', { value: systemValue, percent: percentage });
              lastKnownBrightness = systemValue;
         }
     } catch (e) {
-        toast(i18next.t('status.brightnessReadError'), 'error');
+        // [优化] 使用更准确的错误提示
+        toast(i18next.t('toast.saveFailed', { error: `Brightness: ${e.message}` }), 'error');
     }
 }
 
-// --- Chart.js 函数 ---
+// --- Chart.js 函数 (无修改) ---
 function calculateChartData(params) {
     const datasets = [];
     const colors = { red: 'rgba(255, 99, 132, 1)', green: 'rgba(75, 192, 192, 1)', blue: 'rgba(54, 162, 235, 1)' };
@@ -190,39 +184,18 @@ function calculateChartData(params) {
             const log_b = Math.log(systemBrightness);
             data.push(intercept + (slope * log_b));
         }
-        datasets.push({
-            label: i18next.t(`params.${color}`),
-            data,
-            borderColor: colors[color],
-            backgroundColor: colors[color].replace('1)', '0.2)'),
-            tension: 0.4,
-            borderWidth: 2,
-            pointRadius: 0
-        });
+        datasets.push({ label: i18next.t(`params.${color}`), data, borderColor: colors[color], backgroundColor: colors[color].replace('1)', '0.2)'), tension: 0.4, borderWidth: 2, pointRadius: 0 });
     }
     return { labels: Array.from({ length: 51 }, (_, i) => i * 2), datasets };
 }
-
 function initChart() {
     if (colorChart) colorChart.destroy();
     const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
     const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
     const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
     const chartData = calculateChartData(globalConfig);
-    colorChart = new Chart(chartCanvas.getContext('2d'), {
-        type: 'line',
-        data: chartData,
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            scales: {
-                x: { title: { display: true, text: i18next.t('status.brightness'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } },
-                y: { title: { display: true, text: i18next.t('chart.yAxisTitle'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } }
-            },
-            plugins: { legend: { display: true, labels: { color: tickColor } } }
-        }
-    });
+    colorChart = new Chart(chartCanvas.getContext('2d'), { type: 'line', data: chartData, options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: i18next.t('status.brightness'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } }, y: { title: { display: true, text: i18next.t('chart.yAxisTitle'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } } }, plugins: { legend: { display: true, labels: { color: tickColor } } } } });
 }
-
 function updateChart() {
     if (!chartCanvas) return;
     if (colorChart) {
@@ -240,12 +213,10 @@ function updateChart() {
         colorChart.options.scales.y.grid.color = gridColor;
         colorChart.options.plugins.legend.labels.color = tickColor;
         colorChart.update('none');
-    } else {
-        initChart();
-    }
+    } else { initChart(); }
 }
 
-// --- 核心逻辑 ---
+// --- 核心逻辑 (无修改) ---
 async function applyKcal(params, useRefreshRate = currentRefreshRate) {
     if (!params) return;
     try {
@@ -258,19 +229,13 @@ async function applyKcal(params, useRefreshRate = currentRefreshRate) {
         await exec(cmds.join(' && '));
     } catch (e) { console.warn(`应用Kcal失败: ${e.message}`); }
 }
-
 function parseConfig(text) {
     const parts = text.trim().split(/\s+/);
     if (parts.length !== 6) return null;
     const [ri, rs, gi, gs, bi, bs] = parts.map(p => parseInt(p, 10));
     if ([ri, rs, gi, gs, bi, bs].some(isNaN)) return null;
-    return {
-        red: { intercept: ri / FIXED_PRECISION, slope: rs / FIXED_PRECISION },
-        green: { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION },
-        blue: { intercept: bi / FIXED_PRECISION, slope: bs / FIXED_PRECISION },
-    };
+    return { red: { intercept: ri / FIXED_PRECISION, slope: rs / FIXED_PRECISION }, green: { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION }, blue: { intercept: bi / FIXED_PRECISION, slope: bs / FIXED_PRECISION } };
 }
-
 function serializeConfig(params) {
     const ri = Math.round(params.red.intercept * FIXED_PRECISION);
     const rs = Math.round(params.red.slope * FIXED_PRECISION);
@@ -280,7 +245,6 @@ function serializeConfig(params) {
     const bs = Math.round(params.blue.slope * FIXED_PRECISION);
     return `${ri} ${rs} ${gi} ${gs} ${bi} ${bs}`;
 }
-
 async function readKcalNodeAsConfig() {
     try {
         const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`);
@@ -290,14 +254,9 @@ async function readKcalNodeAsConfig() {
         const [gi, gs] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
         const [bi, bs] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
         if ([ri, rs, gi, gs, bi, bs].some(isNaN)) return null;
-        return {
-            red: { intercept: ri / FIXED_PRECISION, slope: rs / FIXED_PRECISION },
-            green: { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION },
-            blue: { intercept: bi / FIXED_PRECISION, slope: bs / FIXED_PRECISION },
-        };
+        return { red: { intercept: ri / FIXED_PRECISION, slope: rs / FIXED_PRECISION }, green: { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION }, blue: { intercept: bi / FIXED_PRECISION, slope: bs / FIXED_PRECISION } };
     } catch (e) { return null; }
 }
-
 async function loadConfigAndRender() {
     let loadedConfig = null;
     const filename = currentConfigPath.split('/').pop();
@@ -305,7 +264,6 @@ async function loadConfigAndRender() {
         const { stdout } = await exec(`cat ${currentConfigPath}`);
         loadedConfig = parseConfig(stdout);
     } catch (e) { /* 文件不存在或读取失败 */ }
-
     if (loadedConfig) {
         globalConfig = loadedConfig;
         toast(i18next.t('toast.configLoaded', { file: filename }), 'success');
@@ -324,7 +282,6 @@ async function loadConfigAndRender() {
     applyKcal(globalConfig);
     updateChart();
 }
-
 function renderUI(params) {
     for (const color in uiElements) {
         const { intercept, slope } = params[color];
@@ -336,7 +293,7 @@ function renderUI(params) {
     document.querySelectorAll('.form-outline').forEach(formOutline => new Input(formOutline).update());
 }
 
-// --- 事件处理器 ---
+// --- 事件处理器 (无修改) ---
 async function saveConfig() {
     const configString = serializeConfig(globalConfig);
     const filename = currentConfigPath.split('/').pop();
@@ -347,7 +304,6 @@ async function saveConfig() {
         toast(i18next.t('toast.saveFailed', { error: e.message }), 'error');
     }
 }
-
 function resetGlobalConfig() {
     globalConfig = JSON.parse(JSON.stringify(defaultConfig));
     renderUI(globalConfig);
@@ -355,7 +311,6 @@ function resetGlobalConfig() {
     updateChart();
     toast(i18next.t('toast.reset'), 'info');
 }
-
 async function readAndShowNodeStatus() {
     const parsedOutputElem = document.getElementById('parsedNodeOutput');
     parsedOutputElem.innerHTML = i18next.t('status.reading');
@@ -370,22 +325,18 @@ async function readAndShowNodeStatus() {
         if ([ri, rs, rr, gi, gs, gr, bi, bs, br].some(isNaN)) {
             parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeParseError')}</p>`; return;
         }
-        parsedOutputElem.innerHTML = `
-            <h6 class="text-danger">${i18next.t('params.red')}</h6><ul><li>I: ${(ri / FIXED_PRECISION).toFixed(2)} (${ri})</li><li>S: ${(rs / FIXED_PRECISION).toFixed(2)} (${rs})</li><li>Hz: ${rr}</li></ul><hr/>
-            <h6 class="text-success">${i18next.t('params.green')}</h6><ul><li>I: ${(gi / FIXED_PRECISION).toFixed(2)} (${gi})</li><li>S: ${(gs / FIXED_PRECISION).toFixed(2)} (${gs})</li><li>Hz: ${gr}</li></ul><hr/>
-            <h6 class="text-primary">${i18next.t('params.blue')}</h6><ul><li>I: ${(bi / FIXED_PRECISION).toFixed(2)} (${bi})</li><li>S: ${(bs / FIXED_PRECISION).toFixed(2)} (${bs})</li><li>Hz: ${br}</li></ul>`;
+        parsedOutputElem.innerHTML = `<h6 class="text-danger">${i18next.t('params.red')}</h6><ul><li>I: ${(ri / FIXED_PRECISION).toFixed(2)} (${ri})</li><li>S: ${(rs / FIXED_PRECISION).toFixed(2)} (${rs})</li><li>Hz: ${rr}</li></ul><hr/><h6 class="text-success">${i18next.t('params.green')}</h6><ul><li>I: ${(gi / FIXED_PRECISION).toFixed(2)} (${gi})</li><li>S: ${(gs / FIXED_PRECISION).toFixed(2)} (${gs})</li><li>Hz: ${gr}</li></ul><hr/><h6 class="text-primary">${i18next.t('params.blue')}</h6><ul><li>I: ${(bi / FIXED_PRECISION).toFixed(2)} (${bi})</li><li>S: ${(bs / FIXED_PRECISION).toFixed(2)} (${bs})</li><li>Hz: ${br}</li></ul>`;
     } catch (e) {
         parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeReadPermission')}</p>`;
     }
 }
 
-// --- 向导逻辑 ---
+// --- 向导逻辑 (优化) ---
 function calculateFit(point1, point2) {
     const x1 = Math.log(point1.brightness);
     const x2 = Math.log(point2.brightness);
     const y1 = point1.value;
     const y2 = point2.value;
-
     if (Math.abs(x1 - x2) < 1e-6) { return { intercept: y1, slope: 0 }; }
     const slope = (y2 - y1) / (x2 - x1);
     const intercept = y1 - slope * x1;
@@ -394,6 +345,7 @@ function calculateFit(point1, point2) {
 
 function startWizard() {
     originalConfigForWizard = JSON.parse(JSON.stringify(globalConfig));
+    brightnessBeforeWizard = lastKnownBrightness; // 保存进入向导前的亮度
     wizardData = {
         step1: { brightnessPercent: 10, red: 256, green: 256, blue: 256 },
         step2: { brightnessPercent: 80, red: 256, green: 256, blue: 256 }
@@ -430,7 +382,7 @@ function handleWizardNext() {
     wizardFinishButton.style.display = 'block';
     
     setSystemBrightness(wizardData.step2.brightnessPercent);
-    handleWizardColorPreview(2); // Apply initial preview for step 2
+    handleWizardColorPreview(2);
 }
 
 function handleWizardFinish() {
@@ -442,28 +394,21 @@ function handleWizardFinish() {
     const b1 = scaleToSystemBrightness(wizardData.step1.brightnessPercent);
     const b2 = scaleToSystemBrightness(wizardData.step2.brightnessPercent);
 
-    const newRed = calculateFit({ brightness: b1, value: wizardData.step1.red }, { brightness: b2, value: wizardData.step2.red });
-    const newGreen = calculateFit({ brightness: b1, value: wizardData.step1.green }, { brightness: b2, value: wizardData.step2.green });
-    const newBlue = calculateFit({ brightness: b1, value: wizardData.step1.blue }, { brightness: b2, value: wizardData.step2.blue });
-
-    globalConfig = { red: newRed, green: newGreen, blue: newBlue };
+    globalConfig = {
+        red: calculateFit({ brightness: b1, value: wizardData.step1.red }, { brightness: b2, value: wizardData.step2.red }),
+        green: calculateFit({ brightness: b1, value: wizardData.step1.green }, { brightness: b2, value: wizardData.step2.green }),
+        blue: calculateFit({ brightness: b1, value: wizardData.step1.blue }, { brightness: b2, value: wizardData.step2.blue }),
+    };
 
     renderUI(globalConfig);
     applyKcal(globalConfig);
     updateChart();
-    
-    const originalPercentage = Math.round(((lastKnownBrightness - 1) / (maxBrightness - 1)) * 100);
-    setSystemBrightness(originalPercentage);
-    
     wizardModal.hide();
     toast(i18next.t('toast.wizardComplete'), 'success');
 }
 
 function handleWizardCancel() {
     applyKcal(originalConfigForWizard); 
-    const originalPercentage = Math.round(((lastKnownBrightness - 1) / (maxBrightness - 1)) * 100);
-    setSystemBrightness(originalPercentage);
-    
     wizardModal.hide();
     toast(i18next.t('toast.wizardCancelled'), 'info');
 }
@@ -471,17 +416,10 @@ function handleWizardCancel() {
 function handleWizardColorPreview(step) {
     const brightnessPercent = parseInt(step === 1 ? wizardBrightness1.value : wizardBrightness2.value);
     setSystemBrightness(brightnessPercent);
-    
     const r = parseInt(wizardColorSliders[`step${step}`].red.value) / 100;
     const g = parseInt(wizardColorSliders[`step${step}`].green.value) / 100;
     const b = parseInt(wizardColorSliders[`step${step}`].blue.value) / 100;
-
-    const previewConfig = {
-        red: { intercept: r, slope: 0 },
-        green: { intercept: g, slope: 0 },
-        blue: { intercept: b, slope: 0 },
-    };
-    applyKcal(previewConfig);
+    applyKcal({ red: { intercept: r, slope: 0 }, green: { intercept: g, slope: 0 }, blue: { intercept: b, slope: 0 } });
 }
 
 // --- 初始化 ---
@@ -535,29 +473,23 @@ async function init() {
     wizardButton.addEventListener('click', startWizard);
     advancedModeButton.addEventListener('click', () => toggleAdvancedMode(!isAdvancedMode));
 
-    // Advanced editor listeners
     for (const color in uiElements) {
-        const handleParamChange = (param, value) => {
-            globalConfig[color][param] = value;
-            renderUI(globalConfig);
-            applyKcal(globalConfig);
-            updateChart();
-        };
+        const handleParamChange = (param, value) => { globalConfig[color][param] = value; renderUI(globalConfig); applyKcal(globalConfig); updateChart(); };
         uiElements[color].interceptSlider.addEventListener('input', (e) => handleParamChange('intercept', parseInt(e.target.value, 10) / FIXED_PRECISION));
         uiElements[color].interceptInput.addEventListener('change', (e) => handleParamChange('intercept', parseFloat(e.target.value) || 0));
         uiElements[color].slopeSlider.addEventListener('input', (e) => handleParamChange('slope', parseInt(e.target.value, 10) / FIXED_PRECISION));
         uiElements[color].slopeInput.addEventListener('change', (e) => handleParamChange('slope', parseFloat(e.target.value) || 0));
     }
 
-    // Wizard listeners
     wizardNextButton.addEventListener('click', handleWizardNext);
     wizardFinishButton.addEventListener('click', handleWizardFinish);
     wizardCancelButton.addEventListener('click', handleWizardCancel);
     wizardModalElement.addEventListener('hidden.mdb.modal', () => {
-        // This event fires on any hide, so we only restore if the wizard wasn't finished
-        if (originalConfigForWizard) {
-            handleWizardCancel();
-            originalConfigForWizard = null; // Prevent re-running
+        // [优化] 退出向导后，恢复之前的亮度
+        if (brightnessBeforeWizard !== -1) {
+            const originalPercentage = Math.round(((brightnessBeforeWizard - 1) / (maxBrightness - 1)) * 100);
+            setSystemBrightness(originalPercentage);
+            brightnessBeforeWizard = -1;
         }
     });
     
@@ -569,7 +501,7 @@ async function init() {
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateTheme);
     i18next.on('languageChanged', () => updateUIText());
 
-    toggleAdvancedMode(false, false); // Initialize in simple mode
+    toggleAdvancedMode(false, false);
     setInterval(pollSystemStatus, 1000);
 }
 

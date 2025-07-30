@@ -100,6 +100,10 @@ async function pollSystemStatus() {
     } catch (e) { /* 忽略错误 */ }
 
     try {
+        // 在向导打开时，不通过轮询更新亮度值，避免干扰用户操作
+        if (wizardModal && wizardModal.getInstance() && wizardModal.getInstance()._isShown) {
+            return;
+        }
         const { stdout } = await exec(`cat ${BACKLIGHT_PATH}`);
         const newBrightness = parseInt(stdout.trim());
         if (newBrightness !== lastKnownBrightness) {
@@ -151,7 +155,7 @@ function toggleAdvancedMode(enable, showToast = true) {
 
 // --- 主题管理 ---
 function updateTheme() {
-    const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     document.documentElement.setAttribute('data-mdb-theme', isDarkMode ? 'dark' : 'light');
     updateChart();
 }
@@ -164,8 +168,11 @@ async function setSystemBrightness(percentage) {
     const systemValue = scaleToSystemBrightness(percentage);
     try {
         await exec(`echo ${systemValue} > ${BACKLIGHT_PATH}`);
-        brightnessValue.innerText = i18next.t('status.brightnessValue', { value: systemValue, percent: percentage });
-        lastKnownBrightness = systemValue;
+        // Only update main UI if wizard is not open
+        if (!wizardModal || !wizardModal.getInstance() || !wizardModal.getInstance()._isShown) {
+             brightnessValue.innerText = i18next.t('status.brightnessValue', { value: systemValue, percent: percentage });
+             lastKnownBrightness = systemValue;
+        }
     } catch (e) {
         toast(i18next.t('status.brightnessReadError'), 'error');
     }
@@ -379,9 +386,7 @@ function calculateFit(point1, point2) {
     const y1 = point1.value;
     const y2 = point2.value;
 
-    if (Math.abs(x1 - x2) < 1e-6) { // Avoid division by zero if brightness levels are the same
-        return { intercept: y1, slope: 0 };
-    }
+    if (Math.abs(x1 - x2) < 1e-6) { return { intercept: y1, slope: 0 }; }
     const slope = (y2 - y1) / (x2 - x1);
     const intercept = y1 - slope * x1;
     return { intercept, slope };
@@ -394,7 +399,6 @@ function startWizard() {
         step2: { brightnessPercent: 80, red: 256, green: 256, blue: 256 }
     };
     
-    // Reset UI to defaults
     wizardBrightness1.value = wizardData.step1.brightnessPercent;
     wizardColorSliders.step1.red.value = wizardData.step1.red * 100;
     wizardColorSliders.step1.green.value = wizardData.step1.green * 100;
@@ -407,6 +411,9 @@ function startWizard() {
 
     wizardStep1.style.display = 'block';
     wizardStep2.style.display = 'none';
+    wizardNextButton.style.display = 'block';
+    wizardFinishButton.style.display = 'none';
+    
     wizardModal.show();
     setSystemBrightness(wizardData.step1.brightnessPercent);
 }
@@ -419,7 +426,11 @@ function handleWizardNext() {
 
     wizardStep1.style.display = 'none';
     wizardStep2.style.display = 'block';
+    wizardNextButton.style.display = 'none';
+    wizardFinishButton.style.display = 'block';
+    
     setSystemBrightness(wizardData.step2.brightnessPercent);
+    handleWizardColorPreview(2); // Apply initial preview for step 2
 }
 
 function handleWizardFinish() {
@@ -440,12 +451,19 @@ function handleWizardFinish() {
     renderUI(globalConfig);
     applyKcal(globalConfig);
     updateChart();
+    
+    const originalPercentage = Math.round(((lastKnownBrightness - 1) / (maxBrightness - 1)) * 100);
+    setSystemBrightness(originalPercentage);
+    
     wizardModal.hide();
     toast(i18next.t('toast.wizardComplete'), 'success');
 }
 
 function handleWizardCancel() {
-    applyKcal(originalConfigForWizard); // Restore original settings
+    applyKcal(originalConfigForWizard); 
+    const originalPercentage = Math.round(((lastKnownBrightness - 1) / (maxBrightness - 1)) * 100);
+    setSystemBrightness(originalPercentage);
+    
     wizardModal.hide();
     toast(i18next.t('toast.wizardCancelled'), 'info');
 }
@@ -458,7 +476,6 @@ function handleWizardColorPreview(step) {
     const g = parseInt(wizardColorSliders[`step${step}`].green.value) / 100;
     const b = parseInt(wizardColorSliders[`step${step}`].blue.value) / 100;
 
-    // Apply a flat profile for live preview
     const previewConfig = {
         red: { intercept: r, slope: 0 },
         green: { intercept: g, slope: 0 },
@@ -536,7 +553,13 @@ async function init() {
     wizardNextButton.addEventListener('click', handleWizardNext);
     wizardFinishButton.addEventListener('click', handleWizardFinish);
     wizardCancelButton.addEventListener('click', handleWizardCancel);
-    wizardModalElement.addEventListener('hidden.mdb.modal', handleWizardCancel);
+    wizardModalElement.addEventListener('hidden.mdb.modal', () => {
+        // This event fires on any hide, so we only restore if the wizard wasn't finished
+        if (originalConfigForWizard) {
+            handleWizardCancel();
+            originalConfigForWizard = null; // Prevent re-running
+        }
+    });
     
     wizardBrightness1.addEventListener('input', () => setSystemBrightness(parseInt(wizardBrightness1.value)));
     wizardBrightness2.addEventListener('input', () => setSystemBrightness(parseInt(wizardBrightness2.value)));

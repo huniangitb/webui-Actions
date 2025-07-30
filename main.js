@@ -71,7 +71,6 @@ const wizardColorSliders = {
     step2: { red: document.getElementById('wizardColorR2'), green: document.getElementById('wizardColorG2'), blue: document.getElementById('wizardColorB2') }
 };
 
-// [新增] 向导中输入框的引用
 const wizardColorInputs = {
     step1: { red: document.getElementById('wizardColorR1_input'), green: document.getElementById('wizardColorG1_input'), blue: document.getElementById('wizardColorB1_input') },
     step2: { red: document.getElementById('wizardColorR2_input'), green: document.getElementById('wizardColorG2_input'), blue: document.getElementById('wizardColorB2_input') }
@@ -246,7 +245,8 @@ function startWizard() {
 
     for (const step in wizardColorInputs) {
         for (const color in wizardColorInputs[step]) {
-            const val = wizardData[step.replace('step', 'step')][color];
+            // [修正] 使用简单直接的属性访问
+            const val = wizardData[step][color];
             wizardColorInputs[step][color].value = val.toFixed(2);
             wizardColorSliders[step][color].value = val * FIXED_PRECISION;
             new Input(wizardColorInputs[step][color].parentNode).update();

@@ -17,6 +17,8 @@ const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
 const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
 
 const FIXED_PRECISION = 100;
+const NUM_CHART_POINTS = 50; // 定义图表数据点的数量
+
 const defaultConfig = {
     red: { intercept: 256.0, slope: 0.0 },
     green: { intercept: 256.0, slope: 0.0 },
@@ -169,30 +171,102 @@ async function setSystemBrightness(percentage) {
     }
 }
 
-// --- Chart.js 函数 (无修改) ---
+// --- Chart.js 函数 ---
+// [修改] 重写此函数以生成对数分布的数据点
 function calculateChartData(params) {
-    const datasets = [];
-    const colors = { red: 'rgba(255, 99, 132, 1)', green: 'rgba(75, 192, 192, 1)', blue: 'rgba(54, 162, 235, 1)' };
-    for (const color in params) {
-        const data = [];
-        const { intercept, slope } = params[color];
-        for (let p = 0; p <= 100; p += 2) {
-            const systemBrightness = Math.max(1, scaleToSystemBrightness(p));
-            const log_b = Math.log(systemBrightness);
-            data.push(intercept + (slope * log_b));
+    const labels = [];
+    const colorData = {
+        red: [],
+        green: [],
+        blue: []
+    };
+
+    const logMin = Math.log(1);
+    const logMax = Math.log(maxBrightness);
+
+    for (let i = 0; i < NUM_CHART_POINTS; i++) {
+        // 在对数空间中生成一个均匀分布的点
+        const logPoint = logMin + (logMax - logMin) * (i / (NUM_CHART_POINTS - 1));
+        
+        // 将该点转换回线性系统亮度值
+        const systemBrightness = Math.exp(logPoint);
+
+        // 计算对应的百分比，作为X轴标签
+        const percentage = ((systemBrightness - 1) / (maxBrightness - 1)) * 100;
+        labels.push(percentage.toFixed(0));
+
+        // 使用这个对数点来计算Y轴的值 (Kcal value)
+        for (const color in params) {
+            const { intercept, slope } = params[color];
+            const final_val = intercept + (slope * logPoint);
+            colorData[color].push(final_val);
         }
-        datasets.push({ label: i18next.t(`params.${color}`), data, borderColor: colors[color], backgroundColor: colors[color].replace('1)', '0.2)'), tension: 0.4, borderWidth: 2, pointRadius: 0 });
     }
-    return { labels: Array.from({ length: 51 }, (_, i) => i * 2), datasets };
+    
+    const datasets = [{
+        label: i18next.t('params.red'),
+        data: colorData.red,
+        borderColor: 'rgba(255, 99, 132, 1)',
+        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+        tension: 0.1, // 使用较小的张力使曲线更贴近数据点
+        borderWidth: 2,
+        pointRadius: 0
+    }, {
+        label: i18next.t('params.green'),
+        data: colorData.green,
+        borderColor: 'rgba(75, 192, 192, 1)',
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        tension: 0.1,
+        borderWidth: 2,
+        pointRadius: 0
+    }, {
+        label: i18next.t('params.blue'),
+        data: colorData.blue,
+        borderColor: 'rgba(54, 162, 235, 1)',
+        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+        tension: 0.1,
+        borderWidth: 2,
+        pointRadius: 0
+    }];
+    
+    return { labels, datasets };
 }
+
 function initChart() {
     if (colorChart) colorChart.destroy();
     const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
     const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
     const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
     const chartData = calculateChartData(globalConfig);
-    colorChart = new Chart(chartCanvas.getContext('2d'), { type: 'line', data: chartData, options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: i18next.t('status.brightness'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } }, y: { title: { display: true, text: i18next.t('chart.yAxisTitle'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } } }, plugins: { legend: { display: true, labels: { color: tickColor } } } } });
+    colorChart = new Chart(chartCanvas.getContext('2d'), { 
+        type: 'line', 
+        data: chartData, 
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            scales: { 
+                x: { 
+                    title: { display: true, text: i18next.t('status.brightness'), color: tickColor }, 
+                    ticks: { 
+                        color: tickColor,
+                        // 自动跳过一些标签，避免拥挤
+                        maxTicksLimit: 10 
+                    }, 
+                    grid: { color: gridColor } 
+                }, 
+                y: { 
+                    title: { display: true, text: i18next.t('chart.yAxisTitle'), color: tickColor }, 
+                    ticks: { color: tickColor }, 
+                    grid: { color: gridColor } 
+                } 
+            }, 
+            plugins: { 
+                legend: { display: true, labels: { color: tickColor } } 
+            } 
+        } 
+    });
 }
+
 function updateChart() {
     if (!chartCanvas) return;
     if (colorChart) {
@@ -210,7 +284,9 @@ function updateChart() {
         colorChart.options.scales.y.grid.color = gridColor;
         colorChart.options.plugins.legend.labels.color = tickColor;
         colorChart.update('none');
-    } else { initChart(); }
+    } else { 
+        initChart(); 
+    }
 }
 
 // --- 核心逻辑 (无修改) ---
@@ -467,10 +543,8 @@ async function init() {
 
         elements.interceptSlider.addEventListener('input', (e) => handleParamChange('intercept', parseInt(e.target.value, 10) / FIXED_PRECISION));
         
-        // [修改] 增加对数字输入的范围限制
         elements.interceptInput.addEventListener('change', (e) => {
             const val = parseFloat(e.target.value) || 0;
-            // 将值限制在 0 到 256 之间
             const clampedVal = Math.max(0, Math.min(val, 256));
             handleParamChange('intercept', clampedVal);
         });

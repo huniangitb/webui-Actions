@@ -7,7 +7,7 @@ const resources = {
     translation: {
       // Header
       title: "MiuiCX Color Tuner",
-      subtitle: " ",
+      subtitle: { simplified: "Simplified Two-Point Calibration" },
       // Status Card
       "status.cardTitle": "Live Status",
       "status.refreshRate": "Refresh Rate:",
@@ -17,14 +17,22 @@ const resources = {
       "status.brightnessReadError": "Failed to read brightness",
       "status.brightnessPathError": "Backlight path not set",
       "status.refreshRateReadError": "Unavailable",
-      // Config Card
-      "config.cardTitle": "Settings",
-      "config.description": "Click 'Edit' to adjust parameters.",
+      // Calibration Section
+      "calibration.title": "Two-Point Calibration",
+      "calibration.description": "Adjust color at low and high brightness. The app will calculate the curve.",
+      "calibration.step1.title": "Step 1: Low Brightness Point",
+      "calibration.step1.description": "Set screen to a comfortable low brightness, then click below to adjust color.",
+      "calibration.step1.button": "Set Low Point",
+      "calibration.step1.status": "Not set",
+      "calibration.step1.statusSet": "Set: {{offset}} ({{brightness}}%)",
+      "calibration.step2.title": "Step 2: High Brightness Point",
+      "calibration.step2.description": "Set screen to maximum brightness, then click below to adjust color.",
+      "calibration.step2.button": "Set High Point",
+      "calibration.step2.status": "Not set",
+      "calibration.step2.statusSet": "Set: {{offset}} ({{brightness}}%)",
+      "calibration.offsetLabel": "Color Offset (Green <-> Red)",
+      "calibration.confirmButton": "Confirm Point",
       // Buttons
-      "buttons.editMode.enter": { "icon": "mdiFileEdit", "text": "Edit" },
-      "buttons.editMode.exit": { "icon": "mdiLock", "text": "Lock" },
-      "buttons.customizeRanges": { "icon": "mdiTune", "text": "Set Ranges" },
-      "buttons.readNode": { "icon": "mdiSync", "text": "Read Node" },
       "buttons.reset": { "icon": "mdiRestore", "text": "Reset" },
       "buttons.save": "Save",
       // Params & Chart
@@ -32,7 +40,7 @@ const resources = {
       "params.slope": "Slope",
       "params.red": "Red",
       "params.green": "Green",
-      "params.blue": "Blue", // [新增]
+      "params.blue": "Blue",
       "chart.yAxisTitle": "Calculated Value",
       // Footer
       "footer.author": "Author: 囫碾 | WebUI by Gemini Pro",
@@ -51,6 +59,7 @@ const resources = {
       "toast.configLoadFailed": "Config '{{file}}' not found. Reading from node...",
       "toast.configLoadFromNode": "Loaded values from node.",
       "toast.configLoadFromNodeFailed": "Can't read node. Using defaults.",
+      "toast.configLoadFromDefault": "Using default config.",
       "toast.saved": "Config saved to {{file}}.",
       "toast.saveFailed": "Save failed: {{error}}",
       "toast.reset": "Settings reset to default.",
@@ -60,6 +69,9 @@ const resources = {
       "toast.editMode": "Edit mode enabled.",
       "toast.backlightPathError": "Backlight path error.",
       "toast.refreshRateChanged": "Refresh rate changed to {{rate}}Hz. Switched profile.",
+      "toast.lowPointSet": "Low brightness point set. Now set the high point.",
+      "toast.highPointSet": "High brightness point set. Calibration complete!",
+      "toast.calibrationNeeded": "Please set both low and high brightness points before saving.",
       // Errors
       "errors.nodeParseError": "Invalid node format.",
       "errors.nodeReadFailed": "Read failed: {{error}}",
@@ -70,7 +82,7 @@ const resources = {
     translation: {
       // Header
       title: "MiuiCX 色彩调节",
-      subtitle: " ",
+      subtitle: { simplified: "两点简易校准" },
       // Status Card
       "status.cardTitle": "实时状态",
       "status.refreshRate": "刷新率:",
@@ -80,14 +92,22 @@ const resources = {
       "status.brightnessReadError": "无法读取亮度文件",
       "status.brightnessPathError": "未配置背光路径",
       "status.refreshRateReadError": "不可用",
-      // Config Card
-      "config.cardTitle": "参数设置",
-      "config.description": "点击编辑调整参数",
+      // Calibration Section
+      "calibration.title": "两点校准",
+      "calibration.description": "通过调整低亮度和高亮度下的色彩偏移，应用将自动计算色彩曲线。",
+      "calibration.step1.title": "第一步：校准低亮度",
+      "calibration.step1.description": "将屏幕亮度调至舒适的低亮度，然后点击下方按钮进行色彩微调。",
+      "calibration.step1.button": "设置低亮度点",
+      "calibration.step1.status": "未设置",
+      "calibration.step1.statusSet": "已设置: 偏移 {{offset}} (亮度 {{brightness}}%)",
+      "calibration.step2.title": "第二步：校准高亮度",
+      "calibration.step2.description": "将屏幕亮度调至最高，然后点击下方按钮进行色彩微调。",
+      "calibration.step2.button": "设置高亮度点",
+      "calibration.step2.status": "未设置",
+      "calibration.step2.statusSet": "已设置: 偏移 {{offset}} (亮度 {{brightness}}%)",
+      "calibration.offsetLabel": "色彩偏移 (偏绿 <-> 偏红)",
+      "calibration.confirmButton": "确认此点",
       // Buttons
-      "buttons.editMode.enter": { "icon": "mdiFileEdit", "text": "编辑" },
-      "buttons.editMode.exit": { "icon": "mdiLock", "text": "锁定" },
-      "buttons.customizeRanges": { "icon": "mdiTune", "text": "范围设置" },
-      "buttons.readNode": { "icon": "mdiSync", "text": "读取节点" },
       "buttons.reset": { "icon": "mdiRestore", "text": "重置" },
       "buttons.save": "保存",
       // Params & Chart
@@ -95,7 +115,7 @@ const resources = {
       "params.slope": "斜率",
       "params.red": "红色",
       "params.green": "绿色",
-      "params.blue": "蓝色", // [新增]
+      "params.blue": "蓝色",
       "chart.yAxisTitle": "计算值",
       // Footer
       "footer.author": "作者: 囫碾 | WebUI by Gemini2.5 Pro",
@@ -114,6 +134,7 @@ const resources = {
       "toast.configLoadFailed": "未找到配置 '{{file}}'，正从节点读取...",
       "toast.configLoadFromNode": "已从节点加载",
       "toast.configLoadFromNodeFailed": "节点读取失败，使用默认值",
+      "toast.configLoadFromDefault": "使用默认配置",
       "toast.saved": "配置已保存至 {{file}}",
       "toast.saveFailed": "保存失败: {{error}}",
       "toast.reset": "已重置",
@@ -123,6 +144,9 @@ const resources = {
       "toast.editMode": "进入编辑模式",
       "toast.backlightPathError": "背光路径错误",
       "toast.refreshRateChanged": "刷新率变为 {{rate}}Hz，已切换配置文件。",
+      "toast.lowPointSet": "低亮度点已设置，请继续设置高亮度点。",
+      "toast.highPointSet": "高亮度点已设置，校准完成！",
+      "toast.calibrationNeeded": "请先设置低、高两个亮度点再保存。",
       // Errors
       "errors.nodeParseError": "节点格式无效",
       "errors.nodeReadFailed": "读取失败: {{error}}",

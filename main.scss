@@ -1,19 +1,9 @@
-// 导入 MDBootstrap
 @use "mdb-ui-kit/src/scss/mdb.free.scss";
-
-// [修改] 移除所有图标库的 @import
+@import "@mdi/font/css/materialdesignicons.min.css";
 
 body {
   font-size: 16px; 
   padding-bottom: 150px;
-}
-
-// [新增] SVG 图标样式
-.btn .svg-icon {
-  width: 1em;
-  height: 1em;
-  vertical-align: -0.125em; // 类似于 Font Awesome 的对齐方式
-  fill: currentColor; // 使 SVG 颜色与按钮文本颜色一致
 }
 
 .card-title {
@@ -67,6 +57,18 @@ body {
   border-radius: 0.25rem;
   word-wrap: break-word;
   white-space: pre-wrap;
+}
+
+/* [新增] 校准步骤样式 */
+.calibration-step {
+    margin-bottom: 1rem;
+    padding: 0.5rem 0;
+}
+.calibration-step p {
+    margin-bottom: 0.5rem;
+}
+.calibration-step button {
+    margin-top: 0.5rem;
 }
 
 @media (max-width: 768px) {

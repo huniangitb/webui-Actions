@@ -1,15 +1,12 @@
-// 导入 MDB-UI-Kit 组件 和 Chart.js
 import Chart from 'chart.js/auto';
 import { Ripple, Range, Input, Modal, initMDB } from 'mdb-ui-kit';
 import { exec, toast } from 'kernelsu';
 import i18next from './i18n.js';
 import { mdiFileEdit, mdiLock, mdiTune, mdiSync, mdiRestore } from '@mdi/js';
 
-// --- 常量和全局变量 ---
 const MODULE_ID = "miuicx_color_tuner";
 const MODULE_PATH = `/data/adb/modules/${MODULE_ID}`;
 let currentConfigPath = ''; 
-// [修改] 新的节点路径
 const KCAL_RED_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_red";
 const KCAL_GREEN_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_green";
 const KCAL_BLUE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_blue";
@@ -19,12 +16,7 @@ const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
 const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
 
 const FIXED_PRECISION = 100;
-// [修改] 新的默认配置结构
-const defaultConfig = {
-    red: { intercept: 256.0, slope: 0.0 },
-    green: { intercept: 256.0, slope: 0.0 },
-    blue: { intercept: 256.0, slope: 0.0 },
-};
+const defaultConfig = { intercept: 256.0, slope: 0.0 }; // 默认的 intercept 和 slope
 
 const defaultRanges = {
     intercept: { min: 0, max: 256 },
@@ -33,69 +25,45 @@ const defaultRanges = {
 
 const icons = { mdiFileEdit, mdiLock, mdiTune, mdiSync, mdiRestore };
 
-let globalConfig = JSON.parse(JSON.stringify(defaultConfig)); // 深拷贝
+let globalConfig = JSON.parse(JSON.stringify(defaultConfig)); // 当前生效的 intercept 和 slope
 let maxBrightness = 4095;
 let currentRefreshRate = 60;
 let colorChart = null;
-let nodeStatusModal = null;
-let rangeConfigModal = null;
-let isEditMode = false;
+let calibrationModal = null; // 校准模态框实例
+
+let calibrationPoints = {
+    low: null, // { brightness: number, offset: number }
+    high: null, // { brightness: number, offset: number }
+};
+let currentCalibrationMode = null; // 'low' or 'high'
+
 let lastKnownRefreshRate = 0;
 let lastKnownBrightness = -1;
 
-// --- DOM 元素 ---
 const brightnessSlider = document.getElementById('brightnessSlider');
 const brightnessValue = document.getElementById('brightnessValue');
 const refreshRateValue = document.getElementById('refreshRateValue');
 const saveButton = document.getElementById('saveButton');
-const resetConfigButton = document.getElementById('resetConfigButton');
-const readNodeButton = document.getElementById('readNodeButton');
-const customizeRangeButton = document.getElementById('customizeRangeButton');
+const resetButton = document.getElementById('resetButton'); // 重命名为 resetButton
+const setLowPointButton = document.getElementById('setLowPointButton');
+const setHighPointButton = document.getElementById('setHighPointButton');
+const lowPointStatus = document.getElementById('lowPointStatus');
+const highPointStatus = document.getElementById('highPointStatus');
+const colorOffsetSlider = document.getElementById('colorOffsetSlider');
+const colorOffsetValue = document.getElementById('colorOffsetValue');
+const confirmCalibrationButton = document.getElementById('confirmCalibrationButton');
 const chartCanvas = document.getElementById('colorCurveChart');
-const toggleEditModeButton = document.getElementById('toggleEditModeButton');
-const configEditorContainer = document.getElementById('global-config-editor');
 
-// [修改] 新的UI元素
-const uiElements = {
-    red: {
-        interceptSlider: document.getElementById('redInterceptSlider'),
-        interceptInput: document.getElementById('redInterceptInput'),
-        slopeSlider: document.getElementById('redSlopeSlider'),
-        slopeInput: document.getElementById('redSlopeInput'),
-    },
-    green: {
-        interceptSlider: document.getElementById('greenInterceptSlider'),
-        interceptInput: document.getElementById('greenInterceptInput'),
-        slopeSlider: document.getElementById('greenSlopeSlider'),
-        slopeInput: document.getElementById('greenSlopeInput'),
-    },
-    blue: {
-        interceptSlider: document.getElementById('blueInterceptSlider'),
-        interceptInput: document.getElementById('blueInterceptInput'),
-        slopeSlider: document.getElementById('blueSlopeSlider'),
-        slopeInput: document.getElementById('blueSlopeInput'),
-    },
-};
-
-const interceptRangeMin = document.getElementById('interceptRangeMin');
-const interceptRangeMax = document.getElementById('interceptRangeMax');
-const slopeRangeMin = document.getElementById('slopeRangeMin');
-const slopeRangeMax = document.getElementById('slopeRangeMax');
-const saveRangeButton = document.getElementById('saveRangeButton');
-
-// --- SVG 图标创建函数 ---
 function createIcon(path) {
   if (!path) return '';
   return `<svg class="svg-icon me-2" viewBox="0 0 24 24"><path d="${path}" /></svg>`;
 }
 
-// --- 轮询函数 ---
 async function pollSystemStatus() {
     try {
         const { stdout } = await exec('settings get system peak_refresh_rate');
         const newRate = Math.round(parseFloat(stdout.trim())) || 60;
         if (newRate !== lastKnownRefreshRate) {
-            console.log(`Refresh rate changed: ${lastKnownRefreshRate} -> ${newRate}`);
             lastKnownRefreshRate = newRate;
             currentRefreshRate = newRate;
             refreshRateValue.innerText = `${currentRefreshRate} Hz`;
@@ -103,22 +71,20 @@ async function pollSystemStatus() {
             toast(i18next.t('toast.refreshRateChanged', { rate: newRate }), 'info');
             await loadConfigAndRender();
         }
-    } catch (e) { /* 忽略错误 */ }
+    } catch (e) { /* ignore */ }
 
     try {
         const { stdout } = await exec(`cat ${BACKLIGHT_PATH}`);
         const newBrightness = parseInt(stdout.trim());
         if (newBrightness !== lastKnownBrightness) {
-            console.log(`Brightness changed: ${lastKnownBrightness} -> ${newBrightness}`);
             lastKnownBrightness = newBrightness;
-            const percentage = Math.round(((newBrightness - 1) / (maxBrightness - 1)) * 100);
+            const percentage = Math.round((newBrightness / maxBrightness) * 100); // 亮度百分比计算
             brightnessValue.innerText = i18next.t('status.brightnessValue', { value: newBrightness, percent: percentage });
             brightnessSlider.value = percentage;
         }
-    } catch (e) { /* 忽略错误 */ }
+    } catch (e) { /* ignore */ }
 }
 
-// --- 多语言UI更新 ---
 function updateUIText() {
     const elements = document.querySelectorAll('[data-i18n]');
     elements.forEach(el => {
@@ -138,42 +104,30 @@ function updateUIText() {
         new Input(formOutline).update();
     });
     updateChart();
-    toggleEditMode(isEditMode);
+    updateCalibrationStatusUI(); // 更新校准点状态显示
 }
 
-// --- 编辑/查看模式切换 ---
-function toggleEditMode(enable) {
-    isEditMode = enable;
-    const controls = configEditorContainer.querySelectorAll('input[type="range"], input[type="number"]');
-    controls.forEach(control => {
-        control.disabled = !enable;
-    });
-    saveButton.disabled = !enable;
-    resetConfigButton.disabled = !enable;
-
-    const key = enable ? 'buttons.editMode.exit' : 'buttons.editMode.enter';
-    const translation = i18next.t(key, { returnObjects: true });
-    if (typeof translation === 'object') {
-        toggleEditModeButton.innerHTML = `${createIcon(icons[translation.icon])}${translation.text}`;
-    }
-    
-    if (enable) {
-        toggleEditModeButton.classList.remove('btn-success');
-        toggleEditModeButton.classList.add('btn-danger');
+function updateCalibrationStatusUI() {
+    if (calibrationPoints.low) {
+        const brightnessPercent = Math.round((calibrationPoints.low.brightness / maxBrightness) * 100);
+        lowPointStatus.innerText = i18next.t('calibration.step1.statusSet', { offset: calibrationPoints.low.offset, brightness: brightnessPercent });
     } else {
-        toggleEditModeButton.classList.remove('btn-danger');
-        toggleEditModeButton.classList.add('btn-success');
+        lowPointStatus.innerText = i18next.t('calibration.step1.status');
+    }
+    if (calibrationPoints.high) {
+        const brightnessPercent = Math.round((calibrationPoints.high.brightness / maxBrightness) * 100);
+        highPointStatus.innerText = i18next.t('calibration.step2.statusSet', { offset: calibrationPoints.high.offset, brightness: brightnessPercent });
+    } else {
+        highPointStatus.innerText = i18next.t('calibration.step2.status');
     }
 }
 
-// --- 主题管理 ---
 function updateTheme() {
     const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     document.documentElement.setAttribute('data-mdb-theme', isDarkMode ? 'dark' : 'light');
     updateChart();
 }
 
-// --- 工具函数 ---
 const scaleToSystemBrightness = (percentage) => Math.round(1 + (percentage / 100) * (maxBrightness - 1));
 
 async function setSystemBrightness(percentage) {
@@ -188,197 +142,72 @@ async function setSystemBrightness(percentage) {
     }
 }
 
-// --- 范围管理 ---
-function applyRanges(ranges) {
-    for (const color in uiElements) {
-        uiElements[color].interceptSlider.min = ranges.intercept.min * FIXED_PRECISION;
-        uiElements[color].interceptSlider.max = ranges.intercept.max * FIXED_PRECISION;
-        uiElements[color].slopeSlider.min = ranges.slope.min * FIXED_PRECISION;
-        uiElements[color].slopeSlider.max = ranges.slope.max * FIXED_PRECISION;
-    }
-}
-
-function loadAndApplyRanges() {
-    let ranges = { ...defaultRanges };
-    try {
-        const savedRanges = localStorage.getItem(RANGE_CONFIG_KEY);
-        if (savedRanges) {
-            const parsed = JSON.parse(savedRanges);
-            if (parsed.intercept) ranges.intercept = { ...ranges.intercept, ...parsed.intercept };
-            if (parsed.slope) ranges.slope = { ...ranges.slope, ...parsed.slope };
-        }
-    } catch (e) {
-        console.error("加载范围配置失败:", e);
-    }
-    applyRanges(ranges);
-}
-
-function saveRanges() {
-    const iMin = parseFloat(interceptRangeMin.value);
-    const iMax = parseFloat(interceptRangeMax.value);
-    const sMin = parseFloat(slopeRangeMin.value);
-    const sMax = parseFloat(slopeRangeMax.value);
-
-    if ([iMin, iMax, sMin, sMax].some(isNaN)) {
-        toast(i18next.t('toast.rangeError.nan'), 'error'); return;
-    }
-    if (iMin >= iMax || sMin >= sMax) {
-        toast(i18next.t('toast.rangeError.minMax'), 'error'); return;
+function calculateFit() {
+    const { low, high } = calibrationPoints;
+    if (!low || !high) {
+        return { intercept: 256.0, slope: 0.0 };
     }
 
-    const newRanges = {
-        intercept: { min: iMin, max: iMax },
-        slope: { min: sMin, max: sMax },
-    };
-    localStorage.setItem(RANGE_CONFIG_KEY, JSON.stringify(newRanges));
-    applyRanges(newRanges);
-    rangeConfigModal.hide();
-    toast(i18next.t('toast.rangeSaved'), 'success');
-}
+    const x1 = Math.log(Math.max(1, low.brightness)); // 确保亮度至少为1，避免log(0)
+    const y1 = low.offset;
+    const x2 = Math.log(Math.max(1, high.brightness)); // 确保亮度至少为1，避免log(0)
+    const y2 = high.offset;
 
-// --- Chart.js 函数 ---
-function calculateChartData(params) {
-    const labels = [];
-    const datasets = [];
-    const colors = {
-        red: 'rgba(255, 99, 132, 1)',
-        green: 'rgba(75, 192, 192, 1)',
-        blue: 'rgba(54, 162, 235, 1)',
-    };
-
-    for (const color in params) {
-        const data = [];
-        const { intercept, slope } = params[color];
-        for (let p = 0; p <= 100; p += 2) {
-            const systemBrightness = Math.max(1, scaleToSystemBrightness(p));
-            const log_b = Math.log(systemBrightness);
-            const final_val = intercept + (slope * log_b);
-            if (p === 0) labels.push(0);
-            data.push(final_val);
-        }
-        datasets.push({
-            label: i18next.t(`params.${color}`),
-            data: data,
-            borderColor: colors[color],
-            backgroundColor: colors[color].replace('1)', '0.2)'),
-            tension: 0.4,
-            borderWidth: 2,
-            pointRadius: 0
-        });
+    if (x1 === x2) { // 避免除以零，如果亮度相同，则斜率为0
+        return { intercept: y1, slope: 0.0 };
     }
-    
-    return { labels: Array.from({length: 51}, (_, i) => i * 2), datasets };
+
+    const slope = (y2 - y1) / (x2 - x1);
+    const intercept = y1 - slope * x1;
+
+    return { intercept, slope };
 }
 
-function initChart() {
-    if (colorChart) colorChart.destroy();
-    const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
-    const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
-    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-    const chartData = calculateChartData(globalConfig);
-    const ctx = chartCanvas.getContext('2d');
-    colorChart = new Chart(ctx, {
-        type: 'line',
-        data: chartData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: { title: { display: true, text: i18next.t('status.brightness'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } },
-                y: { title: { display: true, text: i18next.t('chart.yAxisTitle'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } }
-            },
-            plugins: { legend: { display: true, labels: { color: tickColor } } }
-        }
-    });
-}
-
-function updateChart() {
-    if (!chartCanvas) return;
-    if (colorChart) {
-        const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
-        const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
-        const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-        
-        colorChart.data = calculateChartData(globalConfig);
-        colorChart.options.scales.x.title.text = i18next.t('status.brightness');
-        colorChart.options.scales.x.title.color = tickColor;
-        colorChart.options.scales.x.ticks.color = tickColor;
-        colorChart.options.scales.x.grid.color = gridColor;
-        colorChart.options.scales.y.title.text = i18next.t('chart.yAxisTitle');
-        colorChart.options.scales.y.title.color = tickColor;
-        colorChart.options.scales.y.ticks.color = tickColor;
-        colorChart.options.scales.y.grid.color = gridColor;
-        colorChart.options.plugins.legend.labels.color = tickColor;
-        
-        colorChart.update('none');
-    } else {
-        initChart();
-    }
-}
-
-// --- 核心逻辑 ---
 async function applyKcal(params) {
-    if (!params) return;
+    const { intercept, slope } = params;
+    const int_intercept = Math.round(intercept * FIXED_PRECISION);
+    const int_slope = Math.round(slope * FIXED_PRECISION);
+    
+    const command = `${int_intercept} ${int_slope} ${currentRefreshRate}`;
+    
     try {
-        const red_i = Math.round(params.red.intercept * FIXED_PRECISION);
-        const red_s = Math.round(params.red.slope * FIXED_PRECISION);
-        const green_i = Math.round(params.green.intercept * FIXED_PRECISION);
-        const green_s = Math.round(params.green.slope * FIXED_PRECISION);
-        const blue_i = Math.round(params.blue.intercept * FIXED_PRECISION);
-        const blue_s = Math.round(params.blue.slope * FIXED_PRECISION);
-
-        await exec(`echo "${red_i} ${red_s} ${currentRefreshRate}" > ${KCAL_RED_PATH}`);
-        await exec(`echo "${green_i} ${green_s} ${currentRefreshRate}" > ${KCAL_GREEN_PATH}`);
-        await exec(`echo "${blue_i} ${blue_s} ${currentRefreshRate}" > ${KCAL_BLUE_PATH}`);
+        await exec(`echo "${command}" > ${KCAL_RED_PATH}`);
+        await exec(`echo "${command}" > ${KCAL_GREEN_PATH}`);
+        await exec(`echo "${command}" > ${KCAL_BLUE_PATH}`);
     } catch (e) {
         console.warn(`应用Kcal失败: ${e.message}`);
     }
 }
 
-function parseConfig(text) {
-    const content = text.trim();
-    if (!content) return null;
-    const parts = content.split(/\s+/);
-    if (parts.length === 6) { // 新的6参数格式
-        const [ri, rs, gi, gs, bi, bs] = parts.map(p => parseInt(p, 10));
-        if ([ri, rs, gi, gs, bi, bs].some(isNaN)) return null;
-        
-        return {
-            red: { intercept: ri / FIXED_PRECISION, slope: rs / FIXED_PRECISION },
-            green: { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION },
-            blue: { intercept: bi / FIXED_PRECISION, slope: bs / FIXED_PRECISION },
-        };
-    }
-    return null;
+function serializeConfig(params) {
+    const { intercept, slope } = params;
+    const int_intercept = Math.round(intercept * FIXED_PRECISION);
+    const int_slope = Math.round(slope * FIXED_PRECISION);
+    return `${int_intercept} ${int_slope}`;
 }
 
-function serializeConfig(params) {
-    const ri = Math.round(params.red.intercept * FIXED_PRECISION);
-    const rs = Math.round(params.red.slope * FIXED_PRECISION);
-    const gi = Math.round(params.green.intercept * FIXED_PRECISION);
-    const gs = Math.round(params.green.slope * FIXED_PRECISION);
-    const bi = Math.round(params.blue.intercept * FIXED_PRECISION);
-    const bs = Math.round(params.blue.slope * FIXED_PRECISION);
-    return `${ri} ${rs} ${gi} ${gs} ${bi} ${bs}`;
+function parseConfig(text) {
+    const parts = text.trim().split(/\s+/);
+    if (parts.length === 2) { // 新的2参数格式
+        const [i, s] = parts.map(p => parseInt(p, 10));
+        if ([i, s].some(isNaN)) return null;
+        return { intercept: i / FIXED_PRECISION, slope: s / FIXED_PRECISION };
+    }
+    // 兼容旧的6参数格式，只取green通道的值
+    if (parts.length === 6) {
+        const [ri, rs, gi, gs, bi, bs] = parts.map(p => parseInt(p, 10));
+        if ([gi, gs].some(isNaN)) return null;
+        return { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION };
+    }
+    return null;
 }
 
 async function readKcalNodeAsConfig() {
     try {
         const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`);
-        const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`);
-        const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`);
-
         const [ri, rs] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        const [gi, gs] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        const [bi, bs] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-
-        if ([ri, rs, gi, gs, bi, bs].some(isNaN)) return null;
-
-        return {
-            red: { intercept: ri / FIXED_PRECISION, slope: rs / FIXED_PRECISION },
-            green: { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION },
-            blue: { intercept: bi / FIXED_PRECISION, slope: bs / FIXED_PRECISION },
-        };
+        if ([ri, rs].some(isNaN)) return null;
+        return { intercept: ri / FIXED_PRECISION, slope: rs / FIXED_PRECISION };
     } catch (e) {
         console.error("读取Kcal节点作为默认值失败:", e);
         return null;
@@ -391,7 +220,7 @@ async function loadConfigAndRender() {
     try {
         const { stdout } = await exec(`cat ${currentConfigPath}`);
         loadedConfig = parseConfig(stdout);
-    } catch (e) { /* 文件不存在或读取失败，忽略错误 */ }
+    } catch (e) { /* ignore */ }
 
     if (loadedConfig) {
         globalConfig = loadedConfig;
@@ -407,29 +236,28 @@ async function loadConfigAndRender() {
             toast(i18next.t('toast.configLoadFromNodeFailed'), 'warning');
         }
     }
-
+    // 根据加载的 globalConfig 重新计算校准点
+    // 这部分需要根据实际情况调整，如果配置文件只存最终参数，则无法反推校准点
+    // 简单起见，这里不反推，只更新UI
     renderUI(globalConfig);
     applyKcal(globalConfig);
     updateChart();
 }
 
 function renderUI(params) {
-    for (const color in uiElements) {
-        const { intercept, slope } = params[color];
-        const elements = uiElements[color];
-        elements.interceptInput.value = intercept.toFixed(2);
-        elements.interceptSlider.value = Math.max(elements.interceptSlider.min, Math.min(intercept * FIXED_PRECISION, elements.interceptSlider.max));
-        elements.slopeInput.value = slope.toFixed(2);
-        elements.slopeSlider.value = Math.max(elements.slopeSlider.min, Math.min(slope * FIXED_PRECISION, elements.slopeSlider.max));
-    }
-    document.querySelectorAll('.form-outline').forEach((formOutline) => {
-        new Input(formOutline).update();
-    });
+    // 在简化模式下，UI不再直接显示intercept和slope的输入框和滑块
+    // 而是通过图表反映最终效果
+    // 这里只需要确保图表更新
+    updateChart();
 }
 
-// --- 事件处理器 ---
 async function saveConfig() {
-    const configString = serializeConfig(globalConfig);
+    if (!calibrationPoints.low || !calibrationPoints.high) {
+        toast(i18next.t('toast.calibrationNeeded'), 'warning');
+        return;
+    }
+    const finalParams = calculateFit();
+    const configString = serializeConfig(finalParams);
     const command = `echo '${configString}' > ${currentConfigPath}`;
     const filename = currentConfigPath.split('/').pop();
     try {
@@ -443,6 +271,9 @@ async function saveConfig() {
 
 function resetGlobalConfig() {
     globalConfig = JSON.parse(JSON.stringify(defaultConfig));
+    calibrationPoints.low = null;
+    calibrationPoints.high = null;
+    updateCalibrationStatusUI();
     renderUI(globalConfig);
     applyKcal(globalConfig);
     updateChart();
@@ -452,7 +283,7 @@ function resetGlobalConfig() {
 async function readAndShowNodeStatus() {
     const parsedOutputElem = document.getElementById('parsedNodeOutput');
     parsedOutputElem.innerHTML = i18next.t('status.reading');
-    nodeStatusModal.show();
+    calibrationModal.show(); // 使用校准模态框显示节点状态
     try {
         const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`);
         const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`);
@@ -494,7 +325,6 @@ async function readAndShowNodeStatus() {
     }
 }
 
-// --- 初始化 ---
 async function fetchInitialRefreshRate() {
     try {
         const { stdout } = await exec('settings get system peak_refresh_rate');
@@ -517,11 +347,8 @@ async function init() {
     initMDB({ Ripple, Range, Input, Modal });
     updateUIText();
     updateTheme();
-    nodeStatusModal = new Modal(document.getElementById('nodeStatusModal'));
-    rangeConfigModal = new Modal(document.getElementById('rangeConfigModal'));
+    calibrationModal = new Modal(document.getElementById('calibrationModal')); // 初始化校准模态框
     
-    loadAndApplyRanges();
-
     await fetchInitialRefreshRate();
     currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
 
@@ -532,7 +359,7 @@ async function init() {
         const currentSystemVal = parseInt(cur.trim());
         lastKnownBrightness = currentSystemVal;
         brightnessSlider.disabled = false;
-        const percentage = Math.round(((currentSystemVal - 1) / (maxBrightness - 1)) * 100);
+        const percentage = Math.round((currentSystemVal / maxBrightness) * 100); // 亮度百分比计算
         brightnessSlider.value = percentage;
         brightnessValue.innerText = i18next.t('status.brightnessValue', { value: currentSystemVal, percent: percentage });
     } catch (e) {
@@ -542,62 +369,53 @@ async function init() {
     }
     
     await loadConfigAndRender();
-    
+    updateCalibrationStatusUI(); // 初始加载后更新校准点状态
+
     // --- 事件监听器 ---
     brightnessSlider.addEventListener('input', (e) => setSystemBrightness(parseInt(e.target.value)));
     saveButton.addEventListener('click', saveConfig);
-    resetConfigButton.addEventListener('click', resetGlobalConfig);
-    readNodeButton.addEventListener('click', readAndShowNodeStatus);
+    resetButton.addEventListener('click', resetGlobalConfig); // 绑定到新的resetButton
+    // readNodeButton.addEventListener('click', readAndShowNodeStatus); // 移除，因为UI上没有这个按钮了
     
-    toggleEditModeButton.addEventListener('click', () => {
-        const willEnterEditMode = !isEditMode;
-        toggleEditMode(willEnterEditMode);
-        if (willEnterEditMode) {
-            toast(i18next.t('toast.editMode'), 'info');
+    setLowPointButton.addEventListener('click', () => openCalibrationModal('low'));
+    setHighPointButton.addEventListener('click', () => openCalibrationModal('high'));
+
+    colorOffsetSlider.addEventListener('input', (e) => {
+        const offset = parseInt(e.target.value, 10);
+        colorOffsetValue.innerText = offset;
+        // 实时预览：应用当前偏移值作为 intercept，slope 为 0
+        applyKcal({ intercept: offset, slope: 0 });
+    });
+
+    confirmCalibrationButton.addEventListener('click', () => {
+        const brightness = lastKnownBrightness > 0 ? lastKnownBrightness : 1;
+        const offset = parseInt(colorOffsetSlider.value, 10);
+
+        if (currentCalibrationMode === 'low') {
+            calibrationPoints.low = { brightness, offset };
+            toast(i18next.t('toast.lowPointSet'), 'success');
+        } else {
+            calibrationPoints.high = { brightness, offset };
+            toast(i18next.t('toast.highPointSet'), 'success');
         }
-    });
 
-    customizeRangeButton.addEventListener('click', () => {
-        interceptRangeMin.value = defaultRanges.intercept.min;
-        interceptRangeMax.value = defaultRanges.intercept.max;
-        slopeRangeMin.value = defaultRanges.slope.min;
-        slopeRangeMax.value = defaultRanges.slope.max;
-        initMDB({ Input });
-        rangeConfigModal.show();
+        if (calibrationPoints.low && calibrationPoints.high) {
+            const finalParams = calculateFit();
+            globalConfig = {
+                red: { ...finalParams },
+                green: { ...finalParams },
+                blue: { ...finalParams },
+            };
+            applyKcal(finalParams);
+            updateChart();
+        }
+        
+        calibrationModal.hide();
+        updateCalibrationStatusUI(); // 更新UI显示校准点状态
     });
-    saveRangeButton.addEventListener('click', saveRanges);
-
-    const handleParamChange = (color, param, value) => {
-        globalConfig[color][param] = value;
-        renderUI(globalConfig);
-        applyKcal(globalConfig);
-        updateChart();
-    };
-    
-    for (const color in uiElements) {
-        const elements = uiElements[color];
-        elements.interceptSlider.addEventListener('input', (e) => {
-            const val = parseInt(e.target.value, 10) / FIXED_PRECISION;
-            handleParamChange(color, 'intercept', val);
-        });
-        elements.interceptInput.addEventListener('change', (e) => {
-            const val = parseFloat(e.target.value) || 0;
-            handleParamChange(color, 'intercept', val);
-        });
-        elements.slopeSlider.addEventListener('input', (e) => {
-            const val = parseInt(e.target.value, 10) / FIXED_PRECISION;
-            handleParamChange(color, 'slope', val);
-        });
-        elements.slopeInput.addEventListener('change', (e) => {
-            const val = parseFloat(e.target.value) || 0;
-            handleParamChange(color, 'slope', val);
-        });
-    }
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateTheme);
     i18next.on('languageChanged', () => updateUIText());
-
-    toggleEditMode(false);
 
     setInterval(pollSystemStatus, 1000);
 }

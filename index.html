@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="title">MiuiCX Color Tuner</title>
+    <title data-i18n="title"></title>
     <link rel="stylesheet" href="main.scss">
 </head>
 <body>
     <div class="container mt-4 mb-5">
         <header class="text-center mb-4">
             <h1 data-i18n="title"></h1>
-            <p class="text-muted" data-i18n="subtitle"></p>
+            <p class="text-muted" data-i18n="subtitle.simplified"></p>
         </header>
 
         <div class="card mb-4">
@@ -26,72 +26,32 @@
         <div class="card">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="card-title mb-0" data-i18n="config.cardTitle"></h5>
-                    <div class="config-actions-group">
-                        <button id="toggleEditModeButton" type="button" class="btn btn-success btn-sm" data-mdb-ripple-init></button>
-                        <button id="customizeRangeButton" type="button" class="btn btn-info btn-sm" data-mdb-ripple-init data-i18n="buttons.customizeRanges"></button>
-                        <button id="readNodeButton" type="button" class="btn btn-secondary btn-sm" data-mdb-ripple-init data-i18n="buttons.readNode"></button>
-                        <button id="resetConfigButton" type="button" class="btn btn-warning btn-sm" data-mdb-ripple-init data-i18n="buttons.reset"></button>
+                    <h5 class="card-title mb-0" data-i18n="calibration.title"></h5>
+                    <div>
+                        <button id="resetButton" type="button" class="btn btn-warning btn-sm" data-mdb-ripple-init data-i18n="buttons.reset"></button>
                         <button id="saveButton" type="button" class="btn btn-primary btn-sm" data-mdb-ripple-init data-i18n="buttons.save"></button>
                     </div>
                 </div>
-                <p class="text-muted small" data-i18n="config.description"></p>
+                
+                <p class="text-muted small" data-i18n="calibration.description"></p>
+
+                <div class="calibration-step">
+                    <p><strong data-i18n="calibration.step1.title"></strong></p>
+                    <p class="text-muted small" data-i18n="calibration.step1.description"></p>
+                    <button id="setLowPointButton" class="btn btn-secondary" data-mdb-ripple-init data-i18n="calibration.step1.button"></button>
+                    <span id="lowPointStatus" class="ms-3 text-muted small"></span>
+                </div>
                 <hr/>
-                <div id="global-config-editor">
-                    <!-- Red Channel -->
-                    <h6 class="text-danger" data-i18n="params.red"></h6>
-                    <div class="param-row">
-                        <label for="redInterceptSlider" class="param-label" data-i18n="params.intercept"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redInterceptSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="redInterceptInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
-                    <div class="param-row">
-                        <label for="redSlopeSlider" class="param-label" data-i18n="params.slope"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redSlopeSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="redSlopeInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
+                <div class="calibration-step">
+                    <p><strong data-i18n="calibration.step2.title"></strong></p>
+                    <p class="text-muted small" data-i18n="calibration.step2.description"></p>
+                    <button id="setHighPointButton" class="btn btn-secondary" data-mdb-ripple-init data-i18n="calibration.step2.button"></button>
+                    <span id="highPointStatus" class="ms-3 text-muted small"></span>
+                </div>
+                <hr/>
 
-                    <!-- Green Channel -->
-                    <h6 class="text-success mt-4" data-i18n="params.green"></h6>
-                    <div class="param-row">
-                        <label for="greenInterceptSlider" class="param-label" data-i18n="params.intercept"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenInterceptSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenInterceptInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
-                    <div class="param-row">
-                        <label for="greenSlopeSlider" class="param-label" data-i18n="params.slope"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenSlopeSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenSlopeInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
-
-                    <!-- Blue Channel -->
-                    <h6 class="text-primary mt-4" data-i18n="params.blue"></h6>
-                    <div class="param-row">
-                        <label for="blueInterceptSlider" class="param-label" data-i18n="params.intercept"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueInterceptSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueInterceptInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
-                    <div class="param-row">
-                        <label for="blueSlopeSlider" class="param-label" data-i18n="params.slope"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueSlopeSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueSlopeInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
-
-                    <div class="chart-container mt-4">
-                        <canvas id="colorCurveChart"></canvas>
-                    </div>
+                <div class="chart-container mt-4">
+                    <canvas id="colorCurveChart"></canvas>
                 </div>
             </div>
         </div>
@@ -100,43 +60,23 @@
         </footer>
     </div>
     
-    <div class="modal fade" id="nodeStatusModal" tabindex="-1">
+    <!-- 校准模态框 -->
+    <div class="modal fade" id="calibrationModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" data-i18n="modals.nodeStatus.title"></h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
-                <div class="modal-body" id="parsedNodeOutput"></div>
-                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-mdb-dismiss="modal" data-i18n="modals.nodeStatus.close"></button></div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal fade" id="rangeConfigModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" data-i18n="modals.range.title"></h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
+                <div class="modal-header"><h5 class="modal-title" id="calibrationModalTitle"></h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
                 <div class="modal-body">
-                    <p class="text-muted" data-i18n="modals.range.description"></p>
-                    
-                    <p class="fw-bold mt-3 mb-1" data-i18n="params.intercept"></p>
-                    <div class="row g-3">
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="interceptRangeMin" class="form-control" step="any" /><label class="form-label" for="interceptRangeMin" data-i18n="modals.range.min"></label></div></div>
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="interceptRangeMax" class="form-control" step="any" /><label class="form-label" for="interceptRangeMax" data-i18n="modals.range.max"></label></div></div>
-                    </div>
-
-                    <p class="fw-bold mt-3 mb-1" data-i18n="params.slope"></p>
-                    <div class="row g-3">
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="slopeRangeMin" class="form-control" step="any" /><label class="form-label" for="slopeRangeMin" data-i18n="modals.range.min"></label></div></div>
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="slopeRangeMax" class="form-control" step="any" /><label class="form-label" for="slopeRangeMax" data-i18n="modals.range.max"></label></div></div>
-                    </div>
+                    <p id="calibrationModalDescription"></p>
+                    <label for="colorOffsetSlider" class="form-label" data-i18n="calibration.offsetLabel"></label>
+                    <div class="range"><input type="range" class="form-range" id="colorOffsetSlider" min="-50" max="50" step="1" value="0" /></div>
+                    <div class="text-center" id="colorOffsetValue">0</div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal" data-i18n="modals.range.cancel"></button>
-                    <button type="button" id="saveRangeButton" class="btn btn-primary" data-i18n="modals.range.save"></button>
+                    <button type="button" id="confirmCalibrationButton" class="btn btn-primary" data-mdb-ripple-init data-i18n="calibration.confirmButton"></button>
                 </div>
             </div>
         </div>
     </div>
-    
-    <script type="module" src="main.js"></script>
 </body>
 </html>

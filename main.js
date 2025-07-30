@@ -3,6 +3,7 @@ import { Ripple, Range, Input, Modal, initMDB } from 'mdb-ui-kit';
 import { exec, toast } from 'kernelsu';
 import i18next from './i18n.js';
 import { mdiFileEdit, mdiLock, mdiTune, mdiSync, mdiRestore } from '@mdi/js';
+ 
 
 const MODULE_ID = "miuicx_color_tuner";
 const MODULE_PATH = `/data/adb/modules/${MODULE_ID}`;
@@ -16,7 +17,7 @@ const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
 const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
 
 const FIXED_PRECISION = 100;
-const defaultConfig = { intercept: 256.0, slope: 0.0 }; // 默认的 intercept 和 slope
+const defaultConfig = { intercept: 256.0, slope: 0.0 };
 
 const defaultRanges = {
     intercept: { min: 0, max: 256 },
@@ -25,17 +26,17 @@ const defaultRanges = {
 
 const icons = { mdiFileEdit, mdiLock, mdiTune, mdiSync, mdiRestore };
 
-let globalConfig = JSON.parse(JSON.stringify(defaultConfig)); // 当前生效的 intercept 和 slope
+let globalConfig = JSON.parse(JSON.stringify(defaultConfig));
 let maxBrightness = 4095;
 let currentRefreshRate = 60;
 let colorChart = null;
-let calibrationModal = null; // 校准模态框实例
+let calibrationModal = null;
 
 let calibrationPoints = {
-    low: null, // { brightness: number, offset: number }
-    high: null, // { brightness: number, offset: number }
+    low: null,
+    high: null,
 };
-let currentCalibrationMode = null; // 'low' or 'high'
+let currentCalibrationMode = null;
 
 let lastKnownRefreshRate = 0;
 let lastKnownBrightness = -1;
@@ -44,7 +45,7 @@ const brightnessSlider = document.getElementById('brightnessSlider');
 const brightnessValue = document.getElementById('brightnessValue');
 const refreshRateValue = document.getElementById('refreshRateValue');
 const saveButton = document.getElementById('saveButton');
-const resetButton = document.getElementById('resetButton'); // 重命名为 resetButton
+const resetButton = document.getElementById('resetButton');
 const setLowPointButton = document.getElementById('setLowPointButton');
 const setHighPointButton = document.getElementById('setHighPointButton');
 const lowPointStatus = document.getElementById('lowPointStatus');
@@ -66,8 +67,10 @@ async function pollSystemStatus() {
         if (newRate !== lastKnownRefreshRate) {
             lastKnownRefreshRate = newRate;
             currentRefreshRate = newRate;
+            
             refreshRateValue.innerText = `${currentRefreshRate} Hz`;
             currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
+            
             toast(i18next.t('toast.refreshRateChanged', { rate: newRate }), 'info');
             await loadConfigAndRender();
         }
@@ -78,7 +81,7 @@ async function pollSystemStatus() {
         const newBrightness = parseInt(stdout.trim());
         if (newBrightness !== lastKnownBrightness) {
             lastKnownBrightness = newBrightness;
-            const percentage = Math.round((newBrightness / maxBrightness) * 100); // 亮度百分比计算
+            const percentage = Math.round((newBrightness / maxBrightness) * 100);
             brightnessValue.innerText = i18next.t('status.brightnessValue', { value: newBrightness, percent: percentage });
             brightnessSlider.value = percentage;
         }
@@ -104,7 +107,7 @@ function updateUIText() {
         new Input(formOutline).update();
     });
     updateChart();
-    updateCalibrationStatusUI(); // 更新校准点状态显示
+    updateCalibrationStatusUI();
 }
 
 function updateCalibrationStatusUI() {
@@ -148,12 +151,12 @@ function calculateFit() {
         return { intercept: 256.0, slope: 0.0 };
     }
 
-    const x1 = Math.log(Math.max(1, low.brightness)); // 确保亮度至少为1，避免log(0)
+    const x1 = Math.log(Math.max(1, low.brightness));
     const y1 = low.offset;
-    const x2 = Math.log(Math.max(1, high.brightness)); // 确保亮度至少为1，避免log(0)
+    const x2 = Math.log(Math.max(1, high.brightness));
     const y2 = high.offset;
 
-    if (x1 === x2) { // 避免除以零，如果亮度相同，则斜率为0
+    if (x1 === x2) {
         return { intercept: y1, slope: 0.0 };
     }
 
@@ -188,13 +191,12 @@ function serializeConfig(params) {
 
 function parseConfig(text) {
     const parts = text.trim().split(/\s+/);
-    if (parts.length === 2) { // 新的2参数格式
+    if (parts.length === 2) {
         const [i, s] = parts.map(p => parseInt(p, 10));
         if ([i, s].some(isNaN)) return null;
         return { intercept: i / FIXED_PRECISION, slope: s / FIXED_PRECISION };
     }
-    // 兼容旧的6参数格式，只取green通道的值
-    if (parts.length === 6) {
+    if (parts.length === 6) { // 兼容旧的6参数格式，只取green通道的值
         const [ri, rs, gi, gs, bi, bs] = parts.map(p => parseInt(p, 10));
         if ([gi, gs].some(isNaN)) return null;
         return { intercept: gi / FIXED_PRECISION, slope: gs / FIXED_PRECISION };
@@ -236,18 +238,12 @@ async function loadConfigAndRender() {
             toast(i18next.t('toast.configLoadFromNodeFailed'), 'warning');
         }
     }
-    // 根据加载的 globalConfig 重新计算校准点
-    // 这部分需要根据实际情况调整，如果配置文件只存最终参数，则无法反推校准点
-    // 简单起见，这里不反推，只更新UI
     renderUI(globalConfig);
     applyKcal(globalConfig);
     updateChart();
 }
 
 function renderUI(params) {
-    // 在简化模式下，UI不再直接显示intercept和slope的输入框和滑块
-    // 而是通过图表反映最终效果
-    // 这里只需要确保图表更新
     updateChart();
 }
 
@@ -283,7 +279,7 @@ function resetGlobalConfig() {
 async function readAndShowNodeStatus() {
     const parsedOutputElem = document.getElementById('parsedNodeOutput');
     parsedOutputElem.innerHTML = i18next.t('status.reading');
-    calibrationModal.show(); // 使用校准模态框显示节点状态
+    calibrationModal.show();
     try {
         const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`);
         const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`);
@@ -347,7 +343,7 @@ async function init() {
     initMDB({ Ripple, Range, Input, Modal });
     updateUIText();
     updateTheme();
-    calibrationModal = new Modal(document.getElementById('calibrationModal')); // 初始化校准模态框
+    calibrationModal = new Modal(document.getElementById('calibrationModal'));
     
     await fetchInitialRefreshRate();
     currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
@@ -359,7 +355,7 @@ async function init() {
         const currentSystemVal = parseInt(cur.trim());
         lastKnownBrightness = currentSystemVal;
         brightnessSlider.disabled = false;
-        const percentage = Math.round((currentSystemVal / maxBrightness) * 100); // 亮度百分比计算
+        const percentage = Math.round((currentSystemVal / maxBrightness) * 100);
         brightnessSlider.value = percentage;
         brightnessValue.innerText = i18next.t('status.brightnessValue', { value: currentSystemVal, percent: percentage });
     } catch (e) {
@@ -369,12 +365,11 @@ async function init() {
     }
     
     await loadConfigAndRender();
-    updateCalibrationStatusUI(); // 初始加载后更新校准点状态
+    updateCalibrationStatusUI();
 
-    // --- 事件监听器 ---
     brightnessSlider.addEventListener('input', (e) => setSystemBrightness(parseInt(e.target.value)));
     saveButton.addEventListener('click', saveConfig);
-    resetButton.addEventListener('click', resetGlobalConfig); // 绑定到新的resetButton
+    resetButton.addEventListener('click', resetGlobalConfig); // 绑定到 resetGlobalConfig
     // readNodeButton.addEventListener('click', readAndShowNodeStatus); // 移除，因为UI上没有这个按钮了
     
     setLowPointButton.addEventListener('click', () => openCalibrationModal('low'));
@@ -383,8 +378,7 @@ async function init() {
     colorOffsetSlider.addEventListener('input', (e) => {
         const offset = parseInt(e.target.value, 10);
         colorOffsetValue.innerText = offset;
-        // 实时预览：应用当前偏移值作为 intercept，slope 为 0
-        applyKcal({ intercept: offset, slope: 0 });
+        applyKcal({ intercept: 256.0 + offset, slope: 0 }); // 实时预览：以256为基准，加上偏移量
     });
 
     confirmCalibrationButton.addEventListener('click', () => {
@@ -402,16 +396,15 @@ async function init() {
         if (calibrationPoints.low && calibrationPoints.high) {
             const finalParams = calculateFit();
             globalConfig = {
-                red: { ...finalParams },
-                green: { ...finalParams },
-                blue: { ...finalParams },
+                intercept: finalParams.intercept,
+                slope: finalParams.slope,
             };
-            applyKcal(finalParams);
+            applyKcal(globalConfig); // 应用计算出的曲线
             updateChart();
         }
         
         calibrationModal.hide();
-        updateCalibrationStatusUI(); // 更新UI显示校准点状态
+        updateCalibrationStatusUI();
     });
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateTheme);

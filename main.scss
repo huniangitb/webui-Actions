@@ -1,5 +1,4 @@
 @use "mdb-ui-kit/src/scss/mdb.free.scss";
-@import "@mdi/font/css/materialdesignicons.min.css";
 
 body {
   font-size: 16px; 
@@ -59,7 +58,6 @@ body {
   white-space: pre-wrap;
 }
 
-/* [新增] 校准步骤样式 */
 .calibration-step {
     margin-bottom: 1rem;
     padding: 0.5rem 0;
@@ -69,6 +67,14 @@ body {
 }
 .calibration-step button {
     margin-top: 0.5rem;
+}
+
+/* 新增 SVG 图标样式 */
+.btn .svg-icon {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  fill: currentColor;
 }
 
 @media (max-width: 768px) {

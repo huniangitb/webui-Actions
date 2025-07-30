@@ -1,5 +1,3 @@
-# .github/workflows/build.yml
-
 name: Build WebUI
 
 # 仅在手动触发时运行
@@ -25,13 +23,18 @@ jobs:
           # 使用 github.event.inputs.branch 来获取用户输入的分支名
           ref: ${{ github.event.inputs.branch }}
 
-      - name: Set up Node.js
+      # 设置 Node.js 环境，并启用 yarn 缓存
+      - name: Set up Node.js with cache
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          # 移除 yarn 缓存，根据您的要求
+          # 新增：为 yarn 启用缓存。
+          # action 会自动根据 yarn.lock 文件生成缓存的 key。
+          # 当 yarn.lock 没有变化时，它会恢复缓存，从而跳过大部分下载过程。
+          cache: 'yarn'
 
       - name: Install dependencies
+        # 如果缓存命中，这一步会非常快
         run: yarn install
 
       - name: Build project

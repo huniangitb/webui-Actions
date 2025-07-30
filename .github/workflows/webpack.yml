@@ -1,9 +1,20 @@
 name: Build WebUI
 
-# 仅在手动触发时运行
+# 触发工作流的事件
 on:
+  # 1. 当代码推送到 main 或 develop 分支时自动触发
+  push:
+    branches:
+      - main
+      - test2
+
+  # 2. 当有 Pull Request 指向 main 分支时自动触发
+  pull_request:
+    branches:
+      - main
+
+  # 3. 保留手动触发功能
   workflow_dispatch:
-    # 添加输入参数，用于在手动触发时选择分支
     inputs:
       branch:
         description: '要构建的仓库分支 (The branch to build)'
@@ -15,47 +26,31 @@ jobs:
   build:
     runs-on: ubuntu-24.04
 
+    # 移除 permissions: contents: write，因为不再需要写入权限来提交 yarn.lock
+
     steps:
-      # 检出代码时，使用手动输入的分支
+      # 检出代码
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # 使用 github.event.inputs.branch 来获取用户输入的分支名
-          ref: ${{ github.event.inputs.branch }}
+          # 动态决定检出哪个分支：
+          # - 如果是手动触发(workflow_dispatch)，使用用户输入的分支。
+          # - 如果是自动触发(push/pull_request)，使用事件对应的分支 (github.ref)。
+          ref: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.branch) || github.ref }}
 
-      - name: Set up Node.js
+      # 设置 Node.js 环境，并启用基于 yarn.lock 的缓存
+      - name: Set up Node.js with cache
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          # 注意：由于我们手动管理缓存，这里不再需要 cache: 'yarn'
-
-      # 新增：获取 yarn 的缓存目录路径
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
-
-      # 新增：使用 actions/cache 来缓存依赖
-      - name: Cache yarn dependencies
-        uses: actions/cache@v4
-        id: yarn-cache # 给这个步骤一个 id，方便后续判断缓存是否命中
-        with:
-          # path: 需要缓存的目录，我们使用上一步获取到的 yarn 缓存目录
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          # key: 缓存的唯一标识符。
-          # runner.os: 区分不同操作系统（如 ubuntu, macos, windows）
-          # hashFiles('**/package.json'): 根据 package.json 文件的内容生成哈希值。
-          # 如果 package.json 文件内容不变，哈希值就不变，缓存就能命中。
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/package.json') }}
-          # restore-keys: 当上面的 key 找不到完全匹配的缓存时，会尝试用这个 key 来查找部分匹配的缓存。
-          # 这是一个可选的降级策略。
-          restore-keys: |
-            ${{ runner.os }}-yarn-
+          # 因为仓库中已有 yarn.lock，这是最推荐的缓存方式。
+          # 它会根据 yarn.lock 文件的哈希值来创建和恢复缓存。
+          cache: 'yarn' # 启用 yarn 缓存
 
       - name: Install dependencies
-        # 如果缓存没有命中，这一步会下载所有依赖。
-        # 如果缓存命中，这一步会利用缓存，速度非常快。
-        # 我们还可以添加一个判断，如果缓存命中，就使用 --frozen-lockfile (但你没有lockfile，所以这里保持原样)
-        run: yarn install
+        # 如果缓存命中，这一步会非常快
+        # 由于 yarn.lock 文件现在已存在并被追踪，可以使用 --frozen-lockfile 确保严格安装
+        run: yarn install --frozen-lockfile
 
       - name: Build project
         run: yarn build

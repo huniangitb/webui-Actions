@@ -7,7 +7,7 @@ const resources = {
     translation: {
       // Header
       title: "MiuiCX Color Tuner",
-      subtitle: "Simplified color calibration with a guided setup.",
+      subtitle: "",
       // Status Card
       "status.cardTitle": "Live Status",
       "status.refreshRate": "Refresh Rate:",
@@ -73,7 +73,7 @@ const resources = {
     translation: {
       // Header
       title: "MiuiCX 色彩调节",
-      subtitle: "通过设置向导，轻松校准您的屏幕色彩。",
+      subtitle: "",
       // Status Card
       "status.cardTitle": "实时状态",
       "status.refreshRate": "刷新率:",

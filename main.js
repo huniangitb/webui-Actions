@@ -93,7 +93,6 @@ async function pollSystemStatus() {
     } catch (e) { /* 忽略错误 */ }
 
     try {
-        // [修正] 使用正确的 'wizardModal._isShown' 来检查模态框是否可见
         if (wizardModal && wizardModal._isShown) {
             return;
         }
@@ -161,13 +160,11 @@ async function setSystemBrightness(percentage) {
     const systemValue = scaleToSystemBrightness(percentage);
     try {
         await exec(`echo ${systemValue} > ${BACKLIGHT_PATH}`);
-        // [修正] 使用正确的 'wizardModal._isShown'
         if (!wizardModal || !wizardModal._isShown) {
              brightnessValue.innerText = i18next.t('status.brightnessValue', { value: systemValue, percent: percentage });
              lastKnownBrightness = systemValue;
         }
     } catch (e) {
-        // [优化] 使用更准确的错误提示
         toast(i18next.t('toast.saveFailed', { error: `Brightness: ${e.message}` }), 'error');
     }
 }
@@ -331,7 +328,7 @@ async function readAndShowNodeStatus() {
     }
 }
 
-// --- 向导逻辑 (优化) ---
+// --- 向导逻辑 (无修改) ---
 function calculateFit(point1, point2) {
     const x1 = Math.log(point1.brightness);
     const x2 = Math.log(point2.brightness);
@@ -342,77 +339,63 @@ function calculateFit(point1, point2) {
     const intercept = y1 - slope * x1;
     return { intercept, slope };
 }
-
 function startWizard() {
     originalConfigForWizard = JSON.parse(JSON.stringify(globalConfig));
-    brightnessBeforeWizard = lastKnownBrightness; // 保存进入向导前的亮度
+    brightnessBeforeWizard = lastKnownBrightness;
     wizardData = {
         step1: { brightnessPercent: 10, red: 256, green: 256, blue: 256 },
         step2: { brightnessPercent: 80, red: 256, green: 256, blue: 256 }
     };
-    
     wizardBrightness1.value = wizardData.step1.brightnessPercent;
     wizardColorSliders.step1.red.value = wizardData.step1.red * 100;
     wizardColorSliders.step1.green.value = wizardData.step1.green * 100;
     wizardColorSliders.step1.blue.value = wizardData.step1.blue * 100;
-    
     wizardBrightness2.value = wizardData.step2.brightnessPercent;
     wizardColorSliders.step2.red.value = wizardData.step2.red * 100;
     wizardColorSliders.step2.green.value = wizardData.step2.green * 100;
     wizardColorSliders.step2.blue.value = wizardData.step2.blue * 100;
-
     wizardStep1.style.display = 'block';
     wizardStep2.style.display = 'none';
     wizardNextButton.style.display = 'block';
     wizardFinishButton.style.display = 'none';
-    
     wizardModal.show();
     setSystemBrightness(wizardData.step1.brightnessPercent);
 }
-
 function handleWizardNext() {
     wizardData.step1.brightnessPercent = parseInt(wizardBrightness1.value);
     wizardData.step1.red = parseInt(wizardColorSliders.step1.red.value) / 100;
     wizardData.step1.green = parseInt(wizardColorSliders.step1.green.value) / 100;
     wizardData.step1.blue = parseInt(wizardColorSliders.step1.blue.value) / 100;
-
     wizardStep1.style.display = 'none';
     wizardStep2.style.display = 'block';
     wizardNextButton.style.display = 'none';
     wizardFinishButton.style.display = 'block';
-    
     setSystemBrightness(wizardData.step2.brightnessPercent);
     handleWizardColorPreview(2);
 }
-
 function handleWizardFinish() {
     wizardData.step2.brightnessPercent = parseInt(wizardBrightness2.value);
     wizardData.step2.red = parseInt(wizardColorSliders.step2.red.value) / 100;
     wizardData.step2.green = parseInt(wizardColorSliders.step2.green.value) / 100;
     wizardData.step2.blue = parseInt(wizardColorSliders.step2.blue.value) / 100;
-
     const b1 = scaleToSystemBrightness(wizardData.step1.brightnessPercent);
     const b2 = scaleToSystemBrightness(wizardData.step2.brightnessPercent);
-
     globalConfig = {
         red: calculateFit({ brightness: b1, value: wizardData.step1.red }, { brightness: b2, value: wizardData.step2.red }),
         green: calculateFit({ brightness: b1, value: wizardData.step1.green }, { brightness: b2, value: wizardData.step2.green }),
         blue: calculateFit({ brightness: b1, value: wizardData.step1.blue }, { brightness: b2, value: wizardData.step2.blue }),
     };
-
     renderUI(globalConfig);
     applyKcal(globalConfig);
     updateChart();
     wizardModal.hide();
     toast(i18next.t('toast.wizardComplete'), 'success');
 }
-
 function handleWizardCancel() {
     applyKcal(originalConfigForWizard); 
     wizardModal.hide();
     toast(i18next.t('toast.wizardCancelled'), 'info');
 }
-
 function handleWizardColorPreview(step) {
     const brightnessPercent = parseInt(step === 1 ? wizardBrightness1.value : wizardBrightness2.value);
     setSystemBrightness(brightnessPercent);
@@ -474,18 +457,32 @@ async function init() {
     advancedModeButton.addEventListener('click', () => toggleAdvancedMode(!isAdvancedMode));
 
     for (const color in uiElements) {
-        const handleParamChange = (param, value) => { globalConfig[color][param] = value; renderUI(globalConfig); applyKcal(globalConfig); updateChart(); };
-        uiElements[color].interceptSlider.addEventListener('input', (e) => handleParamChange('intercept', parseInt(e.target.value, 10) / FIXED_PRECISION));
-        uiElements[color].interceptInput.addEventListener('change', (e) => handleParamChange('intercept', parseFloat(e.target.value) || 0));
-        uiElements[color].slopeSlider.addEventListener('input', (e) => handleParamChange('slope', parseInt(e.target.value, 10) / FIXED_PRECISION));
-        uiElements[color].slopeInput.addEventListener('change', (e) => handleParamChange('slope', parseFloat(e.target.value) || 0));
+        const elements = uiElements[color];
+        const handleParamChange = (param, value) => { 
+            globalConfig[color][param] = value;
+            renderUI(globalConfig);
+            applyKcal(globalConfig);
+            updateChart();
+        };
+
+        elements.interceptSlider.addEventListener('input', (e) => handleParamChange('intercept', parseInt(e.target.value, 10) / FIXED_PRECISION));
+        
+        // [修改] 增加对数字输入的范围限制
+        elements.interceptInput.addEventListener('change', (e) => {
+            const val = parseFloat(e.target.value) || 0;
+            // 将值限制在 0 到 256 之间
+            const clampedVal = Math.max(0, Math.min(val, 256));
+            handleParamChange('intercept', clampedVal);
+        });
+
+        elements.slopeSlider.addEventListener('input', (e) => handleParamChange('slope', parseInt(e.target.value, 10) / FIXED_PRECISION));
+        elements.slopeInput.addEventListener('change', (e) => handleParamChange('slope', parseFloat(e.target.value) || 0));
     }
 
     wizardNextButton.addEventListener('click', handleWizardNext);
     wizardFinishButton.addEventListener('click', handleWizardFinish);
     wizardCancelButton.addEventListener('click', handleWizardCancel);
     wizardModalElement.addEventListener('hidden.mdb.modal', () => {
-        // [优化] 退出向导后，恢复之前的亮度
         if (brightnessBeforeWizard !== -1) {
             const originalPercentage = Math.round(((brightnessBeforeWizard - 1) / (maxBrightness - 1)) * 100);
             setSystemBrightness(originalPercentage);

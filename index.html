@@ -8,11 +8,11 @@
 </head>
 <body>
     <div class="container mt-4 mb-5">
+        <!-- Header and Status Card (No Changes) -->
         <header class="text-center mb-4">
             <h1 data-i18n="title"></h1>
             <p class="text-muted" data-i18n="subtitle"></p>
         </header>
-
         <div class="card mb-4">
             <div class="card-body">
                 <h5 class="card-title" data-i18n="status.cardTitle"></h5>
@@ -23,6 +23,7 @@
             </div>
         </div>
 
+        <!-- Config Card (No Changes) -->
         <div class="card">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -33,8 +34,8 @@
                 </div>
                 <p class="text-muted small" data-i18n="config.description"></p>
                 <hr/>
-                <!-- Advanced Mode Editor (hidden by default) -->
                 <div id="advanced-config-editor" style="display: none;">
+                    <!-- Advanced Editor Content (No Changes) -->
                     <div class="d-flex justify-content-end align-items-center mb-3">
                          <div class="config-actions-group">
                             <button id="readNodeButton" type="button" class="btn btn-sm btn-light" data-mdb-ripple-init data-i18n="buttons.readNode"></button>
@@ -42,81 +43,30 @@
                             <button id="saveButton" type="button" class="btn btn-sm btn-primary" data-mdb-ripple-init data-i18n="buttons.save"></button>
                         </div>
                     </div>
-                    <!-- Red Channel -->
                     <h6 class="text-danger" data-i18n="params.red"></h6>
-                    <div class="param-row">
-                        <label class="param-label" data-i18n="params.intercept"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redInterceptSlider" min="0" max="25600" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="redInterceptInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
-                    <div class="param-row">
-                        <label class="param-label" data-i18n="params.slope"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redSlopeSlider" min="-5000" max="5000" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="redSlopeInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
-                    <!-- Green Channel -->
+                    <div class="param-row"><label class="param-label" data-i18n="params.intercept"></label><div class="slider-input-group"><div class="range flex-grow-1"><input type="range" class="form-range" id="redInterceptSlider" min="0" max="25600" /></div><div class="form-outline" data-mdb-input-init><input type="number" id="redInterceptInput" class="form-control param-input" step="0.01" /></div></div></div>
+                    <div class="param-row"><label class="param-label" data-i18n="params.slope"></label><div class="slider-input-group"><div class="range flex-grow-1"><input type="range" class="form-range" id="redSlopeSlider" min="-5000" max="5000" /></div><div class="form-outline" data-mdb-input-init><input type="number" id="redSlopeInput" class="form-control param-input" step="0.01" /></div></div></div>
                     <h6 class="text-success mt-4" data-i18n="params.green"></h6>
-                    <div class="param-row">
-                        <label class="param-label" data-i18n="params.intercept"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenInterceptSlider" min="0" max="25600" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenInterceptInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
-                    <div class="param-row">
-                        <label class="param-label" data-i18n="params.slope"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenSlopeSlider" min="-5000" max="5000" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenSlopeInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
-                    <!-- Blue Channel -->
+                    <div class="param-row"><label class="param-label" data-i18n="params.intercept"></label><div class="slider-input-group"><div class="range flex-grow-1"><input type="range" class="form-range" id="greenInterceptSlider" min="0" max="25600" /></div><div class="form-outline" data-mdb-input-init><input type="number" id="greenInterceptInput" class="form-control param-input" step="0.01" /></div></div></div>
+                    <div class="param-row"><label class="param-label" data-i18n="params.slope"></label><div class="slider-input-group"><div class="range flex-grow-1"><input type="range" class="form-range" id="greenSlopeSlider" min="-5000" max="5000" /></div><div class="form-outline" data-mdb-input-init><input type="number" id="greenSlopeInput" class="form-control param-input" step="0.01" /></div></div></div>
                     <h6 class="text-primary mt-4" data-i18n="params.blue"></h6>
-                    <div class="param-row">
-                        <label class="param-label" data-i18n="params.intercept"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueInterceptSlider" min="0" max="25600" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueInterceptInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
-                    <div class="param-row">
-                        <label class="param-label" data-i18n="params.slope"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueSlopeSlider" min="-5000" max="5000" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueSlopeInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
+                    <div class="param-row"><label class="param-label" data-i18n="params.intercept"></label><div class="slider-input-group"><div class="range flex-grow-1"><input type="range" class="form-range" id="blueInterceptSlider" min="0" max="25600" /></div><div class="form-outline" data-mdb-input-init><input type="number" id="blueInterceptInput" class="form-control param-input" step="0.01" /></div></div></div>
+                    <div class="param-row"><label class="param-label" data-i18n="params.slope"></label><div class="slider-input-group"><div class="range flex-grow-1"><input type="range" class="form-range" id="blueSlopeSlider" min="-5000" max="5000" /></div><div class="form-outline" data-mdb-input-init><input type="number" id="blueSlopeInput" class="form-control param-input" step="0.01" /></div></div></div>
                 </div>
-                
-                <div class="chart-container mt-4">
-                    <canvas id="colorCurveChart"></canvas>
-                </div>
-
-                <div class="text-center mt-4">
-                    <button id="advancedModeButton" type="button" class="btn btn-secondary btn-sm" data-mdb-ripple-init></button>
-                </div>
+                <div class="chart-container mt-4"><canvas id="colorCurveChart"></canvas></div>
+                <div class="text-center mt-4"><button id="advancedModeButton" type="button" class="btn btn-secondary btn-sm" data-mdb-ripple-init></button></div>
             </div>
         </div>
-        <footer class="text-center mt-4">
-            <p class="text-muted small" data-i18n="footer.author"></p>
-        </footer>
+        <footer class="text-center mt-4"><p class="text-muted small" data-i18n="footer.author"></p></footer>
     </div>
     
     <!-- Modals -->
     <div class="modal fade" id="nodeStatusModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" data-i18n="modals.nodeStatus.title"></h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
-                <div class="modal-body" id="parsedNodeOutput"></div>
-                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-mdb-dismiss="modal" data-i18n="modals.nodeStatus.close"></button></div>
-            </div>
-        </div>
+        <!-- Node Status Modal Content (No Changes) -->
+        <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" data-i18n="modals.nodeStatus.title"></h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div><div class="modal-body" id="parsedNodeOutput"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-mdb-dismiss="modal" data-i18n="modals.nodeStatus.close"></button></div></div></div>
     </div>
 
+    <!-- Wizard Modal (Updated) -->
     <div class="modal fade" id="wizardModal" tabindex="-1" data-mdb-backdrop="static" data-mdb-keyboard="false">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -133,9 +83,18 @@
                         <div class="range"><input type="range" class="form-range" id="wizardBrightness1" min="1" max="50" value="10" /></div>
                         
                         <label class="form-label mt-4" data-i18n="modals.wizard.colorValue"></label>
-                        <div class="range range-danger"><input type="range" class="form-range" id="wizardColorR1" min="0" max="25600" value="25600" /></div>
-                        <div class="range range-success"><input type="range" class="form-range" id="wizardColorG1" min="0" max="25600" value="25600" /></div>
-                        <div class="range range-info"><input type="range" class="form-range" id="wizardColorB1" min="0" max="25600" value="25600" /></div>
+                        <div class="slider-input-group mb-3">
+                            <div class="range flex-grow-1 range-danger"><input type="range" class="form-range" id="wizardColorR1" min="0" max="25600" value="25600" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorR1_input" class="form-control param-input" step="0.01" min="0" max="256" /></div>
+                        </div>
+                        <div class="slider-input-group mb-3">
+                            <div class="range flex-grow-1 range-success"><input type="range" class="form-range" id="wizardColorG1" min="0" max="25600" value="25600" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorG1_input" class="form-control param-input" step="0.01" min="0" max="256" /></div>
+                        </div>
+                        <div class="slider-input-group">
+                            <div class="range flex-grow-1 range-info"><input type="range" class="form-range" id="wizardColorB1" min="0" max="25600" value="25600" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorB1_input" class="form-control param-input" step="0.01" min="0" max="256" /></div>
+                        </div>
                     </div>
                     <!-- Step 2: High Brightness -->
                     <div id="wizardStep2" style="display: none;">
@@ -145,9 +104,18 @@
                         <div class="range"><input type="range" class="form-range" id="wizardBrightness2" min="51" max="100" value="80" /></div>
                         
                         <label class="form-label mt-4" data-i18n="modals.wizard.colorValue"></label>
-                        <div class="range range-danger"><input type="range" class="form-range" id="wizardColorR2" min="0" max="25600" value="25600" /></div>
-                        <div class="range range-success"><input type="range" class="form-range" id="wizardColorG2" min="0" max="25600" value="25600" /></div>
-                        <div class="range range-info"><input type="range" class="form-range" id="wizardColorB2" min="0" max="25600" value="25600" /></div>
+                         <div class="slider-input-group mb-3">
+                            <div class="range flex-grow-1 range-danger"><input type="range" class="form-range" id="wizardColorR2" min="0" max="25600" value="25600" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorR2_input" class="form-control param-input" step="0.01" min="0" max="256" /></div>
+                        </div>
+                        <div class="slider-input-group mb-3">
+                            <div class="range flex-grow-1 range-success"><input type="range" class="form-range" id="wizardColorG2" min="0" max="25600" value="25600" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorG2_input" class="form-control param-input" step="0.01" min="0" max="256" /></div>
+                        </div>
+                        <div class="slider-input-group">
+                            <div class="range flex-grow-1 range-info"><input type="range" class="form-range" id="wizardColorB2" min="0" max="25600" value="25600" /></div>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorB2_input" class="form-control param-input" step="0.01" min="0" max="256" /></div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

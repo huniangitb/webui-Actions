@@ -42,6 +42,11 @@ body {
     flex-shrink: 0;
 }
 
+// [新增] 调整向导中输入框的宽度
+.modal .slider-input-group .form-outline {
+    width: 90px;
+}
+
 .config-actions-group {
     display: flex;
     flex-wrap: wrap;

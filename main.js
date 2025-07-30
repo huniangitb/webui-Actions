@@ -344,7 +344,7 @@ function handleWizardNext() {
     handleWizardColorPreview(2);
 }
 
-function handleWizardFinish() {
+async function handleWizardFinish() {
     wizardData.step2.brightnessPercent = parseInt(wizardBrightness2.value);
     wizardData.step2.red = parseInt(wizardControls.step2.red.input.value);
     wizardData.step2.green = parseInt(wizardControls.step2.green.input.value);
@@ -357,8 +357,9 @@ function handleWizardFinish() {
         blue: calculateFit({ brightness: b1, value: wizardData.step1.blue }, { brightness: b2, value: wizardData.step2.blue }),
     };
     renderUI(globalConfig);
-    applyKcal(globalConfig);
+    await applyKcal(globalConfig);
     updateChart();
+    await saveConfig();
     wizardModal.hide();
     toast(i18next.t('toast.wizardComplete'), 'success');
 }
@@ -387,7 +388,7 @@ function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isIn
         } else {
             input.value = clampedValue.toFixed(2);
         }
-        slider.value = isInt ? Math.round(clampedValue) : clampedValue;
+        slider.value = clampedValue;
         input.dispatchEvent(new Event('change', { bubbles: true }));
     };
     minusBtn.addEventListener('click', () => {
@@ -441,7 +442,7 @@ async function init() {
             handleParamChange('slope', clampedVal);
         });
         
-        setupIncrementer(document.getElementById(`${color}Intercept_minus`), document.getElementById(`${color}Intercept_plus`), elements.interceptInput, elements.interceptSlider, 1, 0, 256, true);
+        setupIncrementer(document.getElementById(`${color}Intercept_minus`), document.getElementById(`${color}Intercept_plus`), elements.interceptInput, elements.interceptSlider, 0.01, 0, 256, false);
         setupIncrementer(document.getElementById(`${color}Slope_minus`), document.getElementById(`${color}Slope_plus`), elements.slopeInput, elements.slopeSlider, 0.1, -50, 50, false);
     }
     

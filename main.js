@@ -15,9 +15,9 @@ const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightnes
 const SLOPE_PRECISION = 100;
 
 const defaultConfig = {
-    red: { intercept: 256, slope: 0.0 },
-    green: { intercept: 256, slope: 0.0 },
-    blue: { intercept: 256, slope: 0.0 },
+    red: { intercept: 256.0, slope: 0.0 },
+    green: { intercept: 256.0, slope: 0.0 },
+    blue: { intercept: 256.0, slope: 0.0 },
 };
 
 const icons = { mdiMagicStaff, mdiTune, mdiArrowLeft, mdiSync, mdiRestore };
@@ -162,6 +162,7 @@ function calculateChartData(params) {
     ];
     return { labels, datasets };
 }
+
 function initChart() {
     if (colorChart) colorChart.destroy();
     const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
@@ -184,6 +185,7 @@ function initChart() {
         }
     });
 }
+
 function updateChart() {
     if (!chartCanvas) return;
     if (colorChart) {
@@ -204,7 +206,7 @@ async function applyKcal(params, useRefreshRate = currentRefreshRate) {
     if (!params) return;
     try {
         const cmds = Object.entries(params).map(([color, { intercept, slope }]) => {
-            const i = intercept * 100;
+            const i = Math.round(intercept * 100);
             const s = Math.round(slope * SLOPE_PRECISION);
             const path = color === 'red' ? KCAL_RED_PATH : color === 'green' ? KCAL_GREEN_PATH : KCAL_BLUE_PATH;
             return `echo "${i} ${s} ${useRefreshRate}" > ${path}`;
@@ -225,11 +227,11 @@ function parseConfig(text) {
 }
 
 function serializeConfig(params) {
-    const ri = params.red.intercept * 100;
+    const ri = Math.round(params.red.intercept * 100);
     const rs = Math.round(params.red.slope * SLOPE_PRECISION);
-    const gi = params.green.intercept * 100;
+    const gi = Math.round(params.green.intercept * 100);
     const gs = Math.round(params.green.slope * SLOPE_PRECISION);
-    const bi = params.blue.intercept * 100;
+    const bi = Math.round(params.blue.intercept * 100);
     const bs = Math.round(params.blue.slope * SLOPE_PRECISION);
     return `${ri} ${rs} ${gi} ${gs} ${bi} ${bs}`;
 }
@@ -280,8 +282,8 @@ async function loadConfigAndRender() {
 function renderUI(params) {
     for (const color in uiElements) {
         const { intercept, slope } = params[color];
-        uiElements[color].interceptInput.value = intercept;
-        uiElements[color].interceptSlider.value = intercept;
+        uiElements[color].interceptInput.value = intercept.toFixed(2);
+        uiElements[color].interceptSlider.value = intercept * 100;
         uiElements[color].slopeInput.value = slope.toFixed(2);
         uiElements[color].slopeSlider.value = slope;
     }
@@ -290,14 +292,14 @@ function renderUI(params) {
 
 async function saveConfig() { const configString = serializeConfig(globalConfig); const filename = currentConfigPath.split('/').pop(); try { await exec(`echo '${configString}' > ${currentConfigPath}`); toast(i18next.t('toast.saved', { file: filename }), 'success'); } catch (e) { toast(i18next.t('toast.saveFailed', { error: e.message }), 'error'); } }
 function resetGlobalConfig() { globalConfig = JSON.parse(JSON.stringify(defaultConfig)); renderUI(globalConfig); applyKcal(globalConfig); updateChart(); toast(i18next.t('toast.reset'), 'info'); }
-async function readAndShowNodeStatus() { const parsedOutputElem = document.getElementById('parsedNodeOutput'); parsedOutputElem.innerHTML = i18next.t('status.reading'); nodeStatusModal.show(); try { const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`); const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`); const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`); const [ri, rs, rr] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [gi, gs, gr] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [bi, bs, br] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); if ([ri, rs, rr, gi, gs, gr, bi, bs, br].some(isNaN)) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeParseError')}</p>`; return; } parsedOutputElem.innerHTML = `<h6 class="text-danger">${i18next.t('params.red')}</h6><ul><li>I: ${ri / 100} (${ri})</li><li>S: ${(rs / SLOPE_PRECISION).toFixed(2)} (${rs})</li><li>Hz: ${rr}</li></ul><hr/><h6 class="text-success">${i18next.t('params.green')}</h6><ul><li>I: ${gi/100} (${gi})</li><li>S: ${(gs / SLOPE_PRECISION).toFixed(2)} (${gs})</li><li>Hz: ${gr}</li></ul><hr/><h6 class="text-primary">${i18next.t('params.blue')}</h6><ul><li>I: ${bi/100} (${bi})</li><li>S: ${(bs / SLOPE_PRECISION).toFixed(2)} (${bs})</li><li>Hz: ${br}</li></ul>`; } catch (e) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeReadPermission')}</p>`; } }
+async function readAndShowNodeStatus() { const parsedOutputElem = document.getElementById('parsedNodeOutput'); parsedOutputElem.innerHTML = i18next.t('status.reading'); nodeStatusModal.show(); try { const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`); const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`); const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`); const [ri, rs, rr] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [gi, gs, gr] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [bi, bs, br] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); if ([ri, rs, rr, gi, gs, gr, bi, bs, br].some(isNaN)) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeParseError')}</p>`; return; } parsedOutputElem.innerHTML = `<h6 class="text-danger">${i18next.t('params.red')}</h6><ul><li>I: ${(ri / 100).toFixed(2)} (${ri})</li><li>S: ${(rs / SLOPE_PRECISION).toFixed(2)} (${rs})</li><li>Hz: ${rr}</li></ul><hr/><h6 class="text-success">${i18next.t('params.green')}</h6><ul><li>I: ${(gi/100).toFixed(2)} (${gi})</li><li>S: ${(gs / SLOPE_PRECISION).toFixed(2)} (${gs})</li><li>Hz: ${gr}</li></ul><hr/><h6 class="text-primary">${i18next.t('params.blue')}</h6><ul><li>I: ${(bi/100).toFixed(2)} (${bi})</li><li>S: ${(bs / SLOPE_PRECISION).toFixed(2)} (${bs})</li><li>Hz: ${br}</li></ul>`; } catch (e) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeReadPermission')}</p>`; } }
 
 function calculateFit(point1, point2) {
     const x1 = Math.log(point1.brightness); const x2 = Math.log(point2.brightness);
     const y1 = point1.value; const y2 = point2.value;
     if (Math.abs(x1 - x2) < 1e-6) { return { intercept: y1, slope: 0 }; }
     const slope = (y2 - y1) / (x2 - x1);
-    const intercept = Math.round(y1 - slope * x1);
+    const intercept = y1 - slope * x1;
     return { intercept, slope };
 }
 
@@ -421,12 +423,12 @@ async function init() {
     for (const color in uiElements) {
         const elements = uiElements[color];
         const handleParamChange = (param, value) => { globalConfig[color][param] = value; renderUI(globalConfig); applyKcal(globalConfig); updateChart(); };
-        elements.interceptSlider.addEventListener('input', (e) => handleParamChange('intercept', parseInt(e.target.value)));
-        elements.interceptInput.addEventListener('change', (e) => { const val = parseInt(e.target.value) || 0; const clampedVal = Math.max(0, Math.min(val, 256)); handleParamChange('intercept', clampedVal); });
+        elements.interceptSlider.addEventListener('input', (e) => handleParamChange('intercept', parseFloat(e.target.value) / 100));
+        elements.interceptInput.addEventListener('change', (e) => { const val = parseFloat(e.target.value) || 0; const clampedVal = Math.max(0, Math.min(val, 256)); handleParamChange('intercept', clampedVal); });
         elements.slopeSlider.addEventListener('input', (e) => handleParamChange('slope', parseFloat(e.target.value)));
         elements.slopeInput.addEventListener('change', (e) => { const val = parseFloat(e.target.value) || 0; const clampedVal = Math.max(-50, Math.min(val, 50)); handleParamChange('slope', clampedVal); });
         
-        setupIncrementer(document.getElementById(`${color}Intercept_minus`), document.getElementById(`${color}Intercept_plus`), elements.interceptInput, elements.interceptSlider, 1, 0, 256, true);
+        setupIncrementer(document.getElementById(`${color}Intercept_minus`), document.getElementById(`${color}Intercept_plus`), elements.interceptInput, elements.interceptSlider, 0.01, 0, 256, false);
         setupIncrementer(document.getElementById(`${color}Slope_minus`), document.getElementById(`${color}Slope_plus`), elements.slopeInput, elements.slopeSlider, 0.1, -50, 50, false);
     }
     

@@ -8,156 +8,170 @@
 </head>
 <body>
     <div class="container mt-4 mb-5">
-        <!-- Header and Status Card (No Changes) -->
-        <header class="text-center mb-4"><h1 data-i18n="title"></h1><p class="text-muted" data-i18n="subtitle"></p></header>
-        <div class="card mb-4"><div class="card-body"><h5 class="card-title" data-i18n="status.cardTitle"></h5><p class="mb-1"><span data-i18n="status.refreshRate"></span> <span id="refreshRateValue" class="badge bg-primary" data-i18n="status.reading"></span></p><label for="brightnessSlider" class="form-label mt-2" data-i18n="status.brightness"></label><div class="range"><input type="range" class="form-range" id="brightnessSlider" min="0" max="100" step="1" disabled /></div><div id="brightnessValue" class="form-text" data-i18n="status.reading"></div></div></div>
-
+        <header class="text-center mb-4">
+            <h1 data-i18n="title"></h1>
+            <p class="text-muted" data-i18n="subtitle"></p>
+        </header>
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title" data-i18n="status.cardTitle"></h5>
+                <p class="mb-1"><span data-i18n="status.refreshRate"></span> <span id="refreshRateValue" class="badge bg-primary" data-i18n="status.reading"></span></p>
+                <label for="brightnessSlider" class="form-label mt-2" data-i18n="status.brightness"></label>
+                <div class="range"><input type="range" class="form-range" id="brightnessSlider" min="0" max="100" step="1" disabled /></div>
+                <div id="brightnessValue" class="form-text" data-i18n="status.reading"></div>
+            </div>
+        </div>
         <div class="card">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="card-title mb-0" data-i18n="config.cardTitle"></h5><div class="config-actions-group"><button id="wizardButton" type="button" class="btn btn-success btn-rounded" data-mdb-ripple-init data-i18n="buttons.wizard"></button></div></div>
-                <p class="text-muted small" data-i18n="config.description"></p><hr/>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title mb-0" data-i18n="config.cardTitle"></h5>
+                    <div class="config-actions-group">
+                        <button id="wizardButton" type="button" class="btn btn-success btn-rounded" data-mdb-ripple-init data-i18n="buttons.wizard"></button>
+                    </div>
+                </div>
+                <p class="text-muted small" data-i18n="config.description"></p>
+                <hr/>
                 <div id="advanced-config-editor" style="display: none;">
-                    <div class="d-flex justify-content-end align-items-center mb-3"><div class="config-actions-group"><button id="readNodeButton" type="button" class="btn btn-sm btn-light" data-mdb-ripple-init data-i18n="buttons.readNode"></button><button id="resetConfigButton" type="button" class="btn btn-sm btn-warning" data-mdb-ripple-init data-i18n="buttons.reset"></button><button id="saveButton" type="button" class="btn btn-sm btn-primary" data-mdb-ripple-init data-i18n="buttons.save"></button></div></div>
-                    
-                    <!-- Red Channel -->
+                    <div class="d-flex justify-content-end align-items-center mb-3">
+                         <div class="config-actions-group">
+                            <button id="readNodeButton" type="button" class="btn btn-sm btn-light" data-mdb-ripple-init data-i18n="buttons.readNode"></button>
+                            <button id="resetConfigButton" type="button" class="btn btn-sm btn-warning" data-mdb-ripple-init data-i18n="buttons.reset"></button>
+                            <button id="saveButton" type="button" class="btn btn-sm btn-primary" data-mdb-ripple-init data-i18n="buttons.save"></button>
+                        </div>
+                    </div>
                     <h6 class="text-danger" data-i18n="params.red"></h6>
                     <div class="param-row">
                         <label class="param-label" data-i18n="params.intercept"></label>
                         <div class="slider-input-group">
-                            <button type="button" class="btn btn-sm btn-outline-secondary btn-stepper" data-target="redInterceptSlider" data-step="-1">-</button>
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redInterceptSlider" min="0" max="256" step="1"/></div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary btn-stepper" data-target="redInterceptSlider" data-step="1">+</button>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="redInterceptInput" class="form-control param-input" step="1" min="0" max="256"/></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redIntercept_minus">-</button>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redInterceptSlider" min="0" max="256" step="1" /></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redIntercept_plus">+</button>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="redInterceptInput" class="form-control param-input" step="1" /></div>
                         </div>
                     </div>
                     <div class="param-row">
                         <label class="param-label" data-i18n="params.slope"></label>
                         <div class="slider-input-group">
-                            <button type="button" class="btn btn-sm btn-outline-secondary btn-stepper" data-target="redSlopeSlider" data-step="-1">-</button>
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redSlopeSlider" min="-50" max="50" step="1"/></div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary btn-stepper" data-target="redSlopeSlider" data-step="1">+</button>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="redSlopeInput" class="form-control param-input" step="1" min="-50" max="50"/></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redSlope_minus">-</button>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="redSlopeSlider" min="-50" max="50" step="0.01" /></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redSlope_plus">+</button>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="redSlopeInput" class="form-control param-input" step="0.01" /></div>
                         </div>
                     </div>
-
-                    <!-- Green Channel -->
                     <h6 class="text-success mt-4" data-i18n="params.green"></h6>
                     <div class="param-row">
                         <label class="param-label" data-i18n="params.intercept"></label>
                         <div class="slider-input-group">
-                            <button type="button" class="btn btn-sm btn-outline-secondary btn-stepper" data-target="greenInterceptSlider" data-step="-1">-</button>
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenInterceptSlider" min="0" max="256" step="1"/></div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary btn-stepper" data-target="greenInterceptSlider" data-step="1">+</button>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenInterceptInput" class="form-control param-input" step="1" min="0" max="256"/></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenIntercept_minus">-</button>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenInterceptSlider" min="0" max="256" step="1" /></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenIntercept_plus">+</button>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenInterceptInput" class="form-control param-input" step="1" /></div>
                         </div>
                     </div>
                     <div class="param-row">
                         <label class="param-label" data-i18n="params.slope"></label>
                         <div class="slider-input-group">
-                            <button type="button" class="btn btn-sm btn-outline-secondary btn-stepper" data-target="greenSlopeSlider" data-step="-1">-</button>
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenSlopeSlider" min="-50" max="50" step="1"/></div>
-                             <button type="button" class="btn btn-sm btn-outline-secondary btn-stepper" data-target="greenSlopeSlider" data-step="1">+</button>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenSlopeInput" class="form-control param-input" step="1" min="-50" max="50"/></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenSlope_minus">-</button>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="greenSlopeSlider" min="-50" max="50" step="0.01" /></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenSlope_plus">+</button>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="greenSlopeInput" class="form-control param-input" step="0.01" /></div>
                         </div>
                     </div>
-
-                    <!-- Blue Channel -->
                     <h6 class="text-primary mt-4" data-i18n="params.blue"></h6>
                     <div class="param-row">
                         <label class="param-label" data-i18n="params.intercept"></label>
                         <div class="slider-input-group">
-                             <button type="button" class="btn btn-sm btn-outline-secondary btn-stepper" data-target="blueInterceptSlider" data-step="-1">-</button>
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueInterceptSlider" min="0" max="256" step="1"/></div>
-                             <button type="button" class="btn btn-sm btn-outline-secondary btn-stepper" data-target="blueInterceptSlider" data-step="1">+</button>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueInterceptInput" class="form-control param-input" step="1" min="0" max="256"/></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueIntercept_minus">-</button>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueInterceptSlider" min="0" max="256" step="1" /></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueIntercept_plus">+</button>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueInterceptInput" class="form-control param-input" step="1" /></div>
                         </div>
                     </div>
                     <div class="param-row">
                         <label class="param-label" data-i18n="params.slope"></label>
                         <div class="slider-input-group">
-                             <button type="button" class="btn btn-sm btn-outline-secondary btn-stepper" data-target="blueSlopeSlider" data-step="-1">-</button>
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueSlopeSlider" min="-50" max="50" step="1"/></div>
-                             <button type="button" class="btn btn-sm btn-outline-secondary btn-stepper" data-target="blueSlopeSlider" data-step="1">+</button>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueSlopeInput" class="form-control param-input" step="1" min="-50" max="50"/></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueSlope_minus">-</button>
+                            <div class="range flex-grow-1"><input type="range" class="form-range" id="blueSlopeSlider" min="-50" max="50" step="0.01" /></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueSlope_plus">+</button>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="blueSlopeInput" class="form-control param-input" step="0.01" /></div>
                         </div>
                     </div>
                 </div>
-                
                 <div class="chart-container mt-4"><canvas id="colorCurveChart"></canvas></div>
                 <div class="text-center mt-4"><button id="advancedModeButton" type="button" class="btn btn-secondary btn-sm" data-mdb-ripple-init></button></div>
             </div>
         </div>
         <footer class="text-center mt-4"><p class="text-muted small" data-i18n="footer.author"></p></footer>
     </div>
-    
-    <!-- Modals -->
-    <div class="modal fade" id="nodeStatusModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" data-i18n="modals.nodeStatus.title"></h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div><div class="modal-body" id="parsedNodeOutput"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-mdb-dismiss="modal" data-i18n="modals.nodeStatus.close"></button></div></div></div></div>
-
+    <div class="modal fade" id="nodeStatusModal" tabindex="-1">
+        <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" data-i18n="modals.nodeStatus.title"></h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div><div class="modal-body" id="parsedNodeOutput"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-mdb-dismiss="modal" data-i18n="modals.nodeStatus.close"></button></div></div></div>
+    </div>
     <div class="modal fade" id="wizardModal" tabindex="-1" data-mdb-backdrop="static" data-mdb-keyboard="false">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" data-i18n="modals.wizard.title"></h5><button type="button" id="wizardCancelButton" class="btn-close"></button></div>
+                <div class="modal-header">
+                    <h5 class="modal-title" data-i18n="modals.wizard.title"></h5>
+                    <button type="button" id="wizardCancelButton" class="btn-close"></button>
+                </div>
                 <div class="modal-body">
-                    <!-- Step 1 -->
                     <div id="wizardStep1">
                         <h6 data-i18n="modals.wizard.step1.title"></h6>
                         <p class="text-muted small" data-i18n="modals.wizard.step1.description"></p>
                         <label class="form-label mt-3" data-i18n="modals.wizard.brightness"></label>
                         <div class="range"><input type="range" class="form-range" id="wizardBrightness1" min="1" max="50" value="10" /></div>
-                        
                         <label class="form-label mt-4" data-i18n="modals.wizard.colorValue"></label>
                         <div class="slider-input-group mb-3">
-                            <button type="button" class="btn btn-sm btn-outline-danger btn-stepper" data-target="wizardColorR1" data-step="-1">-</button>
-                            <div class="range flex-grow-1 range-danger"><input type="range" class="form-range" id="wizardColorR1" min="0" max="256" step="1" value="256"/></div>
-                            <button type="button" class="btn btn-sm btn-outline-danger btn-stepper" data-target="wizardColorR1" data-step="1">+</button>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorR1_input" class="form-control param-input" step="1" min="0" max="256"/></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="wizardColorR1_minus">-</button>
+                            <div class="range flex-grow-1 range-danger"><input type="range" class="form-range" id="wizardColorR1" min="0" max="256" step="1" /></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="wizardColorR1_plus">+</button>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorR1_input" class="form-control param-input" step="1" min="0" max="256" /></div>
                         </div>
                         <div class="slider-input-group mb-3">
-                            <button type="button" class="btn btn-sm btn-outline-success btn-stepper" data-target="wizardColorG1" data-step="-1">-</button>
-                            <div class="range flex-grow-1 range-success"><input type="range" class="form-range" id="wizardColorG1" min="0" max="256" step="1" value="256"/></div>
-                            <button type="button" class="btn btn-sm btn-outline-success btn-stepper" data-target="wizardColorG1" data-step="1">+</button>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorG1_input" class="form-control param-input" step="1" min="0" max="256"/></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="wizardColorG1_minus">-</button>
+                            <div class="range flex-grow-1 range-success"><input type="range" class="form-range" id="wizardColorG1" min="0" max="256" step="1" /></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="wizardColorG1_plus">+</button>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorG1_input" class="form-control param-input" step="1" min="0" max="256" /></div>
                         </div>
                         <div class="slider-input-group">
-                            <button type="button" class="btn btn-sm btn-outline-info btn-stepper" data-target="wizardColorB1" data-step="-1">-</button>
-                            <div class="range flex-grow-1 range-info"><input type="range" class="form-range" id="wizardColorB1" min="0" max="256" step="1" value="256"/></div>
-                            <button type="button" class="btn btn-sm btn-outline-info btn-stepper" data-target="wizardColorB1" data-step="1">+</button>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorB1_input" class="form-control param-input" step="1" min="0" max="256"/></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="wizardColorB1_minus">-</button>
+                            <div class="range flex-grow-1 range-info"><input type="range" class="form-range" id="wizardColorB1" min="0" max="256" step="1" /></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="wizardColorB1_plus">+</button>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorB1_input" class="form-control param-input" step="1" min="0" max="256" /></div>
                         </div>
                     </div>
-                    <!-- Step 2 -->
                     <div id="wizardStep2" style="display: none;">
                         <h6 data-i18n="modals.wizard.step2.title"></h6>
                         <p class="text-muted small" data-i18n="modals.wizard.step2.description"></p>
                         <label class="form-label mt-3" data-i18n="modals.wizard.brightness"></label>
                         <div class="range"><input type="range" class="form-range" id="wizardBrightness2" min="51" max="100" value="80" /></div>
-                        
                         <label class="form-label mt-4" data-i18n="modals.wizard.colorValue"></label>
-                        <div class="slider-input-group mb-3">
-                            <button type="button" class="btn btn-sm btn-outline-danger btn-stepper" data-target="wizardColorR2" data-step="-1">-</button>
-                            <div class="range flex-grow-1 range-danger"><input type="range" class="form-range" id="wizardColorR2" min="0" max="256" step="1" value="256"/></div>
-                            <button type="button" class="btn btn-sm btn-outline-danger btn-stepper" data-target="wizardColorR2" data-step="1">+</button>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorR2_input" class="form-control param-input" step="1" min="0" max="256"/></div>
+                         <div class="slider-input-group mb-3">
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="wizardColorR2_minus">-</button>
+                            <div class="range flex-grow-1 range-danger"><input type="range" class="form-range" id="wizardColorR2" min="0" max="256" step="1" /></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="wizardColorR2_plus">+</button>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorR2_input" class="form-control param-input" step="1" min="0" max="256" /></div>
                         </div>
                         <div class="slider-input-group mb-3">
-                            <button type="button" class="btn btn-sm btn-outline-success btn-stepper" data-target="wizardColorG2" data-step="-1">-</button>
-                            <div class="range flex-grow-1 range-success"><input type="range" class="form-range" id="wizardColorG2" min="0" max="256" step="1" value="256"/></div>
-                            <button type="button" class="btn btn-sm btn-outline-success btn-stepper" data-target="wizardColorG2" data-step="1">+</button>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorG2_input" class="form-control param-input" step="1" min="0" max="256"/></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="wizardColorG2_minus">-</button>
+                            <div class="range flex-grow-1 range-success"><input type="range" class="form-range" id="wizardColorG2" min="0" max="256" step="1" /></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="wizardColorG2_plus">+</button>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorG2_input" class="form-control param-input" step="1" min="0" max="256" /></div>
                         </div>
                         <div class="slider-input-group">
-                            <button type="button" class="btn btn-sm btn-outline-info btn-stepper" data-target="wizardColorB2" data-step="-1">-</button>
-                            <div class="range flex-grow-1 range-info"><input type="range" class="form-range" id="wizardColorB2" min="0" max="256" step="1" value="256"/></div>
-                            <button type="button" class="btn btn-sm btn-outline-info btn-stepper" data-target="wizardColorB2" data-step="1">+</button>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorB2_input" class="form-control param-input" step="1" min="0" max="256"/></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="wizardColorB2_minus">-</button>
+                            <div class="range flex-grow-1 range-info"><input type="range" class="form-range" id="wizardColorB2" min="0" max="256" step="1" /></div>
+                            <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="wizardColorB2_plus">+</button>
+                            <div class="form-outline" data-mdb-input-init><input type="number" id="wizardColorB2_input" class="form-control param-input" step="1" min="0" max="256" /></div>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer"><button type="button" id="wizardNextButton" class="btn btn-primary" data-i18n="modals.wizard.next"></button><button type="button" id="wizardFinishButton" class="btn btn-success" data-i18n="modals.wizard.finish" style="display: none;"></button></div>
+                <div class="modal-footer">
+                    <button type="button" id="wizardNextButton" class="btn btn-primary" data-i18n="modals.wizard.next"></button>
+                    <button type="button" id="wizardFinishButton" class="btn btn-success" data-i18n="modals.wizard.finish" style="display: none;"></button>
+                </div>
             </div>
         </div>
     </div>
-    
     <script type="module" src="main.js"></script>
 </body>
 </html>

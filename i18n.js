@@ -1,14 +1,11 @@
-// i18n.js
 import i18next from 'i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 
 const resources = {
   en: {
     translation: {
-      // Header
       title: "MiuiCX Color Tuner",
       subtitle: "",
-      // Status Card
       "status.cardTitle": "Live Status",
       "status.refreshRate": "Refresh Rate:",
       "status.brightness": "Brightness (%)",
@@ -17,26 +14,21 @@ const resources = {
       "status.brightnessReadError": "Failed to read brightness",
       "status.brightnessPathError": "Backlight path not set",
       "status.refreshRateReadError": "Unavailable",
-      // Config Card
       "config.cardTitle": "Color Profile Settings",
       "config.description": "Use the Wizard for easy setup, or enter Advanced Mode for manual tuning.",
-      // Buttons
       "buttons.wizard": { "icon": "mdiMagicStaff", "text": "Setup Wizard" },
       "buttons.advancedMode.enter": { "icon": "mdiTune", "text": "Advanced Mode" },
       "buttons.advancedMode.exit": { "icon": "mdiArrowLeft", "text": "Exit Advanced" },
       "buttons.readNode": { "icon": "mdiSync", "text": "Read Node" },
       "buttons.reset": { "icon": "mdiRestore", "text": "Reset" },
       "buttons.save": "Save",
-      // Params & Chart
       "params.intercept": "Intercept",
       "params.slope": "Slope",
       "params.red": "Red",
       "params.green": "Green",
       "params.blue": "Blue",
       "chart.yAxisTitle": "Calculated Value",
-      // Footer
       "footer.author": "Author: 囫碾 | WebUI by Gemini Pro",
-      // Modals
       "modals.nodeStatus.title": "Node Status",
       "modals.nodeStatus.close": "Close",
       "modals.wizard.title": "Color Setup Wizard",
@@ -49,7 +41,6 @@ const resources = {
       "modals.wizard.next": "Next",
       "modals.wizard.finish": "Finish & Apply",
       "modals.wizard.cancel": "Cancel",
-      // Toasts
       "toast.configLoaded": "Loaded config for {{file}}.",
       "toast.configLoadFailed": "Config '{{file}}' not found. Reading from node...",
       "toast.configLoadFromNode": "Loaded values from node.",
@@ -63,7 +54,6 @@ const resources = {
       "toast.advancedMode.off": "Exited advanced mode.",
       "toast.backlightPathError": "Backlight path error.",
       "toast.refreshRateChanged": "Refresh rate changed to {{rate}}Hz. Switched profile.",
-      // Errors
       "errors.nodeParseError": "Invalid node format.",
       "errors.nodeReadFailed": "Read failed: {{error}}",
       "errors.nodeReadPermission": "Can't read Kcal node. Check path/permissions."
@@ -71,10 +61,8 @@ const resources = {
   },
   'zh-CN': {
     translation: {
-      // Header
       title: "MiuiCX 色彩调节",
       subtitle: "",
-      // Status Card
       "status.cardTitle": "实时状态",
       "status.refreshRate": "刷新率:",
       "status.brightness": "亮度 (%)",
@@ -83,26 +71,21 @@ const resources = {
       "status.brightnessReadError": "无法读取亮度文件",
       "status.brightnessPathError": "未配置背光路径",
       "status.refreshRateReadError": "不可用",
-      // Config Card
       "config.cardTitle": "色彩配置",
       "config.description": "使用“设置向导”进行简单配置，或进入“高级模式”手动微调。",
-      // Buttons
       "buttons.wizard": { "icon": "mdiMagicStaff", "text": "设置向导" },
       "buttons.advancedMode.enter": { "icon": "mdiTune", "text": "高级模式" },
       "buttons.advancedMode.exit": { "icon": "mdiArrowLeft", "text": "退出高级" },
       "buttons.readNode": { "icon": "mdiSync", "text": "读取节点" },
       "buttons.reset": { "icon": "mdiRestore", "text": "重置" },
       "buttons.save": "保存",
-      // Params & Chart
       "params.intercept": "截距",
       "params.slope": "斜率",
       "params.red": "红色",
       "params.green": "绿色",
       "params.blue": "蓝色",
       "chart.yAxisTitle": "计算值",
-      // Footer
       "footer.author": "作者: 囫碾 | WebUI by Gemini Pro",
-      // Modals
       "modals.nodeStatus.title": "节点状态",
       "modals.nodeStatus.close": "关闭",
       "modals.wizard.title": "色彩设置向导",
@@ -115,7 +98,6 @@ const resources = {
       "modals.wizard.next": "下一步",
       "modals.wizard.finish": "完成并应用",
       "modals.wizard.cancel": "取消",
-      // Toasts
       "toast.configLoaded": "已加载配置: {{file}}",
       "toast.configLoadFailed": "未找到配置 '{{file}}'，正从节点读取...",
       "toast.configLoadFromNode": "已从节点加载",
@@ -129,7 +111,6 @@ const resources = {
       "toast.advancedMode.off": "已退出高级模式。",
       "toast.backlightPathError": "背光路径错误",
       "toast.refreshRateChanged": "刷新率变为 {{rate}}Hz，已切换配置文件。",
-      // Errors
       "errors.nodeParseError": "节点格式无效",
       "errors.nodeReadFailed": "读取失败: {{error}}",
       "errors.nodeReadPermission": "节点读取失败，检查路径/权限"

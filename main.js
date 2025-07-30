@@ -283,7 +283,7 @@ function renderUI(params) {
     for (const color in uiElements) {
         const { intercept, slope } = params[color];
         uiElements[color].interceptInput.value = intercept.toFixed(2);
-        uiElements[color].interceptSlider.value = intercept * 100;
+        uiElements[color].interceptSlider.value = intercept;
         uiElements[color].slopeInput.value = slope.toFixed(2);
         uiElements[color].slopeSlider.value = slope;
     }
@@ -384,11 +384,10 @@ function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isIn
         const clampedValue = Math.max(min, Math.min(newValue, max));
         if (isInt) {
             input.value = Math.round(clampedValue);
-            slider.value = Math.round(clampedValue);
         } else {
             input.value = clampedValue.toFixed(2);
-            slider.value = clampedValue;
         }
+        slider.value = isInt ? Math.round(clampedValue) : clampedValue;
         input.dispatchEvent(new Event('change', { bubbles: true }));
     };
     minusBtn.addEventListener('click', () => {
@@ -423,12 +422,26 @@ async function init() {
     for (const color in uiElements) {
         const elements = uiElements[color];
         const handleParamChange = (param, value) => { globalConfig[color][param] = value; renderUI(globalConfig); applyKcal(globalConfig); updateChart(); };
-        elements.interceptSlider.addEventListener('input', (e) => handleParamChange('intercept', parseFloat(e.target.value) / 100));
-        elements.interceptInput.addEventListener('change', (e) => { const val = parseFloat(e.target.value) || 0; const clampedVal = Math.max(0, Math.min(val, 256)); handleParamChange('intercept', clampedVal); });
-        elements.slopeSlider.addEventListener('input', (e) => handleParamChange('slope', parseFloat(e.target.value)));
-        elements.slopeInput.addEventListener('change', (e) => { const val = parseFloat(e.target.value) || 0; const clampedVal = Math.max(-50, Math.min(val, 50)); handleParamChange('slope', clampedVal); });
         
-        setupIncrementer(document.getElementById(`${color}Intercept_minus`), document.getElementById(`${color}Intercept_plus`), elements.interceptInput, elements.interceptSlider, 0.01, 0, 256, false);
+        elements.interceptSlider.addEventListener('input', (e) => {
+            handleParamChange('intercept', parseFloat(e.target.value));
+        });
+        elements.interceptInput.addEventListener('change', (e) => {
+            const val = parseFloat(e.target.value) || 0;
+            const clampedVal = Math.max(0, Math.min(val, 256));
+            handleParamChange('intercept', clampedVal);
+        });
+
+        elements.slopeSlider.addEventListener('input', (e) => {
+            handleParamChange('slope', parseFloat(e.target.value));
+        });
+        elements.slopeInput.addEventListener('change', (e) => {
+            const val = parseFloat(e.target.value) || 0;
+            const clampedVal = Math.max(-50, Math.min(val, 50));
+            handleParamChange('slope', clampedVal);
+        });
+        
+        setupIncrementer(document.getElementById(`${color}Intercept_minus`), document.getElementById(`${color}Intercept_plus`), elements.interceptInput, elements.interceptSlider, 1, 0, 256, true);
         setupIncrementer(document.getElementById(`${color}Slope_minus`), document.getElementById(`${color}Slope_plus`), elements.slopeInput, elements.slopeSlider, 0.1, -50, 50, false);
     }
     

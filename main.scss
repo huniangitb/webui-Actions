@@ -103,11 +103,6 @@ body {
     justify-content: flex-end;
 }
 
-// 移除：删除此条规则，以允许按钮尺寸变小
-// #advancedModeButton {
-//     min-width: 160px;
-// }
-
 .chart-container {
     position: relative;
     height: 220px;
@@ -122,12 +117,16 @@ input[type="range"] {
     touch-action: pan-y;
 }
 
-.range-danger .form-range::-webkit-slider-thumb { background-color: #f93154; }
+// 修改：为高级模式的截距滑块添加颜色
+.range-danger .form-range::-webkit-slider-thumb,
 .range-danger .form-range::-moz-range-thumb { background-color: #f93154; }
-.range-success .form-range::-webkit-slider-thumb { background-color: #00b74a; }
+
+.range-success .form-range::-webkit-slider-thumb,
 .range-success .form-range::-moz-range-thumb { background-color: #00b74a; }
-.range-info .form-range::-webkit-slider-thumb { background-color: #39c0ed; }
+
+.range-info .form-range::-webkit-slider-thumb,
 .range-info .form-range::-moz-range-thumb { background-color: #39c0ed; }
+
 
 #configContentContainer {
     transition: opacity 0.35s ease, max-height 0.35s ease;

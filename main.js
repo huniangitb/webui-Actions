@@ -154,6 +154,8 @@ function toggleAdvancedMode(enable, showToast = true) {
     } else {
         advancedModeButton.classList.remove('btn-primary'); advancedModeButton.classList.add('btn-secondary');
         if (showToast) toast(i18next.t('toast.advancedMode.off'), 'info');
+        // 新增：退出高级模式时滚动到顶部
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
 

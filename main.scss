@@ -16,6 +16,11 @@ body {
   font-weight: 400;
 }
 
+// 新增：为防止 "色彩配置" 标题换行
+.card-body > .d-flex > .card-title {
+  white-space: nowrap;
+}
+
 .status-header {
     display: flex;
     justify-content: space-between;
@@ -73,6 +78,24 @@ body {
     flex-shrink: 0;
 }
 
+// 新增：为不同颜色的加减号按钮添加浅色背景和悬停效果
+.btn-minus-plus-danger {
+  background-color: rgba(249, 49, 84, 0.15) !important;
+  color: #f93154 !important;
+  &:hover { background-color: rgba(249, 49, 84, 0.25) !important; }
+}
+.btn-minus-plus-success {
+  background-color: rgba(0, 183, 74, 0.15) !important;
+  color: #00b74a !important;
+  &:hover { background-color: rgba(0, 183, 74, 0.25) !important; }
+}
+.btn-minus-plus-primary {
+  background-color: rgba(57, 192, 237, 0.15) !important;
+  color: #39c0ed !important;
+  &:hover { background-color: rgba(57, 192, 237, 0.25) !important; }
+}
+
+
 .config-actions-group {
     display: flex;
     flex-wrap: wrap;
@@ -80,9 +103,10 @@ body {
     justify-content: flex-end;
 }
 
-#advancedModeButton {
-    min-width: 160px;
-}
+// 移除：删除此条规则，以允许按钮尺寸变小
+// #advancedModeButton {
+//     min-width: 160px;
+// }
 
 .chart-container {
     position: relative;

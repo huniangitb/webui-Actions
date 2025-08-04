@@ -23,6 +23,13 @@ const defaultConfig = {
 
 const icons = { mdiMagicStaff, mdiTune, mdiArrowLeft, mdiSync, mdiRestore };
 
+const refreshRateColorStops = [
+    { rate: 30, color: [57, 192, 237] },   // Blue
+    { rate: 60, color: [0, 183, 74] },    // Green
+    { rate: 90, color: [255, 153, 51] },  // Orange
+    { rate: 144, color: [249, 49, 84] }   // Red
+];
+
 let globalConfig = JSON.parse(JSON.stringify(defaultConfig));
 let maxBrightness = 4095;
 let currentRefreshRate = 60;
@@ -47,6 +54,7 @@ const advancedModeButton = document.getElementById('advancedModeButton');
 const wizardButton = document.getElementById('wizardButton');
 const kcalEnableSwitch = document.getElementById('kcalEnableSwitch');
 const configContentContainer = document.getElementById('configContentContainer');
+const configDescription = document.getElementById('configDescription');
 
 const uiElements = {
     red: { interceptSlider: document.getElementById('redInterceptSlider'), interceptInput: document.getElementById('redInterceptInput'), slopeSlider: document.getElementById('redSlopeSlider'), slopeInput: document.getElementById('redSlopeInput') },
@@ -78,6 +86,14 @@ const wizardControls = {
 let wizardData = {};
 
 function createIcon(path) { if (!path) return ''; return `<svg class="svg-icon me-2" viewBox="0 0 24 24"><path d="${path}" /></svg>`; }
+
+function interpolateColor(color1, color2, factor) {
+    const result = color1.slice();
+    for (let i = 0; i < 3; i++) {
+        result[i] = Math.round(color1[i] + factor * (color2[i] - color1[i]));
+    }
+    return result;
+}
 
 async function pollSystemStatus() {
     try {
@@ -117,8 +133,10 @@ function updateUIText() {
 }
 
 function toggleAdvancedMode(enable, showToast = true) {
-    isAdvancedMode = enable; advancedConfigEditor.style.display = enable ? 'block' : 'none';
+    isAdvancedMode = enable; 
+    advancedConfigEditor.style.display = enable ? 'block' : 'none';
     wizardButton.style.display = enable ? 'none' : 'block';
+    configDescription.classList.toggle('hidden', enable);
     const key = enable ? 'buttons.advancedMode.exit' : 'buttons.advancedMode.enter';
     const translation = i18next.t(key, { returnObjects: true });
     if (typeof translation === 'object') { advancedModeButton.innerHTML = `${createIcon(icons[translation.icon])}${translation.text}`; }
@@ -160,25 +178,30 @@ async function setKcalEnabled(enabled) {
 
 function updateKcalEnableUI(enabled) {
     kcalEnableSwitch.checked = enabled;
-    if (enabled) {
-        configContentContainer.classList.remove('disabled');
-    } else {
-        configContentContainer.classList.add('disabled');
-    }
+    configContentContainer.classList.toggle('hidden', !enabled);
 }
 
 function updateRefreshRateUI(rate) {
     refreshRateValue.innerText = `${rate} Hz`;
-    refreshRateValue.className = 'badge';
-    if (rate < 60) {
-        refreshRateValue.classList.add('badge-rate-low');
-    } else if (rate < 90) {
-        refreshRateValue.classList.add('badge-rate-std');
-    } else if (rate < 120) {
-        refreshRateValue.classList.add('badge-rate-high');
+    let color;
+    if (rate <= refreshRateColorStops[0].rate) {
+        color = refreshRateColorStops[0].color;
+    } else if (rate >= refreshRateColorStops[refreshRateColorStops.length - 1].rate) {
+        color = refreshRateColorStops[refreshRateColorStops.length - 1].color;
     } else {
-        refreshRateValue.classList.add('badge-rate-vhigh');
+        let lowerStop, upperStop;
+        for (let i = 0; i < refreshRateColorStops.length - 1; i++) {
+            if (rate >= refreshRateColorStops[i].rate && rate < refreshRateColorStops[i + 1].rate) {
+                lowerStop = refreshRateColorStops[i];
+                upperStop = refreshRateColorStops[i + 1];
+                break;
+            }
+        }
+        const range = upperStop.rate - lowerStop.rate;
+        const factor = (rate - lowerStop.rate) / range;
+        color = interpolateColor(lowerStop.color, upperStop.color, factor);
     }
+    refreshRateValue.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
 }
 
 function calculateChartData(params) {

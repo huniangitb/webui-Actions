@@ -5,7 +5,7 @@ const resources = {
   en: {
     translation: {
       title: "MiuiCX Color Tuner",
-      subtitle: "Simplified color calibration with a guided setup.",
+      subtitle: "",
       "status.cardTitle": "Live Status",
       "status.refreshRate": "Refresh Rate:",
       "status.brightness": "Brightness (%)",
@@ -16,7 +16,7 @@ const resources = {
       "status.refreshRateReadError": "Unavailable",
       "config.cardTitle": "Color Profile Settings",
       "config.description": "Use the Wizard for easy setup, or enter Advanced Mode for manual tuning.",
-      "config.enableKcal": "Enable Color Calibration",
+      "config.enableKcal": "Calibration On",
       "buttons.wizard": { "icon": "mdiMagicStaff", "text": "Setup Wizard" },
       "buttons.advancedMode.enter": { "icon": "mdiTune", "text": "Advanced Mode" },
       "buttons.advancedMode.exit": { "icon": "mdiArrowLeft", "text": "Exit Advanced" },
@@ -63,7 +63,7 @@ const resources = {
   'zh-CN': {
     translation: {
       title: "MiuiCX 色彩调节",
-      subtitle: "通过设置向导，轻松校准您的屏幕色彩。",
+      subtitle: "",
       "status.cardTitle": "实时状态",
       "status.refreshRate": "刷新率:",
       "status.brightness": "亮度 (%)",
@@ -74,7 +74,7 @@ const resources = {
       "status.refreshRateReadError": "不可用",
       "config.cardTitle": "色彩配置",
       "config.description": "使用“设置向导”进行简单配置，或进入“高级模式”手动微调。",
-      "config.enableKcal": "启用色彩校准",
+      "config.enableKcal": "启用校准",
       "buttons.wizard": { "icon": "mdiMagicStaff", "text": "设置向导" },
       "buttons.advancedMode.enter": { "icon": "mdiTune", "text": "高级模式" },
       "buttons.advancedMode.exit": { "icon": "mdiArrowLeft", "text": "退出高级" },

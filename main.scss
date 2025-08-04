@@ -22,14 +22,20 @@ body {
     align-items: center;
 }
 
+.status-header .form-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-left: 0;
+}
+
 .status-header .form-check-label {
     font-size: 0.9em;
 }
 
-.badge-rate-low { background-color: #39c0ed; }
-.badge-rate-std { background-color: #00b74a; }
-.badge-rate-high { background-color: #ff9933; }
-.badge-rate-vhigh { background-color: #f93154; }
+.badge {
+    transition: background-color 0.3s ease-in-out;
+}
 
 .param-row {
     display: flex;
@@ -84,6 +90,10 @@ body {
     border: 1px solid rgba(var(--mdb-body-color-rgb), 0.125);
 }
 
+.range {
+    touch-action: pan-y;
+}
+
 .range-danger .form-range::-webkit-slider-thumb { background-color: #f93154; }
 .range-danger .form-range::-moz-range-thumb { background-color: #f93154; }
 .range-success .form-range::-webkit-slider-thumb { background-color: #00b74a; }
@@ -91,10 +101,27 @@ body {
 .range-info .form-range::-webkit-slider-thumb { background-color: #39c0ed; }
 .range-info .form-range::-moz-range-thumb { background-color: #39c0ed; }
 
-#configContentContainer.disabled {
-    opacity: 0.5;
-    pointer-events: none;
-    transition: opacity 0.3s ease-in-out;
+#configContentContainer {
+    transition: opacity 0.35s ease, max-height 0.35s ease;
+    overflow: hidden;
+    max-height: 2000px;
+}
+  
+#configContentContainer.hidden {
+    max-height: 0;
+    opacity: 0;
+}
+
+#configDescription {
+    transition: opacity 0.3s ease, max-height 0.3s ease, margin-bottom 0.3s ease;
+    overflow: hidden;
+    max-height: 100px;
+}
+
+#configDescription.hidden {
+    max-height: 0;
+    opacity: 0;
+    margin-bottom: 0 !important;
 }
 
 @media (max-width: 768px) {

@@ -76,6 +76,17 @@ body {
 .range-info .form-range::-webkit-slider-thumb { background-color: #39c0ed; }
 .range-info .form-range::-moz-range-thumb { background-color: #39c0ed; }
 
+.form-check.form-switch {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+#configContentContainer.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.3s ease-in-out;
+}
 
 @media (max-width: 768px) {
   .param-row {

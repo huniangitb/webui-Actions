@@ -10,6 +10,7 @@ let currentConfigPath = '';
 const KCAL_RED_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_red";
 const KCAL_GREEN_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_green";
 const KCAL_BLUE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_blue";
+const KCAL_ENABLE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_enable";
 const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
 const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
 const SLOPE_PRECISION = 100;
@@ -44,6 +45,8 @@ const chartCanvas = document.getElementById('colorCurveChart');
 const advancedConfigEditor = document.getElementById('advanced-config-editor');
 const advancedModeButton = document.getElementById('advancedModeButton');
 const wizardButton = document.getElementById('wizardButton');
+const kcalEnableSwitch = document.getElementById('kcalEnableSwitch');
+const configContentContainer = document.getElementById('configContentContainer');
 
 const uiElements = {
     red: { interceptSlider: document.getElementById('redInterceptSlider'), interceptInput: document.getElementById('redInterceptInput'), slopeSlider: document.getElementById('redSlopeSlider'), slopeInput: document.getElementById('redSlopeInput') },
@@ -78,8 +81,8 @@ function createIcon(path) { if (!path) return ''; return `<svg class="svg-icon m
 
 async function pollSystemStatus() {
     try {
-        const { stdout } = await exec('settings get system peak_refresh_rate');
-        const newRate = Math.round(parseFloat(stdout.trim())) || 60;
+        const { stdout } = await exec(`cat ${KCAL_RED_PATH}`);
+        const newRate = parseInt(stdout.trim().split(/\s+/)[2]) || 60;
         if (newRate !== lastKnownRefreshRate) {
             lastKnownRefreshRate = newRate; currentRefreshRate = newRate; refreshRateValue.innerText = `${currentRefreshRate} Hz`;
             currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
@@ -144,6 +147,23 @@ async function setSystemBrightness(percentage) {
              lastKnownBrightness = systemValue;
         }
     } catch (e) { toast(i18next.t('toast.saveFailed', { error: `Brightness: ${e.message}` }), 'error'); }
+}
+
+async function setKcalEnabled(enabled) {
+    try {
+        await exec(`echo ${enabled ? 1 : 0} > ${KCAL_ENABLE_PATH}`);
+    } catch(e) {
+        toast(i18next.t('toast.saveFailed', { error: 'Kcal enable toggle failed' }), 'error');
+    }
+}
+
+function updateKcalEnableUI(enabled) {
+    kcalEnableSwitch.checked = enabled;
+    if (enabled) {
+        configContentContainer.classList.remove('disabled');
+    } else {
+        configContentContainer.classList.add('disabled');
+    }
 }
 
 function calculateChartData(params) {
@@ -292,7 +312,7 @@ function renderUI(params) {
 
 async function saveConfig() { const configString = serializeConfig(globalConfig); const filename = currentConfigPath.split('/').pop(); try { await exec(`echo '${configString}' > ${currentConfigPath}`); toast(i18next.t('toast.saved', { file: filename }), 'success'); } catch (e) { toast(i18next.t('toast.saveFailed', { error: e.message }), 'error'); } }
 function resetGlobalConfig() { globalConfig = JSON.parse(JSON.stringify(defaultConfig)); renderUI(globalConfig); applyKcal(globalConfig); updateChart(); toast(i18next.t('toast.reset'), 'info'); }
-async function readAndShowNodeStatus() { const parsedOutputElem = document.getElementById('parsedNodeOutput'); parsedOutputElem.innerHTML = i18next.t('status.reading'); nodeStatusModal.show(); try { const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`); const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`); const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`); const [ri, rs, rr] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [gi, gs, gr] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [bi, bs, br] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); if ([ri, rs, rr, gi, gs, gr, bi, bs, br].some(isNaN)) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeParseError')}</p>`; return; } parsedOutputElem.innerHTML = `<h6 class="text-danger">${i18next.t('params.red')}</h6><ul><li>I: ${(ri / 100).toFixed(2)} (${ri})</li><li>S: ${(rs / SLOPE_PRECISION).toFixed(2)} (${rs})</li><li>Hz: ${rr}</li></ul><hr/><h6 class="text-success">${i18next.t('params.green')}</h6><ul><li>I: ${(gi/100).toFixed(2)} (${gi})</li><li>S: ${(gs / SLOPE_PRECISION).toFixed(2)} (${gs})</li><li>Hz: ${gr}</li></ul><hr/><h6 class="text-primary">${i18next.t('params.blue')}</h6><ul><li>I: ${(bi/100).toFixed(2)} (${bi})</li><li>S: ${(bs / SLOPE_PRECISION).toFixed(2)} (${bs})</li><li>Hz: ${br}</li></ul>`; } catch (e) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeReadPermission')}</p>`; } }
+async function readAndShowNodeStatus() { const parsedOutputElem = document.getElementById('parsedNodeOutput'); parsedOutputElem.innerHTML = i18next.t('status.reading'); nodeStatusModal.show(); try { const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`); const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`); const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`); const { stdout: enable_stdout } = await exec(`cat ${KCAL_ENABLE_PATH}`); const [ri, rs, rr] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [gi, gs, gr] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [bi, bs, br] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); if ([ri, rs, rr, gi, gs, gr, bi, bs, br].some(isNaN)) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeParseError')}</p>`; return; } parsedOutputElem.innerHTML = `<h6><strong>Kcal Status:</strong> ${enable_stdout.trim() === '1' ? 'Enabled' : 'Disabled'}</h6><hr/><h6 class="text-danger">${i18next.t('params.red')}</h6><ul><li>I: ${(ri / 100).toFixed(2)} (${ri})</li><li>S: ${(rs / SLOPE_PRECISION).toFixed(2)} (${rs})</li><li>Hz: ${rr}</li></ul><hr/><h6 class="text-success">${i18next.t('params.green')}</h6><ul><li>I: ${(gi/100).toFixed(2)} (${gi})</li><li>S: ${(gs / SLOPE_PRECISION).toFixed(2)} (${gs})</li><li>Hz: ${gr}</li></ul><hr/><h6 class="text-primary">${i18next.t('params.blue')}</h6><ul><li>I: ${(bi/100).toFixed(2)} (${bi})</li><li>S: ${(bs / SLOPE_PRECISION).toFixed(2)} (${bs})</li><li>Hz: ${br}</li></ul>`; } catch (e) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeReadPermission')}</p>`; } }
 
 function calculateFit(point1, point2) {
     const x1 = Math.log(point1.brightness); const x2 = Math.log(point2.brightness);
@@ -401,7 +421,42 @@ function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isIn
     });
 }
 
-async function fetchInitialSystemState() { try { const { stdout } = await exec('settings get system peak_refresh_rate'); const rate = Math.round(parseFloat(stdout.trim())); currentRefreshRate = rate > 0 ? rate : 60; refreshRateValue.innerText = `${currentRefreshRate} Hz`; } catch (e) { currentRefreshRate = 60; refreshRateValue.innerText = i18next.t('status.refreshRateReadError'); } lastKnownRefreshRate = currentRefreshRate; try { const { stdout: max } = await exec(`cat ${MAX_BRIGHTNESS_PATH}`); maxBrightness = parseInt(max.trim()); const { stdout: cur } = await exec(`cat ${BACKLIGHT_PATH}`); const currentSystemVal = parseInt(cur.trim()); lastKnownBrightness = currentSystemVal; const percentage = Math.round(((currentSystemVal - 1) / (maxBrightness - 1)) * 100); brightnessSlider.value = percentage; brightnessValue.innerText = i18next.t('status.brightnessValue', { value: currentSystemVal, percent: percentage }); brightnessSlider.disabled = false; } catch (e) { brightnessValue.innerText = i18next.t('status.brightnessReadError'); brightnessSlider.disabled = true; toast(i18next.t('toast.backlightPathError'), 'error'); } }
+async function fetchInitialSystemState() {
+    try {
+        const { stdout } = await exec(`cat ${KCAL_RED_PATH}`);
+        currentRefreshRate = parseInt(stdout.trim().split(/\s+/)[2]) || 60;
+    } catch(e) {
+        try {
+            const { stdout } = await exec('settings get system peak_refresh_rate');
+            currentRefreshRate = Math.round(parseFloat(stdout.trim())) || 60;
+        } catch (e2) {
+            currentRefreshRate = 60;
+        }
+    }
+    refreshRateValue.innerText = `${currentRefreshRate} Hz`;
+    lastKnownRefreshRate = currentRefreshRate;
+    
+    try {
+        const { stdout } = await exec(`cat ${KCAL_ENABLE_PATH}`);
+        updateKcalEnableUI(stdout.trim() === '1');
+    } catch(e) {
+        updateKcalEnableUI(true);
+    }
+
+    try {
+        const { stdout: max } = await exec(`cat ${MAX_BRIGHTNESS_PATH}`); maxBrightness = parseInt(max.trim());
+        const { stdout: cur } = await exec(`cat ${BACKLIGHT_PATH}`); const currentSystemVal = parseInt(cur.trim());
+        lastKnownBrightness = currentSystemVal;
+        const percentage = Math.round(((currentSystemVal - 1) / (maxBrightness - 1)) * 100);
+        brightnessSlider.value = percentage;
+        brightnessValue.innerText = i18next.t('status.brightnessValue', { value: currentSystemVal, percent: percentage });
+        brightnessSlider.disabled = false;
+    } catch (e) {
+        brightnessValue.innerText = i18next.t('status.brightnessReadError');
+        brightnessSlider.disabled = true;
+        toast(i18next.t('toast.backlightPathError'), 'error');
+    }
+}
 
 async function init() {
     await i18next.ready;
@@ -419,6 +474,11 @@ async function init() {
     readNodeButton.addEventListener('click', readAndShowNodeStatus);
     wizardButton.addEventListener('click', startWizard);
     advancedModeButton.addEventListener('click', () => toggleAdvancedMode(!isAdvancedMode));
+    kcalEnableSwitch.addEventListener('change', (e) => {
+        const isEnabled = e.target.checked;
+        setKcalEnabled(isEnabled);
+        updateKcalEnableUI(isEnabled);
+    });
 
     for (const color in uiElements) {
         const elements = uiElements[color];
@@ -442,9 +502,7 @@ async function init() {
             handleParamChange('slope', clampedVal);
         });
         
-        // 高级模式截距步长为1，保留小数显示
         setupIncrementer(document.getElementById(`${color}Intercept_minus`), document.getElementById(`${color}Intercept_plus`), elements.interceptInput, elements.interceptSlider, 1, 0, 256, false);
-        // 高级模式斜率步长为0.1，保留小数显示
         setupIncrementer(document.getElementById(`${color}Slope_minus`), document.getElementById(`${color}Slope_plus`), elements.slopeInput, elements.slopeSlider, 0.1, -50, 50, false);
     }
     
@@ -454,7 +512,6 @@ async function init() {
             const { slider, input } = wizardControls[stepKey][colorKey];
             slider.addEventListener('input', () => { input.value = slider.value; handleWizardColorPreview(stepNum); });
             input.addEventListener('change', () => { const val = parseInt(input.value) || 0; const clampedValue = Math.max(0, Math.min(val, 256)); if (val !== clampedValue) { input.value = clampedValue; } slider.value = clampedValue; handleWizardColorPreview(stepNum); });
-            // 向导模式截距步长为1，显示整数
             setupIncrementer(document.getElementById(`wizardColor${colorKey.charAt(0).toUpperCase()}${stepNum}_minus`), document.getElementById(`wizardColor${colorKey.charAt(0).toUpperCase()}${stepNum}_plus`), input, slider, 1, 0, 256, true);
         }
     }

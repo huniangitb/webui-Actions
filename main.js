@@ -24,10 +24,10 @@ const defaultConfig = {
 const icons = { mdiMagicStaff, mdiTune, mdiArrowLeft, mdiSync, mdiRestore };
 
 const refreshRateColorStops = [
-    { rate: 30, color: [57, 192, 237] },   // Blue
-    { rate: 60, color: [0, 183, 74] },    // Green
-    { rate: 90, color: [255, 153, 51] },  // Orange
-    { rate: 144, color: [249, 49, 84] }   // Red
+    { rate: 30, color: [57, 192, 237] },
+    { rate: 60, color: [0, 183, 74] },
+    { rate: 90, color: [255, 153, 51] },
+    { rate: 144, color: [249, 49, 84] }
 ];
 
 let globalConfig = JSON.parse(JSON.stringify(defaultConfig));
@@ -178,7 +178,7 @@ async function setKcalEnabled(enabled) {
 
 function updateKcalEnableUI(enabled) {
     kcalEnableSwitch.checked = enabled;
-    configContentContainer.classList.toggle('hidden', !enabled);
+    configContentContainer.classList.toggle('content-hidden', !enabled);
 }
 
 function updateRefreshRateUI(rate) {

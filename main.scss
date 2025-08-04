@@ -80,6 +80,10 @@ body {
     justify-content: flex-end;
 }
 
+#advancedModeButton {
+    min-width: 150px;
+}
+
 .chart-container {
     position: relative;
     height: 220px;
@@ -90,7 +94,7 @@ body {
     border: 1px solid rgba(var(--mdb-body-color-rgb), 0.125);
 }
 
-.range {
+input[type="range"] {
     touch-action: pan-y;
 }
 
@@ -107,9 +111,10 @@ body {
     max-height: 2000px;
 }
   
-#configContentContainer.hidden {
+#configContentContainer.content-hidden {
     max-height: 0;
     opacity: 0;
+    pointer-events: none;
 }
 
 #configDescription {

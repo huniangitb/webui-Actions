@@ -84,7 +84,7 @@ async function pollSystemStatus() {
         const { stdout } = await exec(`cat ${KCAL_RED_PATH}`);
         const newRate = parseInt(stdout.trim().split(/\s+/)[2]) || 60;
         if (newRate !== lastKnownRefreshRate) {
-            lastKnownRefreshRate = newRate; currentRefreshRate = newRate; refreshRateValue.innerText = `${currentRefreshRate} Hz`;
+            lastKnownRefreshRate = newRate; currentRefreshRate = newRate; updateRefreshRateUI(newRate);
             currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
             toast(i18next.t('toast.refreshRateChanged', { rate: newRate }), 'info');
             await loadConfigAndRender();
@@ -118,6 +118,7 @@ function updateUIText() {
 
 function toggleAdvancedMode(enable, showToast = true) {
     isAdvancedMode = enable; advancedConfigEditor.style.display = enable ? 'block' : 'none';
+    wizardButton.style.display = enable ? 'none' : 'block';
     const key = enable ? 'buttons.advancedMode.exit' : 'buttons.advancedMode.enter';
     const translation = i18next.t(key, { returnObjects: true });
     if (typeof translation === 'object') { advancedModeButton.innerHTML = `${createIcon(icons[translation.icon])}${translation.text}`; }
@@ -163,6 +164,20 @@ function updateKcalEnableUI(enabled) {
         configContentContainer.classList.remove('disabled');
     } else {
         configContentContainer.classList.add('disabled');
+    }
+}
+
+function updateRefreshRateUI(rate) {
+    refreshRateValue.innerText = `${rate} Hz`;
+    refreshRateValue.className = 'badge';
+    if (rate < 60) {
+        refreshRateValue.classList.add('badge-rate-low');
+    } else if (rate < 90) {
+        refreshRateValue.classList.add('badge-rate-std');
+    } else if (rate < 120) {
+        refreshRateValue.classList.add('badge-rate-high');
+    } else {
+        refreshRateValue.classList.add('badge-rate-vhigh');
     }
 }
 
@@ -433,7 +448,7 @@ async function fetchInitialSystemState() {
             currentRefreshRate = 60;
         }
     }
-    refreshRateValue.innerText = `${currentRefreshRate} Hz`;
+    updateRefreshRateUI(currentRefreshRate);
     lastKnownRefreshRate = currentRefreshRate;
     
     try {

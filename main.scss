@@ -16,6 +16,21 @@ body {
   font-weight: 400;
 }
 
+.status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.status-header .form-check-label {
+    font-size: 0.9em;
+}
+
+.badge-rate-low { background-color: #39c0ed; }
+.badge-rate-std { background-color: #00b74a; }
+.badge-rate-high { background-color: #ff9933; }
+.badge-rate-vhigh { background-color: #f93154; }
+
 .param-row {
     display: flex;
     align-items: center;
@@ -75,12 +90,6 @@ body {
 .range-success .form-range::-moz-range-thumb { background-color: #00b74a; }
 .range-info .form-range::-webkit-slider-thumb { background-color: #39c0ed; }
 .range-info .form-range::-moz-range-thumb { background-color: #39c0ed; }
-
-.form-check.form-switch {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
 
 #configContentContainer.disabled {
     opacity: 0.5;

@@ -49,7 +49,6 @@
                             <label class="param-label" data-i18n="params.intercept"></label>
                             <div class="slider-input-group">
                                 <button type="button" class="btn btn-sm btn-minus-plus btn-minus-plus-danger" id="redIntercept_minus" data-mdb-ripple-init data-mdb-ripple-color="danger">-</button>
-                                <!-- 修改：添加 range-danger 类 -->
                                 <div class="range flex-grow-1 range-danger"><input type="range" class="form-range" id="redInterceptSlider" min="0" max="256" step="0.01" /></div>
                                 <button type="button" class="btn btn-sm btn-minus-plus btn-minus-plus-danger" id="redIntercept_plus" data-mdb-ripple-init data-mdb-ripple-color="danger">+</button>
                                 <div class="form-outline" data-mdb-input-init><input type="number" id="redInterceptInput" class="form-control param-input" step="0.01" /></div>
@@ -58,9 +57,10 @@
                         <div class="param-row">
                             <label class="param-label" data-i18n="params.slope"></label>
                             <div class="slider-input-group">
-                                <button type="button" class="btn btn-sm btn-minus-plus btn-minus-plus-danger" id="redSlope_minus" data-mdb-ripple-init data-mdb-ripple-color="danger">-</button>
+                                <!-- 修改：移除自定义颜色类，改回 btn-secondary -->
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redSlope_minus" data-mdb-ripple-init>-</button>
                                 <div class="range flex-grow-1"><input type="range" class="form-range" id="redSlopeSlider" min="-50" max="50" step="0.01" /></div>
-                                <button type="button" class="btn btn-sm btn-minus-plus btn-minus-plus-danger" id="redSlope_plus" data-mdb-ripple-init data-mdb-ripple-color="danger">+</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redSlope_plus" data-mdb-ripple-init>+</button>
                                 <div class="form-outline" data-mdb-input-init><input type="number" id="redSlopeInput" class="form-control param-input" step="0.01" /></div>
                             </div>
                         </div>
@@ -69,7 +69,6 @@
                             <label class="param-label" data-i18n="params.intercept"></label>
                             <div class="slider-input-group">
                                 <button type="button" class="btn btn-sm btn-minus-plus btn-minus-plus-success" id="greenIntercept_minus" data-mdb-ripple-init data-mdb-ripple-color="success">-</button>
-                                <!-- 修改：添加 range-success 类 -->
                                 <div class="range flex-grow-1 range-success"><input type="range" class="form-range" id="greenInterceptSlider" min="0" max="256" step="0.01" /></div>
                                 <button type="button" class="btn btn-sm btn-minus-plus btn-minus-plus-success" id="greenIntercept_plus" data-mdb-ripple-init data-mdb-ripple-color="success">+</button>
                                 <div class="form-outline" data-mdb-input-init><input type="number" id="greenInterceptInput" class="form-control param-input" step="0.01" /></div>
@@ -78,9 +77,10 @@
                         <div class="param-row">
                             <label class="param-label" data-i18n="params.slope"></label>
                             <div class="slider-input-group">
-                                <button type="button" class="btn btn-sm btn-minus-plus btn-minus-plus-success" id="greenSlope_minus" data-mdb-ripple-init data-mdb-ripple-color="success">-</button>
+                                <!-- 修改：移除自定义颜色类，改回 btn-secondary -->
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenSlope_minus" data-mdb-ripple-init>-</button>
                                 <div class="range flex-grow-1"><input type="range" class="form-range" id="greenSlopeSlider" min="-50" max="50" step="0.01" /></div>
-                                <button type="button" class="btn btn-sm btn-minus-plus btn-minus-plus-success" id="greenSlope_plus" data-mdb-ripple-init data-mdb-ripple-color="success">+</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenSlope_plus" data-mdb-ripple-init>+</button>
                                 <div class="form-outline" data-mdb-input-init><input type="number" id="greenSlopeInput" class="form-control param-input" step="0.01" /></div>
                             </div>
                         </div>
@@ -89,7 +89,6 @@
                             <label class="param-label" data-i18n="params.intercept"></label>
                             <div class="slider-input-group">
                                 <button type="button" class="btn btn-sm btn-minus-plus btn-minus-plus-primary" id="blueIntercept_minus" data-mdb-ripple-init data-mdb-ripple-color="primary">-</button>
-                                <!-- 修改：添加 range-info 类 -->
                                 <div class="range flex-grow-1 range-info"><input type="range" class="form-range" id="blueInterceptSlider" min="0" max="256" step="0.01" /></div>
                                 <button type="button" class="btn btn-sm btn-minus-plus btn-minus-plus-primary" id="blueIntercept_plus" data-mdb-ripple-init data-mdb-ripple-color="primary">+</button>
                                 <div class="form-outline" data-mdb-input-init><input type="number" id="blueInterceptInput" class="form-control param-input" step="0.01" /></div>
@@ -98,9 +97,10 @@
                         <div class="param-row">
                             <label class="param-label" data-i18n="params.slope"></label>
                             <div class="slider-input-group">
-                                <button type="button" class="btn btn-sm btn-minus-plus btn-minus-plus-primary" id="blueSlope_minus" data-mdb-ripple-init data-mdb-ripple-color="primary">-</button>
+                                <!-- 修改：移除自定义颜色类，改回 btn-secondary -->
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueSlope_minus" data-mdb-ripple-init>-</button>
                                 <div class="range flex-grow-1"><input type="range" class="form-range" id="blueSlopeSlider" min="-50" max="50" step="0.01" /></div>
-                                <button type="button" class="btn btn-sm btn-minus-plus btn-minus-plus-primary" id="blueSlope_plus" data-mdb-ripple-init data-mdb-ripple-color="primary">+</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueSlope_plus" data-mdb-ripple-init>+</button>
                                 <div class="form-outline" data-mdb-input-init><input type="number" id="blueSlopeInput" class="form-control param-input" step="0.01" /></div>
                             </div>
                         </div>

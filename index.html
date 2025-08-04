@@ -14,15 +14,12 @@
         </header>
         <div class="card mb-4">
             <div class="card-body">
-                <h5 class="card-title" data-i18n="status.cardTitle"></h5>
-                <div class="status-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0" data-i18n="status.cardTitle"></h5>
                     <p class="mb-0"><span data-i18n="status.refreshRate"></span> <span id="refreshRateValue" class="badge" data-i18n="status.reading"></span></p>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" role="switch" id="kcalEnableSwitch" data-mdb-ripple-init />
-                        <label class="form-check-label" for="kcalEnableSwitch" data-i18n="config.enableKcal"></label>
-                    </div>
                 </div>
-                <label for="brightnessSlider" class="form-label mt-3" data-i18n="status.brightness"></label>
+                <hr class="mt-2 mb-3"/>
+                <label for="brightnessSlider" class="form-label" data-i18n="status.brightness"></label>
                 <div class="range"><input type="range" class="form-range" id="brightnessSlider" min="0" max="100" step="1" disabled /></div>
                 <div id="brightnessValue" class="form-text" data-i18n="status.reading"></div>
             </div>
@@ -33,7 +30,7 @@
                     <h5 class="card-title mb-0" data-i18n="config.cardTitle"></h5>
                     <div class="config-actions-group">
                         <button id="wizardButton" type="button" class="btn btn-success btn-rounded" data-mdb-ripple-init data-i18n="buttons.wizard"></button>
-                        <button id="advancedModeButton" type="button" class="btn btn-secondary btn-sm btn-rounded" data-mdb-ripple-init></button>
+                        <button id="advancedModeButton" type="button" class="btn btn-secondary btn-rounded" data-mdb-ripple-init></button>
                     </div>
                 </div>
                 <p id="configDescription" class="text-muted small" data-i18n="config.description"></p>

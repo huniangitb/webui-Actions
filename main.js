@@ -41,6 +41,7 @@ let lastKnownRefreshRate = 0;
 let lastKnownBrightness = -1;
 let originalConfigForWizard = null;
 let brightnessBeforeWizard = -1;
+let isKcalEnabled = true;
 
 const brightnessSlider = document.getElementById('brightnessSlider');
 const brightnessValue = document.getElementById('brightnessValue');
@@ -52,7 +53,6 @@ const chartCanvas = document.getElementById('colorCurveChart');
 const advancedConfigEditor = document.getElementById('advanced-config-editor');
 const advancedModeButton = document.getElementById('advancedModeButton');
 const wizardButton = document.getElementById('wizardButton');
-const kcalEnableSwitch = document.getElementById('kcalEnableSwitch');
 const configContentContainer = document.getElementById('configContentContainer');
 const configDescription = document.getElementById('configDescription');
 
@@ -117,6 +117,14 @@ async function pollSystemStatus() {
             brightnessSlider.value = percentage;
         }
     } catch (e) {}
+    try {
+        const { stdout } = await exec(`cat ${KCAL_ENABLE_PATH}`);
+        const newEnabledState = stdout.trim() === '1';
+        if (newEnabledState !== isKcalEnabled) {
+            isKcalEnabled = newEnabledState;
+            updateKcalEnableUI(isKcalEnabled);
+        }
+    } catch (e) {}
 }
 
 function updateUIText() {
@@ -168,16 +176,8 @@ async function setSystemBrightness(percentage) {
     } catch (e) { toast(i18next.t('toast.saveFailed', { error: `Brightness: ${e.message}` }), 'error'); }
 }
 
-async function setKcalEnabled(enabled) {
-    try {
-        await exec(`echo ${enabled ? 1 : 0} > ${KCAL_ENABLE_PATH}`);
-    } catch(e) {
-        toast(i18next.t('toast.saveFailed', { error: 'Kcal enable toggle failed' }), 'error');
-    }
-}
-
 function updateKcalEnableUI(enabled) {
-    kcalEnableSwitch.checked = enabled;
+    isKcalEnabled = enabled;
     configContentContainer.classList.toggle('content-hidden', !enabled);
 }
 
@@ -478,7 +478,7 @@ async function fetchInitialSystemState() {
         const { stdout } = await exec(`cat ${KCAL_ENABLE_PATH}`);
         updateKcalEnableUI(stdout.trim() === '1');
     } catch(e) {
-        updateKcalEnableUI(true);
+        updateKcalEnableUI(false);
     }
 
     try {
@@ -512,11 +512,6 @@ async function init() {
     readNodeButton.addEventListener('click', readAndShowNodeStatus);
     wizardButton.addEventListener('click', startWizard);
     advancedModeButton.addEventListener('click', () => toggleAdvancedMode(!isAdvancedMode));
-    kcalEnableSwitch.addEventListener('change', (e) => {
-        const isEnabled = e.target.checked;
-        setKcalEnabled(isEnabled);
-        updateKcalEnableUI(isEnabled);
-    });
 
     for (const color in uiElements) {
         const elements = uiElements[color];

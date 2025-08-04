@@ -28,7 +28,7 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="card-title mb-0" data-i18n="config.cardTitle"></h5>
-                    <div class="config-actions-group">
+                    <div class="config-actions-group flex-nowrap">
                         <button id="wizardButton" type="button" class="btn btn-success btn-rounded" data-mdb-ripple-init data-i18n="buttons.wizard"></button>
                         <button id="advancedModeButton" type="button" class="btn btn-secondary btn-rounded" data-mdb-ripple-init></button>
                     </div>
@@ -48,18 +48,18 @@
                         <div class="param-row">
                             <label class="param-label" data-i18n="params.intercept"></label>
                             <div class="slider-input-group">
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redIntercept_minus" data-mdb-ripple-init>-</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redIntercept_minus" data-mdb-ripple-init data-mdb-ripple-color="danger">-</button>
                                 <div class="range flex-grow-1"><input type="range" class="form-range" id="redInterceptSlider" min="0" max="256" step="0.01" /></div>
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redIntercept_plus" data-mdb-ripple-init>+</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redIntercept_plus" data-mdb-ripple-init data-mdb-ripple-color="danger">+</button>
                                 <div class="form-outline" data-mdb-input-init><input type="number" id="redInterceptInput" class="form-control param-input" step="0.01" /></div>
                             </div>
                         </div>
                         <div class="param-row">
                             <label class="param-label" data-i18n="params.slope"></label>
                             <div class="slider-input-group">
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redSlope_minus" data-mdb-ripple-init>-</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redSlope_minus" data-mdb-ripple-init data-mdb-ripple-color="danger">-</button>
                                 <div class="range flex-grow-1"><input type="range" class="form-range" id="redSlopeSlider" min="-50" max="50" step="0.01" /></div>
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redSlope_plus" data-mdb-ripple-init>+</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="redSlope_plus" data-mdb-ripple-init data-mdb-ripple-color="danger">+</button>
                                 <div class="form-outline" data-mdb-input-init><input type="number" id="redSlopeInput" class="form-control param-input" step="0.01" /></div>
                             </div>
                         </div>
@@ -67,18 +67,18 @@
                         <div class="param-row">
                             <label class="param-label" data-i18n="params.intercept"></label>
                             <div class="slider-input-group">
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenIntercept_minus" data-mdb-ripple-init>-</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenIntercept_minus" data-mdb-ripple-init data-mdb-ripple-color="success">-</button>
                                 <div class="range flex-grow-1"><input type="range" class="form-range" id="greenInterceptSlider" min="0" max="256" step="0.01" /></div>
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenIntercept_plus" data-mdb-ripple-init>+</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenIntercept_plus" data-mdb-ripple-init data-mdb-ripple-color="success">+</button>
                                 <div class="form-outline" data-mdb-input-init><input type="number" id="greenInterceptInput" class="form-control param-input" step="0.01" /></div>
                             </div>
                         </div>
                         <div class="param-row">
                             <label class="param-label" data-i18n="params.slope"></label>
                             <div class="slider-input-group">
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenSlope_minus" data-mdb-ripple-init>-</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenSlope_minus" data-mdb-ripple-init data-mdb-ripple-color="success">-</button>
                                 <div class="range flex-grow-1"><input type="range" class="form-range" id="greenSlopeSlider" min="-50" max="50" step="0.01" /></div>
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenSlope_plus" data-mdb-ripple-init>+</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="greenSlope_plus" data-mdb-ripple-init data-mdb-ripple-color="success">+</button>
                                 <div class="form-outline" data-mdb-input-init><input type="number" id="greenSlopeInput" class="form-control param-input" step="0.01" /></div>
                             </div>
                         </div>
@@ -86,18 +86,18 @@
                         <div class="param-row">
                             <label class="param-label" data-i18n="params.intercept"></label>
                             <div class="slider-input-group">
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueIntercept_minus" data-mdb-ripple-init>-</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueIntercept_minus" data-mdb-ripple-init data-mdb-ripple-color="primary">-</button>
                                 <div class="range flex-grow-1"><input type="range" class="form-range" id="blueInterceptSlider" min="0" max="256" step="0.01" /></div>
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueIntercept_plus" data-mdb-ripple-init>+</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueIntercept_plus" data-mdb-ripple-init data-mdb-ripple-color="primary">+</button>
                                 <div class="form-outline" data-mdb-input-init><input type="number" id="blueInterceptInput" class="form-control param-input" step="0.01" /></div>
                             </div>
                         </div>
                         <div class="param-row">
                             <label class="param-label" data-i18n="params.slope"></label>
                             <div class="slider-input-group">
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueSlope_minus" data-mdb-ripple-init>-</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueSlope_minus" data-mdb-ripple-init data-mdb-ripple-color="primary">-</button>
                                 <div class="range flex-grow-1"><input type="range" class="form-range" id="blueSlopeSlider" min="-50" max="50" step="0.01" /></div>
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueSlope_plus" data-mdb-ripple-init>+</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="blueSlope_plus" data-mdb-ripple-init data-mdb-ripple-color="primary">+</button>
                                 <div class="form-outline" data-mdb-input-init><input type="number" id="blueSlopeInput" class="form-control param-input" step="0.01" /></div>
                             </div>
                         </div>

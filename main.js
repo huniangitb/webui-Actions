@@ -10,23 +10,18 @@ let currentConfigPath = '';
 const KCAL_RED_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_red";
 const KCAL_GREEN_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_green";
 const KCAL_BLUE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_blue";
-const KCAL_SAT_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_sat";
-const KCAL_HUE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_hue";
-const SAT_HUE_CONFIG_PATH = `${MODULE_PATH}/sh.config`;
+const KCAL_SAT_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_sat"; // 饱和度节点
 const KCAL_ENABLE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_enable";
 const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
 const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
 const SLOPE_PRECISION = 100;
-const HUE_NODE_MAX = 1536;
-const HUE_UI_MAX = 360;
 
 const defaultConfig = {
     red: { intercept: 256.0, slope: 0.0 },
     green: { intercept: 256.0, slope: 0.0 },
     blue: { intercept: 256.0, slope: 0.0 },
+    saturation: 255, // 新增饱和度默认值
 };
-const defaultSat = 255;
-const defaultHue = 0; // Raw node value
 
 const icons = { mdiMagicStaff, mdiTune, mdiArrowLeft, mdiSync, mdiRestore };
 
@@ -38,8 +33,6 @@ const refreshRateColorStops = [
 ];
 
 let globalConfig = JSON.parse(JSON.stringify(defaultConfig));
-let currentSat = defaultSat;
-let currentHue = defaultHue;
 let maxBrightness = 4095;
 let currentRefreshRate = 60;
 let colorChart = null;
@@ -64,12 +57,8 @@ const advancedModeButton = document.getElementById('advancedModeButton');
 const wizardButton = document.getElementById('wizardButton');
 const configContentContainer = document.getElementById('configContentContainer');
 const configDescription = document.getElementById('configDescription');
-const satSlider = document.getElementById('satSlider');
-const satInput = document.getElementById('satInput');
-const hueSlider = document.getElementById('hueSlider');
-const hueInput = document.getElementById('hueInput');
-const saveSatHueButton = document.getElementById('saveSatHueButton');
-const resetSatHueButton = document.getElementById('resetSatHueButton');
+const satSlider = document.getElementById('satSlider'); // 饱和度滑块
+const satInput = document.getElementById('satInput');   // 饱和度输入框
 
 const uiElements = {
     red: { interceptSlider: document.getElementById('redInterceptSlider'), interceptInput: document.getElementById('redInterceptInput'), slopeSlider: document.getElementById('redSlopeSlider'), slopeInput: document.getElementById('redSlopeInput') },
@@ -101,8 +90,6 @@ const wizardControls = {
 let wizardData = {};
 
 function createIcon(path) { if (!path) return ''; return `<svg class="svg-icon me-2" viewBox="0 0 24 24"><path d="${path}" /></svg>`; }
-const nodeToUiHue = (nodeValue) => Math.round(nodeValue * (HUE_UI_MAX / HUE_NODE_MAX));
-const uiToNodeHue = (uiValue) => Math.round(uiValue * (HUE_NODE_MAX / HUE_UI_MAX));
 
 function interpolateColor(color1, color2, factor) {
     const result = color1.slice();
@@ -120,7 +107,7 @@ async function pollSystemStatus() {
             lastKnownRefreshRate = newRate; currentRefreshRate = newRate; updateRefreshRateUI(newRate);
             currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
             toast(i18next.t('toast.refreshRateChanged', { rate: newRate }), 'info');
-            await loadConfigAndRender();
+            await loadConfigAndRender(); // 刷新率改变时重新加载配置
         }
     } catch (e) {}
     try {
@@ -226,7 +213,7 @@ function calculateChartData(params) {
     const labels = []; const colorData = { red: [], green: [], blue: [] };
     for (let p = 1; p <= 100; p++) {
         labels.push(p); const systemBrightness = scaleToSystemBrightness(p); const log_b = Math.log(systemBrightness);
-        for (const color in params) {
+        for (const color of ['red', 'green', 'blue']) { // 明确迭代颜色
             const { intercept, slope } = params[color];
             colorData[color].push(intercept + (slope * log_b));
         }
@@ -281,33 +268,33 @@ function updateChart() {
 async function applyKcal(params, useRefreshRate = currentRefreshRate) {
     if (!params) return;
     try {
-        const cmds = Object.entries(params).map(([color, { intercept, slope }]) => {
+        const cmds = Object.entries(params).filter(([key]) => key !== 'saturation').map(([color, { intercept, slope }]) => {
             const i = Math.round(intercept * 100);
             const s = Math.round(slope * SLOPE_PRECISION);
             const path = color === 'red' ? KCAL_RED_PATH : color === 'green' ? KCAL_GREEN_PATH : KCAL_BLUE_PATH;
             return `echo "${i} ${s} ${useRefreshRate}" > ${path}`;
         });
+        // 应用饱和度
+        cmds.push(`echo "${params.saturation} ${useRefreshRate}" > ${KCAL_SAT_PATH}`);
+
         await exec(cmds.join(' && '));
     } catch (e) { console.warn(`Kcal apply failed: ${e.message}`); }
 }
 
-async function applySatHue(sat, hue) {
-    try {
-        await exec(`echo ${sat} > ${KCAL_SAT_PATH} && echo ${hue} > ${KCAL_HUE_PATH}`);
-    } catch (e) { console.warn(`Sat/Hue apply failed: ${e.message}`); }
-}
-
+// parseConfig 现在需要处理饱和度
 function parseConfig(text) {
     const parts = text.trim().split(/\s+/).map(p => parseInt(p, 10));
-    if (parts.length !== 6 || parts.some(isNaN)) return null;
-    const [ri, rs, gi, gs, bi, bs] = parts;
+    if (parts.length !== 7 || parts.some(isNaN)) return null; // 7个参数
+    const [ri, rs, gi, gs, bi, bs, sat] = parts;
     return {
         red: { intercept: ri / 100, slope: rs / SLOPE_PRECISION },
         green: { intercept: gi / 100, slope: gs / SLOPE_PRECISION },
         blue: { intercept: bi / 100, slope: bs / SLOPE_PRECISION },
+        saturation: sat,
     };
 }
 
+// serializeConfig 现在需要处理饱和度
 function serializeConfig(params) {
     const ri = Math.round(params.red.intercept * 100);
     const rs = Math.round(params.red.slope * SLOPE_PRECISION);
@@ -315,22 +302,30 @@ function serializeConfig(params) {
     const gs = Math.round(params.green.slope * SLOPE_PRECISION);
     const bi = Math.round(params.blue.intercept * 100);
     const bs = Math.round(params.blue.slope * SLOPE_PRECISION);
-    return `${ri} ${rs} ${gi} ${gs} ${bi} ${bs}`;
+    const sat = params.saturation;
+    return `${ri} ${rs} ${gi} ${gs} ${bi} ${bs} ${sat}`;
 }
 
+// readKcalNodeAsConfig 现在需要读取饱和度
 async function readKcalNodeAsConfig() {
     try {
         const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`);
         const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`);
         const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`);
+        const { stdout: sat_stdout } = await exec(`cat ${KCAL_SAT_PATH}`); // 读取饱和度
+
         const [ri, rs] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
         const [gi, gs] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
         const [bi, bs] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        if ([ri, rs, gi, gs, bi, bs].some(isNaN)) return null;
+        const [sat_val] = sat_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); // 解析饱和度
+
+        if ([ri, rs, gi, gs, bi, bs, sat_val].some(isNaN)) return null; // 检查所有值
+
         return {
             red: { intercept: ri / 100, slope: rs / SLOPE_PRECISION },
             green: { intercept: gi / 100, slope: gs / SLOPE_PRECISION },
             blue: { intercept: bi / 100, slope: bs / SLOPE_PRECISION },
+            saturation: sat_val,
         };
     } catch (e) { return null; }
 }
@@ -362,19 +357,43 @@ async function loadConfigAndRender() {
 }
 
 function renderUI(params) {
-    for (const color in uiElements) {
+    for (const color of ['red', 'green', 'blue']) {
         const { intercept, slope } = params[color];
         uiElements[color].interceptInput.value = intercept.toFixed(2);
         uiElements[color].interceptSlider.value = intercept;
         uiElements[color].slopeInput.value = slope.toFixed(2);
         uiElements[color].slopeSlider.value = slope;
     }
+    // 渲染饱和度
+    satInput.value = params.saturation;
+    satSlider.value = params.saturation;
+
     document.querySelectorAll('.form-outline').forEach(formOutline => new Input(formOutline).update());
 }
 
 async function saveConfig() { const configString = serializeConfig(globalConfig); const filename = currentConfigPath.split('/').pop(); try { await exec(`echo '${configString}' > ${currentConfigPath}`); toast(i18next.t('toast.saved', { file: filename }), 'success'); } catch (e) { toast(i18next.t('toast.saveFailed', { error: e.message }), 'error'); } }
 function resetGlobalConfig() { globalConfig = JSON.parse(JSON.stringify(defaultConfig)); renderUI(globalConfig); applyKcal(globalConfig); updateChart(); toast(i18next.t('toast.reset'), 'info'); }
-async function readAndShowNodeStatus() { const parsedOutputElem = document.getElementById('parsedNodeOutput'); parsedOutputElem.innerHTML = i18next.t('status.reading'); nodeStatusModal.show(); try { const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`); const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`); const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`); const { stdout: enable_stdout } = await exec(`cat ${KCAL_ENABLE_PATH}`); const [ri, rs, rr] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [gi, gs, gr] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); const [bi, bs, br] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); if ([ri, rs, rr, gi, gs, gr, bi, bs, br].some(isNaN)) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeParseError')}</p>`; return; } parsedOutputElem.innerHTML = `<h6><strong>Kcal Status:</strong> ${enable_stdout.trim() === '1' ? 'Enabled' : 'Disabled'}</h6><hr/><h6 class="text-danger">${i18next.t('params.red')}</h6><ul><li>I: ${(ri / 100).toFixed(2)} (${ri})</li><li>S: ${(rs / SLOPE_PRECISION).toFixed(2)} (${rs})</li><li>Hz: ${rr}</li></ul><hr/><h6 class="text-success">${i18next.t('params.green')}</h6><ul><li>I: ${(gi/100).toFixed(2)} (${gi})</li><li>S: ${(gs / SLOPE_PRECISION).toFixed(2)} (${gs})</li><li>Hz: ${gr}</li></ul><hr/><h6 class="text-primary">${i18next.t('params.blue')}</h6><ul><li>I: ${(bi/100).toFixed(2)} (${bi})</li><li>S: ${(bs / SLOPE_PRECISION).toFixed(2)} (${bs})</li><li>Hz: ${br}</li></ul>`; } catch (e) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeReadPermission')}</p>`; } }
+async function readAndShowNodeStatus() { 
+    const parsedOutputElem = document.getElementById('parsedNodeOutput'); 
+    parsedOutputElem.innerHTML = i18next.t('status.reading'); 
+    nodeStatusModal.show(); 
+    try { 
+        const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`); 
+        const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`); 
+        const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`); 
+        const { stdout: sat_stdout } = await exec(`cat ${KCAL_SAT_PATH}`); // 读取饱和度
+
+        const [ri, rs, rr] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); 
+        const [gi, gs, gr] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); 
+        const [bi, bs, br] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); 
+        const [sat_val, sat_rr] = sat_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); // 解析饱和度及刷新率
+
+        if ([ri, rs, rr, gi, gs, gr, bi, bs, br, sat_val, sat_rr].some(isNaN)) { 
+            parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeParseError')}</p>`; return; 
+        } 
+        parsedOutputElem.innerHTML = `<h6><strong>Kcal Status:</strong> ${isKcalEnabled ? 'Enabled' : 'Disabled'}</h6><hr/><h6 class="text-danger">${i18next.t('params.red')}</h6><ul><li>I: ${(ri / 100).toFixed(2)} (${ri})</li><li>S: ${(rs / SLOPE_PRECISION).toFixed(2)} (${rs})</li><li>Hz: ${rr}</li></ul><hr/><h6 class="text-success">${i18next.t('params.green')}</h6><ul><li>I: ${(gi/100).toFixed(2)} (${gi})</li><li>S: ${(gs / SLOPE_PRECISION).toFixed(2)} (${gs})</li><li>Hz: ${gr}</li></ul><hr/><h6 class="text-primary">${i18next.t('params.blue')}</h6><ul><li>I: ${(bi/100).toFixed(2)} (${bi})</li><li>S: ${(bs / SLOPE_PRECISION).toFixed(2)} (${bs})</li><li>Hz: ${br}</li></ul><hr/><h6>${i18next.t('params.saturation')}</h6><ul><li>Value: ${sat_val}</li><li>Hz: ${sat_rr}</li></ul>`; 
+    } catch (e) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeReadPermission')}</p>`; } 
+}
 
 function calculateFit(point1, point2) {
     const x1 = Math.log(point1.brightness); const x2 = Math.log(point2.brightness);
@@ -437,6 +456,7 @@ async function handleWizardFinish() {
         red: calculateFit({ brightness: b1, value: wizardData.step1.red }, { brightness: b2, value: wizardData.step2.red }),
         green: calculateFit({ brightness: b1, value: wizardData.step1.green }, { brightness: b2, value: wizardData.step2.green }),
         blue: calculateFit({ brightness: b1, value: wizardData.step1.blue }, { brightness: b2, value: wizardData.step2.blue }),
+        saturation: globalConfig.saturation, // 保持现有饱和度
     };
     renderUI(globalConfig);
     await applyKcal(globalConfig);
@@ -459,10 +479,11 @@ function handleWizardColorPreview(stepNum) {
     const r = parseInt(controls.red.input.value);
     const g = parseInt(controls.green.input.value);
     const b = parseInt(controls.blue.input.value);
-    applyKcal({ red: { intercept: r, slope: 0 }, green: { intercept: g, slope: 0 }, blue: { intercept: b, slope: 0 } });
+    // 预览时只应用颜色，不改变饱和度
+    applyKcal({ red: { intercept: r, slope: 0 }, green: { intercept: g, slope: 0 }, blue: { intercept: b, slope: 0 }, saturation: globalConfig.saturation });
 }
 
-function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isInt) {
+function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isInt, onChangeCallback) {
     const updateValue = (newValue) => {
         const clampedValue = Math.max(min, Math.min(newValue, max));
         if (isInt) {
@@ -471,7 +492,9 @@ function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isIn
             input.value = clampedValue.toFixed(2);
         }
         slider.value = clampedValue;
+        // 触发change事件，让外部监听器处理
         input.dispatchEvent(new Event('change', { bubbles: true }));
+        if (onChangeCallback) onChangeCallback(clampedValue);
     };
     minusBtn.addEventListener('click', () => {
         const currentValue = isInt ? parseInt(input.value) : parseFloat(input.value);
@@ -481,62 +504,6 @@ function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isIn
         const currentValue = isInt ? parseInt(input.value) : parseFloat(input.value);
         updateValue(currentValue + step);
     });
-}
-
-function renderSatHueUI(sat, hueNode) {
-    satSlider.value = sat;
-    satInput.value = sat;
-    const hueUI = nodeToUiHue(hueNode);
-    hueSlider.value = hueUI;
-    hueInput.value = hueUI;
-    document.querySelectorAll('.form-outline').forEach(formOutline => new Input(formOutline).update());
-}
-
-async function loadSatHueConfig() {
-    let loaded = false;
-    try {
-        const { stdout } = await exec(`cat ${SAT_HUE_CONFIG_PATH}`);
-        const [s, h] = stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        if (!isNaN(s) && !isNaN(h)) {
-            currentSat = s;
-            currentHue = h;
-            loaded = true;
-            toast(i18next.t('toast.sh.loaded'), 'success');
-        }
-    } catch (e) {}
-
-    if (!loaded) {
-        try {
-            const { stdout: sat_out } = await exec(`cat ${KCAL_SAT_PATH}`);
-            const { stdout: hue_out } = await exec(`cat ${KCAL_HUE_PATH}`);
-            currentSat = parseInt(sat_out.trim());
-            currentHue = parseInt(hue_out.trim());
-        } catch (e) {
-            currentSat = defaultSat;
-            currentHue = defaultHue;
-            toast(i18next.t('toast.sh.loadFailed'), 'warning');
-        }
-    }
-    renderSatHueUI(currentSat, currentHue);
-    applySatHue(currentSat, currentHue);
-}
-
-async function saveSatHueConfig() {
-    const configString = `${currentSat} ${currentHue}`;
-    try {
-        await exec(`echo '${configString}' > ${SAT_HUE_CONFIG_PATH}`);
-        toast(i18next.t('toast.sh.saved'), 'success');
-    } catch (e) {
-        toast(i18next.t('toast.sh.saveFailed', { error: e.message }), 'error');
-    }
-}
-
-function resetSatHue() {
-    currentSat = defaultSat;
-    currentHue = defaultHue;
-    renderSatHueUI(currentSat, currentHue);
-    applySatHue(currentSat, currentHue);
-    toast(i18next.t('toast.sh.reset'), 'info');
 }
 
 async function fetchInitialSystemState() {
@@ -585,20 +552,22 @@ async function init() {
     wizardModal = new Modal(wizardModalElement);
     await fetchInitialSystemState();
     currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
-    await loadConfigAndRender();
-    await loadSatHueConfig();
+    await loadConfigAndRender(); // 加载包含饱和度的完整配置
     brightnessSlider.addEventListener('input', (e) => setSystemBrightness(parseInt(e.target.value)));
     saveButton.addEventListener('click', saveConfig);
     resetConfigButton.addEventListener('click', resetGlobalConfig);
     readNodeButton.addEventListener('click', readAndShowNodeStatus);
     wizardButton.addEventListener('click', startWizard);
     advancedModeButton.addEventListener('click', () => toggleAdvancedMode(!isAdvancedMode));
-    saveSatHueButton.addEventListener('click', saveSatHueConfig);
-    resetSatHueButton.addEventListener('click', resetSatHue);
 
-    for (const color in uiElements) {
+    for (const color of ['red', 'green', 'blue']) {
         const elements = uiElements[color];
-        const handleParamChange = (param, value) => { globalConfig[color][param] = value; renderUI(globalConfig); applyKcal(globalConfig); updateChart(); };
+        const handleParamChange = (param, value) => { 
+            globalConfig[color][param] = value; 
+            renderUI(globalConfig); // 重新渲染所有UI，包括饱和度
+            applyKcal(globalConfig); 
+            updateChart(); 
+        };
         
         elements.interceptSlider.addEventListener('input', (e) => handleParamChange('intercept', parseFloat(e.target.value)));
         elements.interceptInput.addEventListener('change', (e) => {
@@ -618,33 +587,20 @@ async function init() {
         setupIncrementer(document.getElementById(`${color}Slope_minus`), document.getElementById(`${color}Slope_plus`), elements.slopeInput, elements.slopeSlider, 0.1, -50, 50, false);
     }
     
+    // 饱和度控制事件
     satSlider.addEventListener('input', (e) => {
-        currentSat = parseInt(e.target.value);
-        renderSatHueUI(currentSat, currentHue);
-        applySatHue(currentSat, currentHue);
+        globalConfig.saturation = parseInt(e.target.value);
+        renderUI(globalConfig);
+        applyKcal(globalConfig); // 饱和度改变时也应用Kcal
     });
     satInput.addEventListener('change', (e) => {
         const val = parseInt(e.target.value) || 200;
-        currentSat = Math.max(200, Math.min(val, 360));
-        renderSatHueUI(currentSat, currentHue);
-        applySatHue(currentSat, currentHue);
+        globalConfig.saturation = Math.max(200, Math.min(val, 360));
+        renderUI(globalConfig);
+        applyKcal(globalConfig); // 饱和度改变时也应用Kcal
     });
-
-    hueSlider.addEventListener('input', (e) => {
-        currentHue = uiToNodeHue(parseInt(e.target.value));
-        renderSatHueUI(currentSat, currentHue);
-        applySatHue(currentSat, currentHue);
-    });
-    hueInput.addEventListener('change', (e) => {
-        const val = parseInt(e.target.value) || 0;
-        const clampedVal = Math.max(0, Math.min(val, 360));
-        currentHue = uiToNodeHue(clampedVal);
-        renderSatHueUI(currentSat, currentHue);
-        applySatHue(currentSat, currentHue);
-    });
-
     setupIncrementer(document.getElementById('sat_minus'), document.getElementById('sat_plus'), satInput, satSlider, 1, 200, 360, true);
-    setupIncrementer(document.getElementById('hue_minus'), document.getElementById('hue_plus'), hueInput, hueSlider, 1, 0, 360, true);
+
 
     for (const stepNum of [1, 2]) {
         const stepKey = `step${stepNum}`;

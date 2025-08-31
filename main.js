@@ -10,16 +10,23 @@ let currentConfigPath = '';
 const KCAL_RED_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_red";
 const KCAL_GREEN_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_green";
 const KCAL_BLUE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_blue";
+const KCAL_SAT_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_sat";
+const KCAL_HUE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_hue";
+const SAT_HUE_CONFIG_PATH = `${MODULE_PATH}/sh.config`;
 const KCAL_ENABLE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_enable";
 const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
 const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
 const SLOPE_PRECISION = 100;
+const HUE_NODE_MAX = 1536;
+const HUE_UI_MAX = 360;
 
 const defaultConfig = {
     red: { intercept: 256.0, slope: 0.0 },
     green: { intercept: 256.0, slope: 0.0 },
     blue: { intercept: 256.0, slope: 0.0 },
 };
+const defaultSat = 255;
+const defaultHue = 0; // Raw node value
 
 const icons = { mdiMagicStaff, mdiTune, mdiArrowLeft, mdiSync, mdiRestore };
 
@@ -31,6 +38,8 @@ const refreshRateColorStops = [
 ];
 
 let globalConfig = JSON.parse(JSON.stringify(defaultConfig));
+let currentSat = defaultSat;
+let currentHue = defaultHue;
 let maxBrightness = 4095;
 let currentRefreshRate = 60;
 let colorChart = null;
@@ -55,6 +64,12 @@ const advancedModeButton = document.getElementById('advancedModeButton');
 const wizardButton = document.getElementById('wizardButton');
 const configContentContainer = document.getElementById('configContentContainer');
 const configDescription = document.getElementById('configDescription');
+const satSlider = document.getElementById('satSlider');
+const satInput = document.getElementById('satInput');
+const hueSlider = document.getElementById('hueSlider');
+const hueInput = document.getElementById('hueInput');
+const saveSatHueButton = document.getElementById('saveSatHueButton');
+const resetSatHueButton = document.getElementById('resetSatHueButton');
 
 const uiElements = {
     red: { interceptSlider: document.getElementById('redInterceptSlider'), interceptInput: document.getElementById('redInterceptInput'), slopeSlider: document.getElementById('redSlopeSlider'), slopeInput: document.getElementById('redSlopeInput') },
@@ -86,6 +101,8 @@ const wizardControls = {
 let wizardData = {};
 
 function createIcon(path) { if (!path) return ''; return `<svg class="svg-icon me-2" viewBox="0 0 24 24"><path d="${path}" /></svg>`; }
+const nodeToUiHue = (nodeValue) => Math.round(nodeValue * (HUE_UI_MAX / HUE_NODE_MAX));
+const uiToNodeHue = (uiValue) => Math.round(uiValue * (HUE_NODE_MAX / HUE_UI_MAX));
 
 function interpolateColor(color1, color2, factor) {
     const result = color1.slice();
@@ -154,7 +171,6 @@ function toggleAdvancedMode(enable, showToast = true) {
     } else {
         advancedModeButton.classList.remove('btn-primary'); advancedModeButton.classList.add('btn-secondary');
         if (showToast) toast(i18next.t('toast.advancedMode.off'), 'info');
-        // 新增：退出高级模式时滚动到顶部
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
@@ -273,6 +289,12 @@ async function applyKcal(params, useRefreshRate = currentRefreshRate) {
         });
         await exec(cmds.join(' && '));
     } catch (e) { console.warn(`Kcal apply failed: ${e.message}`); }
+}
+
+async function applySatHue(sat, hue) {
+    try {
+        await exec(`echo ${sat} > ${KCAL_SAT_PATH} && echo ${hue} > ${KCAL_HUE_PATH}`);
+    } catch (e) { console.warn(`Sat/Hue apply failed: ${e.message}`); }
 }
 
 function parseConfig(text) {
@@ -461,6 +483,62 @@ function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isIn
     });
 }
 
+function renderSatHueUI(sat, hueNode) {
+    satSlider.value = sat;
+    satInput.value = sat;
+    const hueUI = nodeToUiHue(hueNode);
+    hueSlider.value = hueUI;
+    hueInput.value = hueUI;
+    document.querySelectorAll('.form-outline').forEach(formOutline => new Input(formOutline).update());
+}
+
+async function loadSatHueConfig() {
+    let loaded = false;
+    try {
+        const { stdout } = await exec(`cat ${SAT_HUE_CONFIG_PATH}`);
+        const [s, h] = stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
+        if (!isNaN(s) && !isNaN(h)) {
+            currentSat = s;
+            currentHue = h;
+            loaded = true;
+            toast(i18next.t('toast.sh.loaded'), 'success');
+        }
+    } catch (e) {}
+
+    if (!loaded) {
+        try {
+            const { stdout: sat_out } = await exec(`cat ${KCAL_SAT_PATH}`);
+            const { stdout: hue_out } = await exec(`cat ${KCAL_HUE_PATH}`);
+            currentSat = parseInt(sat_out.trim());
+            currentHue = parseInt(hue_out.trim());
+        } catch (e) {
+            currentSat = defaultSat;
+            currentHue = defaultHue;
+            toast(i18next.t('toast.sh.loadFailed'), 'warning');
+        }
+    }
+    renderSatHueUI(currentSat, currentHue);
+    applySatHue(currentSat, currentHue);
+}
+
+async function saveSatHueConfig() {
+    const configString = `${currentSat} ${currentHue}`;
+    try {
+        await exec(`echo '${configString}' > ${SAT_HUE_CONFIG_PATH}`);
+        toast(i18next.t('toast.sh.saved'), 'success');
+    } catch (e) {
+        toast(i18next.t('toast.sh.saveFailed', { error: e.message }), 'error');
+    }
+}
+
+function resetSatHue() {
+    currentSat = defaultSat;
+    currentHue = defaultHue;
+    renderSatHueUI(currentSat, currentHue);
+    applySatHue(currentSat, currentHue);
+    toast(i18next.t('toast.sh.reset'), 'info');
+}
+
 async function fetchInitialSystemState() {
     try {
         const { stdout } = await exec(`cat ${KCAL_RED_PATH}`);
@@ -508,29 +586,28 @@ async function init() {
     await fetchInitialSystemState();
     currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
     await loadConfigAndRender();
+    await loadSatHueConfig();
     brightnessSlider.addEventListener('input', (e) => setSystemBrightness(parseInt(e.target.value)));
     saveButton.addEventListener('click', saveConfig);
     resetConfigButton.addEventListener('click', resetGlobalConfig);
     readNodeButton.addEventListener('click', readAndShowNodeStatus);
     wizardButton.addEventListener('click', startWizard);
     advancedModeButton.addEventListener('click', () => toggleAdvancedMode(!isAdvancedMode));
+    saveSatHueButton.addEventListener('click', saveSatHueConfig);
+    resetSatHueButton.addEventListener('click', resetSatHue);
 
     for (const color in uiElements) {
         const elements = uiElements[color];
         const handleParamChange = (param, value) => { globalConfig[color][param] = value; renderUI(globalConfig); applyKcal(globalConfig); updateChart(); };
         
-        elements.interceptSlider.addEventListener('input', (e) => {
-            handleParamChange('intercept', parseFloat(e.target.value));
-        });
+        elements.interceptSlider.addEventListener('input', (e) => handleParamChange('intercept', parseFloat(e.target.value)));
         elements.interceptInput.addEventListener('change', (e) => {
             const val = parseFloat(e.target.value) || 0;
             const clampedVal = Math.max(0, Math.min(val, 256));
             handleParamChange('intercept', clampedVal);
         });
 
-        elements.slopeSlider.addEventListener('input', (e) => {
-            handleParamChange('slope', parseFloat(e.target.value));
-        });
+        elements.slopeSlider.addEventListener('input', (e) => handleParamChange('slope', parseFloat(e.target.value)));
         elements.slopeInput.addEventListener('change', (e) => {
             const val = parseFloat(e.target.value) || 0;
             const clampedVal = Math.max(-50, Math.min(val, 50));
@@ -541,6 +618,34 @@ async function init() {
         setupIncrementer(document.getElementById(`${color}Slope_minus`), document.getElementById(`${color}Slope_plus`), elements.slopeInput, elements.slopeSlider, 0.1, -50, 50, false);
     }
     
+    satSlider.addEventListener('input', (e) => {
+        currentSat = parseInt(e.target.value);
+        renderSatHueUI(currentSat, currentHue);
+        applySatHue(currentSat, currentHue);
+    });
+    satInput.addEventListener('change', (e) => {
+        const val = parseInt(e.target.value) || 200;
+        currentSat = Math.max(200, Math.min(val, 360));
+        renderSatHueUI(currentSat, currentHue);
+        applySatHue(currentSat, currentHue);
+    });
+
+    hueSlider.addEventListener('input', (e) => {
+        currentHue = uiToNodeHue(parseInt(e.target.value));
+        renderSatHueUI(currentSat, currentHue);
+        applySatHue(currentSat, currentHue);
+    });
+    hueInput.addEventListener('change', (e) => {
+        const val = parseInt(e.target.value) || 0;
+        const clampedVal = Math.max(0, Math.min(val, 360));
+        currentHue = uiToNodeHue(clampedVal);
+        renderSatHueUI(currentSat, currentHue);
+        applySatHue(currentSat, currentHue);
+    });
+
+    setupIncrementer(document.getElementById('sat_minus'), document.getElementById('sat_plus'), satInput, satSlider, 1, 200, 360, true);
+    setupIncrementer(document.getElementById('hue_minus'), document.getElementById('hue_plus'), hueInput, hueSlider, 1, 0, 360, true);
+
     for (const stepNum of [1, 2]) {
         const stepKey = `step${stepNum}`;
         for (const colorKey in wizardControls[stepKey]) {

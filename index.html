@@ -109,6 +109,36 @@
                 </div>
             </div>
         </div>
+        <div class="card mt-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title mb-0" data-i18n="sh.cardTitle"></h5>
+                    <div class="config-actions-group">
+                        <button id="resetSatHueButton" type="button" class="btn btn-sm btn-warning" data-mdb-ripple-init data-i18n="buttons.reset"></button>
+                        <button id="saveSatHueButton" type="button" class="btn btn-sm btn-primary" data-mdb-ripple-init data-i18n="buttons.save"></button>
+                    </div>
+                </div>
+                <hr/>
+                <div class="param-row">
+                    <label class="param-label" data-i18n="params.saturation"></label>
+                    <div class="slider-input-group">
+                        <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="sat_minus" data-mdb-ripple-init>-</button>
+                        <div class="range flex-grow-1"><input type="range" class="form-range" id="satSlider" min="200" max="360" step="1" /></div>
+                        <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="sat_plus" data-mdb-ripple-init>+</button>
+                        <div class="form-outline" data-mdb-input-init><input type="number" id="satInput" class="form-control param-input" step="1" min="200" max="360" /></div>
+                    </div>
+                </div>
+                <div class="param-row">
+                    <label class="param-label" data-i18n="params.hue"></label>
+                    <div class="slider-input-group">
+                        <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="hue_minus" data-mdb-ripple-init>-</button>
+                        <div class="range flex-grow-1"><input type="range" class="form-range" id="hueSlider" min="0" max="360" step="1" /></div>
+                        <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="hue_plus" data-mdb-ripple-init>+</button>
+                        <div class="form-outline" data-mdb-input-init><input type="number" id="hueInput" class="form-control param-input" step="1" min="0" max="360" /></div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <footer class="text-center mt-4"><p class="text-muted small" data-i18n="footer.author"></p></footer>
     </div>
     <div class="modal fade" id="nodeStatusModal" tabindex="-1">

@@ -227,7 +227,7 @@ function calculateChartData(params) {
 }
 
 function initChart() {
-    if (colorChart) colorChart.destroy();
+    if (colorChart) colorChart.destroy(); // 确保旧图表被销毁
     const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
     const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
     const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
@@ -255,14 +255,28 @@ function updateChart() {
         const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
         const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
         const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+        
+        // 更新数据
         colorChart.data = calculateChartData(globalConfig);
-        colorChart.options.scales.x.title.text = i18next.t('status.brightness'); colorChart.options.scales.x.title.color = tickColor;
-        colorChart.options.scales.x.ticks.color = tickColor; colorChart.options.scales.x.grid.color = gridColor;
-        colorChart.options.scales.y.title.text = i18next.t('chart.yAxisTitle'); colorChart.options.scales.y.title.color = tickColor;
-        colorChart.options.scales.y.ticks.color = tickColor; colorChart.options.scales.y.grid.color = gridColor;
+
+        // 更新选项中与主题相关的颜色和文本
+        colorChart.options.scales.x.title.text = i18next.t('status.brightness');
+        colorChart.options.scales.x.title.color = tickColor;
+        colorChart.options.scales.x.ticks.color = tickColor;
+        colorChart.options.scales.x.grid.color = gridColor;
+
+        colorChart.options.scales.y.title.text = i18next.t('chart.yAxisTitle');
+        colorChart.options.scales.y.title.color = tickColor;
+        colorChart.options.scales.y.ticks.color = tickColor;
+        colorChart.options.scales.y.grid.color = gridColor;
+
         colorChart.options.plugins.legend.labels.color = tickColor;
+        
+        // 增量更新图表
         colorChart.update();
-    } else { initChart(); }
+    } else { 
+        initChart(); // 如果图表不存在，则初始化
+    }
 }
 
 async function applyKcal(params, useRefreshRate = currentRefreshRate) {
@@ -483,7 +497,7 @@ function handleWizardColorPreview(stepNum) {
     applyKcal({ red: { intercept: r, slope: 0 }, green: { intercept: g, slope: 0 }, blue: { intercept: b, slope: 0 }, saturation: globalConfig.saturation });
 }
 
-function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isInt, onChangeCallback) {
+function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isInt) {
     const updateValue = (newValue) => {
         const clampedValue = Math.max(min, Math.min(newValue, max));
         if (isInt) {
@@ -494,7 +508,6 @@ function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isIn
         slider.value = clampedValue;
         // 触发change事件，让外部监听器处理
         input.dispatchEvent(new Event('change', { bubbles: true }));
-        if (onChangeCallback) onChangeCallback(clampedValue);
     };
     minusBtn.addEventListener('click', () => {
         const currentValue = isInt ? parseInt(input.value) : parseFloat(input.value);

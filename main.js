@@ -35,8 +35,8 @@ const defaultConfig = {
     saturation: 255,
 };
 const defaultHue = 0;    // 内核原始值
-const defaultCont = 256; // 128-383
-const defaultVal = 256;  // 128-383
+const defaultCont = 255; // 128-383
+const defaultVal = 255;  // 128-383
 
 const icons = { mdiMagicStaff, mdiTune, mdiArrowLeft, mdiSync, mdiRestore };
 

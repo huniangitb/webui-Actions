@@ -11,7 +11,6 @@ const resources = {
       "status.brightness": "Brightness (%)",
       "status.reading": "Reading...",
       "status.brightnessValue": "{{value}} ({{percent}}%)",
-      "status.brightnessReadError": "Failed to read brightness",
       "status.brightnessPathError": "Backlight path not set",
       "status.refreshRateReadError": "Unavailable",
       "config.cardTitle": "Color Profile Settings",
@@ -30,9 +29,9 @@ const resources = {
       "params.green": "Green",
       "params.blue": "Blue",
       "params.saturation": "Saturation",
-      "params.hue": "Hue",
+      "params.hue": "Hue (°)", // Added degree symbol for clarity
       "params.contrast": "Contrast",
-      "params.value": "Value",
+      "params.whiteValue": "White Value", // Changed from Value to White Value
       "chart.yAxisTitle": "Calculated Value",
       "footer.author": "Author: 囫碾 | WebUI by Gemini2.5 Pro",
       "modals.nodeStatus.title": "Node Status",
@@ -98,9 +97,9 @@ const resources = {
       "params.green": "绿色",
       "params.blue": "蓝色",
       "params.saturation": "饱和度",
-      "params.hue": "色相",
+      "params.hue": "色相 (°)", // Added degree symbol for clarity
       "params.contrast": "对比度",
-      "params.value": "值",
+      "params.whiteValue": "白值", // Changed from 值 to 白值
       "chart.yAxisTitle": "计算值",
       "footer.author": "作者: 囫碾 | WebUI by Gemini2.5 Pro",
       "modals.nodeStatus.title": "节点状态",

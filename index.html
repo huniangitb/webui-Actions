@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="title">MiuiCX Color Tuner</title>
     <link rel="stylesheet" href="main.scss">
-</head>
-<body>
+</head><body>
     <div class="container mt-4 mb-5">
         <header class="text-center mb-4">
             <h1 data-i18n="title"></h1>
@@ -131,9 +130,9 @@
                     <label class="param-label" data-i18n="params.hue"></label>
                     <div class="slider-input-group">
                         <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="hue_minus" data-mdb-ripple-init>-</button>
-                        <div class="range flex-grow-1"><input type="range" class="form-range" id="hueSlider" min="0" max="1536" step="1" /></div>
+                        <div class="range flex-grow-1"><input type="range" class="form-range" id="hueSlider" min="0" max="360" step="1" /></div>
                         <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="hue_plus" data-mdb-ripple-init>+</button>
-                        <div class="form-outline" data-mdb-input-init><input type="number" id="hueInput" class="form-control param-input" step="1" min="0" max="1536" /></div>
+                        <div class="form-outline" data-mdb-input-init><input type="number" id="hueInput" class="form-control param-input" step="1" min="0" max="360" /></div>
                     </div>
                 </div>
                 <div class="param-row">
@@ -146,7 +145,7 @@
                     </div>
                 </div>
                 <div class="param-row">
-                    <label class="param-label" data-i18n="params.value"></label>
+                    <label class="param-label" data-i18n="params.whiteValue"></label> <!-- Changed to whiteValue -->
                     <div class="slider-input-group">
                         <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="val_minus" data-mdb-ripple-init>-</button>
                         <div class="range flex-grow-1"><input type="range" class="form-range" id="valSlider" min="128" max="383" step="1" /></div>

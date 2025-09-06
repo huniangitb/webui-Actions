@@ -100,22 +100,12 @@
                                 <div class="form-outline" data-mdb-input-init><input type="number" id="blueSlopeInput" class="form-control param-input" step="0.01" /></div>
                             </div>
                         </div>
-                        <h6 class="mt-4" data-i18n="params.saturation"></h6>
-                        <div class="param-row">
-                            <label class="param-label"></label> <!-- 空标签用于对齐 -->
-                            <div class="slider-input-group">
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="sat_minus" data-mdb-ripple-init>-</button>
-                                <div class="range flex-grow-1"><input type="range" class="form-range" id="satSlider" min="200" max="360" step="1" /></div>
-                                <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="sat_plus" data-mdb-ripple-init>+</button>
-                                <div class="form-outline" data-mdb-input-init><input type="number" id="satInput" class="form-control param-input" step="1" min="200" max="360" /></div>
-                            </div>
-                        </div>
                     </div>
                     <div class="chart-container mt-4"><canvas id="colorCurveChart"></canvas></div>
                 </div>
             </div>
         </div>
-        <!-- 新增: 显示增强卡片 -->
+        <!-- 显示增强卡片 -->
         <div class="card mt-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -126,6 +116,15 @@
                     </div>
                 </div>
                 <hr/>
+                <div class="param-row">
+                    <label class="param-label" data-i18n="params.saturation"></label>
+                    <div class="slider-input-group">
+                        <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="sat_minus" data-mdb-ripple-init>-</button>
+                        <div class="range flex-grow-1"><input type="range" class="form-range" id="satSlider" min="200" max="360" step="1" /></div>
+                        <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="sat_plus" data-mdb-ripple-init>+</button>
+                        <div class="form-outline" data-mdb-input-init><input type="number" id="satInput" class="form-control param-input" step="1" min="200" max="360" /></div>
+                    </div>
+                </div>
                 <div class="param-row">
                     <label class="param-label" data-i18n="params.hue"></label>
                     <div class="slider-input-group">
@@ -145,7 +144,7 @@
                     </div>
                 </div>
                 <div class="param-row">
-                    <label class="param-label" data-i18n="params.whiteValue"></label> <!-- Changed to whiteValue -->
+                    <label class="param-label" data-i18n="params.whiteValue"></label>
                     <div class="slider-input-group">
                         <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="val_minus" data-mdb-ripple-init>-</button>
                         <div class="range flex-grow-1"><input type="range" class="form-range" id="valSlider" min="128" max="383" step="1" /></div>

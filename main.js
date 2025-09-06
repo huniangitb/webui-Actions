@@ -7,21 +7,34 @@ import { mdiMagicStaff, mdiTune, mdiArrowLeft, mdiSync, mdiRestore } from '@mdi/
 const MODULE_ID = "miuicx_color_tuner";
 const MODULE_PATH = `/data/adb/modules/${MODULE_ID}`;
 let currentConfigPath = '';
+
+// Kcal节点路径
 const KCAL_RED_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_red";
 const KCAL_GREEN_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_green";
 const KCAL_BLUE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_blue";
-const KCAL_SAT_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_sat"; // 饱和度节点
+const KCAL_SAT_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_sat";
+const KCAL_HUE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_hue";
+const KCAL_CONT_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_cont";
+const KCAL_VAL_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_val";
 const KCAL_ENABLE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_enable";
 const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
 const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
+
+// 配置文件路径
+const ADV_COLOR_CONFIG_PATH = `${MODULE_PATH}/adv.config`;
+
 const SLOPE_PRECISION = 100;
 
+// 默认配置
 const defaultConfig = {
     red: { intercept: 256.0, slope: 0.0 },
     green: { intercept: 256.0, slope: 0.0 },
     blue: { intercept: 256.0, slope: 0.0 },
-    saturation: 255, // 新增饱和度默认值
+    saturation: 255,
 };
+const defaultHue = 0;
+const defaultCont = 256;
+const defaultVal = 256;
 
 const icons = { mdiMagicStaff, mdiTune, mdiArrowLeft, mdiSync, mdiRestore };
 
@@ -32,7 +45,11 @@ const refreshRateColorStops = [
     { rate: 144, color: [249, 49, 84] }
 ];
 
+// 全局状态变量
 let globalConfig = JSON.parse(JSON.stringify(defaultConfig));
+let currentHue = defaultHue;
+let currentCont = defaultCont;
+let currentVal = defaultVal;
 let maxBrightness = 4095;
 let currentRefreshRate = 60;
 let colorChart = null;
@@ -45,6 +62,7 @@ let originalConfigForWizard = null;
 let brightnessBeforeWizard = -1;
 let isKcalEnabled = true;
 
+// DOM元素引用
 const brightnessSlider = document.getElementById('brightnessSlider');
 const brightnessValue = document.getElementById('brightnessValue');
 const refreshRateValue = document.getElementById('refreshRateValue');
@@ -57,8 +75,17 @@ const advancedModeButton = document.getElementById('advancedModeButton');
 const wizardButton = document.getElementById('wizardButton');
 const configContentContainer = document.getElementById('configContentContainer');
 const configDescription = document.getElementById('configDescription');
-const satSlider = document.getElementById('satSlider'); // 饱和度滑块
-const satInput = document.getElementById('satInput');   // 饱和度输入框
+const satSlider = document.getElementById('satSlider');
+const satInput = document.getElementById('satInput');
+// 新增显示增强UI元素
+const hueSlider = document.getElementById('hueSlider');
+const hueInput = document.getElementById('hueInput');
+const contSlider = document.getElementById('contSlider');
+const contInput = document.getElementById('contInput');
+const valSlider = document.getElementById('valSlider');
+const valInput = document.getElementById('valInput');
+const saveAdvColorButton = document.getElementById('saveAdvColorButton');
+const resetAdvColorButton = document.getElementById('resetAdvColorButton');
 
 const uiElements = {
     red: { interceptSlider: document.getElementById('redInterceptSlider'), interceptInput: document.getElementById('redInterceptInput'), slopeSlider: document.getElementById('redSlopeSlider'), slopeInput: document.getElementById('redSlopeInput') },
@@ -67,6 +94,7 @@ const uiElements = {
 };
 
 const wizardModalElement = document.getElementById('wizardModal');
+// ... (wizard相关的DOM引用保持不变)
 const wizardStep1 = document.getElementById('wizardStep1');
 const wizardStep2 = document.getElementById('wizardStep2');
 const wizardBrightness1 = document.getElementById('wizardBrightness1');
@@ -90,14 +118,7 @@ const wizardControls = {
 let wizardData = {};
 
 function createIcon(path) { if (!path) return ''; return `<svg class="svg-icon me-2" viewBox="0 0 24 24"><path d="${path}" /></svg>`; }
-
-function interpolateColor(color1, color2, factor) {
-    const result = color1.slice();
-    for (let i = 0; i < 3; i++) {
-        result[i] = Math.round(color1[i] + factor * (color2[i] - color1[i]));
-    }
-    return result;
-}
+function interpolateColor(color1, color2, factor) { const result = color1.slice(); for (let i = 0; i < 3; i++) { result[i] = Math.round(color1[i] + factor * (color2[i] - color1[i])); } return result; }
 
 async function pollSystemStatus() {
     try {
@@ -107,7 +128,7 @@ async function pollSystemStatus() {
             lastKnownRefreshRate = newRate; currentRefreshRate = newRate; updateRefreshRateUI(newRate);
             currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
             toast(i18next.t('toast.refreshRateChanged', { rate: newRate }), 'info');
-            await loadConfigAndRender(); // 刷新率改变时重新加载配置
+            await loadConfigAndRender();
         }
     } catch (e) {}
     try {
@@ -209,11 +230,12 @@ function updateRefreshRateUI(rate) {
     refreshRateValue.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
 }
 
+// ... (calculateChartData, initChart, updateChart functions remain the same as the previous version)
 function calculateChartData(params) {
     const labels = []; const colorData = { red: [], green: [], blue: [] };
     for (let p = 1; p <= 100; p++) {
         labels.push(p); const systemBrightness = scaleToSystemBrightness(p); const log_b = Math.log(systemBrightness);
-        for (const color of ['red', 'green', 'blue']) { // 明确迭代颜色
+        for (const color of ['red', 'green', 'blue']) {
             const { intercept, slope } = params[color];
             colorData[color].push(intercept + (slope * log_b));
         }
@@ -227,7 +249,7 @@ function calculateChartData(params) {
 }
 
 function initChart() {
-    if (colorChart) colorChart.destroy(); // 确保旧图表被销毁
+    if (colorChart) colorChart.destroy();
     const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
     const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
     const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
@@ -255,29 +277,22 @@ function updateChart() {
         const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
         const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
         const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-        
-        // 更新数据
         colorChart.data = calculateChartData(globalConfig);
-
-        // 更新选项中与主题相关的颜色和文本
         colorChart.options.scales.x.title.text = i18next.t('status.brightness');
         colorChart.options.scales.x.title.color = tickColor;
         colorChart.options.scales.x.ticks.color = tickColor;
         colorChart.options.scales.x.grid.color = gridColor;
-
         colorChart.options.scales.y.title.text = i18next.t('chart.yAxisTitle');
         colorChart.options.scales.y.title.color = tickColor;
         colorChart.options.scales.y.ticks.color = tickColor;
         colorChart.options.scales.y.grid.color = gridColor;
-
         colorChart.options.plugins.legend.labels.color = tickColor;
-        
-        // 增量更新图表
         colorChart.update();
     } else { 
-        initChart(); // 如果图表不存在，则初始化
+        initChart();
     }
 }
+
 
 async function applyKcal(params, useRefreshRate = currentRefreshRate) {
     if (!params) return;
@@ -288,17 +303,25 @@ async function applyKcal(params, useRefreshRate = currentRefreshRate) {
             const path = color === 'red' ? KCAL_RED_PATH : color === 'green' ? KCAL_GREEN_PATH : KCAL_BLUE_PATH;
             return `echo "${i} ${s} ${useRefreshRate}" > ${path}`;
         });
-        // 应用饱和度
         cmds.push(`echo "${params.saturation} ${useRefreshRate}" > ${KCAL_SAT_PATH}`);
-
         await exec(cmds.join(' && '));
     } catch (e) { console.warn(`Kcal apply failed: ${e.message}`); }
 }
 
-// parseConfig 现在需要处理饱和度
+async function applyAdvColor(hue, cont, val) {
+    try {
+        const cmds = [
+            `echo ${hue} > ${KCAL_HUE_PATH}`,
+            `echo ${cont} > ${KCAL_CONT_PATH}`,
+            `echo ${val} > ${KCAL_VAL_PATH}`
+        ];
+        await exec(cmds.join(' && '));
+    } catch (e) { console.warn(`Adv Color apply failed: ${e.message}`); }
+}
+
 function parseConfig(text) {
     const parts = text.trim().split(/\s+/).map(p => parseInt(p, 10));
-    if (parts.length !== 7 || parts.some(isNaN)) return null; // 7个参数
+    if (parts.length !== 7 || parts.some(isNaN)) return null;
     const [ri, rs, gi, gs, bi, bs, sat] = parts;
     return {
         red: { intercept: ri / 100, slope: rs / SLOPE_PRECISION },
@@ -308,7 +331,6 @@ function parseConfig(text) {
     };
 }
 
-// serializeConfig 现在需要处理饱和度
 function serializeConfig(params) {
     const ri = Math.round(params.red.intercept * 100);
     const rs = Math.round(params.red.slope * SLOPE_PRECISION);
@@ -320,20 +342,19 @@ function serializeConfig(params) {
     return `${ri} ${rs} ${gi} ${gs} ${bi} ${bs} ${sat}`;
 }
 
-// readKcalNodeAsConfig 现在需要读取饱和度
 async function readKcalNodeAsConfig() {
     try {
         const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`);
         const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`);
         const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`);
-        const { stdout: sat_stdout } = await exec(`cat ${KCAL_SAT_PATH}`); // 读取饱和度
+        const { stdout: sat_stdout } = await exec(`cat ${KCAL_SAT_PATH}`);
 
         const [ri, rs] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
         const [gi, gs] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
         const [bi, bs] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        const [sat_val] = sat_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); // 解析饱和度
+        const [sat_val] = sat_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
 
-        if ([ri, rs, gi, gs, bi, bs, sat_val].some(isNaN)) return null; // 检查所有值
+        if ([ri, rs, gi, gs, bi, bs, sat_val].some(isNaN)) return null;
 
         return {
             red: { intercept: ri / 100, slope: rs / SLOPE_PRECISION },
@@ -378,37 +399,15 @@ function renderUI(params) {
         uiElements[color].slopeInput.value = slope.toFixed(2);
         uiElements[color].slopeSlider.value = slope;
     }
-    // 渲染饱和度
     satInput.value = params.saturation;
     satSlider.value = params.saturation;
-
     document.querySelectorAll('.form-outline').forEach(formOutline => new Input(formOutline).update());
 }
 
 async function saveConfig() { const configString = serializeConfig(globalConfig); const filename = currentConfigPath.split('/').pop(); try { await exec(`echo '${configString}' > ${currentConfigPath}`); toast(i18next.t('toast.saved', { file: filename }), 'success'); } catch (e) { toast(i18next.t('toast.saveFailed', { error: e.message }), 'error'); } }
 function resetGlobalConfig() { globalConfig = JSON.parse(JSON.stringify(defaultConfig)); renderUI(globalConfig); applyKcal(globalConfig); updateChart(); toast(i18next.t('toast.reset'), 'info'); }
-async function readAndShowNodeStatus() { 
-    const parsedOutputElem = document.getElementById('parsedNodeOutput'); 
-    parsedOutputElem.innerHTML = i18next.t('status.reading'); 
-    nodeStatusModal.show(); 
-    try { 
-        const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`); 
-        const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`); 
-        const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`); 
-        const { stdout: sat_stdout } = await exec(`cat ${KCAL_SAT_PATH}`); // 读取饱和度
 
-        const [ri, rs, rr] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); 
-        const [gi, gs, gr] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); 
-        const [bi, bs, br] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); 
-        const [sat_val, sat_rr] = sat_stdout.trim().split(/\s+/).map(p => parseInt(p, 10)); // 解析饱和度及刷新率
-
-        if ([ri, rs, rr, gi, gs, gr, bi, bs, br, sat_val, sat_rr].some(isNaN)) { 
-            parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeParseError')}</p>`; return; 
-        } 
-        parsedOutputElem.innerHTML = `<h6><strong>Kcal Status:</strong> ${isKcalEnabled ? 'Enabled' : 'Disabled'}</h6><hr/><h6 class="text-danger">${i18next.t('params.red')}</h6><ul><li>I: ${(ri / 100).toFixed(2)} (${ri})</li><li>S: ${(rs / SLOPE_PRECISION).toFixed(2)} (${rs})</li><li>Hz: ${rr}</li></ul><hr/><h6 class="text-success">${i18next.t('params.green')}</h6><ul><li>I: ${(gi/100).toFixed(2)} (${gi})</li><li>S: ${(gs / SLOPE_PRECISION).toFixed(2)} (${gs})</li><li>Hz: ${gr}</li></ul><hr/><h6 class="text-primary">${i18next.t('params.blue')}</h6><ul><li>I: ${(bi/100).toFixed(2)} (${bi})</li><li>S: ${(bs / SLOPE_PRECISION).toFixed(2)} (${bs})</li><li>Hz: ${br}</li></ul><hr/><h6>${i18next.t('params.saturation')}</h6><ul><li>Value: ${sat_val}</li><li>Hz: ${sat_rr}</li></ul>`; 
-    } catch (e) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeReadPermission')}</p>`; } 
-}
-
+// ... (wizard functions remain the same as the previous version)
 function calculateFit(point1, point2) {
     const x1 = Math.log(point1.brightness); const x2 = Math.log(point2.brightness);
     const y1 = point1.value; const y2 = point2.value;
@@ -417,7 +416,6 @@ function calculateFit(point1, point2) {
     const intercept = y1 - slope * x1;
     return { intercept, slope };
 }
-
 function startWizard() {
     originalConfigForWizard = JSON.parse(JSON.stringify(globalConfig));
     brightnessBeforeWizard = lastKnownBrightness;
@@ -445,7 +443,6 @@ function startWizard() {
     wizardModal.show();
     setSystemBrightness(wizardData.step1.brightnessPercent);
 }
-
 function handleWizardNext() {
     wizardData.step1.brightnessPercent = parseInt(wizardBrightness1.value);
     wizardData.step1.red = parseInt(wizardControls.step1.red.input.value);
@@ -458,7 +455,6 @@ function handleWizardNext() {
     setSystemBrightness(wizardData.step2.brightnessPercent);
     handleWizardColorPreview(2);
 }
-
 async function handleWizardFinish() {
     wizardData.step2.brightnessPercent = parseInt(wizardBrightness2.value);
     wizardData.step2.red = parseInt(wizardControls.step2.red.input.value);
@@ -470,7 +466,7 @@ async function handleWizardFinish() {
         red: calculateFit({ brightness: b1, value: wizardData.step1.red }, { brightness: b2, value: wizardData.step2.red }),
         green: calculateFit({ brightness: b1, value: wizardData.step1.green }, { brightness: b2, value: wizardData.step2.green }),
         blue: calculateFit({ brightness: b1, value: wizardData.step1.blue }, { brightness: b2, value: wizardData.step2.blue }),
-        saturation: globalConfig.saturation, // 保持现有饱和度
+        saturation: globalConfig.saturation,
     };
     renderUI(globalConfig);
     await applyKcal(globalConfig);
@@ -479,13 +475,11 @@ async function handleWizardFinish() {
     wizardModal.hide();
     toast(i18next.t('toast.wizardComplete'), 'success');
 }
-
 function handleWizardCancel() {
     applyKcal(originalConfigForWizard); 
     wizardModal.hide();
     toast(i18next.t('toast.wizardCancelled'), 'info');
 }
-
 function handleWizardColorPreview(stepNum) {
     const brightnessPercent = parseInt(stepNum === 1 ? wizardBrightness1.value : wizardBrightness2.value);
     setSystemBrightness(brightnessPercent);
@@ -493,8 +487,108 @@ function handleWizardColorPreview(stepNum) {
     const r = parseInt(controls.red.input.value);
     const g = parseInt(controls.green.input.value);
     const b = parseInt(controls.blue.input.value);
-    // 预览时只应用颜色，不改变饱和度
     applyKcal({ red: { intercept: r, slope: 0 }, green: { intercept: g, slope: 0 }, blue: { intercept: b, slope: 0 }, saturation: globalConfig.saturation });
+}
+
+// 新增: 显示增强UI渲染函数
+function renderAdvColorUI(hue, cont, val) {
+    hueSlider.value = hue;
+    hueInput.value = hue;
+    contSlider.value = cont;
+    contInput.value = cont;
+    valSlider.value = val;
+    valInput.value = val;
+    document.querySelectorAll('.form-outline').forEach(formOutline => new Input(formOutline).update());
+}
+
+// 新增: 加载显示增强配置
+async function loadAdvColorConfig() {
+    let loaded = false;
+    try {
+        const { stdout } = await exec(`cat ${ADV_COLOR_CONFIG_PATH}`);
+        const [h, c, v] = stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
+        if (![h, c, v].some(isNaN)) {
+            currentHue = h;
+            currentCont = c;
+            currentVal = v;
+            loaded = true;
+            toast(i18next.t('toast.advColor.loaded'), 'success');
+        }
+    } catch (e) {}
+
+    if (!loaded) {
+        try {
+            const { stdout: hue_out } = await exec(`cat ${KCAL_HUE_PATH}`);
+            const { stdout: cont_out } = await exec(`cat ${KCAL_CONT_PATH}`);
+            const { stdout: val_out } = await exec(`cat ${KCAL_VAL_PATH}`);
+            currentHue = parseInt(hue_out.trim());
+            currentCont = parseInt(cont_out.trim());
+            currentVal = parseInt(val_out.trim());
+        } catch (e) {
+            currentHue = defaultHue;
+            currentCont = defaultCont;
+            currentVal = defaultVal;
+            toast(i18next.t('toast.advColor.loadFailed'), 'warning');
+        }
+    }
+    renderAdvColorUI(currentHue, currentCont, currentVal);
+    applyAdvColor(currentHue, currentCont, currentVal);
+}
+
+// 新增: 保存显示增强配置
+async function saveAdvColorConfig() {
+    const configString = `${currentHue} ${currentCont} ${currentVal}`;
+    try {
+        await exec(`echo '${configString}' > ${ADV_COLOR_CONFIG_PATH}`);
+        toast(i18next.t('toast.advColor.saved'), 'success');
+    } catch (e) {
+        toast(i18next.t('toast.advColor.saveFailed', { error: e.message }), 'error');
+    }
+}
+
+// 新增: 重置显示增强配置
+function resetAdvColor() {
+    currentHue = defaultHue;
+    currentCont = defaultCont;
+    currentVal = defaultVal;
+    renderAdvColorUI(currentHue, currentCont, currentVal);
+    applyAdvColor(currentHue, currentCont, currentVal);
+    toast(i18next.t('toast.advColor.reset'), 'info');
+}
+
+async function readAndShowNodeStatus() {
+    const parsedOutputElem = document.getElementById('parsedNodeOutput');
+    parsedOutputElem.innerHTML = i18next.t('status.reading');
+    nodeStatusModal.show();
+    try {
+        const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`);
+        const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`);
+        const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`);
+        const { stdout: sat_stdout } = await exec(`cat ${KCAL_SAT_PATH}`);
+        const { stdout: hue_stdout } = await exec(`cat ${KCAL_HUE_PATH}`);
+        const { stdout: cont_stdout } = await exec(`cat ${KCAL_CONT_PATH}`);
+        const { stdout: val_stdout } = await exec(`cat ${KCAL_VAL_PATH}`);
+
+        const [ri, rs, rr] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
+        const [gi, gs, gr] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
+        const [bi, bs, br] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
+        const [sat_val, sat_rr] = sat_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
+        const hue_val = parseInt(hue_stdout.trim());
+        const cont_val = parseInt(cont_stdout.trim());
+        const val_val = parseInt(val_stdout.trim());
+
+        if ([ri, rs, rr, gi, gs, gr, bi, bs, br, sat_val, sat_rr, hue_val, cont_val, val_val].some(isNaN)) {
+            parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeParseError')}</p>`; return;
+        }
+        parsedOutputElem.innerHTML = `<h6><strong>Kcal Status:</strong> ${isKcalEnabled ? 'Enabled' : 'Disabled'}</h6><hr/>` +
+            `<h6 class="text-danger">${i18next.t('params.red')}</h6><ul><li>I: ${(ri / 100).toFixed(2)} (${ri})</li><li>S: ${(rs / SLOPE_PRECISION).toFixed(2)} (${rs})</li><li>Hz: ${rr}</li></ul><hr/>` +
+            `<h6 class="text-success">${i18next.t('params.green')}</h6><ul><li>I: ${(gi / 100).toFixed(2)} (${gi})</li><li>S: ${(gs / SLOPE_PRECISION).toFixed(2)} (${gs})</li><li>Hz: ${gr}</li></ul><hr/>` +
+            `<h6 class="text-primary">${i18next.t('params.blue')}</h6><ul><li>I: ${(bi / 100).toFixed(2)} (${bi})</li><li>S: ${(bs / SLOPE_PRECISION).toFixed(2)} (${bs})</li><li>Hz: ${br}</li></ul><hr/>` +
+            `<h6>${i18next.t('params.saturation')}</h6><ul><li>Value: ${sat_val}</li><li>Hz: ${sat_rr}</li></ul><hr/>` +
+            `<h6>${i18next.t('params.hue')}</h6><ul><li>Value: ${hue_val}</li></ul>` +
+            `<h6>${i18next.t('params.contrast')}</h6><ul><li>Value: ${cont_val}</li></ul>` +
+            `<h6>${i18next.t('params.value')}</h6><ul><li>Value: ${val_val}</li></ul>`;
+    } catch (e) { parsedOutputElem.innerHTML = `<p class="text-danger">${i18next.t('errors.nodeReadPermission')}</p>`; }
 }
 
 function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isInt) {
@@ -506,7 +600,6 @@ function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isIn
             input.value = clampedValue.toFixed(2);
         }
         slider.value = clampedValue;
-        // 触发change事件，让外部监听器处理
         input.dispatchEvent(new Event('change', { bubbles: true }));
     };
     minusBtn.addEventListener('click', () => {
@@ -523,7 +616,7 @@ async function fetchInitialSystemState() {
     try {
         const { stdout } = await exec(`cat ${KCAL_RED_PATH}`);
         currentRefreshRate = parseInt(stdout.trim().split(/\s+/)[2]) || 60;
-    } catch(e) {
+    } catch (e) {
         try {
             const { stdout } = await exec('settings get system peak_refresh_rate');
             currentRefreshRate = Math.round(parseFloat(stdout.trim())) || 60;
@@ -533,14 +626,12 @@ async function fetchInitialSystemState() {
     }
     updateRefreshRateUI(currentRefreshRate);
     lastKnownRefreshRate = currentRefreshRate;
-    
     try {
         const { stdout } = await exec(`cat ${KCAL_ENABLE_PATH}`);
         updateKcalEnableUI(stdout.trim() === '1');
-    } catch(e) {
+    } catch (e) {
         updateKcalEnableUI(false);
     }
-
     try {
         const { stdout: max } = await exec(`cat ${MAX_BRIGHTNESS_PATH}`); maxBrightness = parseInt(max.trim());
         const { stdout: cur } = await exec(`cat ${BACKLIGHT_PATH}`); const currentSystemVal = parseInt(cur.trim());
@@ -565,7 +656,10 @@ async function init() {
     wizardModal = new Modal(wizardModalElement);
     await fetchInitialSystemState();
     currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
-    await loadConfigAndRender(); // 加载包含饱和度的完整配置
+    await loadConfigAndRender();
+    await loadAdvColorConfig(); // 加载显示增强配置
+
+    // 主配置事件
     brightnessSlider.addEventListener('input', (e) => setSystemBrightness(parseInt(e.target.value)));
     saveButton.addEventListener('click', saveConfig);
     resetConfigButton.addEventListener('click', resetGlobalConfig);
@@ -573,48 +667,44 @@ async function init() {
     wizardButton.addEventListener('click', startWizard);
     advancedModeButton.addEventListener('click', () => toggleAdvancedMode(!isAdvancedMode));
 
+    // 显示增强事件
+    saveAdvColorButton.addEventListener('click', saveAdvColorConfig);
+    resetAdvColorButton.addEventListener('click', resetAdvColor);
+
     for (const color of ['red', 'green', 'blue']) {
         const elements = uiElements[color];
-        const handleParamChange = (param, value) => { 
-            globalConfig[color][param] = value; 
-            renderUI(globalConfig); // 重新渲染所有UI，包括饱和度
-            applyKcal(globalConfig); 
-            updateChart(); 
+        const handleParamChange = (param, value) => {
+            globalConfig[color][param] = value;
+            renderUI(globalConfig);
+            applyKcal(globalConfig);
+            updateChart();
         };
-        
         elements.interceptSlider.addEventListener('input', (e) => handleParamChange('intercept', parseFloat(e.target.value)));
-        elements.interceptInput.addEventListener('change', (e) => {
-            const val = parseFloat(e.target.value) || 0;
-            const clampedVal = Math.max(0, Math.min(val, 256));
-            handleParamChange('intercept', clampedVal);
-        });
-
+        elements.interceptInput.addEventListener('change', (e) => { const val = parseFloat(e.target.value) || 0; const clampedVal = Math.max(0, Math.min(val, 256)); handleParamChange('intercept', clampedVal); });
         elements.slopeSlider.addEventListener('input', (e) => handleParamChange('slope', parseFloat(e.target.value)));
-        elements.slopeInput.addEventListener('change', (e) => {
-            const val = parseFloat(e.target.value) || 0;
-            const clampedVal = Math.max(-50, Math.min(val, 50));
-            handleParamChange('slope', clampedVal);
-        });
-        
+        elements.slopeInput.addEventListener('change', (e) => { const val = parseFloat(e.target.value) || 0; const clampedVal = Math.max(-50, Math.min(val, 50)); handleParamChange('slope', clampedVal); });
         setupIncrementer(document.getElementById(`${color}Intercept_minus`), document.getElementById(`${color}Intercept_plus`), elements.interceptInput, elements.interceptSlider, 1, 0, 256, false);
         setupIncrementer(document.getElementById(`${color}Slope_minus`), document.getElementById(`${color}Slope_plus`), elements.slopeInput, elements.slopeSlider, 0.1, -50, 50, false);
     }
     
     // 饱和度控制事件
-    satSlider.addEventListener('input', (e) => {
-        globalConfig.saturation = parseInt(e.target.value);
-        renderUI(globalConfig);
-        applyKcal(globalConfig); // 饱和度改变时也应用Kcal
-    });
-    satInput.addEventListener('change', (e) => {
-        const val = parseInt(e.target.value) || 200;
-        globalConfig.saturation = Math.max(200, Math.min(val, 360));
-        renderUI(globalConfig);
-        applyKcal(globalConfig); // 饱和度改变时也应用Kcal
-    });
+    satSlider.addEventListener('input', (e) => { globalConfig.saturation = parseInt(e.target.value); renderUI(globalConfig); applyKcal(globalConfig); });
+    satInput.addEventListener('change', (e) => { const val = parseInt(e.target.value) || 200; globalConfig.saturation = Math.max(200, Math.min(val, 360)); renderUI(globalConfig); applyKcal(globalConfig); });
     setupIncrementer(document.getElementById('sat_minus'), document.getElementById('sat_plus'), satInput, satSlider, 1, 200, 360, true);
 
+    // 新增: 显示增强控制事件
+    hueSlider.addEventListener('input', (e) => { currentHue = parseInt(e.target.value); renderAdvColorUI(currentHue, currentCont, currentVal); applyAdvColor(currentHue, currentCont, currentVal); });
+    hueInput.addEventListener('change', (e) => { const val = parseInt(e.target.value) || 0; currentHue = Math.max(0, Math.min(val, 1536)); renderAdvColorUI(currentHue, currentCont, currentVal); applyAdvColor(currentHue, currentCont, currentVal); });
+    contSlider.addEventListener('input', (e) => { currentCont = parseInt(e.target.value); renderAdvColorUI(currentHue, currentCont, currentVal); applyAdvColor(currentHue, currentCont, currentVal); });
+    contInput.addEventListener('change', (e) => { const val = parseInt(e.target.value) || 128; currentCont = Math.max(128, Math.min(val, 383)); renderAdvColorUI(currentHue, currentCont, currentVal); applyAdvColor(currentHue, currentCont, currentVal); });
+    valSlider.addEventListener('input', (e) => { currentVal = parseInt(e.target.value); renderAdvColorUI(currentHue, currentCont, currentVal); applyAdvColor(currentHue, currentCont, currentVal); });
+    valInput.addEventListener('change', (e) => { const val = parseInt(e.target.value) || 128; currentVal = Math.max(128, Math.min(val, 383)); renderAdvColorUI(currentHue, currentCont, currentVal); applyAdvColor(currentHue, currentCont, currentVal); });
 
+    setupIncrementer(document.getElementById('hue_minus'), document.getElementById('hue_plus'), hueInput, hueSlider, 1, 0, 1536, true);
+    setupIncrementer(document.getElementById('cont_minus'), document.getElementById('cont_plus'), contInput, contSlider, 1, 128, 383, true);
+    setupIncrementer(document.getElementById('val_minus'), document.getElementById('val_plus'), valInput, valSlider, 1, 128, 383, true);
+
+    // ... (wizard event listeners remain the same)
     for (const stepNum of [1, 2]) {
         const stepKey = `step${stepNum}`;
         for (const colorKey in wizardControls[stepKey]) {
@@ -624,7 +714,6 @@ async function init() {
             setupIncrementer(document.getElementById(`wizardColor${colorKey.charAt(0).toUpperCase()}${stepNum}_minus`), document.getElementById(`wizardColor${colorKey.charAt(0).toUpperCase()}${stepNum}_plus`), input, slider, 1, 0, 256, true);
         }
     }
-
     wizardNextButton.addEventListener('click', handleWizardNext);
     wizardFinishButton.addEventListener('click', handleWizardFinish);
     wizardCancelButton.addEventListener('click', handleWizardCancel);
@@ -637,6 +726,8 @@ async function init() {
     });
     wizardBrightness1.addEventListener('input', () => setSystemBrightness(parseInt(wizardBrightness1.value)));
     wizardBrightness2.addEventListener('input', () => setSystemBrightness(parseInt(wizardBrightness2.value)));
+
+
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateTheme);
     i18next.on('languageChanged', () => updateUIText());
     toggleAdvancedMode(false, false);

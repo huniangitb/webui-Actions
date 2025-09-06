@@ -116,6 +116,46 @@
                 </div>
             </div>
         </div>
+        <!-- 新增: 显示增强卡片 -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title mb-0" data-i18n="advColor.cardTitle"></h5>
+                    <div class="config-actions-group">
+                        <button id="resetAdvColorButton" type="button" class="btn btn-sm btn-warning" data-mdb-ripple-init data-i18n="buttons.reset"></button>
+                        <button id="saveAdvColorButton" type="button" class="btn btn-sm btn-primary" data-mdb-ripple-init data-i18n="buttons.save"></button>
+                    </div>
+                </div>
+                <hr/>
+                <div class="param-row">
+                    <label class="param-label" data-i18n="params.hue"></label>
+                    <div class="slider-input-group">
+                        <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="hue_minus" data-mdb-ripple-init>-</button>
+                        <div class="range flex-grow-1"><input type="range" class="form-range" id="hueSlider" min="0" max="1536" step="1" /></div>
+                        <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="hue_plus" data-mdb-ripple-init>+</button>
+                        <div class="form-outline" data-mdb-input-init><input type="number" id="hueInput" class="form-control param-input" step="1" min="0" max="1536" /></div>
+                    </div>
+                </div>
+                <div class="param-row">
+                    <label class="param-label" data-i18n="params.contrast"></label>
+                    <div class="slider-input-group">
+                        <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="cont_minus" data-mdb-ripple-init>-</button>
+                        <div class="range flex-grow-1"><input type="range" class="form-range" id="contSlider" min="128" max="383" step="1" /></div>
+                        <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="cont_plus" data-mdb-ripple-init>+</button>
+                        <div class="form-outline" data-mdb-input-init><input type="number" id="contInput" class="form-control param-input" step="1" min="128" max="383" /></div>
+                    </div>
+                </div>
+                <div class="param-row">
+                    <label class="param-label" data-i18n="params.value"></label>
+                    <div class="slider-input-group">
+                        <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="val_minus" data-mdb-ripple-init>-</button>
+                        <div class="range flex-grow-1"><input type="range" class="form-range" id="valSlider" min="128" max="383" step="1" /></div>
+                        <button type="button" class="btn btn-secondary btn-sm btn-minus-plus" id="val_plus" data-mdb-ripple-init>+</button>
+                        <div class="form-outline" data-mdb-input-init><input type="number" id="valInput" class="form-control param-input" step="1" min="128" max="383" /></div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <footer class="text-center mt-4"><p class="text-muted small" data-i18n="footer.author"></p></footer>
     </div>
     <div class="modal fade" id="nodeStatusModal" tabindex="-1">

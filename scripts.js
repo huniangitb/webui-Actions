@@ -1,89 +1,10 @@
-// scripts.js
-
-// 重要提示：为了让涟漪效果 (Ripple) 正常工作，
-// 你的 PostCSS/PurgeCSS 配置 (.postcssrc.js) 必须将相关样式加入安全列表。
-// 示例:
-// safelist: {
-//   greedy: [/^ripple/],
-//   keyframes: ['ripple-wave'],
-// }
 
 import { exec, toast } from 'kernelsu';
 import { parseLogContent, updateLocalStorage, getStoredData, clearStoredData } from './logParser.js';
+// MDB 会通过 data-* 属性自动初始化，我们只需要导入模块即可。
 import 'mdb-ui-kit/js/mdb.es.min.js';
 import Chart from 'chart.js/auto';
-
-// --- 自动错误日志记录模块 ---
-
-const LOG_FILE_PATH = '/data/adb/modules/Clean-C/webui.log';
 initMDB({ Ripple });
-/**
- * 将错误信息异步写入到设备上的日志文件。
- * @param {string|Error} errorInfo - 要记录的错误信息或 Error 对象。
- */
-async function logErrorToFile(errorInfo) {
-    try {
-        const now = new Date();
-        const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-        
-        let logMessage;
-        if (errorInfo instanceof Error) {
-            logMessage = `[${timestamp}] ERROR: ${errorInfo.message}\nSTACK: ${errorInfo.stack}`;
-        } else {
-            logMessage = `[${timestamp}] LOG: ${String(errorInfo)}`;
-        }
-
-        // 对消息进行转义，以安全地传递给 shell
-        const escapedMessage = logMessage.replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$');
-        
-        // 使用 echo 和 >> 追加到文件
-        const command = `echo "${escapedMessage}" >> ${LOG_FILE_PATH}`;
-        
-        // "Fire-and-forget" - 我们执行它，但不等待它完成，以免阻塞 UI
-        exec(command).catch(e => {
-            // 如果日志记录本身失败，只在控制台报告，避免无限循环
-            console.log('WebUI logErrorToFile failed:', e);
-        });
-    } catch (e) {
-        console.log('WebUI logErrorToFile caught an exception:', e);
-    }
-}
-
-// 1. 重写 console.error
-const originalConsoleError = console.error;
-console.error = function(...args) {
-    // 仍然在开发者控制台打印错误
-    originalConsoleError.apply(console, args);
-    // 将错误信息格式化为字符串并写入文件
-    const errorMessage = args.map(arg => {
-        if (arg instanceof Error) {
-            return `${arg.message}\n${arg.stack}`;
-        }
-        try {
-            return JSON.stringify(arg);
-        } catch {
-            return String(arg);
-        }
-    }).join(' ');
-    logErrorToFile(`console.error: ${errorMessage}`);
-};
-
-// 2. 捕获未处理的同步错误
-window.onerror = function(message, source, lineno, colno, error) {
-    const fullMessage = `Uncaught Error: ${message} at ${source}:${lineno}:${colno}`;
-    logErrorToFile(error || fullMessage);
-    // 返回 true 以防止错误在控制台中重复显示
-    return true;
-};
-
-// 3. 捕获未处理的 Promise rejections
-window.addEventListener('unhandledrejection', function(event) {
-    logErrorToFile(event.reason || 'Unhandled promise rejection');
-});
-
-// --- 错误日志记录模块结束 ---
-
-
 document.addEventListener('DOMContentLoaded', async () => {
     // --- DOM 元素获取 ---
     const configForm = document.getElementById('config-form');
@@ -113,9 +34,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastChartData = { dirty: -1, free: -1 };
     let appNamesMap = new Map();
 
+    // --- 日志文件路径 ---
+    const WEBUI_LOG_FILE = '/data/adb/modules/Clean-C/webui.log';
+
     // --- 辅助函数 ---
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
+    /**
+     * 将消息记录到 webui.log 文件
+     * @param {string} level 日志级别 (e.g., "INFO", "WARN", "ERROR")
+     * @param {string} message 要记录的消息
+     */
+    async function logToWebuiFile(level, message) {
+        const timestamp = new Date().toISOString();
+        const logEntry = `[${timestamp}] [WEBUI-${level}] ${message}\n`;
+        // 使用 exec 执行 shell 命令将日志写入文件
+        try {
+            const { errno, stderr } = await exec(`echo "${logEntry.replace(/"/g, '\\"')}" >> ${WEBUI_LOG_FILE}`);
+            if (errno !== 0) {
+                console.error(`无法写入 webui.log: ${stderr}`);
+            }
+        } catch (error) {
+            console.error(`执行写入 webui.log 命令失败: ${error.message}`);
+        }
+    }
+    
+    // 覆盖默认的 console.error 和 console.warn，使其也记录到文件
+    const originalConsoleError = console.error;
+    console.error = function(...args) {
+        originalConsoleError(...args);
+        logToWebuiFile("ERROR", args.map(String).join(' '));
+    };
+
+    const originalConsoleWarn = console.warn;
+    console.warn = function(...args) {
+        originalConsoleWarn(...args);
+        logToWebuiFile("WARN", args.map(String).join(' '));
+    };
+
+    /**
+     * 通过执行 tcp_client 程序发送命令
+     * @param {string} command 要发送的命令名称
+     * @returns {Promise<object|null>} 如果有 JSON 响应则返回解析后的对象，否则返回 null
+     */
     async function sendTcpCommand(command) {
         try {
             const clientPath = '/data/adb/modules/Clean-C/bin/tcp_client';
@@ -124,37 +85,43 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (errno === 0) {
                 if (!stdout.trim()) {
-                    toast(`命令 '${command}' 成功，但无响应内容。`);
+                    toast(`命令 '${command}' 已发送，无响应内容。`);
+                    logToWebuiFile("INFO", `TCP Command '${command}' sent, no response content.`);
                     return { status: "ok", message: "no content" };
                 }
                 try {
-                    return JSON.parse(stdout.trim());
+                    const parsedResponse = JSON.parse(stdout.trim());
+                    logToWebuiFile("INFO", `TCP Command '${command}' response: ${stdout.trim()}`);
+                    return parsedResponse;
                 } catch (jsonError) {
-                    const error = new Error(`解析服务器响应失败: ${stdout.trim()}`);
-                    error.cause = jsonError;
-                    throw error;
+                    toast(`解析服务器响应失败: ${stdout.trim()}`);
+                    console.error(`解析服务器响应失败:`, jsonError, `原始响应: ${stdout.trim()}`);
+                    return null;
                 }
             } else {
-                throw new Error(`发送命令失败: ${stderr || '未知错误'}`);
+                toast(`发送命令失败: ${stderr || '未知错误'}`);
+                console.error(`TCP 命令发送失败: ${stderr}`);
+                return null;
             }
         } catch (error) {
-            logErrorToFile(error); // 记录执行或解析错误
-            toast(error.message);
+            toast(`执行命令发送程序失败: ${error.message}`);
+            console.error(`执行 tcp_client 失败: ${error.message}`);
             return null;
         }
     }
 
+    /**
+     * 通过 TCP 获取 GC 状态
+     * @returns {Promise<object|null>} 返回解析后的 GC 状态 JSON 对象，失败返回 null
+     */
     async function getGcStatusViaTcp() {
         const response = await sendTcpCommand('stats');
-        if (response && Array.isArray(response)) {
-            return response;
-        } else if (response && response.error) {
-            console.error("服务器返回错误:", response.error);
-            return null;
-        }
-        return response; // 可能为 null
+        return response;
     }
 
+    /**
+     * 加载并解析应用名称配置文件 list.config
+     */
     async function loadAppNamesConfig() {
         try {
             const { errno, stdout, stderr } = await exec('cat /data/media/0/Android/清理规则/list.config');
@@ -168,11 +135,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     }
                 });
+                logToWebuiFile("INFO", "App names config loaded successfully.");
             } else if (!stderr.includes('No such file or directory')) {
-                throw new Error(`加载 list.config 失败: ${stderr}`);
+                console.error("加载 list.config 失败:", stderr);
             }
         } catch (error) {
-            console.error(error); // 会被重写的 console.error 捕获并记录
+            console.error("加载 list.config 时发生异常:", error);
         }
     }
 
@@ -180,10 +148,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function getF2fsSegmentsInfoForChart() {
         try {
             const command = `
-                F2FS_DEVICES=$(ls /sys/fs/f2fs/ 2>/dev/null)
-                if [ -z "$F2FS_DEVICES" ]; then exit 1; fi
-                FIRST_DEVICE=$(echo "$F2FS_DEVICES" | head -n 1)
-                SYSFS_PATH="/sys/fs/f2fs/$FIRST_DEVICE"
+                DATA_DEVICE=$(getprop dev.mnt.dev.data)
+                if [ -z "$DATA_DEVICE" ]; then exit 1; fi
+                SYSFS_PATH="/sys/fs/f2fs/$DATA_DEVICE"
+                if [ ! -d "$SYSFS_PATH" ]; then SYSFS_PATH="/sys/fs/mifs/$DATA_DEVICE"; fi
                 if [ ! -d "$SYSFS_PATH" ]; then exit 1; fi
                 cat "$SYSFS_PATH/dirty_segments"
                 echo "---SPLIT---"
@@ -192,14 +160,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const { errno, stdout } = await exec(command);
             if (errno === 0) {
                 const parts = stdout.split('---SPLIT---');
+                logToWebuiFile("INFO", `F2FS segments info: dirty=${parts[0]?.trim()}, free=${parts[1]?.trim()}`);
                 return {
                     dirty_segments: parts[0]?.trim(),
                     free_segments: parts[1]?.trim(),
                 };
             }
         } catch (e) {
-            // 这是一个预期的、非关键的错误，只在控制台警告
-            console.warn("获取 F2FS 段信息失败:", e.message);
+            console.warn("获取 F2FS 段信息失败:", e);
         }
         return null;
     }
@@ -208,6 +176,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const { errno, stdout } = await exec(`mount | grep " /data " | awk '{print $5}'`);
             isExt4 = (errno !== 0 || stdout.trim() === 'ext4');
+            logToWebuiFile("INFO", `Filesystem check: isExt4=${isExt4}, mount_type=${stdout.trim()}`);
 
             if (isExt4) {
                 if (f2fsGcInfoContainer) f2fsGcInfoContainer.style.display = 'none';
@@ -220,22 +189,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (f2fsGcInfoContainer) f2fsGcInfoContainer.style.display = 'block';
                 if (f2fsGcConfigContainer) f2fsGcConfigContainer.style.display = 'block';
                 if (!gcInfoIntervalId) {
-                    gcInfoIntervalId = setInterval(updateAllF2fsInfo, 2000);
+                    gcInfoIntervalId = setInterval(updateAllF2fsInfo, 2000); // 2秒更新一次，避免过于频繁
                 }
             }
         } catch (error) {
             toast(`检查文件系统失败: ${error.message}`);
-            console.error(error);
+            console.error("检查文件系统失败:", error);
         }
     }
 
     async function updateAllF2fsInfo() {
         const segmentInfo = await getF2fsSegmentsInfoForChart();
-        const gcStatusArray = await getGcStatusViaTcp();
+        const statusInfo = await getGcStatusViaTcp();
+
         if (segmentInfo) {
             updateSegmentChart(segmentInfo);
         }
-        updateGcStatusAndControls(gcStatusArray);
+        updateGcStatusAndControls(statusInfo); // 总是更新，即使 statusInfo 为 null
     }
     
     function updateSegmentChart(info) {
@@ -250,68 +220,50 @@ document.addEventListener('DOMContentLoaded', async () => {
             segmentChart.update('none');
             lastChartData.dirty = dirty;
             lastChartData.free = free;
+            logToWebuiFile("INFO", `Segment chart updated: Dirty=${dirty}, Free=${free}`);
         }
     }
 
     function updateGcStatusAndControls(gcStatusArray) {
         if (isExt4) return;
 
-        gcStatusSpan.innerHTML = '';
-        gcControlButton.style.display = 'none';
-
         if (!gcStatusArray || !Array.isArray(gcStatusArray)) {
-            const p = document.createElement('p');
-            p.className = 'badge bg-danger';
-            p.textContent = '状态获取失败';
-            gcStatusSpan.appendChild(p);
+            gcStatusSpan.textContent = '状态\n错误';
+            gcStatusSpan.className = 'badge bg-danger';
+            gcControlButton.textContent = '状态未知';
+            gcControlButton.className = 'btn btn-sm btn-outline-secondary';
+            gcControlButton.dataset.action = 'unknown';
+            logToWebuiFile("WARN", "GC status update failed: No valid status array received.");
             return;
         }
-        if (gcStatusArray.length === 0) {
-            const p = document.createElement('p');
-            p.className = 'badge bg-secondary';
-            p.textContent = '未发现 F2FS 设备';
-            gcStatusSpan.appendChild(p);
-            return;
-        }
-        
-        let anyRunning = false;
-        gcStatusArray.forEach(deviceStatus => {
-            const container = document.createElement('div');
-            container.className = 'mb-2';
-            
-            let statusText = `<strong>${deviceStatus.device_name} (${deviceStatus.mount_point}):</strong> `;
-            let badgeClass = 'badge bg-secondary';
 
-            if (!deviceStatus.is_running) {
-                statusText += '关闭';
-            } else {
-                anyRunning = true;
-                const elapsed = deviceStatus.elapsed_seconds || 0;
-                const reclaimed = deviceStatus.reclaimed_segments || 0;
+        const gcStatus = gcStatusArray[0] || { is_running: false }; // 默认为非运行状态
+        logToWebuiFile("INFO", `GC status received: is_running=${gcStatus.is_running}, is_paused=${gcStatus.is_paused}`);
 
-                if (deviceStatus.is_paused) {
-                    const reason = deviceStatus.pause_reason || "未知";
-                    statusText += `暂停 (${reason})<br>已运行: ${elapsed}s | 已回收: ${reclaimed}`;
-                    badgeClass = 'badge bg-warning';
-                } else {
-                    statusText += `运行中<br>已运行: ${elapsed}s | 已回收: ${reclaimed}`;
-                    badgeClass = 'badge bg-success';
-                }
-            }
-            
-            container.innerHTML = `<span class="${badgeClass}">${statusText}</span>`;
-            gcStatusSpan.appendChild(container);
-        });
-
-        gcControlButton.style.display = 'inline-block';
-        if (anyRunning) {
-            gcControlButton.textContent = '全部停止';
-            gcControlButton.className = 'btn btn-sm btn-danger';
-            gcControlButton.dataset.action = 'stop';
-        } else {
-            gcControlButton.textContent = '全部开始';
+        if (!gcStatus.is_running) {
+            gcStatusSpan.textContent = 'GC回收\n关闭';
+            gcStatusSpan.className = 'badge bg-secondary';
+            gcControlButton.textContent = '开始';
             gcControlButton.className = 'btn btn-sm btn-success';
             gcControlButton.dataset.action = 'start';
+        } else {
+            const elapsed = gcStatus.elapsed_seconds || 0;
+            const reclaimed = gcStatus.reclaimed_segments || 0;
+
+            if (gcStatus.is_paused) {
+                const reason = gcStatus.pause_reason || "未知";
+                gcStatusSpan.innerHTML = `GC回收: 暂停<br>原因: ${reason}<br>已运行: ${elapsed}s | 已回收: ${reclaimed}`;
+                gcStatusSpan.className = 'badge bg-warning';
+                gcControlButton.textContent = '停止';
+                gcControlButton.className = 'btn btn-sm btn-danger';
+                gcControlButton.dataset.action = 'stop';
+            } else {
+                gcStatusSpan.innerHTML = `GC回收: 运行中<br>已运行: ${elapsed}s | 已回收: ${reclaimed}`;
+                gcStatusSpan.className = 'badge bg-success';
+                gcControlButton.textContent = '停止';
+                gcControlButton.className = 'btn btn-sm btn-danger';
+                gcControlButton.dataset.action = 'stop';
+            }
         }
     }
 
@@ -323,6 +275,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const f2fsGcEnabled = f2fsGcConfigToggle.checked ? 'y' : 'n';
         await saveConfigFile(retentionDays, cleanInterval, f2fsGcEnabled);
         toast('配置已保存，请重启模块以应用所有更改。');
+        logToWebuiFile("INFO", `Config saved: Days=${retentionDays}, Interval=${cleanInterval}, F2FS_GC=${f2fsGcEnabled}`);
     });
 
     async function loadConfigFile() {
@@ -335,12 +288,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const f2fsGcValue = config['f2fs-GC'] || 'n';
                 f2fsGcConfigToggle.checked = f2fsGcValue === 'y';
                 updateGcConfigToggleLabel(f2fsGcConfigToggle.checked);
+                logToWebuiFile("INFO", "Config file loaded successfully.");
             } else {
-                throw new Error(stderr);
+                toast(`错误: ${stderr}`);
+                console.error(`加载配置文件失败: ${stderr}`);
             }
         } catch (error) {
             toast(`加载配置失败: ${error.message}`);
-            console.error(error);
+            console.error("加载配置失败:", error);
         }
     }
 
@@ -362,7 +317,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (errno === 0) {
                 lines = stdout.split('\n');
             } else if (!stderr.includes('No such file or directory')) {
-                throw new Error(`读取配置文件失败: ${stderr}`);
+                toast(`读取配置文件失败: ${stderr}`);
+                console.error(`读取配置文件失败: ${stderr}`);
+                return;
             }
 
             let hasRetention = false, hasInterval = false, hasF2fsGc = false;
@@ -380,11 +337,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const command = `printf "%s" "${updatedConfig.replace(/"/g, '\\"')}" > /data/media/0/Android/清理规则/配置.txt`;
             const { errno: writeErrno, stderr: writeStderr } = await exec(command);
             if (writeErrno !== 0) {
-                throw new Error(`写入配置文件失败: ${writeStderr}`);
+                toast(`错误: ${writeStderr}`);
+                console.error(`保存配置文件失败: ${writeStderr}`);
+            } else {
+                logToWebuiFile("INFO", "Config file saved successfully.");
             }
         } catch (error) {
             toast(`保存配置失败: ${error.message}`);
-            console.error(error);
+            console.error("保存配置失败:", error);
         }
     }
 
@@ -402,6 +362,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     f2fsGcConfigToggle.addEventListener('change', () => {
         updateGcConfigToggleLabel(f2fsGcConfigToggle.checked);
+        logToWebuiFile("INFO", `F2FS GC toggle changed to: ${f2fsGcConfigToggle.checked}`);
     });
 
     // --- 图表初始化与更新 ---
@@ -416,7 +377,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-            tooltip: { enabled: true },
         },
     });
 
@@ -433,32 +393,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 { label: '已删除目录数', data: [], backgroundColor: 'rgba(54, 162, 235, 0.2)', borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1 },
             ],
         },
-        options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { position: 'bottom' } } },
+        options: { scales: { y: { beginAtZero: true } } },
     });
-
-    function updateChartTheme(isDarkMode) {
-        const textColor = isDarkMode ? '#f8f9fa' : '#2A2A2A';
-        const bgColor = isDarkMode ? 'rgba(51, 51, 51, 0.8)' : 'rgba(248, 249, 250, 0.8)';
-        
-        segmentChart.data.datasets[0].borderColor = isDarkMode ? '#2A2A2A' : '#f8f9fa';
-        segmentChart.options.plugins.tooltip.backgroundColor = bgColor;
-        segmentChart.options.plugins.tooltip.titleColor = textColor;
-        segmentChart.options.plugins.tooltip.bodyColor = textColor;
-        segmentChart.update('none'); 
-
-        barChart.options.scales.y.ticks.color = textColor;
-        barChart.options.scales.x.ticks.color = textColor;
-        barChart.options.plugins.legend.labels.color = textColor;
-        barChart.options.plugins.tooltip.backgroundColor = bgColor;
-        barChart.options.plugins.tooltip.titleColor = textColor;
-        barChart.options.plugins.tooltip.bodyColor = textColor;
-        barChart.update('none');
-    }
-
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-        updateChartTheme(e.matches);
-    });
-    updateChartTheme(isDarkMode);
 
     // --- 日期选择器和日志数据处理 ---
     async function initDatePicker() {
@@ -473,9 +409,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             dateSelect.max = formatDate(today);
             dateSelect.value = formatDate(today);
             dateSelect.addEventListener('change', updateDisplaysForSelectedDate);
+            logToWebuiFile("INFO", "Date picker initialized.");
         } catch (error) {
             toast(`初始化日期选择器失败: ${error.message}`);
-            console.error(error);
+            console.error("初始化日期选择器失败:", error);
         }
     }
 
@@ -485,12 +422,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (errno === 0 && stdout.trim() !== '') {
                 const parsedData = parseLogContent(stdout);
                 updateLocalStorage(parsedData);
+                logToWebuiFile("INFO", "Stats JSON log file loaded and parsed successfully.");
             } else if (errno !== 0 && !stderr.includes('No such file or directory')) {
                 throw new Error(`读取统计文件失败: ${stderr}`);
+            } else {
+                logToWebuiFile("INFO", "Stats JSON log file is empty or does not exist.");
             }
         } catch (error) {
             toast(`加载统计数据失败: ${error.message}`);
-            console.error(error);
+            console.error("加载统计数据失败:", error);
         }
         updateDisplaysForSelectedDate();
     }
@@ -567,6 +507,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         barChart.data.datasets[3].data = dates.map(date => aggregatedData[date].deletedFiles);
         barChart.data.datasets[4].data = dates.map(date => aggregatedData[date].deletedDirs);
         barChart.update('none');
+        logToWebuiFile("INFO", "Bar chart updated.");
     }
 
     function updateDisplaysForSelectedDate() {
@@ -575,6 +516,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         appStatsTitle.textContent = `应用清理详情 (${selectedDate})`;
         const aggregatedData = aggregateAppStatsForDate(selectedDate);
         updateAppStatsList(aggregatedData);
+        logToWebuiFile("INFO", `Display updated for selected date: ${selectedDate}`);
     }
 
     // --- 事件监听器 ---
@@ -582,12 +524,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         clearStoredData();
         updateDisplaysForSelectedDate();
         toast('数据已清除');
+        logToWebuiFile("INFO", "Local storage data cleared.");
     });
 
     gcControlButton.addEventListener('click', async () => {
         const action = gcControlButton.dataset.action;
         if (action === 'unknown') {
             toast('无法确定GC状态，请刷新。');
+            logToWebuiFile("WARN", "GC Control Button clicked but status is unknown.");
             return;
         }
 
@@ -597,14 +541,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const command = action === 'start' ? 'start_gc' : 'stop_gc';
         await sendTcpCommand(command);
 
-        await delay(1500);
+        await delay(1500); // 延时等待服务状态更新
         gcControlButton.disabled = false;
         await updateAllF2fsInfo();
+        logToWebuiFile("INFO", `GC control action: ${action} executed.`);
     });
 
     cleanNowBtn.addEventListener('click', async () => {
         toast('正在请求立即清理...');
         await sendTcpCommand('clean_now');
+        logToWebuiFile("INFO", "Manual clean_now command sent.");
     });
 
     const editRuleFile = async (fileName) => {
@@ -613,9 +559,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const { errno, stderr } = await exec(`am start -a android.intent.action.VIEW -d file://${filePath} -t text/plain`);
             if (errno !== 0) throw new Error(`编辑文件失败: ${stderr}`);
             toast(`尝试打开文件: ${fileName}`);
+            logToWebuiFile("INFO", `Attempted to open rule file: ${fileName}`);
         } catch (error) {
             toast(`编辑文件失败: ${error.message}`);
-            console.error(error);
+            console.error(`编辑文件失败: ${error.message}`);
         }
     };
     editBlacklist1Btn.addEventListener('click', () => editRuleFile('blacklist1.txt'));
@@ -628,17 +575,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             await updateAllF2fsInfo();
         }
         toast('数据已刷新');
+        logToWebuiFile("INFO", "Data refreshed via button.");
     });
 
     deleteLogBtn.addEventListener('click', async () => {
         try {
-            const { errno, stderr } = await exec('rm -f /data/adb/modules/Clean-C/stats.json /data/adb/modules/Clean-C/run.log /data/adb/modules/Clean-C/run.log.old /data/adb/modules/Clean-C/app-clean.log');
+            const { errno, stderr } = await exec('rm -f /data/adb/modules/Clean-C/run.log /data/adb/modules/Clean-C/stats.json');
             if (errno !== 0) throw new Error(`删除日志失败: ${stderr}`);
-            await loadLogFile();
+            clearStoredData(); // 清除本地存储的日志数据
+            await loadLogFile(); // 重新加载（现在应该是空的）
             toast('日志文件已删除');
+            logToWebuiFile("INFO", "Log files (run.log, stats.json) deleted.");
         } catch (error) {
             toast(`删除日志失败: ${error.message}`);
-            console.error(error);
+            console.error(`删除日志失败: ${error.message}`);
         }
     });
 
@@ -647,16 +597,28 @@ document.addEventListener('DOMContentLoaded', async () => {
             const { errno, stderr } = await exec('sh /data/adb/modules/Clean-C/rest.sh');
             if (errno === 0) {
                 toast('模块已重启');
+                logToWebuiFile("INFO", "Module restart script executed successfully.");
+                // 重启后可能需要重新加载所有信息，但延迟一下，等待服务启动
+                await delay(3000); // 等待3秒让cleaner服务有时间启动
+                await updateAllF2fsInfo();
             } else {
-                throw new Error(`重启模块失败: ${stderr || '未知错误'}`);
+                toast(`重启模块失败: ${stderr || '未知错误'}`);
+                console.error(`重启模块失败: ${stderr || '未知错误'}`);
             }
         } catch (error) {
             toast(`模块重启失败: ${error.message}`);
-            console.error(error);
+            console.error(`模块重启失败: ${error.message}`);
         }
     });
 
+    // --- 捕获未处理的 Promise 拒绝，记录到文件 ---
+    window.addEventListener('unhandledrejection', (event) => {
+        console.error("Unhandled Promise Rejection:", event.reason);
+        event.preventDefault(); // 防止默认的错误处理 (通常是打印到控制台)
+    });
+
     // --- 页面初始化 ---
+    logToWebuiFile("INFO", "WebUI script started.");
     await checkFileSystem();
     await initDatePicker();
     await loadConfigFile();
@@ -665,4 +627,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!isExt4) {
         await updateAllF2fsInfo();
     }
+    logToWebuiFile("INFO", "WebUI initialization complete.");
 });

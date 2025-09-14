@@ -14,10 +14,9 @@ import { parseLogContent, updateLocalStorage, getStoredData, clearStoredData } f
 import 'mdb-ui-kit/js/mdb.es.min.js';
 import Chart from 'chart.js/auto';
 import VConsole from 'vconsole';
-
 const vConsole = new VConsole();
 initMDB({ Ripple });
-document.addEventListener('DOMContentLoaded'， async () => {
+document.addEventListener('DOMContentLoaded', async () => { // 修复：将全角逗号 “，” 更改为半角逗号 “,”
     // --- DOM 元素获取 ---
     const configForm = document.getElementById('config-form');
     const retentionDaysInput = document.getElementById('retention-days');
@@ -132,7 +131,7 @@ document.addEventListener('DOMContentLoaded'， async () => {
                 echo "---SPLIT---"
                 cat "$SYSFS_PATH/free_segments"
             `;
-            const { errno, stdout } = await exec(command);
+            const { errno, stdout, stderr } = await exec(command); // 获取 stderr
             if (errno === 0) {
                 const parts = stdout.split('---SPLIT---');
                 return {
@@ -140,7 +139,7 @@ document.addEventListener('DOMContentLoaded'， async () => {
                     free_segments: parts[1]?.trim(),
                 };
             } else {
-                console.warn(`Failed to get F2FS segment info (exec errno: ${errno}): ${stdout.trim() || 'No output'} ${stderr.trim() || 'No stderr'}`); // 添加 console 输出
+                console.warn(`Failed to get F2FS segment info (exec errno: ${errno}): ${stdout.trim() || 'No output'} ${stderr.trim() || 'No stderr'}`); // 添加 console 输出，包含 stderr
             }
         } catch (e) {
             console.warn("An exception occurred while getting F2FS segment info:", e); // 添加 console 输出

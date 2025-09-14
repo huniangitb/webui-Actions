@@ -519,4 +519,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     deleteLogBtn.addEventListener('click', async () => {
         try {
             const { errno, stderr } = await exec('rm -f /data/adb/modules/Clean-C/run.log /data/adb/modules/Clean-C/stats.json');
-            if (errno !== 0) throw new Error(`删除日志失败: ${std
+            if (errno !== 0) throw new Error(`删除日志失败: ${stderr}`);
+            await loadLogFile();
+            toast('日志文件已删除');
+        } catch (error) {
+            toast(`删除日志失败: ${error.message}`);
+        }
+    });
+
+    restartModuleBtn.addEventListener('click', async () => {
+        try {
+            const { errno, stderr } = await exec('sh /data/adb/modules/Clean-C/rest.sh');
+            if (errno === 0) {
+                toast('模块已重启');
+            } else {
+                toast(`重启模块失败: ${stderr || '未知错误'}`);
+            }
+        } catch (error) {
+            toast(`模块重启失败: ${error.message}`);
+        }
+    });
+
+    // --- 页面初始化 ---
+    await checkFileSystem();
+    await initDatePicker();
+    await loadConfigFile();
+    await loadAppNamesConfig();
+    await loadLogFile();
+    if (!isExt4) {
+        await updateAllF2fsInfo();
+    }
+});

@@ -17,7 +17,7 @@ import VConsole from 'vconsole';
 
 const vConsole = new VConsole();
 initMDB({ Ripple });
-document。addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded'， async () => {
     // --- DOM 元素获取 ---
     const configForm = document.getElementById('config-form');
     const retentionDaysInput = document.getElementById('retention-days');

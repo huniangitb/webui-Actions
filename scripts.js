@@ -1,10 +1,19 @@
+// scripts.js
+
+// 重要提示：为了让涟漪效果 (Ripple) 正常工作，
+// 你的 PostCSS/PurgeCSS 配置 (.postcssrc.js) 必须将相关样式加入安全列表。
+// 示例:
+// safelist: {
+//   greedy: [/^ripple/],
+//   keyframes: ['ripple-wave'],
+// }
 
 import { exec, toast } from 'kernelsu';
 import { parseLogContent, updateLocalStorage, getStoredData, clearStoredData } from './logParser.js';
 // MDB 会通过 data-* 属性自动初始化，我们只需要导入模块即可。
 import 'mdb-ui-kit/js/mdb.es.min.js';
 import Chart from 'chart.js/auto';
-initMDB({ Ripple });
+
 document.addEventListener('DOMContentLoaded', async () => {
     // --- DOM 元素获取 ---
     const configForm = document.getElementById('config-form');
@@ -34,43 +43,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastChartData = { dirty: -1, free: -1 };
     let appNamesMap = new Map();
 
-    // --- 日志文件路径 ---
-    const WEBUI_LOG_FILE = '/data/adb/modules/Clean-C/webui.log';
-
     // --- 辅助函数 ---
     const delay = ms => new Promise(res => setTimeout(res, ms));
-
-    /**
-     * 将消息记录到 webui.log 文件
-     * @param {string} level 日志级别 (e.g., "INFO", "WARN", "ERROR")
-     * @param {string} message 要记录的消息
-     */
-    async function logToWebuiFile(level, message) {
-        const timestamp = new Date().toISOString();
-        const logEntry = `[${timestamp}] [WEBUI-${level}] ${message}\n`;
-        // 使用 exec 执行 shell 命令将日志写入文件
-        try {
-            const { errno, stderr } = await exec(`echo "${logEntry.replace(/"/g, '\\"')}" >> ${WEBUI_LOG_FILE}`);
-            if (errno !== 0) {
-                console.error(`无法写入 webui.log: ${stderr}`);
-            }
-        } catch (error) {
-            console.error(`执行写入 webui.log 命令失败: ${error.message}`);
-        }
-    }
-    
-    // 覆盖默认的 console.error 和 console.warn，使其也记录到文件
-    const originalConsoleError = console.error;
-    console.error = function(...args) {
-        originalConsoleError(...args);
-        logToWebuiFile("ERROR", args.map(String).join(' '));
-    };
-
-    const originalConsoleWarn = console.warn;
-    console.warn = function(...args) {
-        originalConsoleWarn(...args);
-        logToWebuiFile("WARN", args.map(String).join(' '));
-    };
 
     /**
      * 通过执行 tcp_client 程序发送命令
@@ -85,27 +59,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (errno === 0) {
                 if (!stdout.trim()) {
+                    console.warn(`TCP Command '${command}' sent, but received no response content.`); // 添加 console 输出
                     toast(`命令 '${command}' 已发送，无响应内容。`);
-                    logToWebuiFile("INFO", `TCP Command '${command}' sent, no response content.`);
                     return { status: "ok", message: "no content" };
                 }
                 try {
-                    const parsedResponse = JSON.parse(stdout.trim());
-                    logToWebuiFile("INFO", `TCP Command '${command}' response: ${stdout.trim()}`);
-                    return parsedResponse;
+                    return JSON.parse(stdout.trim());
                 } catch (jsonError) {
+                    console.error(`Failed to parse TCP server response for command '${command}':`, jsonError, `Original response: ${stdout.trim()}`); // 添加 console 输出
                     toast(`解析服务器响应失败: ${stdout.trim()}`);
-                    console.error(`解析服务器响应失败:`, jsonError, `原始响应: ${stdout.trim()}`);
                     return null;
                 }
             } else {
+                console.error(`TCP Command '${command}' failed with error code ${errno}: ${stderr || 'Unknown error'}`); // 添加 console 输出
                 toast(`发送命令失败: ${stderr || '未知错误'}`);
-                console.error(`TCP 命令发送失败: ${stderr}`);
                 return null;
             }
         } catch (error) {
+            console.error(`Execution of tcp_client failed for command '${command}':`, error.message); // 添加 console 输出
             toast(`执行命令发送程序失败: ${error.message}`);
-            console.error(`执行 tcp_client 失败: ${error.message}`);
             return null;
         }
     }
@@ -115,7 +87,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {Promise<object|null>} 返回解析后的 GC 状态 JSON 对象，失败返回 null
      */
     async function getGcStatusViaTcp() {
-        const response = await sendTcpCommand('stats');
+        const response = await sendTcpCommand('stats'); // 统一使用 'stats' 命令
         return response;
     }
 
@@ -125,6 +97,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function loadAppNamesConfig() {
         try {
             const { errno, stdout, stderr } = await exec('cat /data/media/0/Android/清理规则/list.config');
+            if (errno !== 0 && !stderr.includes('No such file or directory')) { // 仅在非文件不存在的错误时打印
+                console.error("Failed to load list.config:", stderr); // 添加 console 输出
+            }
             if (errno === 0) {
                 const lines = stdout.split('\n');
                 lines.forEach(line => {
@@ -135,12 +110,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     }
                 });
-                logToWebuiFile("INFO", "App names config loaded successfully.");
-            } else if (!stderr.includes('No such file or directory')) {
-                console.error("加载 list.config 失败:", stderr);
             }
         } catch (error) {
-            console.error("加载 list.config 时发生异常:", error);
+            console.error("An exception occurred while loading list.config:", error); // 添加 console 输出
         }
     }
 
@@ -160,23 +132,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             const { errno, stdout } = await exec(command);
             if (errno === 0) {
                 const parts = stdout.split('---SPLIT---');
-                logToWebuiFile("INFO", `F2FS segments info: dirty=${parts[0]?.trim()}, free=${parts[1]?.trim()}`);
                 return {
                     dirty_segments: parts[0]?.trim(),
                     free_segments: parts[1]?.trim(),
                 };
+            } else {
+                console.warn(`Failed to get F2FS segment info (exec errno: ${errno}): ${stdout.trim() || 'No output'} ${stderr.trim() || 'No stderr'}`); // 添加 console 输出
             }
         } catch (e) {
-            console.warn("获取 F2FS 段信息失败:", e);
+            console.warn("An exception occurred while getting F2FS segment info:", e); // 添加 console 输出
         }
         return null;
     }
 
     async function checkFileSystem() {
         try {
-            const { errno, stdout } = await exec(`mount | grep " /data " | awk '{print $5}'`);
+            const { errno, stdout, stderr } = await exec(`mount | grep " /data " | awk '{print $5}'`);
             isExt4 = (errno !== 0 || stdout.trim() === 'ext4');
-            logToWebuiFile("INFO", `Filesystem check: isExt4=${isExt4}, mount_type=${stdout.trim()}`);
 
             if (isExt4) {
                 if (f2fsGcInfoContainer) f2fsGcInfoContainer.style.display = 'none';
@@ -193,8 +165,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
         } catch (error) {
+            console.error("Failed to check file system:", error); // 添加 console 输出
             toast(`检查文件系统失败: ${error.message}`);
-            console.error("检查文件系统失败:", error);
         }
     }
 
@@ -220,7 +192,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             segmentChart.update('none');
             lastChartData.dirty = dirty;
             lastChartData.free = free;
-            logToWebuiFile("INFO", `Segment chart updated: Dirty=${dirty}, Free=${free}`);
         }
     }
 
@@ -228,17 +199,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (isExt4) return;
 
         if (!gcStatusArray || !Array.isArray(gcStatusArray)) {
+            console.error("Invalid GC status data received:", gcStatusArray); // 添加 console 输出
             gcStatusSpan.textContent = '状态\n错误';
             gcStatusSpan.className = 'badge bg-danger';
             gcControlButton.textContent = '状态未知';
             gcControlButton.className = 'btn btn-sm btn-outline-secondary';
             gcControlButton.dataset.action = 'unknown';
-            logToWebuiFile("WARN", "GC status update failed: No valid status array received.");
             return;
         }
 
-        const gcStatus = gcStatusArray[0] || { is_running: false }; // 默认为非运行状态
-        logToWebuiFile("INFO", `GC status received: is_running=${gcStatus.is_running}, is_paused=${gcStatus.is_paused}`);
+        // 即使数组为空，也显示为关闭状态
+        const gcStatus = gcStatusArray[0] || { is_running: false };
 
         if (!gcStatus.is_running) {
             gcStatusSpan.textContent = 'GC回收\n关闭';
@@ -273,9 +244,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const retentionDays = retentionDaysInput.value;
         const cleanInterval = cleanIntervalInput.value;
         const f2fsGcEnabled = f2fsGcConfigToggle.checked ? 'y' : 'n';
-        await saveConfigFile(retentionDays, cleanInterval, f2fsGcEnabled);
-        toast('配置已保存，请重启模块以应用所有更改。');
-        logToWebuiFile("INFO", `Config saved: Days=${retentionDays}, Interval=${cleanInterval}, F2FS_GC=${f2fsGcEnabled}`);
+        try {
+            await saveConfigFile(retentionDays, cleanInterval, f2fsGcEnabled);
+            toast('配置已保存，请重启模块以应用所有更改。');
+        } catch (error) {
+            console.error("Failed to save config file:", error); // 添加 console 输出
+            toast(`保存配置失败: ${error.message}`);
+        }
     });
 
     async function loadConfigFile() {
@@ -288,14 +263,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const f2fsGcValue = config['f2fs-GC'] || 'n';
                 f2fsGcConfigToggle.checked = f2fsGcValue === 'y';
                 updateGcConfigToggleLabel(f2fsGcConfigToggle.checked);
-                logToWebuiFile("INFO", "Config file loaded successfully.");
-            } else {
+            } else if (!stderr.includes('No such file or directory')) { // 仅在非文件不存在的错误时打印
+                console.error("Failed to load config file (exec errno):", stderr); // 添加 console 输出
                 toast(`错误: ${stderr}`);
-                console.error(`加载配置文件失败: ${stderr}`);
             }
         } catch (error) {
+            console.error("Failed to load config file (exception):", error); // 添加 console 输出
             toast(`加载配置失败: ${error.message}`);
-            console.error("加载配置失败:", error);
         }
     }
 
@@ -317,9 +291,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (errno === 0) {
                 lines = stdout.split('\n');
             } else if (!stderr.includes('No such file or directory')) {
+                console.error("Failed to read config file for saving (exec errno):", stderr); // 添加 console 输出
                 toast(`读取配置文件失败: ${stderr}`);
-                console.error(`读取配置文件失败: ${stderr}`);
-                return;
+                throw new Error(`读取配置文件失败: ${stderr}`); // 抛出错误以便上层捕获
             }
 
             let hasRetention = false, hasInterval = false, hasF2fsGc = false;
@@ -337,14 +311,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             const command = `printf "%s" "${updatedConfig.replace(/"/g, '\\"')}" > /data/media/0/Android/清理规则/配置.txt`;
             const { errno: writeErrno, stderr: writeStderr } = await exec(command);
             if (writeErrno !== 0) {
+                console.error("Failed to write config file:", writeStderr); // 添加 console 输出
                 toast(`错误: ${writeStderr}`);
-                console.error(`保存配置文件失败: ${writeStderr}`);
-            } else {
-                logToWebuiFile("INFO", "Config file saved successfully.");
+                throw new Error(`写入配置文件失败: ${writeStderr}`); // 抛出错误以便上层捕获
             }
         } catch (error) {
-            toast(`保存配置失败: ${error.message}`);
-            console.error("保存配置失败:", error);
+            console.error("An exception occurred while saving config file:", error); // 添加 console 输出
+            throw error; // 重新抛出异常
         }
     }
 
@@ -362,7 +335,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     f2fsGcConfigToggle.addEventListener('change', () => {
         updateGcConfigToggleLabel(f2fsGcConfigToggle.checked);
-        logToWebuiFile("INFO", `F2FS GC toggle changed to: ${f2fsGcConfigToggle.checked}`);
     });
 
     // --- 图表初始化与更新 ---
@@ -399,8 +371,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- 日期选择器和日志数据处理 ---
     async function initDatePicker() {
         try {
-            const { errno, stdout } = await exec('date +"%F"');
-            if (errno !== 0) throw new Error('无法获取当前日期');
+            const { errno, stdout, stderr } = await exec('date +"%F"');
+            if (errno !== 0) {
+                console.error("Failed to get current date (exec errno):", stderr); // 添加 console 输出
+                throw new Error('无法获取当前日期');
+            }
             const today = new Date(stdout.trim());
             const sixDaysAgo = new Date(today);
             sixDaysAgo.setDate(today.getDate() - 6);
@@ -409,10 +384,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             dateSelect.max = formatDate(today);
             dateSelect.value = formatDate(today);
             dateSelect.addEventListener('change', updateDisplaysForSelectedDate);
-            logToWebuiFile("INFO", "Date picker initialized.");
         } catch (error) {
+            console.error("Failed to initialize date picker:", error); // 添加 console 输出
             toast(`初始化日期选择器失败: ${error.message}`);
-            console.error("初始化日期选择器失败:", error);
         }
     }
 
@@ -422,15 +396,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (errno === 0 && stdout.trim() !== '') {
                 const parsedData = parseLogContent(stdout);
                 updateLocalStorage(parsedData);
-                logToWebuiFile("INFO", "Stats JSON log file loaded and parsed successfully.");
             } else if (errno !== 0 && !stderr.includes('No such file or directory')) {
+                console.error("Failed to read stats.json (exec errno):", stderr); // 添加 console 输出
                 throw new Error(`读取统计文件失败: ${stderr}`);
-            } else {
-                logToWebuiFile("INFO", "Stats JSON log file is empty or does not exist.");
             }
         } catch (error) {
+            console.error("Failed to load statistics data (exception):", error); // 添加 console 输出
             toast(`加载统计数据失败: ${error.message}`);
-            console.error("加载统计数据失败:", error);
         }
         updateDisplaysForSelectedDate();
     }
@@ -507,7 +479,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         barChart.data.datasets[3].data = dates.map(date => aggregatedData[date].deletedFiles);
         barChart.data.datasets[4].data = dates.map(date => aggregatedData[date].deletedDirs);
         barChart.update('none');
-        logToWebuiFile("INFO", "Bar chart updated.");
     }
 
     function updateDisplaysForSelectedDate() {
@@ -516,7 +487,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         appStatsTitle.textContent = `应用清理详情 (${selectedDate})`;
         const aggregatedData = aggregateAppStatsForDate(selectedDate);
         updateAppStatsList(aggregatedData);
-        logToWebuiFile("INFO", `Display updated for selected date: ${selectedDate}`);
     }
 
     // --- 事件监听器 ---
@@ -524,14 +494,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         clearStoredData();
         updateDisplaysForSelectedDate();
         toast('数据已清除');
-        logToWebuiFile("INFO", "Local storage data cleared.");
     });
 
     gcControlButton.addEventListener('click', async () => {
         const action = gcControlButton.dataset.action;
         if (action === 'unknown') {
+            console.warn("GC control button clicked with unknown action."); // 添加 console 输出
             toast('无法确定GC状态，请刷新。');
-            logToWebuiFile("WARN", "GC Control Button clicked but status is unknown.");
             return;
         }
 
@@ -539,30 +508,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         gcControlButton.textContent = '...';
 
         const command = action === 'start' ? 'start_gc' : 'stop_gc';
+        // sendTcpCommand 内部已处理 console.error
         await sendTcpCommand(command);
 
-        await delay(1500); // 延时等待服务状态更新
+        await delay(1500); // 增加延迟，给服务器处理时间
         gcControlButton.disabled = false;
         await updateAllF2fsInfo();
-        logToWebuiFile("INFO", `GC control action: ${action} executed.`);
     });
 
     cleanNowBtn.addEventListener('click', async () => {
         toast('正在请求立即清理...');
+        // sendTcpCommand 内部已处理 console.error
         await sendTcpCommand('clean_now');
-        logToWebuiFile("INFO", "Manual clean_now command sent.");
     });
 
     const editRuleFile = async (fileName) => {
         try {
             const filePath = `/data/media/0/Android/清理规则/${fileName}`;
             const { errno, stderr } = await exec(`am start -a android.intent.action.VIEW -d file://${filePath} -t text/plain`);
-            if (errno !== 0) throw new Error(`编辑文件失败: ${stderr}`);
+            if (errno !== 0) {
+                console.error(`Failed to edit file '${fileName}' (exec errno):`, stderr); // 添加 console 输出
+                throw new Error(`编辑文件失败: ${stderr}`);
+            }
             toast(`尝试打开文件: ${fileName}`);
-            logToWebuiFile("INFO", `Attempted to open rule file: ${fileName}`);
         } catch (error) {
+            console.error(`Failed to edit file '${fileName}' (exception):`, error); // 添加 console 输出
             toast(`编辑文件失败: ${error.message}`);
-            console.error(`编辑文件失败: ${error.message}`);
         }
     };
     editBlacklist1Btn.addEventListener('click', () => editRuleFile('blacklist1.txt'));
@@ -575,20 +546,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             await updateAllF2fsInfo();
         }
         toast('数据已刷新');
-        logToWebuiFile("INFO", "Data refreshed via button.");
     });
 
     deleteLogBtn.addEventListener('click', async () => {
         try {
             const { errno, stderr } = await exec('rm -f /data/adb/modules/Clean-C/run.log /data/adb/modules/Clean-C/stats.json');
-            if (errno !== 0) throw new Error(`删除日志失败: ${stderr}`);
-            clearStoredData(); // 清除本地存储的日志数据
-            await loadLogFile(); // 重新加载（现在应该是空的）
+            if (errno !== 0) {
+                console.error("Failed to delete log files (exec errno):", stderr); // 添加 console 输出
+                throw new Error(`删除日志失败: ${stderr}`);
+            }
+            await loadLogFile(); // 重新加载以反映删除后的状态
             toast('日志文件已删除');
-            logToWebuiFile("INFO", "Log files (run.log, stats.json) deleted.");
         } catch (error) {
+            console.error("Failed to delete log files (exception):", error); // 添加 console 输出
             toast(`删除日志失败: ${error.message}`);
-            console.error(`删除日志失败: ${error.message}`);
         }
     });
 
@@ -597,28 +568,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             const { errno, stderr } = await exec('sh /data/adb/modules/Clean-C/rest.sh');
             if (errno === 0) {
                 toast('模块已重启');
-                logToWebuiFile("INFO", "Module restart script executed successfully.");
-                // 重启后可能需要重新加载所有信息，但延迟一下，等待服务启动
-                await delay(3000); // 等待3秒让cleaner服务有时间启动
-                await updateAllF2fsInfo();
             } else {
+                console.error("Failed to restart module (exec errno):", stderr); // 添加 console 输出
                 toast(`重启模块失败: ${stderr || '未知错误'}`);
-                console.error(`重启模块失败: ${stderr || '未知错误'}`);
             }
         } catch (error) {
+            console.error("An exception occurred while restarting module:", error); // 添加 console 输出
             toast(`模块重启失败: ${error.message}`);
-            console.error(`模块重启失败: ${error.message}`);
         }
     });
 
-    // --- 捕获未处理的 Promise 拒绝，记录到文件 ---
-    window.addEventListener('unhandledrejection', (event) => {
-        console.error("Unhandled Promise Rejection:", event.reason);
-        event.preventDefault(); // 防止默认的错误处理 (通常是打印到控制台)
-    });
-
     // --- 页面初始化 ---
-    logToWebuiFile("INFO", "WebUI script started.");
     await checkFileSystem();
     await initDatePicker();
     await loadConfigFile();
@@ -627,5 +587,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!isExt4) {
         await updateAllF2fsInfo();
     }
-    logToWebuiFile("INFO", "WebUI initialization complete.");
 });

@@ -1,0 +1,107 @@
+// 1. 完整引入 MDB 的所有样式
+@import 'mdb-ui-kit/src/scss/mdb.free.scss';
+
+// --- 全局和基础设置 ---
+body {
+  background-color: #F2F2F2;
+  font-size: 1rem;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+h1 {
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.card {
+  border-radius: 15px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1.5rem;
+}
+
+.card-header h5 {
+  font-size: 1.25rem;
+}
+
+// --- 按钮组和布局修复 ---
+.btn {
+  white-space: normal;
+  line-height: 1.2;
+  text-align: center;
+}
+
+// 开机自动GC按钮尺寸修复
+#f2fs-gc-config-toggle-label {
+  width: 85px;
+  box-sizing: border-box;
+  text-align: center;
+  transition: all 0.2s ease-in-out;
+}
+
+// --- 图表和列表样式 ---
+#gc-status {
+  white-space: normal;
+  line-height: 1.2;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+#app-stats-title {
+  font-size: 1rem;
+}
+
+.app-stats-list-wrapper {
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid rgba(0, 0, 0, 0.125);
+    border-radius: .25rem;
+}
+
+.list-group-item {
+  font-size: 0.8rem;
+}
+
+// --- 深色模式样式 ---
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #1e1e1e;
+    color: #cccccc;
+  }
+
+  .card {
+    background-color: #2d2d2d;
+    color: #cccccc;
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .card-header, .card-footer {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .form-control {
+    background-color: #3a3a3a;
+    color: #ffffff;
+    border-color: #555555;
+  }
+
+  .form-control:focus {
+    background-color: #4a4a4a;
+    border-color: #007bff;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+
+  .app-stats-list-wrapper, .list-group-item {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+}

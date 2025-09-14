@@ -13,8 +13,11 @@ import { parseLogContent, updateLocalStorage, getStoredData, clearStoredData } f
 // MDB 会通过 data-* 属性自动初始化，我们只需要导入模块即可。
 import 'mdb-ui-kit/js/mdb.es.min.js';
 import Chart from 'chart.js/auto';
+import VConsole from 'vconsole';
 
-document.addEventListener('DOMContentLoaded', async () => {
+const vConsole = new VConsole();
+initMDB({ Ripple });
+document。addEventListener('DOMContentLoaded', async () => {
     // --- DOM 元素获取 ---
     const configForm = document.getElementById('config-form');
     const retentionDaysInput = document.getElementById('retention-days');

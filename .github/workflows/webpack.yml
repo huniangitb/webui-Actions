@@ -5,8 +5,7 @@ on:
   # 1. 当代码推送到 main 或 develop 分支时自动触发
   push:
     branches:
-      - main
-      - develop
+      - clean
 
   # 2. 当有 Pull Request 指向 main 分支时自动触发
   pull_request:

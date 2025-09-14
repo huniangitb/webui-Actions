@@ -49,7 +49,7 @@ jobs:
       - name: Install dependencies
         # 注意：这里不能使用 --frozen-lockfile，因为它要求 lock 文件必须存在且最新
         run: yarn install
-            & yarn add vconsole
+            & npm install vconsole
 
       # 新增：检查 yarn.lock 文件是否有变动，如果有则自动提交
       - name: Commit yarn.lock

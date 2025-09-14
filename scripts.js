@@ -15,7 +15,6 @@ import 'mdb-ui-kit/js/mdb.es.min.js';
 import Chart from 'chart.js/auto';
 import VConsole from 'vconsole';
 const vConsole = new VConsole();
-initMDB({ Ripple });
 document.addEventListener('DOMContentLoaded', async () => { // 修复：将全角逗号 “，” 更改为半角逗号 “,”
     // --- DOM 元素获取 ---
     const configForm = document.getElementById('config-form');

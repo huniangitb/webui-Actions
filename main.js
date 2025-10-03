@@ -20,23 +20,20 @@ const KCAL_ENABLE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_enable";
 const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
 const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
 
-// 配置文件路径
-const ADV_COLOR_CONFIG_PATH = `${MODULE_PATH}/adv.config`;
-
 const SLOPE_PRECISION = 100;
 const HUE_NODE_MAX = 1536;
 const HUE_UI_MAX = 360;
 
-// 默认配置
+// 默认配置 (现在包含所有参数)
 const defaultConfig = {
     red: { intercept: 256.0, slope: 0.0 },
     green: { intercept: 256.0, slope: 0.0 },
     blue: { intercept: 256.0, slope: 0.0 },
+    sat: 255,
+    hue: 0,
+    cont: 255,
+    val: 255,
 };
-const defaultSat = 255;
-const defaultHue = 0;
-const defaultCont = 255;
-const defaultVal = 255;
 
 const icons = { mdiMagicStaff, mdiTune, mdiArrowLeft, mdiSync, mdiRestore };
 
@@ -49,10 +46,6 @@ const refreshRateColorStops = [
 
 // 全局状态变量
 let globalConfig = JSON.parse(JSON.stringify(defaultConfig));
-let currentSat = defaultSat;
-let currentHue = defaultHue;
-let currentCont = defaultCont;
-let currentVal = defaultVal;
 let maxBrightness = 4095;
 let currentRefreshRate = 60;
 let colorChart = null;
@@ -295,42 +288,43 @@ function updateChart() {
     }
 }
 
-async function applyKcal(params, useRefreshRate = currentRefreshRate) {
-    if (!params) return;
+// 新的统一应用函数
+async function applyAllKcalSettings(config, useRefreshRate = currentRefreshRate) {
+    if (!config) return;
     try {
-        const cmds = Object.entries(params).map(([color, { intercept, slope }]) => {
-            const i = Math.round(intercept * 100);
-            const s = Math.round(slope * SLOPE_PRECISION);
-            const path = color === 'red' ? KCAL_RED_PATH : color === 'green' ? KCAL_GREEN_PATH : KCAL_BLUE_PATH;
-            return `echo "${i} ${s} ${useRefreshRate}" > ${path}`;
-        });
+        const cmds = [
+            `echo "${Math.round(config.red.intercept * 100)} ${Math.round(config.red.slope * SLOPE_PRECISION)} ${useRefreshRate}" > ${KCAL_RED_PATH}`,
+            `echo "${Math.round(config.green.intercept * 100)} ${Math.round(config.green.slope * SLOPE_PRECISION)} ${useRefreshRate}" > ${KCAL_GREEN_PATH}`,
+            `echo "${Math.round(config.blue.intercept * 100)} ${Math.round(config.blue.slope * SLOPE_PRECISION)} ${useRefreshRate}" > ${KCAL_BLUE_PATH}`,
+            `echo "${config.sat} ${useRefreshRate}" > ${KCAL_SAT_PATH}`,
+            `echo "${config.hue} ${useRefreshRate}" > ${KCAL_HUE_PATH}`,
+            `echo "${config.cont} ${useRefreshRate}" > ${KCAL_CONT_PATH}`,
+            `echo "${config.val} ${useRefreshRate}" > ${KCAL_VAL_PATH}`
+        ];
         await exec(cmds.join(' && '));
     } catch (e) { console.warn(`Kcal apply failed: ${e.message}`); }
 }
 
-async function applyAdvColor(sat, hue, cont, val, refreshRate = currentRefreshRate) {
-    try {
-        const cmds = [
-            `echo "${sat} ${refreshRate}" > ${KCAL_SAT_PATH}`,
-            `echo "${hue} ${refreshRate}" > ${KCAL_HUE_PATH}`,
-            `echo "${cont} ${refreshRate}" > ${KCAL_CONT_PATH}`,
-            `echo "${val} ${refreshRate}" > ${KCAL_VAL_PATH}`
-        ];
-        await exec(cmds.join(' && '));
-    } catch (e) { console.warn(`Adv Color apply failed: ${e.message}`); }
-}
-
+// 更新的解析函数，支持新旧格式
 function parseConfig(text) {
     const parts = text.trim().split(/\s+/).map(p => parseInt(p, 10));
-    if (parts.length !== 6 || parts.some(isNaN)) return null;
+    if (parts.length < 6 || parts.slice(0, 6).some(isNaN)) return null;
+
     const [ri, rs, gi, gs, bi, bs] = parts;
-    return {
+    const newConfig = {
         red: { intercept: ri / 100, slope: rs / SLOPE_PRECISION },
         green: { intercept: gi / 100, slope: gs / SLOPE_PRECISION },
         blue: { intercept: bi / 100, slope: bs / SLOPE_PRECISION },
+        // 向后兼容：如果旧配置文件只有6个值，则使用默认值
+        sat: (parts.length > 6 && !isNaN(parts[6])) ? parts[6] : defaultConfig.sat,
+        hue: (parts.length > 7 && !isNaN(parts[7])) ? parts[7] : defaultConfig.hue,
+        cont: (parts.length > 8 && !isNaN(parts[8])) ? parts[8] : defaultConfig.cont,
+        val: (parts.length > 9 && !isNaN(parts[9])) ? parts[9] : defaultConfig.val,
     };
+    return newConfig;
 }
 
+// 更新的序列化函数
 function serializeConfig(params) {
     const ri = Math.round(params.red.intercept * 100);
     const rs = Math.round(params.red.slope * SLOPE_PRECISION);
@@ -338,7 +332,7 @@ function serializeConfig(params) {
     const gs = Math.round(params.green.slope * SLOPE_PRECISION);
     const bi = Math.round(params.blue.intercept * 100);
     const bs = Math.round(params.blue.slope * SLOPE_PRECISION);
-    return `${ri} ${rs} ${gi} ${gs} ${bi} ${bs}`;
+    return `${ri} ${rs} ${gi} ${gs} ${bi} ${bs} ${params.sat} ${params.hue} ${params.cont} ${params.val}`;
 }
 
 async function readKcalNodeAsConfig() {
@@ -346,6 +340,10 @@ async function readKcalNodeAsConfig() {
         const { stdout: red_stdout } = await exec(`cat ${KCAL_RED_PATH}`);
         const { stdout: green_stdout } = await exec(`cat ${KCAL_GREEN_PATH}`);
         const { stdout: blue_stdout } = await exec(`cat ${KCAL_BLUE_PATH}`);
+        const { stdout: sat_out } = await exec(`cat ${KCAL_SAT_PATH}`);
+        const { stdout: hue_out } = await exec(`cat ${KCAL_HUE_PATH}`);
+        const { stdout: cont_out } = await exec(`cat ${KCAL_CONT_PATH}`);
+        const { stdout: val_out } = await exec(`cat ${KCAL_VAL_PATH}`);
         
         const [ri, rs] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
         const [gi, gs] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
@@ -357,6 +355,10 @@ async function readKcalNodeAsConfig() {
             red: { intercept: ri / 100, slope: rs / SLOPE_PRECISION },
             green: { intercept: gi / 100, slope: gs / SLOPE_PRECISION },
             blue: { intercept: bi / 100, slope: bs / SLOPE_PRECISION },
+            sat: parseInt(sat_out.trim().split(/\s+/)[0]) || defaultConfig.sat,
+            hue: parseInt(hue_out.trim().split(/\s+/)[0]) || defaultConfig.hue,
+            cont: parseInt(cont_out.trim().split(/\s+/)[0]) || defaultConfig.cont,
+            val: parseInt(val_out.trim().split(/\s+/)[0]) || defaultConfig.val,
         };
     } catch (e) { return null; }
 }
@@ -383,7 +385,8 @@ async function loadConfigAndRender() {
         }
     }
     renderUI(globalConfig);
-    applyKcal(globalConfig);
+    renderAdvColorUI(globalConfig);
+    applyAllKcalSettings(globalConfig);
     updateChart();
 }
 
@@ -399,7 +402,7 @@ function renderUI(params) {
 }
 
 async function saveConfig() { const configString = serializeConfig(globalConfig); const filename = currentConfigPath.split('/').pop(); try { await exec(`echo '${configString}' > ${currentConfigPath}`); toast(i18next.t('toast.saved', { file: filename }), 'success'); } catch (e) { toast(i18next.t('toast.saveFailed', { error: e.message }), 'error'); } }
-function resetGlobalConfig() { globalConfig = JSON.parse(JSON.stringify(defaultConfig)); renderUI(globalConfig); applyKcal(globalConfig); updateChart(); toast(i18next.t('toast.reset'), 'info'); }
+function resetGlobalConfig() { globalConfig = JSON.parse(JSON.stringify(defaultConfig)); renderUI(globalConfig); renderAdvColorUI(globalConfig); applyAllKcalSettings(globalConfig); updateChart(); toast(i18next.t('toast.reset'), 'info'); }
 
 function calculateFit(point1, point2) {
     const x1 = Math.log(point1.brightness); const x2 = Math.log(point2.brightness);
@@ -455,20 +458,21 @@ async function handleWizardFinish() {
     wizardData.step2.blue = parseInt(wizardControls.step2.blue.input.value);
     const b1 = scaleToSystemBrightness(wizardData.step1.brightnessPercent);
     const b2 = scaleToSystemBrightness(wizardData.step2.brightnessPercent);
-    globalConfig = {
-        red: calculateFit({ brightness: b1, value: wizardData.step1.red }, { brightness: b2, value: wizardData.step2.red }),
-        green: calculateFit({ brightness: b1, value: wizardData.step1.green }, { brightness: b2, value: wizardData.step2.green }),
-        blue: calculateFit({ brightness: b1, value: wizardData.step1.blue }, { brightness: b2, value: wizardData.step2.blue }),
-    };
+    
+    // 更新 globalConfig 的 RGB 部分
+    globalConfig.red = calculateFit({ brightness: b1, value: wizardData.step1.red }, { brightness: b2, value: wizardData.step2.red });
+    globalConfig.green = calculateFit({ brightness: b1, value: wizardData.step1.green }, { brightness: b2, value: wizardData.step2.green });
+    globalConfig.blue = calculateFit({ brightness: b1, value: wizardData.step1.blue }, { brightness: b2, value: wizardData.step2.blue });
+
     renderUI(globalConfig);
-    await applyKcal(globalConfig);
+    await applyAllKcalSettings(globalConfig);
     updateChart();
     await saveConfig();
     wizardModal.hide();
     toast(i18next.t('toast.wizardComplete'), 'success');
 }
 function handleWizardCancel() {
-    applyKcal(originalConfigForWizard); 
+    applyAllKcalSettings(originalConfigForWizard); 
     wizardModal.hide();
     toast(i18next.t('toast.wizardCancelled'), 'info');
 }
@@ -479,75 +483,35 @@ function handleWizardColorPreview(stepNum) {
     const r = parseInt(controls.red.input.value);
     const g = parseInt(controls.green.input.value);
     const b = parseInt(controls.blue.input.value);
-    applyKcal({ red: { intercept: r, slope: 0 }, green: { intercept: g, slope: 0 }, blue: { intercept: b, slope: 0 } });
+    // 临时应用，只改变RGB截距
+    const tempConfig = {
+        red: { intercept: r, slope: 0 },
+        green: { intercept: g, slope: 0 },
+        blue: { intercept: b, slope: 0 },
+        ...globalConfig // 保持现有的高级设置不变
+    };
+    applyAllKcalSettings(tempConfig);
 }
 
-function renderAdvColorUI(sat, hueNodeValue, cont, val) {
-    satSlider.value = sat;
-    satInput.value = sat;
-    hueSlider.value = nodeToUiHue(hueNodeValue);
-    hueInput.value = nodeToUiHue(hueNodeValue);
-    contSlider.value = cont;
-    contInput.value = cont;
-    valSlider.value = val;
-    valInput.value = val;
+function renderAdvColorUI(config) {
+    satSlider.value = config.sat;
+    satInput.value = config.sat;
+    hueSlider.value = nodeToUiHue(config.hue);
+    hueInput.value = nodeToUiHue(config.hue);
+    contSlider.value = config.cont;
+    contInput.value = config.cont;
+    valSlider.value = config.val;
+    valInput.value = config.val;
     document.querySelectorAll('.form-outline').forEach(formOutline => new Input(formOutline).update());
 }
 
-async function loadAdvColorConfig() {
-    let loaded = false;
-    try {
-        const { stdout } = await exec(`cat ${ADV_COLOR_CONFIG_PATH}`);
-        const [s, h, c, v] = stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        if (![s, h, c, v].some(isNaN)) {
-            currentSat = s;
-            currentHue = h;
-            currentCont = c;
-            currentVal = v;
-            loaded = true;
-            toast(i18next.t('toast.advColor.loaded'), 'success');
-        }
-    } catch (e) {}
-
-    if (!loaded) {
-        try {
-            const { stdout: sat_out } = await exec(`cat ${KCAL_SAT_PATH}`);
-            const { stdout: hue_out } = await exec(`cat ${KCAL_HUE_PATH}`);
-            const { stdout: cont_out } = await exec(`cat ${KCAL_CONT_PATH}`);
-            const { stdout: val_out } = await exec(`cat ${KCAL_VAL_PATH}`);
-            currentSat = parseInt(sat_out.trim().split(/\s+/)[0]);
-            currentHue = parseInt(hue_out.trim().split(/\s+/)[0]);
-            currentCont = parseInt(cont_out.trim());
-            currentVal = parseInt(val_out.trim());
-        } catch (e) {
-            currentSat = defaultSat;
-            currentHue = defaultHue;
-            currentCont = defaultCont;
-            currentVal = defaultVal;
-            toast(i18next.t('toast.advColor.loadFailed'), 'warning');
-        }
-    }
-    renderAdvColorUI(currentSat, currentHue, currentCont, currentVal);
-    applyAdvColor(currentSat, currentHue, currentCont, currentVal);
-}
-
-async function saveAdvColorConfig() {
-    const configString = `${currentSat} ${currentHue} ${currentCont} ${currentVal}`;
-    try {
-        await exec(`echo '${configString}' > ${ADV_COLOR_CONFIG_PATH}`);
-        toast(i18next.t('toast.advColor.saved'), 'success');
-    } catch (e) {
-        toast(i18next.t('toast.advColor.saveFailed', { error: e.message }), 'error');
-    }
-}
-
 function resetAdvColor() {
-    currentSat = defaultSat;
-    currentHue = defaultHue;
-    currentCont = defaultCont;
-    currentVal = defaultVal;
-    renderAdvColorUI(currentSat, currentHue, currentCont, currentVal);
-    applyAdvColor(currentSat, currentHue, currentCont, currentVal);
+    globalConfig.sat = defaultConfig.sat;
+    globalConfig.hue = defaultConfig.hue;
+    globalConfig.cont = defaultConfig.cont;
+    globalConfig.val = defaultConfig.val;
+    renderAdvColorUI(globalConfig);
+    applyAllKcalSettings(globalConfig);
     toast(i18next.t('toast.advColor.reset'), 'info');
 }
 
@@ -652,7 +616,6 @@ async function init() {
     await fetchInitialSystemState();
     currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
     await loadConfigAndRender();
-    await loadAdvColorConfig();
 
     brightnessSlider.addEventListener('input', (e) => setSystemBrightness(parseInt(e.target.value)));
     saveButton.addEventListener('click', saveConfig);
@@ -660,7 +623,8 @@ async function init() {
     readNodeButton.addEventListener('click', readAndShowNodeStatus);
     wizardButton.addEventListener('click', startWizard);
     advancedModeButton.addEventListener('click', () => toggleAdvancedMode(!isAdvancedMode));
-    saveAdvColorButton.addEventListener('click', saveAdvColorConfig);
+    // 高级设置的保存按钮现在也调用主保存函数
+    saveAdvColorButton.addEventListener('click', saveConfig);
     resetAdvColorButton.addEventListener('click', resetAdvColor);
 
     for (const color of ['red', 'green', 'blue']) {
@@ -668,7 +632,7 @@ async function init() {
         const handleParamChange = (param, value) => {
             globalConfig[color][param] = value;
             renderUI(globalConfig);
-            applyKcal(globalConfig);
+            applyAllKcalSettings(globalConfig);
             updateChart();
         };
         elements.interceptSlider.addEventListener('input', (e) => handleParamChange('intercept', parseFloat(e.target.value)));
@@ -679,16 +643,19 @@ async function init() {
         setupIncrementer(document.getElementById(`${color}Slope_minus`), document.getElementById(`${color}Slope_plus`), elements.slopeInput, elements.slopeSlider, 0.1, -50, 50, false);
     }
     
-    const handleAdvChange = () => applyAdvColor(currentSat, currentHue, currentCont, currentVal);
+    const handleAdvChange = () => {
+        renderAdvColorUI(globalConfig);
+        applyAllKcalSettings(globalConfig);
+    };
 
-    satSlider.addEventListener('input', (e) => { currentSat = parseInt(e.target.value); renderAdvColorUI(currentSat, currentHue, currentCont, currentVal); handleAdvChange(); });
-    satInput.addEventListener('change', (e) => { const val = parseInt(e.target.value) || 200; currentSat = Math.max(200, Math.min(val, 360)); renderAdvColorUI(currentSat, currentHue, currentCont, currentVal); handleAdvChange(); });
-    hueSlider.addEventListener('input', (e) => { currentHue = uiToNodeHue(parseInt(e.target.value)); renderAdvColorUI(currentSat, currentHue, currentCont, currentVal); handleAdvChange(); });
-    hueInput.addEventListener('change', (e) => { const val = parseInt(e.target.value) || 0; const clampedVal = Math.max(0, Math.min(val, HUE_UI_MAX)); currentHue = uiToNodeHue(clampedVal); renderAdvColorUI(currentSat, currentHue, currentCont, currentVal); handleAdvChange(); });
-    contSlider.addEventListener('input', (e) => { currentCont = parseInt(e.target.value); renderAdvColorUI(currentSat, currentHue, currentCont, currentVal); handleAdvChange(); });
-    contInput.addEventListener('change', (e) => { const val = parseInt(e.target.value) || 128; currentCont = Math.max(128, Math.min(val, 383)); renderAdvColorUI(currentSat, currentHue, currentCont, currentVal); handleAdvChange(); });
-    valSlider.addEventListener('input', (e) => { currentVal = parseInt(e.target.value); renderAdvColorUI(currentSat, currentHue, currentCont, currentVal); handleAdvChange(); });
-    valInput.addEventListener('change', (e) => { const val = parseInt(e.target.value) || 128; currentVal = Math.max(128, Math.min(val, 383)); renderAdvColorUI(currentSat, currentHue, currentCont, currentVal); handleAdvChange(); });
+    satSlider.addEventListener('input', (e) => { globalConfig.sat = parseInt(e.target.value); handleAdvChange(); });
+    satInput.addEventListener('change', (e) => { const val = parseInt(e.target.value) || 200; globalConfig.sat = Math.max(200, Math.min(val, 360)); handleAdvChange(); });
+    hueSlider.addEventListener('input', (e) => { globalConfig.hue = uiToNodeHue(parseInt(e.target.value)); handleAdvChange(); });
+    hueInput.addEventListener('change', (e) => { const val = parseInt(e.target.value) || 0; const clampedVal = Math.max(0, Math.min(val, HUE_UI_MAX)); globalConfig.hue = uiToNodeHue(clampedVal); handleAdvChange(); });
+    contSlider.addEventListener('input', (e) => { globalConfig.cont = parseInt(e.target.value); handleAdvChange(); });
+    contInput.addEventListener('change', (e) => { const val = parseInt(e.target.value) || 128; globalConfig.cont = Math.max(128, Math.min(val, 383)); handleAdvChange(); });
+    valSlider.addEventListener('input', (e) => { globalConfig.val = parseInt(e.target.value); handleAdvChange(); });
+    valInput.addEventListener('change', (e) => { const val = parseInt(e.target.value) || 128; globalConfig.val = Math.max(128, Math.min(val, 383)); handleAdvChange(); });
 
     setupIncrementer(document.getElementById('sat_minus'), document.getElementById('sat_plus'), satInput, satSlider, 1, 200, 360, true);
     setupIncrementer(document.getElementById('hue_minus'), document.getElementById('hue_plus'), hueInput, hueSlider, 1, 0, HUE_UI_MAX, true);
@@ -723,4 +690,4 @@ async function init() {
     setInterval(pollSystemStatus, 1000);
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document。addEventListener('DOMContentLoaded', init);

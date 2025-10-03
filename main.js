@@ -173,9 +173,9 @@ function toggleAdvancedMode(enable, showToast = true) {
         advancedModeButton.classList.remove('btn-secondary'); advancedModeButton.classList.add('btn-primary');
         if (showToast) toast(i18next.t('toast.advancedMode.on'), 'info');
     } else {
-        advancedModeButton.classList.remove('btn-primary'); advancedModeButton.classList.add('btn-secondary');
-        if (showToast) toast(i18next.t('toast.advancedMode.off'), 'info');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        advancedModeButton。classList。remove('btn-primary'); advancedModeButton。classList。add('btn-secondary');
+        if (showToast) toast(i18next。t('toast.advancedMode.off')， 'info');
+        window。scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
 
@@ -195,73 +195,73 @@ async function setSystemBrightness(percentage) {
              brightnessValue.innerText = i18next.t('status.brightnessValue', { value: systemValue, percent: percentage });
              lastKnownBrightness = systemValue;
         }
-    } catch (e) { toast(i18next.t('toast.saveFailed', { error: `Brightness: ${e.message}` }), 'error'); }
+    } catch (e) { toast(i18next。t('toast.saveFailed'， { error: `Brightness: ${e.message}` }), 'error'); }
 }
 
 function updateKcalEnableUI(enabled) {
     isKcalEnabled = enabled;
-    configContentContainer.classList.toggle('content-hidden', !enabled);
+    configContentContainer。classList。toggle('content-hidden', !enabled);
 }
 
 function updateRefreshRateUI(rate) {
-    refreshRateValue.innerText = `${rate} Hz`;
+    refreshRateValue。innerText = `${rate} Hz`;
     let color;
-    if (rate <= refreshRateColorStops[0].rate) {
-        color = refreshRateColorStops[0].color;
-    } else if (rate >= refreshRateColorStops[refreshRateColorStops.length - 1].rate) {
-        color = refreshRateColorStops[refreshRateColorStops.length - 1].color;
+    if (rate <= refreshRateColorStops[0]。rate) {
+        color = refreshRateColorStops[0]。color;
+    } else if (rate >= refreshRateColorStops[refreshRateColorStops。length - 1]。rate) {
+        color = refreshRateColorStops[refreshRateColorStops。length - 1]。color;
     } else {
-        let lowerStop, upperStop;
+        let lowerStop， upperStop;
         for (let i = 0; i < refreshRateColorStops.length - 1; i++) {
-            if (rate >= refreshRateColorStops[i].rate && rate < refreshRateColorStops[i + 1].rate) {
+            if (rate >= refreshRateColorStops[i]。rate && rate < refreshRateColorStops[i + 1].rate) {
                 lowerStop = refreshRateColorStops[i];
                 upperStop = refreshRateColorStops[i + 1];
                 break;
             }
         }
-        const range = upperStop.rate - lowerStop.rate;
+        const range = upperStop。rate - lowerStop.rate;
         const factor = (rate - lowerStop.rate) / range;
-        color = interpolateColor(lowerStop.color, upperStop.color, factor);
+        color = interpolateColor(lowerStop。color， upperStop.color， factor);
     }
-    refreshRateValue.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+    refreshRateValue。style。backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
 }
 
 function calculateChartData(params) {
     const labels = []; const colorData = { red: [], green: [], blue: [] };
     for (let p = 1; p <= 100; p++) {
         labels.push(p); const systemBrightness = scaleToSystemBrightness(p); const log_b = Math.log(systemBrightness);
-        for (const color of ['red', 'green', 'blue']) {
-            const { intercept, slope } = params[color];
-            colorData[color].push(intercept + (slope * log_b));
+        for (const color / ['red', 'green', 'blue']) {
+            const { intercept， slope } = params[color];
+            colorData[color]。push(intercept + (slope * log_b));
         }
     }
     const datasets = [
-        { label: i18next.t('params.red'), data: colorData.red, borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 },
-        { label: i18next.t('params.green'), data: colorData.green, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 },
+        { label: i18next.t('params.red')， data: colorData.red, borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 },
+        { label: i18next。t('params.green'), data: colorData.green, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 },
         { label: i18next.t('params.blue'), data: colorData.blue, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 }
     ];
-    return { labels, datasets };
+    return { labels， datasets };
 }
 
 function initChart() {
-    if (colorChart) colorChart.destroy();
-    const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
+    if (colorChart) colorChart。destroy();
+    const isDarkMode = document。documentElement.dataset.mdbTheme === 'dark';
     const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
     const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
     const chartData = calculateChartData(globalConfig);
-    colorChart = new Chart(chartCanvas.getContext('2d'), {
-        type: 'line', data: chartData, options: {
-            responsive: true, maintainAspectRatio: false, scales: {
+    colorChart = new Chart(chartCanvas。getContext('2d')， {
+        输入: 'line'， data: chartData， options: {
+            responsive: true， maintainAspectRatio: false， scales: {
                 x: {
-                    type: 'logarithmic', title: { display: true, text: i18next.t('status.brightness'), color: tickColor }, min: 1, max: 100,
+                    输入: 'logarithmic'， title: { display: true, text: i18next.t('status.brightness'), color: tickColor }, min: 1, max: 100,
                     ticks: {
-                        color: tickColor,
+                        color: tickColor，
                         callback: function (value) { const shown_ticks = [1, 2, 5, 10, 20, 50, 100]; if (shown_ticks.includes(Number(value))) return value + '%'; },
                         generateTicks: function () { return [{ value: 1 }, { value: 2 }, { value: 5 }, { value: 10 }, { value: 20 }, { value: 50 }, { value: 100 }]; }
-                    }, grid: { color: gridColor }
-                },
+                    }， grid: { color: gridColor }
+                }，
                 y: { title: { display: true, text: i18next.t('chart.yAxisTitle'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } }
-            }, plugins: { legend: { display: true, labels: { color: tickColor } } }
+            }， plugins: { legend: { display: true, labels: { color: tickColor } } }
         }
     });
 }
@@ -269,20 +269,20 @@ function initChart() {
 function updateChart() {
     if (!chartCanvas) return;
     if (colorChart) {
-        const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
+        const isDarkMode = document。documentElement。dataset.mdbTheme === 'dark';
         const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
         const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-        colorChart.data = calculateChartData(globalConfig);
+        colorChart。data = calculateChartData(globalConfig);
         colorChart.options.scales.x.title.text = i18next.t('status.brightness');
         colorChart.options.scales.x.title.color = tickColor;
-        colorChart.options.scales.x.ticks.color = tickColor;
-        colorChart.options.scales.x.grid.color = gridColor;
-        colorChart.options.scales.y.title.text = i18next.t('chart.yAxisTitle');
-        colorChart.options.scales.y.title.color = tickColor;
-        colorChart.options.scales.y.ticks.color = tickColor;
-        colorChart.options.scales.y.grid.color = gridColor;
-        colorChart.options.plugins.legend.labels.color = tickColor;
-        colorChart.update();
+        colorChart。options。scales.x.ticks.color = tickColor;
+        colorChart。options。scales。x。grid。color = gridColor;
+        colorChart。options。scales。y。title。text = i18next。t('chart.yAxisTitle');
+        colorChart。options。scales。y。title。color = tickColor;
+        colorChart。options。scales.y.ticks.color = tickColor;
+        colorChart。options。scales.y.grid.color = gridColor;
+        colorChart。options。plugins.legend.labels.color = tickColor;
+        colorChart。update();
     } else { 
         initChart();
     }
@@ -293,46 +293,46 @@ async function applyAllKcalSettings(config, useRefreshRate = currentRefreshRate)
     if (!config) return;
     try {
         const cmds = [
-            `echo "${Math.round(config.red.intercept * 100)} ${Math.round(config.red.slope * SLOPE_PRECISION)} ${useRefreshRate}" > ${KCAL_RED_PATH}`,
+            `echo "${Math。round(config.red。intercept * 100)} ${Math。round(config。red.slope * SLOPE_PRECISION)} ${useRefreshRate}" > ${KCAL_RED_PATH}`,
             `echo "${Math.round(config.green.intercept * 100)} ${Math.round(config.green.slope * SLOPE_PRECISION)} ${useRefreshRate}" > ${KCAL_GREEN_PATH}`,
-            `echo "${Math.round(config.blue.intercept * 100)} ${Math.round(config.blue.slope * SLOPE_PRECISION)} ${useRefreshRate}" > ${KCAL_BLUE_PATH}`,
+            `echo "${Math.round(config.blue。intercept * 100)} ${Math.round(config.blue.slope * SLOPE_PRECISION)} ${useRefreshRate}" > ${KCAL_BLUE_PATH}`，
             `echo "${config.sat} ${useRefreshRate}" > ${KCAL_SAT_PATH}`,
             `echo "${config.hue} ${useRefreshRate}" > ${KCAL_HUE_PATH}`,
-            `echo "${config.cont} ${useRefreshRate}" > ${KCAL_CONT_PATH}`,
-            `echo "${config.val} ${useRefreshRate}" > ${KCAL_VAL_PATH}`
+            `echo "${config。cont} ${useRefreshRate}" > ${KCAL_CONT_PATH}`，
+            `echo "${config。val} ${useRefreshRate}" > ${KCAL_VAL_PATH}`
         ];
         await exec(cmds.join(' && '));
-    } catch (e) { console.warn(`Kcal apply failed: ${e.message}`); }
+    } catch (e) { console。warn(`Kcal apply failed: ${e。message}`); }
 }
 
 // 更新的解析函数，支持新旧格式
 function parseConfig(text) {
     const parts = text.trim().split(/\s+/).map(p => parseInt(p, 10));
-    if (parts.length < 6 || parts.slice(0, 6).some(isNaN)) return null;
+    if (parts。length < 6 || parts。slice(0, 6)。some(isNaN)) return null;
 
-    const [ri, rs, gi, gs, bi, bs] = parts;
+    const [ri， rs， gi， gs， bi, bs] = parts;
     const newConfig = {
-        red: { intercept: ri / 100, slope: rs / SLOPE_PRECISION },
+        red: { intercept: ri / 100， slope: rs / SLOPE_PRECISION },
         green: { intercept: gi / 100, slope: gs / SLOPE_PRECISION },
         blue: { intercept: bi / 100, slope: bs / SLOPE_PRECISION },
         // 向后兼容：如果旧配置文件只有6个值，则使用默认值
-        sat: (parts.length > 6 && !isNaN(parts[6])) ? parts[6] : defaultConfig.sat,
-        hue: (parts.length > 7 && !isNaN(parts[7])) ? parts[7] : defaultConfig.hue,
-        cont: (parts.length > 8 && !isNaN(parts[8])) ? parts[8] : defaultConfig.cont,
-        val: (parts.length > 9 && !isNaN(parts[9])) ? parts[9] : defaultConfig.val,
+        sat: (parts。length > 6 && !isNaN(parts[6])) ? parts[6] : defaultConfig。sat，
+        hue: (parts。length > 7 && !isNaN(parts[7])) ? parts[7] : defaultConfig。hue，
+        cont: (parts。length > 8 && !isNaN(parts[8])) ? parts[8] : defaultConfig.cont,
+        val: (parts。length > 9 && !isNaN(parts[9])) ? parts[9] : defaultConfig。val，
     };
     return newConfig;
 }
 
 // 更新的序列化函数
 function serializeConfig(params) {
-    const ri = Math.round(params.red.intercept * 100);
-    const rs = Math.round(params.red.slope * SLOPE_PRECISION);
-    const gi = Math.round(params.green.intercept * 100);
-    const gs = Math.round(params.green.slope * SLOPE_PRECISION);
-    const bi = Math.round(params.blue.intercept * 100);
-    const bs = Math.round(params.blue.slope * SLOPE_PRECISION);
-    return `${ri} ${rs} ${gi} ${gs} ${bi} ${bs} ${params.sat} ${params.hue} ${params.cont} ${params.val}`;
+    const ri = Math。round(params。red.intercept * 100);
+    const rs = Math。round(params。red.slope * SLOPE_PRECISION);
+    const gi = Math。round(params。green。intercept * 100);
+    const gs = Math。round(params。green。slope * SLOPE_PRECISION);
+    const bi = Math。round(params。blue。intercept * 100);
+    const bs = Math。round(params。blue.slope * SLOPE_PRECISION);
+    return `${ri} ${rs} ${gi} ${gs} ${bi} ${bs} ${params。sat} ${params。hue} ${params。cont} ${params。val}`;
 }
 
 async function readKcalNodeAsConfig() {
@@ -345,17 +345,17 @@ async function readKcalNodeAsConfig() {
         const { stdout: cont_out } = await exec(`cat ${KCAL_CONT_PATH}`);
         const { stdout: val_out } = await exec(`cat ${KCAL_VAL_PATH}`);
         
-        const [ri, rs] = red_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        const [gi, gs] = green_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
-        const [bi, bs] = blue_stdout.trim().split(/\s+/).map(p => parseInt(p, 10));
+        const [ri， rs] = red_stdout。trim()。split(/\s+/)。map(p => parseInt(p， 10));
+        const [gi， gs] = green_stdout.trim().split(/\s+/)。map(p => parseInt(p, 10));
+        const [bi， bs] = blue_stdout。trim()。split(/\s+/)。map(p => parseInt(p， 10));
 
-        if ([ri, rs, gi, gs, bi, bs].some(isNaN)) return null;
+        if ([ri， rs, gi, gs, bi, bs].some(isNaN)) return null;
 
         return {
-            red: { intercept: ri / 100, slope: rs / SLOPE_PRECISION },
+            red: { intercept: ri / 100, slope: rs / SLOPE_PRECISION }，
             green: { intercept: gi / 100, slope: gs / SLOPE_PRECISION },
             blue: { intercept: bi / 100, slope: bs / SLOPE_PRECISION },
-            sat: parseInt(sat_out.trim().split(/\s+/)[0]) || defaultConfig.sat,
+            sat: parseInt(sat_out。trim()。split(/\s+/)[0]) || defaultConfig.sat，
             hue: parseInt(hue_out.trim().split(/\s+/)[0]) || defaultConfig.hue,
             cont: parseInt(cont_out.trim().split(/\s+/)[0]) || defaultConfig.cont,
             val: parseInt(val_out.trim().split(/\s+/)[0]) || defaultConfig.val,
@@ -690,4 +690,4 @@ async function init() {
     setInterval(pollSystemStatus, 1000);
 }
 
-document。addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', init);

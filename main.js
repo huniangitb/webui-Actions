@@ -288,7 +288,6 @@ function updateChart() {
     }
 }
 
-// 新的统一应用函数
 async function applyAllKcalSettings(config, useRefreshRate = currentRefreshRate) {
     if (!config) return;
     try {
@@ -305,7 +304,6 @@ async function applyAllKcalSettings(config, useRefreshRate = currentRefreshRate)
     } catch (e) { console.warn(`Kcal apply failed: ${e.message}`); }
 }
 
-// 更新的解析函数，支持新旧格式
 function parseConfig(text) {
     const parts = text.trim().split(/\s+/).map(p => parseInt(p, 10));
     if (parts.length < 6 || parts.slice(0, 6).some(isNaN)) return null;
@@ -315,7 +313,6 @@ function parseConfig(text) {
         red: { intercept: ri / 100, slope: rs / SLOPE_PRECISION },
         green: { intercept: gi / 100, slope: gs / SLOPE_PRECISION },
         blue: { intercept: bi / 100, slope: bs / SLOPE_PRECISION },
-        // 向后兼容：如果旧配置文件只有6个值，则使用默认值
         sat: (parts.length > 6 && !isNaN(parts[6])) ? parts[6] : defaultConfig.sat,
         hue: (parts.length > 7 && !isNaN(parts[7])) ? parts[7] : defaultConfig.hue,
         cont: (parts.length > 8 && !isNaN(parts[8])) ? parts[8] : defaultConfig.cont,
@@ -324,7 +321,6 @@ function parseConfig(text) {
     return newConfig;
 }
 
-// 更新的序列化函数
 function serializeConfig(params) {
     const ri = Math.round(params.red.intercept * 100);
     const rs = Math.round(params.red.slope * SLOPE_PRECISION);
@@ -412,6 +408,9 @@ function calculateFit(point1, point2) {
     const intercept = y1 - slope * x1;
     return { intercept, slope };
 }
+
+// --- WIZARD FUNCTIONS (FIXED) ---
+
 function startWizard() {
     originalConfigForWizard = JSON.parse(JSON.stringify(globalConfig));
     brightnessBeforeWizard = lastKnownBrightness;
@@ -438,7 +437,10 @@ function startWizard() {
     wizardFinishButton.style.display = 'none';
     wizardModal.show();
     setSystemBrightness(wizardData.step1.brightnessPercent);
+    // FIX 1: Apply neutral color values at the start of the wizard
+    handleWizardColorPreview(1); 
 }
+
 function handleWizardNext() {
     wizardData.step1.brightnessPercent = parseInt(wizardBrightness1.value);
     wizardData.step1.red = parseInt(wizardControls.step1.red.input.value);
@@ -451,6 +453,7 @@ function handleWizardNext() {
     setSystemBrightness(wizardData.step2.brightnessPercent);
     handleWizardColorPreview(2);
 }
+
 async function handleWizardFinish() {
     wizardData.step2.brightnessPercent = parseInt(wizardBrightness2.value);
     wizardData.step2.red = parseInt(wizardControls.step2.red.input.value);
@@ -459,23 +462,32 @@ async function handleWizardFinish() {
     const b1 = scaleToSystemBrightness(wizardData.step1.brightnessPercent);
     const b2 = scaleToSystemBrightness(wizardData.step2.brightnessPercent);
     
-    // 更新 globalConfig 的 RGB 部分
+    // Update globalConfig's RGB part
     globalConfig.red = calculateFit({ brightness: b1, value: wizardData.step1.red }, { brightness: b2, value: wizardData.step2.red });
     globalConfig.green = calculateFit({ brightness: b1, value: wizardData.step1.green }, { brightness: b2, value: wizardData.step2.green });
     globalConfig.blue = calculateFit({ brightness: b1, value: wizardData.step1.blue }, { brightness: b2, value: wizardData.step2.blue });
+    
+    // FIX 2: Reset advanced parameters to default after wizard calibration
+    globalConfig.sat = defaultConfig.sat;
+    globalConfig.hue = defaultConfig.hue;
+    globalConfig.cont = defaultConfig.cont;
+    globalConfig.val = defaultConfig.val;
 
     renderUI(globalConfig);
+    renderAdvColorUI(globalConfig); // Update the advanced UI as well
     await applyAllKcalSettings(globalConfig);
     updateChart();
     await saveConfig();
     wizardModal.hide();
     toast(i18next.t('toast.wizardComplete'), 'success');
 }
+
 function handleWizardCancel() {
     applyAllKcalSettings(originalConfigForWizard); 
     wizardModal.hide();
     toast(i18next.t('toast.wizardCancelled'), 'info');
 }
+
 function handleWizardColorPreview(stepNum) {
     const brightnessPercent = parseInt(stepNum === 1 ? wizardBrightness1.value : wizardBrightness2.value);
     setSystemBrightness(brightnessPercent);
@@ -483,15 +495,20 @@ function handleWizardColorPreview(stepNum) {
     const r = parseInt(controls.red.input.value);
     const g = parseInt(controls.green.input.value);
     const b = parseInt(controls.blue.input.value);
-    // 临时应用，只改变RGB截距
+
+    // FIX 3: Correctly construct the temporary config for preview.
+    // Spread operator should come first to keep advanced settings from original config during preview.
     const tempConfig = {
+        ...originalConfigForWizard,
         red: { intercept: r, slope: 0 },
         green: { intercept: g, slope: 0 },
         blue: { intercept: b, slope: 0 },
-        ...globalConfig // 保持现有的高级设置不变
     };
     applyAllKcalSettings(tempConfig);
 }
+
+// --- END OF WIZARD FUNCTIONS ---
+
 
 function renderAdvColorUI(config) {
     satSlider.value = config.sat;
@@ -623,7 +640,6 @@ async function init() {
     readNodeButton.addEventListener('click', readAndShowNodeStatus);
     wizardButton.addEventListener('click', startWizard);
     advancedModeButton.addEventListener('click', () => toggleAdvancedMode(!isAdvancedMode));
-    // 高级设置的保存按钮现在也调用主保存函数
     saveAdvColorButton.addEventListener('click', saveConfig);
     resetAdvColorButton.addEventListener('click', resetAdvColor);
 

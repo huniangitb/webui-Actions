@@ -33,7 +33,16 @@ h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); }
 
 // --- 编辑页特定样式 ---
 #f2fs-gc-config-toggle-label { width: 85px; box-sizing: border-box; text-align: center; transition: all 0.2s ease-in-out; }
-.cron-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; transition: opacity 0.35s ease-out, max-height 0.35s ease-out !important; overflow: hidden; max-height: 500px; opacity: 1; }
+.cron-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-start; // 修复：按钮紧凑排列
+  transition: opacity 0.35s ease-out, max-height 0.35s ease-out !important;
+  overflow: hidden;
+  max-height: 500px;
+  opacity: 1;
+}
 .cron-grid.collapsed { max-height: 0; opacity: 0; }
 .cron-grid .btn { min-width: 45px; padding: 0.375rem 0.5rem; font-size: 0.8rem; }
 #cron-expression { cursor: pointer; background-color: var(--mdb-form-control-bg) !important; }
@@ -41,22 +50,15 @@ h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); }
 .schedule-input-group { transition: opacity 0.35s ease, max-height 0.35s ease, margin-top 0.35s ease, padding-top 0.35s ease, padding-bottom 0.35s ease; overflow: hidden; max-height: 150px; opacity: 1; }
 .schedule-input-group.hidden { max-height: 0; opacity: 0; margin-top: 0 !important; margin-bottom: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
 
-// --- Cron 编辑器滑动动画 (关键改动) ---
-#cron-tabs-content {
-  overflow: hidden;
-}
-.tab-panes-wrapper {
-  display: flex;
-  transition: transform 0.35s ease-in-out;
-}
+// --- Cron 编辑器动画 (回归 MDB 原生) ---
 .tab-content > .tab-pane {
-  width: 100%;
-  flex-shrink: 0;
-  opacity: 1; // 始终可见，通过 transform 控制位置
-  visibility: visible;
+  display: none;
+}
+.tab-content > .active {
+  display: block;
 }
 
-// --- 底部导航栏样式 (关键改动) ---
+// --- 底部导航栏样式 ---
 .bottom-nav {
   position: fixed;
   bottom: 0;

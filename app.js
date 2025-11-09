@@ -1,9 +1,9 @@
 import { exec, toast } from 'kernelsu';
-import { Ripple, Modal, initMDB } from 'mdb-ui-kit';
+import { Ripple, Modal, Tab, initMDB } from 'mdb-ui-kit'; // 引入 Tab
 import Chart from 'chart.js/auto';
 import { mdiHome, mdiPencilBoxOutline } from '@mdi/js';
 
-initMDB({ Ripple });
+initMDB({ Ripple, Tab }); // 初始化 Tab
 
 // --- 内联模块: logParser.js ---
 function parseLogContent(ndjsonContent) { if (!ndjsonContent || ndjsonContent.trim() === '') return []; const parsedEntries = []; const lines = ndjsonContent.split('\n'); lines.forEach(line => { if (line.trim() === '') return; try { const stats = JSON.parse(line); if (!stats.timestamp || !stats.global_stats) return; const formattedTimestamp = stats.timestamp.replace('T', ' ').replace('Z', ''); const reclaimedSegments = (stats.gc_trim_stats && stats.gc_trim_stats.reclaimed_segments) ? stats.gc_trim_stats.reclaimed_segments : 0; const trimmedMBValue = (stats.gc_trim_stats && stats.gc_trim_stats.trimmed_mb) ? stats.gc_trim_stats.trimmed_mb : 0; const parsedEntry = { timestamp: formattedTimestamp, date: stats.timestamp.split('T')[0], deletedFiles: stats.global_stats.files_deleted || 0, deletedDirs: stats.global_stats.dirs_deleted || 0, dirtySegments: reclaimedSegments, fileCleanedMB: stats.global_stats.megabytes_deleted || 0, trimMB: trimmedMBValue, appStats: stats.app_stats || [] }; parsedEntries.push(parsedEntry); } catch (error) { console.error("解析 JSON 行失败:", error, "行内容:", line); } }); return parsedEntries; }
@@ -134,17 +134,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const intervalInputGroup = document.getElementById('interval-input-group');
         const cronInputGroup = document.getElementById('cron-input-group');
         const cronExpressionInput = document.getElementById('cron-expression');
-        const cronEditorModal = new Modal(document.getElementById('cron-editor-modal'));
-        const cronTabTriggers = document.querySelectorAll('#cron-tabs .nav-link');
+        const cronEditorModalEl = document.getElementById('cron-editor-modal');
+        const cronEditorModal = new Modal(cronEditorModalEl);
         const cronFields = { minutes: { el: document.getElementById('cron-minutes'), min: 0, max: 59, name: '分钟' }, hours: { el: document.getElementById('cron-hours'), min: 0, max: 23, name: '小时' }, dom: { el: document.getElementById('cron-dom'), min: 1, max: 31, name: '日' }, months: { el: document.getElementById('cron-months'), min: 1, max: 12, name: '月', labels: ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'] }, dow: { el: document.getElementById('cron-dow'), min: 0, max: 6, name: '星期', labels: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] } };
-
-        // --- Cron 编辑器结构初始化 (关键改动) ---
-        const cronTabsContent = document.getElementById('cron-tabs-content');
-        const panesWrapper = document.createElement('div');
-        panesWrapper.className = 'tab-panes-wrapper';
-        const panes = cronTabsContent.querySelectorAll('.tab-pane');
-        panes.forEach(pane => panesWrapper.appendChild(pane));
-        cronTabsContent.appendChild(panesWrapper);
 
         function updateGcConfigToggleLabel(isChecked) { f2fsGcConfigToggleLabel.textContent = isChecked ? '已开启' : '已关闭'; f2fsGcConfigToggleLabel.classList.toggle('btn-success', isChecked); f2fsGcConfigToggleLabel.classList.toggle('btn-outline-secondary', !isChecked); }
         function updateScheduleModeUI() { const isCron = scheduleModeCronRadio.checked; intervalInputGroup.classList.toggle('hidden', isCron); cronInputGroup.classList.toggle('hidden', !isCron); cleanIntervalInput.required = !isCron; cronExpressionInput.required = isCron; }
@@ -159,30 +151,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('edit-cron-btn').addEventListener('click', () => { parseCronToUI(cronExpressionInput.value); cronEditorModal.show(); });
         document.getElementById('save-cron-btn').addEventListener('click', () => { cronExpressionInput.value = generateCronFromUI(); cronEditorModal.hide(); });
         
-        // --- Cron 编辑器滑动动画逻辑 (关键改动) ---
-        cronTabTriggers.forEach((clickedTrigger, targetIndex) => {
-            clickedTrigger.addEventListener('click', (event) => {
-                event.preventDefault();
-                if (clickedTrigger.classList.contains('active')) return;
-
-                // 立即收起所有 grid，确保动画平滑
-                panes.forEach(p => p.querySelector('.cron-grid')?.classList.add('collapsed'));
-
-                // 更新 active 状态
-                cronTabTriggers.forEach(t => t.classList.remove('active'));
-                clickedTrigger.classList.add('active');
-
-                // 计算并应用 transform
-                panesWrapper.style.transform = `translateX(-${targetIndex * 100}%)`;
-
-                // 动画结束后，检查新面板是否需要展开
-                setTimeout(() => {
-                    const targetPane = panes[targetIndex];
-                    if (targetPane.querySelector('input[value="specific"]')?.checked) {
-                        targetPane.querySelector('.cron-grid')?.classList.remove('collapsed');
-                    }
-                }, 350); // 动画时长
-            });
+        // --- Cron 编辑器事件 (关键改动) ---
+        // 监听 MDB Tab 组件的 'shown.bs.tab' 事件
+        cronEditorModalEl.addEventListener('shown.bs.tab', () => {
+            // 强制重绘以修复潜在的渲染问题
+            void cronEditorModalEl.offsetWidth;
         });
 
         document.getElementById('cron-editor-modal').addEventListener('click', (e) => { if (e.target.name && e.target.name.endsWith('-mode')) { const fieldKey = e.target.name.replace('-mode', ''); cronFields[fieldKey].el.querySelector('.cron-grid').classList.toggle('collapsed', e.target.value === '*'); } });

@@ -1,21 +1,11 @@
 // 1. 完整引入 MDB 的所有样式
 @import 'mdb-ui-kit/src/scss/mdb.free.scss';
 
-// --- 新增: 复杂的背景动画 ---
-@keyframes aurora-1 {
-  0% { transform: translate(0, 0) rotate(0deg); }
-  25% { transform: translate(40vw, -10vh) rotate(30deg); }
-  50% { transform: translate(20vw, 30vh) rotate(60deg); }
-  75% { transform: translate(-30vw, 10vh) rotate(90deg); }
-  100% { transform: translate(0, 0) rotate(0deg); }
-}
-
-@keyframes aurora-2 {
-  0% { transform: translate(0, 0) rotate(0deg); }
-  25% { transform: translate(-30vw, 20vh) rotate(-40deg); }
-  50% { transform: translate(10vw, -15vh) rotate(-80deg); }
-  75% { transform: translate(25vw, 10vh) rotate(-120deg); }
-  100% { transform: translate(0, 0) rotate(0deg); }
+// --- 终极版背景动画: 移动背景位置 ---
+@keyframes aurora-sweep {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 // --- 全局和基础设置 ---
@@ -24,36 +14,44 @@ html { height: 100%; overflow: hidden; }
 body {
   height: 100%; font-size: 1rem; margin: 0; padding: 0 0 80px 0;
   color: #1a1a1a; overflow-y: auto; position: relative;
-  background-color: #f0f2f5; // 浅色模式下的一个柔和底色
+  background-color: #f0f2f5;
 }
 
-// --- 新增: 高斯模糊的动态背景层 (双层) ---
-body::before, body::after {
+// --- 高斯模糊的动态背景层 ---
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: -2;
+
+  // --- 核心: 创建一个 300% 宽的巨大背景画布 ---
+  background-size: 300% 300%;
+  // 在这个巨大画布上定位四个颜色点
+  // 亮度提升 (hsla 的第三个值 l: lightness)
+  background-image: linear-gradient(135deg,
+    hsl(0, 90%, 75%),   /* 红色 */
+    hsl(140, 90%, 70%), /* 绿色 */
+    hsl(270, 90%, 75%), /* 紫色 */
+    hsl(200, 90%, 70%)  /* 蓝色 */
+  );
+
+  // 动画: 平滑地移动背景画布的位置
+  animation: aurora-sweep 25s infinite linear;
+  filter: blur(100px);
+  -webkit-filter: blur(100px);
+}
+
+// --- 噪点图层 (抖动) ---
+html::before {
   content: '';
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
   z-index: -1;
-  mix-blend-mode: screen; // 使用滤色模式让颜色混合时更亮
-  filter: blur(120px);
-  -webkit-filter: blur(120px);
-  opacity: 0.9;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 250 250' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.03;
 }
 
-body::before {
-  // 浅色模式: 红 & 紫
-  background:
-    radial-gradient(circle at 20% 25%, hsla(0, 90%, 80%, 0.8), transparent 40%),
-    radial-gradient(circle at 80% 75%, hsla(270, 90%, 80%, 0.8), transparent 40%);
-  animation: aurora-1 30s alternate infinite ease-in-out;
-}
-
-body::after {
-  // 浅色模式: 绿 & 蓝
-  background:
-    radial-gradient(circle at 75% 20%, hsla(200, 90%, 80%, 0.8), transparent 40%),
-    radial-gradient(circle at 25% 80%, hsla(140, 90%, 80%, 0.8), transparent 40%);
-  animation: aurora-2 35s alternate-reverse infinite ease-in-out;
-}
 
 .container { max-width: 960px; margin-left: auto; margin-right: auto; padding-left: 15px; padding-right: 15px; }
 
@@ -126,7 +124,7 @@ main { width: 50%; flex-shrink: 0; }
   border-top: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
   display: flex; justify-content: space-around; align-items: center; z-index: 1030;
-  transition: all 0.3s ease-in-out; // 为悬浮过渡添加动画
+  transition: all 0.3s ease-in-out;
 }
 .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #1a1a1a; text-decoration: none; transition: color 0.2s; flex-grow: 1; height: 100%; }
 .nav-item span { font-size: 0.75rem; margin-top: 4px; }
@@ -139,18 +137,13 @@ main { width: 50%; flex-shrink: 0; }
   body { color: #e0e0e0; background-color: #121212; }
   
   body::before {
-    // 深色模式: 红 & 紫
-    background:
-      radial-gradient(circle at 20% 25%, hsla(0, 80%, 55%, 0.7), transparent 40%),
-      radial-gradient(circle at 80% 75%, hsla(270, 80%, 55%, 0.7), transparent 40%);
-    animation-duration: 40s;
-  }
-  body::after {
-    // 深色模式: 绿 & 蓝
-    background:
-      radial-gradient(circle at 75% 20%, hsla(200, 80%, 55%, 0.7), transparent 40%),
-      radial-gradient(circle at 25% 80%, hsla(140, 80%, 55%, 0.7), transparent 40%);
-    animation-duration: 45s;
+    background-image: linear-gradient(135deg,
+      hsl(0, 80%, 45%),   /* 深红 */
+      hsl(140, 80%, 35%), /* 深绿 */
+      hsl(270, 80%, 45%), /* 深紫 */
+      hsl(200, 80%, 40%)  /* 深蓝 */
+    );
+    animation-duration: 30s;
   }
   
   h1 { background: rgba(40, 40, 40, 0.2); border-color: rgba(255, 255, 255, 0.1); }
@@ -166,29 +159,18 @@ main { width: 50%; flex-shrink: 0; }
   .nav-item.active { color: var(--mdb-primary); }
 }
 
-// --- 新增: 大屏幕设备的悬浮导航栏 ---
+// --- 大屏幕设备的悬浮导航栏 ---
 @media (min-width: 768px) {
-  body {
-    // 为悬浮导航栏留出底部空间
-    padding-bottom: 0;
-  }
+  body { padding-bottom: 0; }
   .bottom-nav {
-    // 尺寸和定位
-    width: auto;
-    max-width: 380px;
-    bottom: 1.5rem;
-    left: 50%;
-    transform: translateX(-50%);
-    // 移除全宽属性
+    width: auto; max-width: 380px; bottom: 1.5rem;
+    left: 50%; transform: translateX(-50%);
     right: auto;
-    // 外观
-    border-radius: 50px; // 胶囊形状
-    border: 1px solid rgba(255, 255, 255, 0.2); // 四周都有边框
+    border-radius: 50px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
   }
   .dark .bottom-nav,
   @media (prefers-color-scheme: dark) {
-    .bottom-nav {
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
+    .bottom-nav { border: 1px solid rgba(255, 255, 255, 0.1); }
   }
 }

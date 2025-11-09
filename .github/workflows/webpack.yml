@@ -7,6 +7,7 @@ on:
     branches:
       - main
       - develop
+      - Clean-C-webui
 
   # 2. 当有 Pull Request 指向 main 分支时自动触发
   pull_request:

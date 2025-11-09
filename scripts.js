@@ -2,9 +2,7 @@ import { exec, toast } from 'kernelsu';
 import { parseLogContent, updateLocalStorage, getStoredData, clearStoredData } from './logParser.js';
 import { Ripple, Modal, initMDB } from 'mdb-ui-kit';
 import Chart from 'chart.js/auto';
-import VConsole from 'vconsole';
 
-const vConsole = new VConsole();
 initMDB({ Ripple });
 
 document.addEventListener('DOMContentLoaded', async () => {

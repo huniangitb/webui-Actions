@@ -52,7 +52,7 @@ export function injectIcons() {
  * @brief 显示加载完成后的主界面。
  */
 export function showApp() {
-    document.getElementById('app-wrapper').classList.add('loaded');
+    document.querySelector('.app-wrapper').classList.add('loaded');
     document.getElementById('loader').style.display = 'none';
 }
 

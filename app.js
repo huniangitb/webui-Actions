@@ -30,11 +30,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 2. 检查后端状态
     if (!await checkBackendProcess()) {
-        handleApiError('后端服务未运行');
+        isBackendOnline = false; // 更新全局状态
+        disableBackendFeatures('后端服务未运行');
     }
 
     // 3. 初始化各个页面的功能
-    // 将统一的错误处理函数传递给每个模块
     await initHomePage(handleApiError);
     await initEditPage(handleApiError);
 

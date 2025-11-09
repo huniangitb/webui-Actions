@@ -5,14 +5,12 @@ on:
   # 1. 当代码推送到 main 或 develop 分支时自动触发
   push:
     branches:
-      - main
-      - develop
       - Clean-C-webui
 
   # 2. 当有 Pull Request 指向 main 分支时自动触发
   pull_request:
     branches:
-      - main
+      - Clean-C-webui
 
   # 3. 保留手动触发功能
   workflow_dispatch:
@@ -20,7 +18,7 @@ on:
       branch:
         description: '要构建的仓库分支 (The branch to build)'
         required: true
-        default: 'main' # 默认使用 main 分支
+        default: 'Clean-C-webui' # 默认使用 main 分支
         type: string
 
 jobs:

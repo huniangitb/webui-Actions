@@ -152,9 +152,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('save-cron-btn').addEventListener('click', () => { cronExpressionInput.value = generateCronFromUI(); cronEditorModal.hide(); });
         
         // --- Cron 编辑器事件 (关键改动) ---
-        // 监听 MDB Tab 组件的 'shown.bs.tab' 事件
+        // 手动初始化 MDB Tab 组件
+        document.querySelectorAll('#cron-tabs [data-mdb-toggle="pill"]').forEach(triggerEl => {
+            const tab = new Tab(triggerEl);
+            triggerEl.addEventListener('click', (event) => {
+                event.preventDefault();
+                tab.show();
+            });
+        });
+        // 监听 MDB Tab 组件的 'shown.bs.tab' 事件，用于强制重绘
         cronEditorModalEl.addEventListener('shown.bs.tab', () => {
-            // 强制重绘以修复潜在的渲染问题
             void cronEditorModalEl.offsetWidth;
         });
 

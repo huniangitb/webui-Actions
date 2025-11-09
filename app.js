@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const appWrapper = document.querySelector('.app-wrapper');
     let isExt4 = false;
     let gcInfoIntervalId = null;
-    let isBackendOnline = true; 
+    let isBackendOnline = true;
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
     // --- SPA 页面切换逻辑 ---
@@ -35,7 +35,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const pageId = e.currentTarget.dataset.page;
-            // 使用 history.replaceState 替换 URL，不产生历史记录，实现返回即退出
             history.replaceState(null, '', `#${pageId}`);
             showPage(pageId);
         });
@@ -43,15 +42,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- 后端通信与状态检查 ---
     function disableBackendFeatures(reason) {
-        if (!isBackendOnline) return; 
+        if (!isBackendOnline) return;
         isBackendOnline = false;
         toast(reason, 4000);
-        
         document.querySelectorAll('#clean-now-btn, #refresh-log, #restart-module, #gc-control-btn, #config-form button[type="submit"]').forEach(btn => {
             btn.disabled = true;
             btn.classList.add('disabled');
         });
-        
         if (gcInfoIntervalId) {
             clearInterval(gcInfoIntervalId);
             gcInfoIntervalId = null;
@@ -62,34 +59,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             globalGcStatusSpan.className = 'badge bg-danger';
         }
     }
-
-    async function checkBackendProcess() {
-        try {
-            const { errno } = await exec('pgrep cleaner');
-            return errno === 0;
-        } catch (e) {
-            return false;
-        }
-    }
-
+    async function checkBackendProcess() { try { const { errno } = await exec('pgrep cleaner'); return errno === 0; } catch (e) { return false; } }
     async function sendTcpCommand(command) {
         if (!isBackendOnline) return null;
         try {
-            const { errno, stdout, stderr } = await exec(`/data/adb/modules/Clean-C/tcp_client ${command}`);
+            const { errno, stdout } = await exec(`/data/adb/modules/Clean-C/tcp_client ${command}`);
             if (errno === 0) {
                 if (!stdout.trim()) return [];
-                try { return JSON.parse(stdout.trim()); } catch (e) {
-                    disableBackendFeatures('后端响应解析失败');
-                    return null;
-                }
-            } else {
-                disableBackendFeatures('后端通信失败');
-                return null;
-            }
-        } catch (error) {
-            disableBackendFeatures('后端通信异常');
-            return null;
-        }
+                try { return JSON.parse(stdout.trim()); } catch (e) { disableBackendFeatures('后端响应解析失败'); return null; }
+            } else { disableBackendFeatures('后端通信失败'); return null; }
+        } catch (error) { disableBackendFeatures('后端通信异常'); return null; }
     }
 
     // --- 辅助函数 ---
@@ -126,11 +105,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         dateSelect.addEventListener('change', updateDisplaysForSelectedDate);
         document.getElementById('clear-data').addEventListener('click', () => { clearStoredData(); updateDisplaysForSelectedDate(); toast('数据已清除'); });
-        gcControlButton.addEventListener('click', async () => { const action = gcControlButton.dataset.action; if (action === 'unknown' || !isBackendOnline) return; gcControlButton.disabled = true; gcControlButton.textContent = '...'; await sendTcpCommand(action === 'start' ? 'start_gc' : 'stop_gc'); await delay(1500); gcControlButton.disabled = false; await updateAllF2fsInfo(true); });
-        document.getElementById('clean-now-btn').addEventListener('click', async () => { if (!isBackendOnline) return; toast('正在请求立即清理...'); await sendTcpCommand('clean_now'); });
+        gcControlButton.addEventListener('click', async () => { const action = gcControlButton.dataset.action; if (action === 'unknown') return; gcControlButton.disabled = true; gcControlButton.textContent = '...'; await sendTcpCommand(action === 'start' ? 'start_gc' : 'stop_gc'); await delay(1500); gcControlButton.disabled = false; await updateAllF2fsInfo(true); });
+        document.getElementById('clean-now-btn').addEventListener('click', async () => { toast('正在请求立即清理...'); await sendTcpCommand('clean_now'); });
         document.getElementById('refresh-log').addEventListener('click', async () => { toast('正在手动刷新...'); if (!isExt4 && !gcInfoIntervalId && isBackendOnline) { gcInfoIntervalId = setInterval(updateAllF2fsInfo, 2000); toast('已重新启动自动刷新'); } await loadLogFile(); if (!isExt4) await updateAllF2fsInfo(true); toast('数据已刷新'); });
         document.getElementById('delete-log').addEventListener('click', async () => { try { await exec('rm -f /data/adb/modules/Clean-C/run.log /data/adb/modules/Clean-C/stats.json'); await loadLogFile(); toast('日志文件已删除'); } catch (e) { toast(`删除日志失败: ${e.message}`); } });
-        document.getElementById('restart-module').addEventListener('click', async () => { if (!isBackendOnline) return; toast('正在请求重启模块...'); await sendTcpCommand('restart'); toast('重启命令已发送'); });
+        document.getElementById('restart-module').addEventListener('click', async () => { toast('正在请求重启模块...'); await sendTcpCommand('restart'); toast('重启命令已发送'); });
         customizePartitionsBtn.addEventListener('click', () => { partitionsModalBody.innerHTML = ''; Array.from(allDiscoveredPartitions).sort().forEach(deviceName => { partitionsModalBody.innerHTML += `<div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="switch-${deviceName}" data-device-name="${deviceName}" ${!hiddenPartitions.has(deviceName) ? 'checked' : ''}><label class="form-check-label" for="switch-${deviceName}">${deviceName}</label></div>`; }); partitionsModal.show(); });
         savePartitionsBtn.addEventListener('click', () => { const newHidden = new Set(); partitionsModalBody.querySelectorAll('.form-check-input').forEach(cb => { if (!cb.checked) newHidden.add(cb.dataset.deviceName); }); hiddenPartitions = newHidden; localStorage.setItem('hiddenF2fsPartitions', JSON.stringify(Array.from(hiddenPartitions))); partitionsModal.hide(); toast('显示偏好已保存'); updateAllF2fsInfo(true); });
 
@@ -164,15 +143,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         function generateCronEditorUI() { for (const key in cronFields) { const { el, min, max, name, labels } = cronFields[key]; let gridHtml = '<div class="cron-grid collapsed">'; for (let i = min; i <= max; i++) { gridHtml += `<div><input type="checkbox" class="btn-check" id="${key}-${i}" value="${i}"><label class="btn btn-outline-primary" for="${key}-${i}">${labels ? labels[i - min] : i}</label></div>`; } el.innerHTML = `<div class="btn-group mb-3 w-100"><input type="radio" class="btn-check" name="${key}-mode" id="${key}-every" value="*" checked><label class="btn btn-outline-primary" for="${key}-every">每${(labels ? '个' : '') + name}</label><input type="radio" class="btn-check" name="${key}-mode" id="${key}-specific" value="specific"><label class="btn btn-outline-primary" for="${key}-specific">指定</label></div>` + gridHtml + '</div>'; } }
         function parseCronToUI(expression) { const parts = expression.split(' '); if (parts.length !== 5) return; ['minutes', 'hours', 'dom', 'months', 'dow'].forEach((key, i) => { const part = parts[i], field = cronFields[key]; field.el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); if (part === '*') { field.el.querySelector(`#${key}-every`).checked = true; field.el.querySelector('.cron-grid').classList.add('collapsed'); } else { field.el.querySelector(`#${key}-specific`).checked = true; field.el.querySelector('.cron-grid').classList.remove('collapsed'); part.split(',').forEach(range => { if (range.includes('-')) { const [start, end] = range.split('-').map(Number); for (let j = start; j <= end; j++) { const cb = field.el.querySelector(`#${key}-${j}`); if (cb) cb.checked = true; } } else if (range.includes('/')) { const [_, step] = range.split('/').map(Number); for (let j = field.min; j <= field.max; j += step) { const cb = field.el.querySelector(`#${key}-${j}`); if (cb) cb.checked = true; } } else { const cb = field.el.querySelector(`#${key}-${Number(range)}`); if (cb) cb.checked = true; } }); } }); }
         function generateCronFromUI() { return ['minutes', 'hours', 'dom', 'months', 'dow'].map(key => { const field = cronFields[key]; if (field.el.querySelector(`input[name="${key}-mode"]:checked`).value === '*') return '*'; const selected = Array.from(field.el.querySelectorAll('.cron-grid input:checked')).map(cb => Number(cb.value)); if (selected.length === 0 || selected.length === (field.max - field.min + 1)) return '*'; selected.sort((a, b) => a - b); const ranges = []; for (let i = 0; i < selected.length; i++) { let start = selected[i]; while (i + 1 < selected.length && selected[i+1] === selected[i] + 1) i++; ranges.push(start === selected[i] ? `${start}` : `${start}-${selected[i]}`); } return ranges.join(','); }).join(' '); }
-        async function loadConfigFile() { try { const { errno, stdout, stderr } = await exec('cat /data/media/0/Android/清理规则/配置.txt'); if (errno === 0) { const config = {}; stdout.split('\n').forEach(line => { if (line.includes('=')) { const [key, value] = line.split('=').map(item => item.trim()); if (key && value) config[key] = value; } }); retentionDaysInput.value = config.保留天数 || '30'; if (config.cron表达式 && config.cron表达式.trim() !== '') { scheduleModeCronRadio.checked = true; cronExpressionInput.value = config.cron表达式; } else { cronExpressionInput.value = '0 * * * *'; } cleanIntervalInput.value = config.程序清理间隔秒数 || '3600'; const f2fsGcValue = config['f2fs-GC'] || 'n'; f2fsGcConfigToggle.checked = f2fsGcValue === 'y'; } } catch (e) { toast(`加载配置失败: ${e.message}`); } updateScheduleModeUI(); updateGcConfigToggleLabel(f2fsGcConfigToggle.checked); }
+        async function loadConfigFile() { try { const { errno, stdout } = await exec('cat /data/media/0/Android/清理规则/配置.txt'); if (errno === 0) { const config = {}; stdout.split('\n').forEach(line => { if (line.includes('=')) { const [key, value] = line.split('=').map(item => item.trim()); if (key && value) config[key] = value; } }); retentionDaysInput.value = config.保留天数 || '30'; if (config.cron表达式 && config.cron表达式.trim() !== '') { scheduleModeCronRadio.checked = true; cronExpressionInput.value = config.cron表达式; } else { cronExpressionInput.value = '0 * * * *'; } cleanIntervalInput.value = config.程序清理间隔秒数 || '3600'; const f2fsGcValue = config['f2fs-GC'] || 'n'; f2fsGcConfigToggle.checked = f2fsGcValue === 'y'; } } catch (e) { toast(`加载配置失败: ${e.message}`); } updateScheduleModeUI(); updateGcConfigToggleLabel(f2fsGcConfigToggle.checked); }
         
-        configForm.addEventListener('submit', async (e) => { e.preventDefault(); if (!isBackendOnline) return; try { const { errno, stdout, stderr } = await exec('cat /data/media/0/Android/清理规则/配置.txt'); let lines = (errno === 0) ? stdout.split('\n') : []; if (errno !== 0 && !stderr.includes('No such file')) throw new Error(`读取配置失败: ${stderr}`); const otherLines = lines.filter(l => !/^(保留天数=|程序清理间隔秒数=|cron表达式=|f2fs-GC=)/.test(l) && l.trim() !== ''); const newConfig = [...otherLines, `保留天数=${retentionDaysInput.value}`, `f2fs-GC=${f2fsGcConfigToggle.checked ? 'y' : 'n'}`]; if (scheduleModeCronRadio.checked) { newConfig.push(`cron表达式=${cronExpressionInput.value}`, `程序清理间隔秒数=${cleanIntervalInput.value}`); } else { newConfig.push(`程序清理间隔秒数=${cleanIntervalInput.value}`, `cron表达式=${cronExpressionInput.value || '0 * * * *'}`); } const updatedConfig = newConfig.join('\n'); const { errno: writeErrno, stderr: writeStderr } = await exec(`printf "%s" "${updatedConfig.replace(/"/g, '\\"')}" > /data/media/0/Android/清理规则/配置.txt`); if (writeErrno !== 0) throw new Error(`写入配置失败: ${writeStderr}`); toast('配置已保存，正在请求重启模块...'); await sendTcpCommand('restart'); toast('重启命令已发送'); } catch (error) { toast(`操作失败: ${error.message}`); } });
+        configForm.addEventListener('submit', async (e) => { e.preventDefault(); try { const { errno, stdout, stderr } = await exec('cat /data/media/0/Android/清理规则/配置.txt'); let lines = (errno === 0) ? stdout.split('\n') : []; if (errno !== 0 && !stderr.includes('No such file')) throw new Error(`读取配置失败: ${stderr}`); const otherLines = lines.filter(l => !/^(保留天数=|程序清理间隔秒数=|cron表达式=|f2fs-GC=)/.test(l) && l.trim() !== ''); const newConfig = [...otherLines, `保留天数=${retentionDaysInput.value}`, `f2fs-GC=${f2fsGcConfigToggle.checked ? 'y' : 'n'}`]; if (scheduleModeCronRadio.checked) { newConfig.push(`cron表达式=${cronExpressionInput.value}`, `程序清理间隔秒数=${cleanIntervalInput.value}`); } else { newConfig.push(`程序清理间隔秒数=${cleanIntervalInput.value}`, `cron表达式=${cronExpressionInput.value || '0 * * * *'}`); } const updatedConfig = newConfig.join('\n'); const { errno: writeErrno, stderr: writeStderr } = await exec(`printf "%s" "${updatedConfig.replace(/"/g, '\\"')}" > /data/media/0/Android/清理规则/配置.txt`); if (writeErrno !== 0) throw new Error(`写入配置失败: ${writeStderr}`); toast('配置已保存，正在请求重启模块...'); await sendTcpCommand('restart'); toast('重启命令已发送'); } catch (error) { toast(`操作失败: ${error.message}`); } });
         f2fsGcConfigToggle.addEventListener('change', () => updateGcConfigToggleLabel(f2fsGcConfigToggle.checked));
         document.querySelectorAll('input[name="schedule-mode"]').forEach(el => el.addEventListener('change', updateScheduleModeUI));
         document.getElementById('edit-cron-btn').addEventListener('click', () => { parseCronToUI(cronExpressionInput.value); cronEditorModal.show(); });
         document.getElementById('save-cron-btn').addEventListener('click', () => { cronExpressionInput.value = generateCronFromUI(); cronEditorModal.hide(); });
         
-        // Cron 编辑器标签页切换逻辑 (使用 transitionend 确保动画同步)
         cronTabTriggers.forEach(clickedTrigger => {
             clickedTrigger.addEventListener('click', (event) => {
                 event.preventDefault();
@@ -181,49 +159,33 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const currentPane = document.querySelector('#cron-tabs-content .tab-pane.active');
                 const targetPane = document.querySelector(clickedTrigger.getAttribute('href'));
                 const currentGrid = currentPane?.querySelector('.cron-grid');
-                
-                // 核心切换逻辑
+
                 const switchTabs = () => {
-                    // 1. 移除旧的 active 状态
                     cronTabTriggers.forEach(trigger => trigger.classList.remove('active'));
                     document.querySelectorAll('#cron-tabs-content .tab-pane').forEach(pane => {
                         pane.classList.remove('active', 'show');
                     });
-
-                    // 2. 添加新的 active 状态
                     clickedTrigger.classList.add('active');
                     if (targetPane) {
                         targetPane.classList.add('active');
-                        
-                        // 强制浏览器重绘
                         void targetPane.offsetWidth;
-
                         targetPane.classList.add('show');
-
-                        // 3. 检查新面板是否需要展开，并触发展开动画
                         const targetIsSpecific = targetPane.querySelector('input[value="specific"]')?.checked;
                         if (targetIsSpecific) {
-                            setTimeout(() => { // 稍等 CSS show 动画开始
-                                targetPane.querySelector('.cron-grid')?.classList.remove('collapsed');
-                            }, 10);
+                            targetPane.querySelector('.cron-grid')?.classList.remove('collapsed');
                         }
                     }
                 };
 
-                // 如果当前面板是展开的 (即非 collapsed)，则先收起并监听动画结束事件
                 if (currentGrid && !currentGrid.classList.contains('collapsed')) {
-                    // 添加一次性事件监听器
                     currentGrid.addEventListener('transitionend', function onTransitionEnd(e) {
-                        // 确保是 max-height 动画结束时才触发
                         if (e.propertyName === 'max-height') {
                             currentGrid.removeEventListener('transitionend', onTransitionEnd);
                             switchTabs();
                         }
                     });
-                    // 触发收缩动画
                     currentGrid.classList.add('collapsed');
                 } else {
-                    // 如果当前面板已经是收缩状态，直接切换
                     switchTabs();
                 }
             });
@@ -244,21 +206,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- 应用初始化 ---
     injectIcons();
-
-    // 优先检查后端进程
     if (!await checkBackendProcess()) {
-        disableBackendFeatures('后端服务 cleaner 未运行，功能已禁用');
+        disableBackendFeatures('后端服务未运行');
     }
-
     await initHomePage();
     await initEditPage();
-
     const initialPage = window.location.hash.substring(1) || 'home';
-    // 替换历史记录，防止滑动返回
-    history.replaceState(null, '', `#${initialPage}`);
     showPage(initialPage);
-
-    // 初始化完成，显示界面
     appWrapper.classList.add('loaded');
     loader.style.display = 'none';
 });

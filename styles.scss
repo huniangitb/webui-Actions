@@ -55,7 +55,7 @@ h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); }
 #partitions-modal-body { display: flex; flex-direction: column; gap: 0.75rem; }
 
 // --- 编辑页特定样式 ---
-#f2fs-gc-config-toggle-label { width: 85px; box-sizing: border-box; text-align: center; transition: all 0.2s ease-in-out; }
+#f2fs-gc-config-toggle-label { width: 100px; box-sizing: border-box; text-align: center; transition: all 0.2s ease-in-out; }
 // 移除 !important
 .cron-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; transition: opacity 0.35s ease-out, max-height 0.35s ease-out; overflow: hidden; max-height: 500px; opacity: 1; }
 .cron-grid.collapsed { max-height: 0; opacity: 0; }

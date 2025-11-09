@@ -1,84 +1,80 @@
 // 1. 完整引入 MDB 的所有样式
 @import 'mdb-ui-kit/src/scss/mdb.free.scss';
 
-// --- 新增: 动态背景动画 ---
-@keyframes moveAndRotate {
-  0% {
-    transform: translate(0, 0) rotate(0deg) scale(1.2);
-  }
-  25% {
-    transform: translate(20px, 40px) rotate(90deg) scale(1.2);
-  }
-  50% {
-    transform: translate(0, 0) rotate(180deg) scale(1.2);
-  }
-  75% {
-    transform: translate(-20px, -40px) rotate(270deg) scale(1.2);
-  }
-  100% {
-    transform: translate(0, 0) rotate(360deg) scale(1.2);
-  }
+// --- 新增: 复杂的背景动画 ---
+@keyframes aurora-1 {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(40vw, -10vh) rotate(30deg); }
+  50% { transform: translate(20vw, 30vh) rotate(60deg); }
+  75% { transform: translate(-30vw, 10vh) rotate(90deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+@keyframes aurora-2 {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(-30vw, 20vh) rotate(-40deg); }
+  50% { transform: translate(10vw, -15vh) rotate(-80deg); }
+  75% { transform: translate(25vw, 10vh) rotate(-120deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
 }
 
 // --- 全局和基础设置 ---
-html {
-  height: 100%;
-  overflow: hidden; // 防止伪元素导致滚动条
-}
+html { height: 100%; overflow: hidden; }
 
 body {
-  height: 100%;
-  font-size: 1rem;
-  margin: 0;
-  padding: 0 0 80px 0;
-  color: #1a1a1a;
-  overflow-y: auto;
-  position: relative;
-  background-color: #f0f0f0; // 添加一个基础背景色
+  height: 100%; font-size: 1rem; margin: 0; padding: 0 0 80px 0;
+  color: #1a1a1a; overflow-y: auto; position: relative;
+  background-color: #f0f2f5; // 浅色模式下的一个柔和底色
 }
 
-// --- 新增: 高斯模糊的动态背景层 ---
-body::before {
+// --- 新增: 高斯模糊的动态背景层 (双层) ---
+body::before, body::after {
   content: '';
   position: fixed;
-  top: -10%; left: -10%;
-  width: 120%; height: 120%;
+  top: 0; left: 0; width: 100%; height: 100%;
   z-index: -1;
+  mix-blend-mode: screen; // 使用滤色模式让颜色混合时更亮
+  filter: blur(120px);
+  -webkit-filter: blur(120px);
+  opacity: 0.9;
+}
 
-  // --- 核心: 四个角的颜色点 ---
-  // 我们使用 hsla 来精确控制颜色、饱和度和亮度
+body::before {
+  // 浅色模式: 红 & 紫
   background:
-    // 右下角 (紫色)
-    radial-gradient(circle at 100% 100%, hsla(270, 85%, 75%, 0.8), transparent 25%),
-    // 左下角 (绿色)
-    radial-gradient(circle at 0% 100%, hsla(140, 85%, 75%, 0.8), transparent 25%),
-    // 右上角 (蓝色)
-    radial-gradient(circle at 100% 0%, hsla(200, 85%, 75%, 0.8), transparent 25%),
-    // 左上角 (红色)
-    radial-gradient(circle at 0% 0%, hsla(0, 85%, 75%, 0.8), transparent 25%);
+    radial-gradient(circle at 20% 25%, hsla(0, 90%, 80%, 0.8), transparent 40%),
+    radial-gradient(circle at 80% 75%, hsla(270, 90%, 80%, 0.8), transparent 40%);
+  animation: aurora-1 30s alternate infinite ease-in-out;
+}
 
-  // 动画和模糊效果
-  animation: moveAndRotate 30s alternate infinite;
-  filter: blur(100px);
-  -webkit-filter: blur(100px);
-  opacity: 0.8; // 调整整体亮度
+body::after {
+  // 浅色模式: 绿 & 蓝
+  background:
+    radial-gradient(circle at 75% 20%, hsla(200, 90%, 80%, 0.8), transparent 40%),
+    radial-gradient(circle at 25% 80%, hsla(140, 90%, 80%, 0.8), transparent 40%);
+  animation: aurora-2 35s alternate-reverse infinite ease-in-out;
 }
 
 .container { max-width: 960px; margin-left: auto; margin-right: auto; padding-left: 15px; padding-right: 15px; }
-h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+
+// --- 标题毛玻璃效果 ---
+h1 {
+  font-size: clamp(1.5rem, 4vw, 2.5rem); color: #fff; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  display: inline-block; padding: 0.5em 1em;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-radius: 15px; border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
 
 // --- 毛玻璃 (Glassmorphism) 效果 ---
 .card, .modal-content, .partition-gc-status-item {
   background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  margin-bottom: 1.5rem;
+  backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+  border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); margin-bottom: 1.5rem;
 }
 
-// --- 样式调整以适应毛玻璃效果 ---
 .card-header, .modal-header { background-color: transparent; border-bottom: 1px solid rgba(255, 255, 255, 0.2); }
 .card-header h5 { font-size: 1.25rem; }
 .btn { white-space: normal; line-height: 1.2; text-align: center; }
@@ -122,15 +118,15 @@ main { width: 50%; flex-shrink: 0; }
 .tab-content > .tab-pane.active { height: auto; overflow: visible; }
 .tab-content > .tab-pane.active.show { opacity: 1; }
 
-// --- 底部导航栏样式 (更新为毛玻璃效果) ---
+// --- 底部导航栏样式 ---
 .bottom-nav {
   position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
   background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
+  backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
   border-top: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
   display: flex; justify-content: space-around; align-items: center; z-index: 1030;
+  transition: all 0.3s ease-in-out; // 为悬浮过渡添加动画
 }
 .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #1a1a1a; text-decoration: none; transition: color 0.2s; flex-grow: 1; height: 100%; }
 .nav-item span { font-size: 0.75rem; margin-top: 4px; }
@@ -142,42 +138,57 @@ main { width: 50%; flex-shrink: 0; }
   #loader { background-color: #121212; }
   body { color: #e0e0e0; background-color: #121212; }
   
-  // 深色模式的模糊背景
   body::before {
+    // 深色模式: 红 & 紫
     background:
-      // 右下角 (深紫)
-      radial-gradient(circle at 100% 100%, hsla(270, 70%, 40%, 0.7), transparent 30%),
-      // 左下角 (深绿)
-      radial-gradient(circle at 0% 100%, hsla(140, 70%, 30%, 0.7), transparent 30%),
-      // 右上角 (深蓝)
-      radial-gradient(circle at 100% 0%, hsla(200, 70%, 40%, 0.7), transparent 30%),
-      // 左上角 (深红)
-      radial-gradient(circle at 0% 0%, hsla(0, 70%, 40%, 0.7), transparent 30%);
+      radial-gradient(circle at 20% 25%, hsla(0, 80%, 55%, 0.7), transparent 40%),
+      radial-gradient(circle at 80% 75%, hsla(270, 80%, 55%, 0.7), transparent 40%);
     animation-duration: 40s;
-    opacity: 1;
+  }
+  body::after {
+    // 深色模式: 绿 & 蓝
+    background:
+      radial-gradient(circle at 75% 20%, hsla(200, 80%, 55%, 0.7), transparent 40%),
+      radial-gradient(circle at 25% 80%, hsla(140, 80%, 55%, 0.7), transparent 40%);
+    animation-duration: 45s;
   }
   
-  h1 { color: #fff; }
-
-  // 深色模式下的毛玻璃效果
-  .card, .modal-content, .partition-gc-status-item {
-    background: rgba(40, 40, 40, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
+  h1 { background: rgba(40, 40, 40, 0.2); border-color: rgba(255, 255, 255, 0.1); }
+  .card, .modal-content, .partition-gc-status-item { background: rgba(40, 40, 40, 0.2); border: 1px solid rgba(255, 255, 255, 0.1); }
   .card-header, .card-footer, .modal-header, .modal-footer { border-color: rgba(255, 255, 255, 0.1); }
-  .form-control, .form-select {
-    background-color: rgba(58, 58, 58, 0.5); color: #ffffff; border-color: rgba(255, 255, 255, 0.2);
-  }
+  .form-control, .form-select { background-color: rgba(58, 58, 58, 0.5); color: #ffffff; border-color: rgba(255, 255, 255, 0.2); }
   .form-control:focus, .form-select:focus { background-color: rgba(74, 74, 74, 0.7); border-color: #007bff; }
   .app-stats-list-wrapper, .list-group-item { border-color: rgba(255, 255, 255, 0.1); }
   .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
   
-  // 深色模式下的底部导航栏
-  .bottom-nav {
-    background: rgba(40, 40, 40, 0.2);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-  }
+  .bottom-nav { background: rgba(40, 40, 40, 0.2); border-top: 1px solid rgba(255, 255, 255, 0.1); }
   .nav-item { color: #bbb; }
   .nav-item.active { color: var(--mdb-primary); }
+}
+
+// --- 新增: 大屏幕设备的悬浮导航栏 ---
+@media (min-width: 768px) {
+  body {
+    // 为悬浮导航栏留出底部空间
+    padding-bottom: 0;
+  }
+  .bottom-nav {
+    // 尺寸和定位
+    width: auto;
+    max-width: 380px;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    // 移除全宽属性
+    right: auto;
+    // 外观
+    border-radius: 50px; // 胶囊形状
+    border: 1px solid rgba(255, 255, 255, 0.2); // 四周都有边框
+  }
+  .dark .bottom-nav,
+  @media (prefers-color-scheme: dark) {
+    .bottom-nav {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+  }
 }

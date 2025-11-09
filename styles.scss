@@ -54,7 +54,7 @@ h1 {
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border-radius: 15px; border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  margin-bottom: 1rem; /* 修复: 减小标题下边距 */
+  margin-bottom: 1rem;
 }
 
 // --- 毛玻璃 (Glassmorphism) 效果 ---
@@ -89,7 +89,7 @@ h1 {
 
 .input-group.input-glass-wrapper {
   padding: 0; overflow: hidden;
-  flex-wrap: nowrap; /* 修复: Cron 编辑按钮强制不换行 */
+  flex-wrap: nowrap; /* Cron 编辑按钮强制不换行 */
   .btn { border-color: rgba(255, 255, 255, 0.2); }
   .form-control-transparent { padding: 0.375rem 0.75rem; }
 }
@@ -100,18 +100,21 @@ h1 {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50px; /* 修复: 使其更圆润 */
+  border-radius: 50px; /* 使其更圆润 */
   padding: 0.25rem; display: flex; gap: 0.25rem;
 }
 .radio-toggle-input { display: none; }
 .radio-toggle-label {
   flex: 1; padding: 0.375rem 0.75rem; text-align: center;
-  border-radius: 50px; /* 修复: 使其更圆润 */
+  border-radius: 50px; /* 使其更圆润 */
   cursor: pointer; transition: all 0.2s ease-in-out; color: #1a1a1a;
 }
 .radio-toggle-input:checked + .radio-toggle-label {
-  background-color: rgba(255, 255, 255, 0.5); color: #000; font-weight: 500;
+  background-color: rgba(255, 255, 255, 0.5);
+  color: #000;
+  font-weight: 500;
 }
+
 
 // --- 加载动画样式 ---
 #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: #F2F2F2; z-index: 9999; }
@@ -152,9 +155,20 @@ main { width: 50%; flex-shrink: 0; }
 
 // --- Cron 编辑器模态框特殊样式 ---
 #cron-editor-modal .modal-content {
-  background: rgba(255, 255, 255, 0.1); /* 修复: 降低透明度 (80%不透明) */
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); /* 修复: 提高模糊 */
+  background: rgba(255, 255, 255, 0.2); /* 提高不透明度 (~80%) */
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); /* 提高模糊 */
 }
+/* 修复: Cron 编辑器内部按钮背景 */
+#cron-tabs .nav-link,
+#cron-editor-modal .modal-body .btn-outline-primary {
+    background-color: transparent !important;
+    color: #1a1a1a;
+}
+#cron-tabs .nav-link.active {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    color: #000;
+}
+
 
 // --- 底部导航栏样式 ---
 .bottom-nav {
@@ -174,24 +188,29 @@ main { width: 50%; flex-shrink: 0; }
 // --- 深色模式样式 ---
 @media (prefers-color-scheme: dark) {
   #loader { background-color: #121212; }
-  body { color: #f5f5f5; background-color: #121212; }
+  body {
+    color: #f5f5f5;
+    background-color: #121212;
+  }
   
   body::before {
     background-image: linear-gradient(135deg,
-      hsl(0, 90%, 50%), hsl(140, 90%, 45%), hsl(270, 90%, 55%), hsl(200, 90%, 50%)
+      hsl(0, 90%, 50%),
+      hsl(140, 90%, 45%),
+      hsl(270, 90%, 55%),
+      hsl(200, 90%, 50%)
     );
     animation-duration: 30s;
   }
   
   h1 { background: rgba(50, 50, 50, 0.3); border-color: rgba(255, 255, 255, 0.1); }
   .card, .modal-content, .partition-gc-status-item {
-    background: rgba(50, 50, 50, 0.3); /* 修复: 提高不透明度 */
+    background: rgba(50, 50, 50, 0.3); /* 提升不透明度 */
     border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #f5f5f5; /* 修复: 强制字体颜色 */
+    color: #f5f5f5;
   }
-  /* 修复: 确保容器内所有子元素都继承亮色字体 */
   .card *, .modal-content * {
-    color: inherit;
+    color: inherit; /* 修复: 确保容器内所有子元素继承亮色字体 */
   }
 
   .card-header, .card-footer, .modal-header, .modal-footer { border-color: rgba(255, 255, 255, 0.1); }
@@ -216,10 +235,21 @@ main { width: 50%; flex-shrink: 0; }
     background-color: rgba(255, 255, 255, 0.15); color: #f5f5f5;
   }
 
+  /* 修复: 深色模式下 Cron 编辑器内部按钮 */
   #cron-editor-modal .modal-content {
     background: rgba(50, 50, 50, 0.8);
     backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   }
+  #cron-tabs .nav-link,
+  #cron-editor-modal .modal-body .btn-outline-primary {
+    background-color: transparent !important;
+    color: #f5f5f5;
+  }
+  #cron-tabs .nav-link.active {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    color: #f5f5f5;
+  }
+
 
   .app-stats-list-wrapper, .list-group-item { border-color: rgba(255, 255, 255, 0.1); }
   .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }

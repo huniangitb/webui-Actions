@@ -30,7 +30,11 @@ body { background-color: #F2F2F2; font-size: 1rem; margin: 0; padding: 0 0 80px 
 h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); }
 .card { border-radius: 15px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); margin-bottom: 1.5rem; }
 .card-header h5 { font-size: 1.25rem; }
-.btn { white-space: normal; line-height: 1.2; text-align: center; 
+.btn { 
+  white-space: normal; 
+  line-height: 1.2; 
+  text-align: center; 
+}
 
 
 // --- 主页特定样式 ---

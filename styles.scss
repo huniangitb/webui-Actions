@@ -43,28 +43,17 @@ h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); }
 
 // --- Cron 编辑器滑动动画 (关键改动) ---
 #cron-tabs-content {
-  position: relative;
   overflow: hidden;
-  min-height: 250px; // 防止容器在绝对定位时塌陷
+}
+.tab-panes-wrapper {
+  display: flex;
+  transition: transform 0.35s ease-in-out;
 }
 .tab-content > .tab-pane {
-  position: absolute;
-  top: 0;
-  left: 0;
   width: 100%;
-  transition: transform 0.35s ease-in-out, opacity 0.35s ease-in-out;
-  opacity: 0;
-  transform: translateX(100%); // 默认在右侧屏幕外
-}
-.tab-content > .tab-pane.active {
-  opacity: 1;
-  transform: translateX(0); // active 状态在屏幕中央
-}
-.tab-content > .tab-pane.transition-out-left {
-  transform: translateX(-100%); // 动画：滑向左侧屏幕外
-}
-.tab-content > .tab-pane.transition-out-right {
-  transform: translateX(100%); // 动画：滑向右侧屏幕外
+  flex-shrink: 0;
+  opacity: 1; // 始终可见，通过 transform 控制位置
+  visibility: visible;
 }
 
 // --- 底部导航栏样式 (关键改动) ---
@@ -74,8 +63,8 @@ h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); }
   left: 0;
   right: 0;
   height: 60px;
-  background-color: rgba(255, 255, 255, 0.85); // 半透明背景
-  backdrop-filter: blur(10px); // 毛玻璃效果
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   display: flex;
   justify-content: space-around;
@@ -99,7 +88,7 @@ h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); }
   .app-stats-list-wrapper, .list-group-item { border-color: rgba(255, 255, 255, 0.1); }
   .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
   .bottom-nav {
-    background-color: rgba(45, 45, 45, 0.85); // 深色半透明背景
+    background-color: rgba(45, 45, 45, 0.85);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
   }
   .nav-item { color: #777; }

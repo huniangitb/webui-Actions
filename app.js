@@ -138,6 +138,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const cronTabTriggers = document.querySelectorAll('#cron-tabs .nav-link');
         const cronFields = { minutes: { el: document.getElementById('cron-minutes'), min: 0, max: 59, name: '分钟' }, hours: { el: document.getElementById('cron-hours'), min: 0, max: 23, name: '小时' }, dom: { el: document.getElementById('cron-dom'), min: 1, max: 31, name: '日' }, months: { el: document.getElementById('cron-months'), min: 1, max: 12, name: '月', labels: ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'] }, dow: { el: document.getElementById('cron-dow'), min: 0, max: 6, name: '星期', labels: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] } };
 
+        // --- Cron 编辑器结构初始化 (关键改动) ---
+        const cronTabsContent = document.getElementById('cron-tabs-content');
+        const panesWrapper = document.createElement('div');
+        panesWrapper.className = 'tab-panes-wrapper';
+        const panes = cronTabsContent.querySelectorAll('.tab-pane');
+        panes.forEach(pane => panesWrapper.appendChild(pane));
+        cronTabsContent.appendChild(panesWrapper);
+
         function updateGcConfigToggleLabel(isChecked) { f2fsGcConfigToggleLabel.textContent = isChecked ? '已开启' : '已关闭'; f2fsGcConfigToggleLabel.classList.toggle('btn-success', isChecked); f2fsGcConfigToggleLabel.classList.toggle('btn-outline-secondary', !isChecked); }
         function updateScheduleModeUI() { const isCron = scheduleModeCronRadio.checked; intervalInputGroup.classList.toggle('hidden', isCron); cronInputGroup.classList.toggle('hidden', !isCron); cleanIntervalInput.required = !isCron; cronExpressionInput.required = isCron; }
         function generateCronEditorUI() { for (const key in cronFields) { const { el, min, max, name, labels } = cronFields[key]; let gridHtml = '<div class="cron-grid collapsed">'; for (let i = min; i <= max; i++) { gridHtml += `<div><input type="checkbox" class="btn-check" id="${key}-${i}" value="${i}"><label class="btn btn-outline-primary" for="${key}-${i}">${labels ? labels[i - min] : i}</label></div>`; } el.innerHTML = `<div class="btn-group mb-3 w-100"><input type="radio" class="btn-check" name="${key}-mode" id="${key}-every" value="*" checked><label class="btn btn-outline-primary" for="${key}-every">每${(labels ? '个' : '') + name}</label><input type="radio" class="btn-check" name="${key}-mode" id="${key}-specific" value="specific"><label class="btn btn-outline-primary" for="${key}-specific">指定</label></div>` + gridHtml + '</div>'; } }
@@ -157,44 +165,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 event.preventDefault();
                 if (clickedTrigger.classList.contains('active')) return;
 
-                const currentTrigger = document.querySelector('#cron-tabs .nav-link.active');
-                const currentIndex = Array.from(cronTabTriggers).indexOf(currentTrigger);
-                const currentPane = document.querySelector(currentTrigger.getAttribute('href'));
-                const targetPane = document.querySelector(clickedTrigger.getAttribute('href'));
-                
-                // 确定滑动方向
-                const direction = targetIndex > currentIndex ? 'right' : 'left';
+                // 立即收起所有 grid，确保动画平滑
+                panes.forEach(p => p.querySelector('.cron-grid')?.classList.add('collapsed'));
 
-                // 立即收起当前面板的 grid (如果展开)
-                currentPane.querySelector('.cron-grid')?.classList.add('collapsed');
-
-                // 准备动画
-                currentPane.classList.remove('active');
-                if (direction === 'right') {
-                    currentPane.classList.add('transition-out-left');
-                    targetPane.style.transform = 'translateX(100%)';
-                } else {
-                    currentPane.classList.add('transition-out-right');
-                    targetPane.style.transform = 'translateX(-100%)';
-                }
-                
-                // 强制重绘以确保初始状态被应用
-                void targetPane.offsetWidth;
-
-                // 激活新标签和面板，开始滑动
+                // 更新 active 状态
                 cronTabTriggers.forEach(t => t.classList.remove('active'));
                 clickedTrigger.classList.add('active');
-                targetPane.classList.add('active');
-                targetPane.style.transform = 'translateX(0)';
 
-                // 动画结束后清理
-                targetPane.addEventListener('transitionend', () => {
-                    currentPane.classList.remove('transition-out-left', 'transition-out-right');
-                    // 检查新面板是否需要展开
+                // 计算并应用 transform
+                panesWrapper.style.transform = `translateX(-${targetIndex * 100}%)`;
+
+                // 动画结束后，检查新面板是否需要展开
+                setTimeout(() => {
+                    const targetPane = panes[targetIndex];
                     if (targetPane.querySelector('input[value="specific"]')?.checked) {
                         targetPane.querySelector('.cron-grid')?.classList.remove('collapsed');
                     }
-                }, { once: true }); // 监听器只执行一次
+                }, 350); // 动画时长
             });
         });
 

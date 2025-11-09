@@ -24,20 +24,27 @@ function handleApiError(reason) {
 
 // 主应用逻辑
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. 初始化基础 UI
-    injectIcons();
-    initPageSwitcher();
+    try {
+        // 1. 初始化基础 UI
+        injectIcons();
+        initPageSwitcher();
 
-    // 2. 检查后端状态
-    if (!await checkBackendProcess()) {
-        isBackendOnline = false; // 更新全局状态
-        disableBackendFeatures('后端服务未运行');
+        // 2. 检查后端状态
+        if (!await checkBackendProcess()) {
+            // 如果后端未运行，抛出一个错误，由 catch 块统一处理
+            throw new Error('后端服务未运行');
+        }
+
+        // 3. 初始化各个页面的功能
+        // 将统一的错误处理函数传递给每个模块，用于处理轮询等后续错误
+        await initHomePage(handleApiError);
+        await initEditPage(handleApiError);
+
+    } catch (error) {
+        // 捕获任何初始化阶段的错误
+        handleApiError(error.message);
+    } finally {
+        // 4. 无论成功或失败，都必须显示应用界面
+        showApp();
     }
-
-    // 3. 初始化各个页面的功能
-    await initHomePage(handleApiError);
-    await initEditPage(handleApiError);
-
-    // 4. 显示应用
-    showApp();
 });

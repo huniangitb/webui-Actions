@@ -169,8 +169,11 @@ main { width: 50%; flex-shrink: 0; }
     border-radius: 50px;
     border: 1px solid rgba(255, 255, 255, 0.2);
   }
-  .dark .bottom-nav,
+
+  // --- 修复: 正确嵌套深色模式的样式 ---
   @media (prefers-color-scheme: dark) {
-    .bottom-nav { border: 1px solid rgba(255, 255, 255, 0.1); }
+    .bottom-nav {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
   }
 }

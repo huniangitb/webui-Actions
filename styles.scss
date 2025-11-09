@@ -23,19 +23,13 @@ body::before {
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
   z-index: -2;
-
-  // --- 核心: 创建一个 300% 宽的巨大背景画布 ---
   background-size: 300% 300%;
-  // 在这个巨大画布上定位四个颜色点
-  // 亮度提升 (hsla 的第三个值 l: lightness)
   background-image: linear-gradient(135deg,
     hsl(0, 90%, 75%),   /* 红色 */
     hsl(140, 90%, 70%), /* 绿色 */
     hsl(270, 90%, 75%), /* 紫色 */
     hsl(200, 90%, 70%)  /* 蓝色 */
   );
-
-  // 动画: 平滑地移动背景画布的位置
   animation: aurora-sweep 25s infinite linear;
   filter: blur(100px);
   -webkit-filter: blur(100px);
@@ -63,6 +57,7 @@ h1 {
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border-radius: 15px; border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem; /* 紧凑布局 */
 }
 
 // --- 毛玻璃 (Glassmorphism) 效果 ---
@@ -76,6 +71,44 @@ h1 {
 .card-header, .modal-header { background-color: transparent; border-bottom: 1px solid rgba(255, 255, 255, 0.2); }
 .card-header h5 { font-size: 1.25rem; }
 .btn { white-space: normal; line-height: 1.2; text-align: center; }
+
+// --- 新增: 毛玻璃输入框样式 ---
+.input-glass-wrapper {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  display: flex;
+  align-items: center;
+  transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+}
+.form-control-transparent {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  width: 100%;
+  color: #1a1a1a;
+  padding: 0;
+  height: auto;
+}
+.form-control-transparent::placeholder {
+  color: rgba(0, 0, 0, 0.6);
+}
+// 特殊处理带按钮的输入框组
+.input-group.input-glass-wrapper {
+  padding: 0;
+  overflow: hidden;
+  .btn {
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  .form-control-transparent {
+    padding: 0.375rem 0.75rem;
+  }
+}
+
 
 // --- 加载动画样式 ---
 #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: #F2F2F2; z-index: 9999; }
@@ -108,8 +141,6 @@ main { width: 50%; flex-shrink: 0; }
 .cron-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; transition: opacity 0.35s ease-out, max-height 0.35s ease-out; overflow: hidden; max-height: 500px; opacity: 1; }
 .cron-grid.collapsed { max-height: 0; opacity: 0; }
 .cron-grid .btn { min-width: 45px; padding: 0.375rem 0.5rem; font-size: 0.8rem; }
-#cron-expression { cursor: pointer; background-color: var(--mdb-form-control-bg) !important; }
-.cron-grid .btn-check:checked + .btn-outline-primary, .btn-group .btn-check:checked + .btn-outline-primary { background-color: var(--mdb-primary) !important; color: #fff !important; border-color: var(--mdb-primary) !important; }
 .schedule-input-group { transition: opacity 0.35s ease, max-height 0.35s ease, margin-top 0.35s ease, padding-top 0.35s ease, padding-bottom 0.35s ease; overflow: hidden; max-height: 150px; opacity: 1; }
 .schedule-input-group.hidden { max-height: 0; opacity: 0; margin-top: 0 !important; margin-bottom: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
 .tab-content > .tab-pane { display: block; opacity: 0; transition: opacity .3s ease-in-out; height: 0; overflow: hidden; }
@@ -134,14 +165,17 @@ main { width: 50%; flex-shrink: 0; }
 // --- 深色模式样式 ---
 @media (prefers-color-scheme: dark) {
   #loader { background-color: #121212; }
-  body { color: #e0e0e0; background-color: #121212; }
+  body {
+    color: #f5f5f5;
+    background-color: #121212;
+  }
   
   body::before {
     background-image: linear-gradient(135deg,
-      hsl(0, 80%, 45%),   /* 深红 */
-      hsl(140, 80%, 35%), /* 深绿 */
-      hsl(270, 80%, 45%), /* 深紫 */
-      hsl(200, 80%, 40%)  /* 深蓝 */
+      hsl(0, 90%, 50%),
+      hsl(140, 90%, 45%),
+      hsl(270, 90%, 55%),
+      hsl(200, 90%, 50%)
     );
     animation-duration: 30s;
   }
@@ -149,8 +183,26 @@ main { width: 50%; flex-shrink: 0; }
   h1 { background: rgba(40, 40, 40, 0.2); border-color: rgba(255, 255, 255, 0.1); }
   .card, .modal-content, .partition-gc-status-item { background: rgba(40, 40, 40, 0.2); border: 1px solid rgba(255, 255, 255, 0.1); }
   .card-header, .card-footer, .modal-header, .modal-footer { border-color: rgba(255, 255, 255, 0.1); }
-  .form-control, .form-select { background-color: rgba(58, 58, 58, 0.5); color: #ffffff; border-color: rgba(255, 255, 255, 0.2); }
-  .form-control:focus, .form-select:focus { background-color: rgba(74, 74, 74, 0.7); border-color: #007bff; }
+  
+  // --- 深色模式下的毛玻璃输入框 ---
+  .input-glass-wrapper {
+    background: rgba(40, 40, 40, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .form-control-transparent {
+    color: #f5f5f5;
+    color-scheme: dark; /* 关键: 触发深色原生UI */
+  }
+  .form-control-transparent::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
+  .form-control-transparent::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+  .input-group.input-glass-wrapper .btn {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
   .app-stats-list-wrapper, .list-group-item { border-color: rgba(255, 255, 255, 0.1); }
   .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
   
@@ -169,8 +221,6 @@ main { width: 50%; flex-shrink: 0; }
     border-radius: 50px;
     border: 1px solid rgba(255, 255, 255, 0.2);
   }
-
-  // --- 修复: 正确嵌套深色模式的样式 ---
   @media (prefers-color-scheme: dark) {
     .bottom-nav {
       border: 1px solid rgba(255, 255, 255, 0.1);

@@ -70,7 +70,22 @@ h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); }
 .tab-content > .tab-pane.active.show { opacity: 1; }
 
 // --- 底部导航栏样式 ---
-.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background-color: #fff; display: flex; justify-content: space-around; align-items: center; box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1); z-index: 1030; }
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background-color: rgba(255, 255, 255, 0.75); /* 修改: 使用半透明背景 */
+  -webkit-backdrop-filter: blur(10px); /* 新增: 毛玻璃效果 (兼容 Safari) */
+  backdrop-filter: blur(10px); /* 新增: 毛玻璃效果 */
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1030;
+  border-top: 1px solid rgba(0, 0, 0, 0.05); /* 新增: 添加细微边框增强质感 */
+}
 .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #888; text-decoration: none; transition: color 0.2s; flex-grow: 1; height: 100%; }
 .nav-item span { font-size: 0.75rem; margin-top: 4px; }
 .nav-item.active { color: var(--mdb-primary); }
@@ -86,7 +101,10 @@ h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); }
   .form-control:focus, .form-select:focus { background-color: #4a4a4a; border-color: #007bff; }
   .app-stats-list-wrapper, .list-group-item { border-color: rgba(255, 255, 255, 0.1); }
   .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
-  .bottom-nav { background-color: #2d2d2d; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+  .bottom-nav {
+    background-color: rgba(45, 45, 45, 0.75); /* 修改: 使用半透明背景 */
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
   .nav-item { color: #777; }
   .nav-item.active { color: var(--mdb-primary); }
 }

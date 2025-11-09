@@ -33,7 +33,7 @@ h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); }
 
 // --- 编辑页特定样式 ---
 #f2fs-gc-config-toggle-label { width: 85px; box-sizing: border-box; text-align: center; transition: all 0.2s ease-in-out; }
-.cron-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; transition: opacity 0.35s ease-out !important, max-height 0.35s ease-out !important; overflow: hidden; max-height: 500px; opacity: 1; }
+.cron-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; /* 修复：!important 只在末尾使用一次 */ transition: opacity 0.35s ease-out, max-height 0.35s ease-out !important; overflow: hidden; max-height: 500px; opacity: 1; }
 .cron-grid.collapsed { max-height: 0; opacity: 0; }
 .cron-grid .btn { min-width: 45px; padding: 0.375rem 0.5rem; font-size: 0.8rem; }
 #cron-expression { cursor: pointer; background-color: var(--mdb-form-control-bg) !important; }

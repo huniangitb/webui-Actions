@@ -18,65 +18,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- 全局状态和元素 ---
     const loader = document.getElementById('loader');
     const appWrapper = document.querySelector('.app-wrapper');
+    const pagesContainer = document.querySelector('.pages-container');
     let isExt4 = false;
     let gcInfoIntervalId = null;
     let isBackendOnline = true;
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
-    // --- SPA 页面切换逻辑 (已修改) ---
+    // --- SPA 页面切换逻辑 ---
     const pages = { home: document.getElementById('page-home'), edit: document.getElementById('page-edit') };
     const navItems = document.querySelectorAll('.nav-item');
     let currentPageId = 'home'; // 追踪当前页面
 
     function showPage(pageId) {
-        if (pageId === currentPageId) return;
+        if (pageId === currentPageId || !pagesContainer) return;
 
-        const newPage = pages[pageId];
-        const oldPage = pages[currentPageId];
-        if (!newPage || !oldPage) return;
+        const pageIndex = Object.keys(pages).indexOf(pageId);
+        if (pageIndex === -1) return;
 
-        // 确定滑动方向
-        const oldIndex = Array.from(navItems).findIndex(item => item.dataset.page === currentPageId);
-        const newIndex = Array.from(navItems).findIndex(item => item.dataset.page === pageId);
-        const direction = newIndex > oldIndex ? 'right' : 'left';
+        const translateXValue = pageIndex * -50;
+        pagesContainer.style.transform = `translateX(${translateXValue}%)`;
 
-        // 1. 准备新页面：立即定位到起始位置
-        newPage.style.transition = 'none';
-        if (direction === 'right') {
-            newPage.style.transform = 'translateX(100%)';
-        } else {
-            newPage.style.transform = 'translateX(-100%)';
-        }
-        newPage.style.position = 'relative'; // 确保新页面在动画期间占据空间
-        
-        // 强制浏览器渲染起始状态
-        newPage.offsetHeight; 
-
-        // 2. 启动动画
-        newPage.style.transition = 'transform 0.3s ease-in-out';
-        oldPage.classList.remove('page-active');
-        newPage.classList.add('page-active');
-
-        if (direction === 'right') {
-            oldPage.classList.add('page-leave-left');
-        } else {
-            oldPage.classList.add('page-leave-right');
-        }
-
-        // 3. 更新导航栏状态
-        navItems.forEach(item => item.classList.toggle('active', item.dataset.page === pageId));
-        
-        // 4. 动画结束后清理类
-        newPage.addEventListener('transitionend', function onTransitionEnd() {
-            newPage.removeEventListener('transitionend', onTransitionEnd);
-            Object.values(pages).forEach(p => {
-                p.classList.remove('page-leave-left', 'page-leave-right');
-                // 动画结束后，非激活页面设为 absolute
-                if (p !== newPage) {
-                    p.style.position = 'absolute';
-                }
-            });
-        }, { once: true });
+        navItems.forEach(item => {
+            item.classList.toggle('active', item.dataset.page === pageId);
+        });
 
         currentPageId = pageId;
     }
@@ -265,17 +229,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initHomePage();
     await initEditPage();
     
-    // 初始化时，确保只有当前页面是 page-active
+    // 初始化页面位置
     const initialPageId = window.location.hash.substring(1) || 'home';
-    if (pages[initialPageId]) {
-        pages[initialPageId].classList.add('page-active');
-        pages[initialPageId].style.position = 'relative';
-        currentPageId = initialPageId;
-    } else {
-        pages['home'].classList.add('page-active');
-        pages['home'].style.position = 'relative';
-        currentPageId = 'home';
+    const initialPageIndex = Object.keys(pages).indexOf(initialPageId);
+    const validPageIndex = initialPageIndex > -1 ? initialPageIndex : 0;
+    const initialTranslateX = validPageIndex * -50;
+    currentPageId = Object.keys(pages)[validPageIndex];
+
+    if (pagesContainer) {
+        pagesContainer.style.transition = 'none'; // 禁用初始动画
+        pagesContainer.style.transform = `translateX(${initialTranslateX}%)`;
+        // 强制浏览器重绘以立即应用变换
+        void pagesContainer.offsetWidth;
+        pagesContainer.style.transition = ''; // 恢复 CSS 中定义的过渡效果
     }
+
     navItems.forEach(item => item.classList.toggle('active', item.dataset.page === currentPageId));
 
     appWrapper.classList.add('loaded');

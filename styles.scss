@@ -1,10 +1,28 @@
 // 1. 完整引入 MDB 的所有样式
 @import 'mdb-ui-kit/src/scss/mdb.free.scss';
 
+
 // --- 加载动画样式 ---
 #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: #F2F2F2; z-index: 9999; }
-.app-wrapper { opacity: 0; transition: opacity 0.4s ease-in; }
+.app-wrapper {
+  position: relative; // 关键：为页面容器提供相对定位和视口
+  opacity: 0;
+  transition: opacity 0.4s ease-in;
+  overflow-x: hidden; // 新增：为页面滑动效果裁剪内容
+}
 .app-wrapper.loaded { opacity: 1; }
+
+// --- 页面切换动画 ---
+.pages-container {
+  display: flex;
+  width: 200%; // 容器宽度为两倍视口，以并排容纳两个页面
+  transition: transform 0.3s ease-in-out;
+  touch-action: pan-y; // 禁止用户通过触摸左右滑动页面
+}
+main {
+  width: 50%; // 每个页面占据容器的一半，即一个视口的宽度
+  flex-shrink: 0; // 防止页面在 flex 布局中被压缩
+}
 
 // --- 全局和基础设置 ---
 body { background-color: #F2F2F2; font-size: 1rem; margin: 0; padding: 0 0 80px 0; }
@@ -12,41 +30,7 @@ body { background-color: #F2F2F2; font-size: 1rem; margin: 0; padding: 0 0 80px 
 h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); }
 .card { border-radius: 15px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); margin-bottom: 1.5rem; }
 .card-header h5 { font-size: 1.25rem; }
-.btn { white-space: normal; line-height: 1.2; text-align: center; }
-
-// --- 页面切换动画 ---
-.app-wrapper {
-  position: relative; 
-  overflow-x: hidden; 
-}
-
-main[id^="page-"] {
-  width: 100%;
-  transition: transform 0.3s ease-in-out;
-  // 默认将所有页面放在屏幕外，除了激活的那个
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform: translateX(100%); // 默认在右侧屏幕外
-}
-
-main#page-home {
-  transform: translateX(0); // 首页默认在屏幕内
-  position: relative; // 保证首页初始时占据空间
-}
-
-main.page-active {
-  transform: translateX(0) !important;
-  position: relative; // 激活的页面需要占据正常文档流空间
-}
-
-main.page-leave-left {
-  transform: translateX(-100%) !important;
-}
-
-main.page-leave-right {
-  transform: translateX(100%) !important;
-}
+.btn { white-space: normal; line-height: 1.2; text-align: center; 
 
 
 // --- 主页特定样式 ---

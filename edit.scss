@@ -1,15 +1,11 @@
 // 1. 完整引入 MDB 的所有样式
 @import 'mdb-ui-kit/src/scss/mdb.free.scss';
-// 引入 Font Awesome 图标
-//@import '~@fortawesome/fontawesome-free/scss/fontawesome';
-//@import '~@fortawesome/fontawesome-free/scss/solid';
 
 // --- 全局和基础设置 ---
 body {
   background-color: #F2F2F2;
   font-size: 1rem;
   margin: 0;
-  // 为底部导航栏留出空间
   padding: 0 0 80px 0; 
 }
 
@@ -130,7 +126,7 @@ h1 {
   justify-content: space-around;
   align-items: center;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-  z-index: 1030; // 确保在内容之上
+  z-index: 1030;
 }
 
 .nav-item {
@@ -152,6 +148,12 @@ h1 {
 
 .nav-item.active {
   color: var(--mdb-primary);
+}
+
+.nav-icon {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
 }
 
 // --- 深色模式样式 ---

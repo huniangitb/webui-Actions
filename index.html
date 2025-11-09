@@ -38,7 +38,6 @@
                 <h5 class="mb-0">控制中心</h5>
             </div>
             <div class="card-body">
-                <!-- F2FS GC 信息 -->
                 <div id="f2fs-gc-info-container" class="mb-3" style="display: none;">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <p class="mb-0 fw-bold">F2FS 垃圾回收</p>
@@ -51,7 +50,6 @@
                     <div id="partition-gc-status-container" class="d-flex flex-wrap justify-content-center gap-2 mb-1"></div>
                     <div id="f2fs-charts-container" class="d-flex flex-wrap justify-content-center gap-3 mt-1"></div>
                 </div>
-                <!-- 操作按钮容器 -->
                 <div class="actions-container">
                     <button id="clean-now-btn" class="btn btn-primary btn-sm" data-mdb-ripple-init data-mdb-ripple-color="light">立即<br>清理</button>
                     <button id="refresh-log" class="btn btn-primary btn-sm" data-mdb-ripple-init data-mdb-ripple-color="light">刷新<br>数据</button>
@@ -66,11 +64,11 @@
     <!-- 底部导航栏 -->
     <nav class="bottom-nav">
         <a href="index.html" class="nav-item active">
-            <i class="bi bi-house-door fa-lg"></i>
+            <svg class="nav-icon" viewBox="0 0 24 24"><path data-icon="home"></path></svg>
             <span>主页</span>
         </a>
         <a href="edit.html" class="nav-item">
-            <i class="bi bi-pencil-square fa-lg"></i>
+            <svg class="nav-icon" viewBox="0 0 24 24"><path data-icon="edit"></path></svg>
             <span>编辑</span>
         </a>
     </nav>

@@ -2,6 +2,8 @@ import { exec, toast } from 'kernelsu';
 import { parseLogContent, updateLocalStorage, getStoredData, clearStoredData } from './logParser.js';
 import { Ripple, Modal, initMDB } from 'mdb-ui-kit';
 import Chart from 'chart.js/auto';
+import { icons } from './icons.js';
+
 initMDB({ Ripple });
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -13,7 +15,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const appStatsTitle = document.getElementById('app-stats-title');
     const f2fsGcInfoContainer = document.getElementById('f2fs-gc-info-container');
     const gcControlButton = document.getElementById('gc-control-btn');
-    const f2fsGcConfigContainer = document.getElementById('f2fs-gc-config-container');
     const f2fsChartsContainer = document.getElementById('f2fs-charts-container');
     const partitionGcStatusContainer = document.getElementById('partition-gc-status-container');
     const customizePartitionsBtn = document.getElementById('customize-partitions-btn');
@@ -34,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let appNamesMap = new Map();
     let allDiscoveredPartitions = new Set();
     let hiddenPartitions = new Set(JSON.parse(localStorage.getItem('hiddenF2fsPartitions') || '[]'));
-    let consecutiveErrors = 0; // 新增：用于记录连续错误次数
+    let consecutiveErrors = 0;
 
     // --- 辅助函数 ---
     const delay = ms => new Promise(res => setTimeout(res, ms));
@@ -48,23 +49,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         return `${minutes}m ${totalSeconds % 60}s`;
     }
 
+    function injectIcons() {
+        document.querySelectorAll('[data-icon]').forEach(el => {
+            const iconName = el.getAttribute('data-icon');
+            if (icons[iconName]) {
+                el.setAttribute('d', icons[iconName]);
+            }
+        });
+    }
+
     async function sendTcpCommand(command) {
         try {
             const clientPath = '/data/adb/modules/Clean-C/tcp_client';
             const fullCommand = `${clientPath} ${command}`;
             const { errno, stdout, stderr } = await exec(fullCommand);
             if (errno === 0) {
-                consecutiveErrors = 0; // 成功后重置错误计数器
+                consecutiveErrors = 0;
                 if (!stdout.trim()) return [];
                 try { 
                     const result = JSON.parse(stdout.trim());
+                    // 状态持久化：保存最新状态到 sessionStorage
+                    sessionStorage.setItem('lastGcStatus', JSON.stringify(result));
                     return Array.isArray(result) ? result : [];
                 } catch (e) {
                     toast(`解析服务器响应失败`);
                     return null;
                 }
             } else {
-                consecutiveErrors++; // 失败时增加错误计数器
+                consecutiveErrors++;
                 toast(`命令发送失败`);
                 return null;
             }
@@ -79,7 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function loadAppNamesConfig() {
         try {
-            const { errno, stdout, stderr } = await exec('cat /data/media/0/Android/清理规则/list.config');
+            const { errno, stdout } = await exec('cat /data/media/0/Android/清理规则/list.config');
             if (errno === 0) {
                 stdout.split('\n').forEach(line => {
                     if (line.includes('=')) {
@@ -87,8 +99,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (pkg && name) appNamesMap.set(pkg, name);
                     }
                 });
-            } else if (!stderr.includes('No such file or directory')) console.error("Failed to load list.config:", stderr);
-        } catch (error) { console.error("An exception occurred while loading list.config:", error); }
+            }
+        } catch (error) { console.error("Error loading app names:", error); }
     }
 
     // --- F2FS 信息获取与更新 ---
@@ -109,10 +121,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    async function updateAllF2fsInfo() {
+    async function updateAllF2fsInfo(isManualRefresh = false) {
         const partitionsData = await getGcStatusViaTcp();
 
-        // 错误处理：如果获取数据失败
         if (partitionsData === null) {
             if (consecutiveErrors >= 3 && gcInfoIntervalId) {
                 clearInterval(gcInfoIntervalId);
@@ -255,13 +266,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         localStorage.setItem('hiddenF2fsPartitions', JSON.stringify(Array.from(hiddenPartitions)));
         partitionsModal.hide();
         toast('显示偏好已保存');
-        updateAllF2fsInfo();
+        updateAllF2fsInfo(true);
     });
 
     // --- 图表初始化与更新 ---
     const barChartCtx = document.getElementById('bar-chart').getContext('2d');
     const barChart = new Chart(barChartCtx, {
-        type: 'bar', data: { labels: [], datasets: [ { label: '文件清理 (MB)', backgroundColor: 'rgba(153, 102, 255, 0.2)', borderColor: 'rgba(153, 102, 255, 1)', borderWidth: 1 }, { label: 'GC TRIM (MB)', backgroundColor: 'rgba(255, 159, 64, 0.2)', borderColor: 'rgba(255, 159, 64, 1)', borderWidth: 1, hidden: isExt4 }, { label: '回收脏段数', backgroundColor: 'rgba(75, 192, 192, 0.2)', borderColor: 'rgba(75, 192, 192, 1)', borderWidth: 1, hidden: isExt4 }, { label: '已删除文件数', backgroundColor: 'rgba(255, 99, 132, 0.2)', borderColor: 'rgba(255, 99, 132, 1)', borderWidth: 1 }, { label: '已删除目录数', backgroundColor: 'rgba(54, 162, 235, 0.2)', borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1 }, ] },
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [
+                { label: '文件清理 (MB)', data: [], backgroundColor: 'rgba(153, 102, 255, 0.2)', borderColor: 'rgba(153, 102, 255, 1)', borderWidth: 1 },
+                { label: '回收脏段数', data: [], backgroundColor: 'rgba(75, 192, 192, 0.2)', borderColor: 'rgba(75, 192, 192, 1)', borderWidth: 1, hidden: isExt4 },
+                { label: '已删除文件数', data: [], backgroundColor: 'rgba(255, 99, 132, 0.2)', borderColor: 'rgba(255, 99, 132, 1)', borderWidth: 1 },
+                { label: '已删除目录数', data: [], backgroundColor: 'rgba(54, 162, 235, 0.2)', borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1 },
+            ]
+        },
         options: { scales: { y: { beginAtZero: true } } },
     });
 
@@ -321,17 +341,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         const aggregatedData = {};
         filteredData.forEach(entry => {
             const date = entry.date;
-            if (!aggregatedData[date]) aggregatedData[date] = { deletedFiles: 0, deletedDirs: 0, dirtySegments: 0, fileCleanedMB: 0, trimMB: 0 };
-            Object.keys(aggregatedData[date]).forEach(key => aggregatedData[date][key] += entry[key] || 0);
+            if (!aggregatedData[date]) aggregatedData[date] = { deletedFiles: 0, deletedDirs: 0, dirtySegments: 0, fileCleanedMB: 0 };
+            aggregatedData[date].deletedFiles += entry.deletedFiles || 0;
+            aggregatedData[date].deletedDirs += entry.deletedDirs || 0;
+            aggregatedData[date].dirtySegments += entry.dirtySegments || 0;
+            aggregatedData[date].fileCleanedMB += entry.fileCleanedMB || 0;
         });
-        barChart.data.datasets.forEach(ds => { if (ds.label.includes('GC') || ds.label.includes('脏段')) ds.hidden = isExt4; });
+        barChart.data.datasets.forEach(ds => { if (ds.label.includes('脏段')) ds.hidden = isExt4; });
         const dates = Object.keys(aggregatedData).sort();
         barChart.data.labels = dates;
         barChart.data.datasets[0].data = dates.map(d => aggregatedData[d].fileCleanedMB);
-        barChart.data.datasets[1].data = dates.map(d => aggregatedData[d].trimMB);
-        barChart.data.datasets[2].data = dates.map(d => aggregatedData[d].dirtySegments);
-        barChart.data.datasets[3].data = dates.map(d => aggregatedData[d].deletedFiles);
-        barChart.data.datasets[4].data = dates.map(d => aggregatedData[d].deletedDirs);
+        barChart.data.datasets[1].data = dates.map(d => aggregatedData[d].dirtySegments);
+        barChart.data.datasets[2].data = dates.map(d => aggregatedData[d].deletedFiles);
+        barChart.data.datasets[3].data = dates.map(d => aggregatedData[d].deletedDirs);
         barChart.update('none');
     }
 
@@ -351,27 +373,42 @@ document.addEventListener('DOMContentLoaded', async () => {
         await sendTcpCommand(action === 'start' ? 'start_gc' : 'stop_gc');
         await delay(1500);
         gcControlButton.disabled = false;
-        await updateAllF2fsInfo();
+        await updateAllF2fsInfo(true);
     });
     cleanNowBtn.addEventListener('click', async () => { toast('正在请求立即清理...'); await sendTcpCommand('clean_now'); });
     refreshLogBtn.addEventListener('click', async () => {
         toast('正在手动刷新...');
-        // 如果自动刷新已停止，重新启动它
         if (!isExt4 && !gcInfoIntervalId) {
             gcInfoIntervalId = setInterval(updateAllF2fsInfo, 2000);
             toast('已重新启动自动刷新');
         }
         await loadLogFile();
-        if (!isExt4) await updateAllF2fsInfo();
+        if (!isExt4) await updateAllF2fsInfo(true);
         toast('数据已刷新');
     });
     deleteLogBtn.addEventListener('click', async () => { try { await exec('rm -f /data/adb/modules/Clean-C/run.log /data/adb/modules/Clean-C/stats.json'); await loadLogFile(); toast('日志文件已删除'); } catch (error) { toast(`删除日志失败: ${error.message}`); } });
     restartModuleBtn.addEventListener('click', async () => { try { const { errno, stderr } = await exec('sh /data/adb/modules/Clean-C/rest.sh'); if (errno === 0) toast('模块已重启'); else toast(`重启模块失败: ${stderr || '未知错误'}`); } catch (error) { toast(`模块重启失败: ${error.message}`); } });
 
     // --- 页面初始化 ---
+    injectIcons();
     await checkFileSystem();
     await initDatePicker();
     await loadAppNamesConfig();
     await loadLogFile();
-    if (!isExt4) await updateAllF2fsInfo();
+    
+    // 状态持久化：尝试从 sessionStorage 恢复上次的状态
+    const lastStatus = sessionStorage.getItem('lastGcStatus');
+    if (lastStatus) {
+        try {
+            const partitionsData = JSON.parse(lastStatus);
+            if (Array.isArray(partitionsData)) {
+                updatePartitionCharts(partitionsData);
+                updatePartitionGcStatus(partitionsData);
+            }
+        } catch (e) {
+            console.error("Failed to parse sessionStorage data:", e);
+        }
+    }
+
+    if (!isExt4) await updateAllF2fsInfo(true);
 });

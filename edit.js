@@ -1,5 +1,6 @@
 import { exec, toast } from 'kernelsu';
 import { Ripple, Modal, initMDB } from 'mdb-ui-kit';
+import { icons } from './icons.js';
 
 initMDB({ Ripple });
 
@@ -43,6 +44,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --- 辅助函数 ---
+    function injectIcons() {
+        document.querySelectorAll('[data-icon]').forEach(el => {
+            const iconName = el.getAttribute('data-icon');
+            if (icons[iconName]) {
+                el.setAttribute('d', icons[iconName]);
+            }
+        });
+    }
+
     async function checkFileSystem() {
         try {
             const { stdout } = await exec(`mount | grep " /data " | awk '{print $5}'`);
@@ -269,6 +279,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     editWhitelistBtn.addEventListener('click', () => editRuleFile('whitelist.txt'));
 
     // --- 页面初始化 ---
+    injectIcons();
     generateCronEditorUI();
     await checkFileSystem();
     await loadConfigFile();

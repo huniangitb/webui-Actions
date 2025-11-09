@@ -19,10 +19,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loader = document.getElementById('loader');
     const appWrapper = document.querySelector('.app-wrapper');
     let isExt4 = false;
-    let gcInfoIntervalId = null; // 现在是持久的，不会因页面切换而丢失
+    let gcInfoIntervalId = null;
+    let isBackendOnline = true; // 新增：后端在线状态标志
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
-    // --- SPA 页面切换逻辑 ---
+    // --- SPA 页面切换逻辑 (关键改动) ---
     const pages = { home: document.getElementById('page-home'), edit: document.getElementById('page-edit') };
     const navItems = document.querySelectorAll('.nav-item');
     function showPage(pageId) {
@@ -34,17 +35,70 @@ document.addEventListener('DOMContentLoaded', async () => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const pageId = e.currentTarget.dataset.page;
-            window.location.hash = pageId;
+            // 使用 history.replaceState 替换 URL，不产生历史记录，实现返回即退出
+            history.replaceState(null, '', `#${pageId}`);
             showPage(pageId);
         });
     });
 
+    // --- 后端通信与状态检查 (关键改动) ---
+    function disableBackendFeatures(reason) {
+        if (!isBackendOnline) return; // 防止重复执行
+        isBackendOnline = false;
+        toast(reason, 4000);
+        // 禁用所有与后端交互的按钮
+        document.querySelectorAll('#clean-now-btn, #refresh-log, #restart-module, #gc-control-btn, #config-form button[type="submit"]').forEach(btn => {
+            btn.disabled = true;
+            btn.classList.add('disabled');
+        });
+        // 停止 F2FS 状态轮询
+        if (gcInfoIntervalId) {
+            clearInterval(gcInfoIntervalId);
+            gcInfoIntervalId = null;
+        }
+        const globalGcStatusSpan = document.getElementById('global-gc-status');
+        if (globalGcStatusSpan) {
+            globalGcStatusSpan.textContent = '后端离线';
+            globalGcStatusSpan.className = 'badge bg-danger';
+        }
+    }
+
+    async function checkBackendProcess() {
+        try {
+            const { errno } = await exec('pgrep cleaner');
+            return errno === 0;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async function sendTcpCommand(command) {
+        if (!isBackendOnline) return null;
+        try {
+            const { errno, stdout, stderr } = await exec(`/data/adb/modules/Clean-C/tcp_client ${command}`);
+            if (errno === 0) {
+                if (!stdout.trim()) return [];
+                try { return JSON.parse(stdout.trim()); } catch (e) {
+                    disableBackendFeatures('后端响应解析失败');
+                    return null;
+                }
+            } else {
+                // 任何命令失败都立即禁用后端功能
+                disableBackendFeatures('后端通信失败');
+                return null;
+            }
+        } catch (error) {
+            disableBackendFeatures('后端通信异常');
+            return null;
+        }
+    }
+
     // --- 辅助函数 ---
     function injectIcons() { document.querySelectorAll('[data-icon]').forEach(el => { const iconName = el.getAttribute('data-icon'); if (icons[iconName]) el.setAttribute('d', icons[iconName]); }); }
-    async function sendTcpCommand(command) { try { const { errno, stdout } = await exec(`/data/adb/modules/Clean-C/tcp_client ${command}`); if (errno === 0) { if (!stdout.trim()) return []; try { return JSON.parse(stdout.trim()); } catch (e) { toast(`解析服务器响应失败`); return null; } } else { toast(`命令发送失败`); return null; } } catch (error) { toast(`执行命令发送程序失败`); return null; } }
 
     // --- 主页逻辑 ---
     const initHomePage = (() => {
+        // ... (主页内部代码无重大逻辑修改，保持原样)
         const dateSelect = document.getElementById('date-select');
         const appStatsList = document.getElementById('app-stats-list');
         const appStatsContainer = document.getElementById('app-stats-container');
@@ -64,22 +118,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         const barChart = new Chart(document.getElementById('bar-chart').getContext('2d'), { type: 'bar', data: { labels: [], datasets: [{ label: '文件清理 (MB)', data: [], backgroundColor: 'rgba(153, 102, 255, 0.2)', borderColor: 'rgba(153, 102, 255, 1)', borderWidth: 1 }, { label: '回收脏段数', data: [], backgroundColor: 'rgba(75, 192, 192, 0.2)', borderColor: 'rgba(75, 192, 192, 1)', borderWidth: 1 }, { label: '已删除文件数', data: [], backgroundColor: 'rgba(255, 99, 132, 0.2)', borderColor: 'rgba(255, 99, 132, 1)', borderWidth: 1 }, { label: '已删除目录数', data: [], backgroundColor: 'rgba(54, 162, 235, 0.2)', borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } } } });
 
         function formatDuration(s) { if (isNaN(s) || s < 0) return "0s"; if (s < 60) return `${s}s`; const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h > 0 ? `${h}h ${m}m` : `${m}m ${s % 60}s`; }
-        async function checkFileSystem() { try { const { stdout } = await exec(`mount | grep " /data " | awk '{print $5}'`); isExt4 = (stdout.trim() === 'ext4'); f2fsGcInfoContainer.style.display = isExt4 ? 'none' : 'block'; if (isExt4 && gcInfoIntervalId) { clearInterval(gcInfoIntervalId); gcInfoIntervalId = null; } if (!isExt4 && !gcInfoIntervalId) { gcInfoIntervalId = setInterval(updateAllF2fsInfo, 2000); } } catch (error) { toast(`检查文件系统失败`); } }
-        async function updateAllF2fsInfo(isManualRefresh = false) { const partitionsData = await sendTcpCommand('stats'); if (partitionsData === null) return; if (Array.isArray(partitionsData)) { partitionsData.forEach(p => allDiscoveredPartitions.add(p.device_name)); customizePartitionsBtn.style.display = allDiscoveredPartitions.size >= 2 ? 'block' : 'none'; const visiblePartitions = partitionsData.filter(p => !hiddenPartitions.has(p.device_name)); updatePartitionCharts(visiblePartitions); updatePartitionGcStatus(visiblePartitions); } }
+        async function checkFileSystem() { try { const { stdout } = await exec(`mount | grep " /data " | awk '{print $5}'`); isExt4 = (stdout.trim() === 'ext4'); f2fsGcInfoContainer.style.display = isExt4 ? 'none' : 'block'; if (isExt4 && gcInfoIntervalId) { clearInterval(gcInfoIntervalId); gcInfoIntervalId = null; } if (!isExt4 && !gcInfoIntervalId && isBackendOnline) { gcInfoIntervalId = setInterval(updateAllF2fsInfo, 2000); } } catch (error) { toast(`检查文件系统失败`); } }
+        async function updateAllF2fsInfo(isManualRefresh = false) { const partitionsData = await sendTcpCommand('stats'); if (partitionsData === null) { if (gcInfoIntervalId) { clearInterval(gcInfoIntervalId); gcInfoIntervalId = null; } return; } if (Array.isArray(partitionsData)) { partitionsData.forEach(p => allDiscoveredPartitions.add(p.device_name)); customizePartitionsBtn.style.display = allDiscoveredPartitions.size >= 2 ? 'block' : 'none'; const visiblePartitions = partitionsData.filter(p => !hiddenPartitions.has(p.device_name)); updatePartitionCharts(visiblePartitions); updatePartitionGcStatus(visiblePartitions); } }
         function updatePartitionCharts(partitionsData) { const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches; const currentVisibleDevices = new Set(partitionsData.map(p => p.device_name)); partitionsData.forEach(data => { const { device_name, dirty_segments, free_segments } = data; if (typeof dirty_segments !== 'number' || typeof free_segments !== 'number') return; if (partitionCharts.has(device_name)) { const chart = partitionCharts.get(device_name); chart.data.labels = [`脏段 (${dirty_segments})`, `空闲段 (${free_segments})`]; chart.data.datasets[0].data = [dirty_segments, free_segments]; chart.update('none'); } else { const wrapper = document.createElement('div'); wrapper.className = 'partition-chart-wrapper'; wrapper.id = `chart-wrapper-${device_name}`; wrapper.innerHTML = `<div class="partition-chart-canvas-container"><canvas></canvas></div><p class="partition-chart-label">${device_name}</p>`; f2fsChartsContainer.appendChild(wrapper); const newChart = new Chart(wrapper.querySelector('canvas').getContext('2d'), { type: 'doughnut', data: { labels: [`脏段 (${dirty_segments})`, `空闲段 (${free_segments})`], datasets: [{ data: [dirty_segments, free_segments], backgroundColor: ['#ff6384', '#36a2eb'], borderColor: isDarkMode ? '#2A2A2A' : '#f8f9fa' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); partitionCharts.set(device_name, newChart); } }); for (const deviceName of partitionCharts.keys()) { if (!currentVisibleDevices.has(deviceName)) { partitionCharts.get(deviceName).destroy(); document.getElementById(`chart-wrapper-${deviceName}`)?.remove(); partitionCharts.delete(deviceName); } } }
         function updatePartitionGcStatus(gcStatusArray) { if (isExt4) return; partitionGcStatusContainer.innerHTML = ''; const runningPartitions = gcStatusArray.filter(p => p.is_running && !hiddenPartitions.has(p.device_name)); const anyGcRunning = runningPartitions.length > 0; if (anyGcRunning) { document.getElementById('global-gc-status').style.display = 'none'; partitionGcStatusContainer.style.display = 'flex'; runningPartitions.forEach(({ device_name, is_paused, elapsed_seconds, reclaimed_segments, pause_reason }) => { const itemDiv = document.createElement('div'); itemDiv.className = 'partition-gc-status-item'; itemDiv.innerHTML = `<p>${device_name}</p><span class="badge ${is_paused ? 'bg-warning' : 'bg-success'}">${is_paused ? `暂停<br>原因: ${pause_reason || "未知"}` : '运行中'}<br>运行: ${formatDuration(elapsed_seconds || 0)} | 回收: ${reclaimed_segments || 0}</span>`; partitionGcStatusContainer.appendChild(itemDiv); }); gcControlButton.textContent = '停止所有'; gcControlButton.className = 'btn btn-sm btn-danger'; gcControlButton.dataset.action = 'stop'; } else { partitionGcStatusContainer.style.display = 'none'; const globalGcStatusSpan = document.getElementById('global-gc-status'); globalGcStatusSpan.style.display = 'inline-block'; globalGcStatusSpan.textContent = 'GC回收: 关闭'; globalGcStatusSpan.className = 'badge bg-secondary'; gcControlButton.textContent = '开始所有'; gcControlButton.className = 'btn btn-sm btn-success'; gcControlButton.dataset.action = 'start'; } }
         async function initDatePicker() { try { const { stdout } = await exec('date +"%F"'); const today = new Date(stdout.trim()); const sixDaysAgo = new Date(today); sixDaysAgo.setDate(today.getDate() - 6); const formatDate = (d) => d.toISOString().split('T')[0]; dateSelect.min = formatDate(sixDaysAgo); dateSelect.max = dateSelect.value = formatDate(today); } catch (e) { toast(`初始化日期选择器失败`); } }
         async function loadLogFile() { try { const { errno, stdout, stderr } = await exec('cat /data/adb/modules/Clean-C/stats.json'); if (errno === 0 && stdout.trim() !== '') updateLocalStorage(parseLogContent(stdout)); else if (errno !== 0 && !stderr.includes('No such file')) throw new Error(stderr); } catch (e) { toast(`加载统计数据失败: ${e.message}`); } updateDisplaysForSelectedDate(); }
         function updateDisplaysForSelectedDate() { const selectedDate = dateSelect.value; const storedData = getStoredData(); const filteredData = selectedDate ? storedData.filter(entry => entry.date === selectedDate) : storedData; const aggregatedData = {}; filteredData.forEach(entry => { const date = entry.date; if (!aggregatedData[date]) aggregatedData[date] = { deletedFiles: 0, deletedDirs: 0, dirtySegments: 0, fileCleanedMB: 0 }; aggregatedData[date].deletedFiles += entry.deletedFiles || 0; aggregatedData[date].deletedDirs += entry.deletedDirs || 0; aggregatedData[date].dirtySegments += entry.dirtySegments || 0; aggregatedData[date].fileCleanedMB += entry.fileCleanedMB || 0; }); barChart.data.datasets.forEach(ds => { if (ds.label.includes('脏段')) ds.hidden = isExt4; }); const dates = Object.keys(aggregatedData).sort(); barChart.data.labels = dates; barChart.data.datasets[0].data = dates.map(d => aggregatedData[d].fileCleanedMB); barChart.data.datasets[1].data = dates.map(d => aggregatedData[d].dirtySegments); barChart.data.datasets[2].data = dates.map(d => aggregatedData[d].deletedFiles); barChart.data.datasets[3].data = dates.map(d => aggregatedData[d].deletedDirs); barChart.update('none'); appStatsTitle.textContent = `应用清理详情 (${selectedDate})`; const dailyEntries = getStoredData().filter(entry => entry.date === selectedDate); const aggregatedStats = new Map(); dailyEntries.forEach(entry => entry.appStats?.forEach(app => { const existing = aggregatedStats.get(app.package_name) || { ...app, bytes_deleted: 0, megabytes_deleted: 0 }; existing.bytes_deleted += app.bytes_deleted; existing.megabytes_deleted += app.megabytes_deleted; aggregatedStats.set(app.package_name, existing); })); const appStats = Array.from(aggregatedStats.values()); appStatsList.innerHTML = ''; appStatsContainer.classList.toggle('hidden', !appStats || appStats.length === 0); if (!appStats || appStats.length === 0) { appStatsList.innerHTML = '<li class="list-group-item text-muted">该日无应用数据清理记录。</li>'; return; } appStats.sort((a, b) => b.bytes_deleted - a.bytes_deleted).forEach(app => { const displayName = appNamesMap.get(app.package_name) || app.package_name; appStatsList.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center"><span class="text-truncate me-3" title="${app.package_name}">${displayName}</span><span class="badge bg-primary rounded-pill">${app.megabytes_deleted.toFixed(2)} MB</span></li>`; }); }
         
-        // Event Listeners
         dateSelect.addEventListener('change', updateDisplaysForSelectedDate);
         document.getElementById('clear-data').addEventListener('click', () => { clearStoredData(); updateDisplaysForSelectedDate(); toast('数据已清除'); });
         gcControlButton.addEventListener('click', async () => { const action = gcControlButton.dataset.action; if (action === 'unknown') return; gcControlButton.disabled = true; gcControlButton.textContent = '...'; await sendTcpCommand(action === 'start' ? 'start_gc' : 'stop_gc'); await delay(1500); gcControlButton.disabled = false; await updateAllF2fsInfo(true); });
         document.getElementById('clean-now-btn').addEventListener('click', async () => { toast('正在请求立即清理...'); await sendTcpCommand('clean_now'); });
-        document.getElementById('refresh-log').addEventListener('click', async () => { toast('正在手动刷新...'); if (!isExt4 && !gcInfoIntervalId) { gcInfoIntervalId = setInterval(updateAllF2fsInfo, 2000); toast('已重新启动自动刷新'); } await loadLogFile(); if (!isExt4) await updateAllF2fsInfo(true); toast('数据已刷新'); });
+        document.getElementById('refresh-log').addEventListener('click', async () => { toast('正在手动刷新...'); if (!isExt4 && !gcInfoIntervalId && isBackendOnline) { gcInfoIntervalId = setInterval(updateAllF2fsInfo, 2000); toast('已重新启动自动刷新'); } await loadLogFile(); if (!isExt4) await updateAllF2fsInfo(true); toast('数据已刷新'); });
         document.getElementById('delete-log').addEventListener('click', async () => { try { await exec('rm -f /data/adb/modules/Clean-C/run.log /data/adb/modules/Clean-C/stats.json'); await loadLogFile(); toast('日志文件已删除'); } catch (e) { toast(`删除日志失败: ${e.message}`); } });
-        document.getElementById('restart-module').addEventListener('click', async () => { try { const { errno, stderr } = await exec('sh /data/adb/modules/Clean-C/rest.sh'); if (errno === 0) toast('模块已重启'); else toast(`重启模块失败: ${stderr || '未知错误'}`); } catch (e) { toast(`模块重启失败: ${e.message}`); } });
+        document.getElementById('restart-module').addEventListener('click', async () => { toast('正在请求重启模块...'); await sendTcpCommand('restart'); toast('重启命令已发送'); });
         customizePartitionsBtn.addEventListener('click', () => { partitionsModalBody.innerHTML = ''; Array.from(allDiscoveredPartitions).sort().forEach(deviceName => { partitionsModalBody.innerHTML += `<div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="switch-${deviceName}" data-device-name="${deviceName}" ${!hiddenPartitions.has(deviceName) ? 'checked' : ''}><label class="form-check-label" for="switch-${deviceName}">${deviceName}</label></div>`; }); partitionsModal.show(); });
         savePartitionsBtn.addEventListener('click', () => { const newHidden = new Set(); partitionsModalBody.querySelectorAll('.form-check-input').forEach(cb => { if (!cb.checked) newHidden.add(cb.dataset.deviceName); }); hiddenPartitions = newHidden; localStorage.setItem('hiddenF2fsPartitions', JSON.stringify(Array.from(hiddenPartitions))); partitionsModal.hide(); toast('显示偏好已保存'); updateAllF2fsInfo(true); });
 
@@ -94,6 +147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- 编辑页逻辑 ---
     const initEditPage = (() => {
+        // ... (大部分代码保持不变)
         const configForm = document.getElementById('config-form');
         const retentionDaysInput = document.getElementById('retention-days');
         const cleanIntervalInput = document.getElementById('clean-interval');
@@ -115,13 +169,44 @@ document.addEventListener('DOMContentLoaded', async () => {
         function generateCronFromUI() { return ['minutes', 'hours', 'dom', 'months', 'dow'].map(key => { const field = cronFields[key]; if (field.el.querySelector(`input[name="${key}-mode"]:checked`).value === '*') return '*'; const selected = Array.from(field.el.querySelectorAll('.cron-grid input:checked')).map(cb => Number(cb.value)); if (selected.length === 0 || selected.length === (field.max - field.min + 1)) return '*'; selected.sort((a, b) => a - b); const ranges = []; for (let i = 0; i < selected.length; i++) { let start = selected[i]; while (i + 1 < selected.length && selected[i+1] === selected[i] + 1) i++; ranges.push(start === selected[i] ? `${start}` : `${start}-${selected[i]}`); } return ranges.join(','); }).join(' '); }
         async function loadConfigFile() { try { const { errno, stdout, stderr } = await exec('cat /data/media/0/Android/清理规则/配置.txt'); if (errno === 0) { const config = {}; stdout.split('\n').forEach(line => { if (line.includes('=')) { const [key, value] = line.split('=').map(item => item.trim()); if (key && value) config[key] = value; } }); retentionDaysInput.value = config.保留天数 || '30'; if (config.cron表达式 && config.cron表达式.trim() !== '') { scheduleModeCronRadio.checked = true; cronExpressionInput.value = config.cron表达式; } else { cronExpressionInput.value = '0 * * * *'; } cleanIntervalInput.value = config.程序清理间隔秒数 || '3600'; const f2fsGcValue = config['f2fs-GC'] || 'n'; f2fsGcConfigToggle.checked = f2fsGcValue === 'y'; } } catch (e) { toast(`加载配置失败: ${e.message}`); } updateScheduleModeUI(); updateGcConfigToggleLabel(f2fsGcConfigToggle.checked); }
         
-        // Event Listeners
-        configForm.addEventListener('submit', async (e) => { e.preventDefault(); try { const { errno, stdout, stderr } = await exec('cat /data/media/0/Android/清理规则/配置.txt'); let lines = (errno === 0) ? stdout.split('\n') : []; if (errno !== 0 && !stderr.includes('No such file')) throw new Error(`读取配置失败: ${stderr}`); const otherLines = lines.filter(l => !/^(保留天数=|程序清理间隔秒数=|cron表达式=|f2fs-GC=)/.test(l) && l.trim() !== ''); const newConfig = [...otherLines, `保留天数=${retentionDaysInput.value}`, `f2fs-GC=${f2fsGcConfigToggle.checked ? 'y' : 'n'}`]; if (scheduleModeCronRadio.checked) { newConfig.push(`cron表达式=${cronExpressionInput.value}`, `程序清理间隔秒数=${cleanIntervalInput.value}`); } else { newConfig.push(`程序清理间隔秒数=${cleanIntervalInput.value}`, `cron表达式=${cronExpressionInput.value || '0 * * * *'}`); } const updatedConfig = newConfig.join('\n'); const { errno: writeErrno, stderr: writeStderr } = await exec(`printf "%s" "${updatedConfig.replace(/"/g, '\\"')}" > /data/media/0/Android/清理规则/配置.txt`); if (writeErrno !== 0) throw new Error(`写入配置失败: ${writeStderr}`); toast('配置已保存，正在重启模块...'); await exec('sh /data/adb/modules/Clean-C/rest.sh'); toast('模块已重启'); } catch (error) { toast(`操作失败: ${error.message}`); } });
+        configForm.addEventListener('submit', async (e) => { e.preventDefault(); try { const { errno, stdout, stderr } = await exec('cat /data/media/0/Android/清理规则/配置.txt'); let lines = (errno === 0) ? stdout.split('\n') : []; if (errno !== 0 && !stderr.includes('No such file')) throw new Error(`读取配置失败: ${stderr}`); const otherLines = lines.filter(l => !/^(保留天数=|程序清理间隔秒数=|cron表达式=|f2fs-GC=)/.test(l) && l.trim() !== ''); const newConfig = [...otherLines, `保留天数=${retentionDaysInput.value}`, `f2fs-GC=${f2fsGcConfigToggle.checked ? 'y' : 'n'}`]; if (scheduleModeCronRadio.checked) { newConfig.push(`cron表达式=${cronExpressionInput.value}`, `程序清理间隔秒数=${cleanIntervalInput.value}`); } else { newConfig.push(`程序清理间隔秒数=${cleanIntervalInput.value}`, `cron表达式=${cronExpressionInput.value || '0 * * * *'}`); } const updatedConfig = newConfig.join('\n'); const { errno: writeErrno, stderr: writeStderr } = await exec(`printf "%s" "${updatedConfig.replace(/"/g, '\\"')}" > /data/media/0/Android/清理规则/配置.txt`); if (writeErrno !== 0) throw new Error(`写入配置失败: ${writeStderr}`); toast('配置已保存，正在请求重启模块...'); await sendTcpCommand('restart'); toast('重启命令已发送'); } catch (error) { toast(`操作失败: ${error.message}`); } });
         f2fsGcConfigToggle.addEventListener('change', () => updateGcConfigToggleLabel(f2fsGcConfigToggle.checked));
         document.querySelectorAll('input[name="schedule-mode"]').forEach(el => el.addEventListener('change', updateScheduleModeUI));
         document.getElementById('edit-cron-btn').addEventListener('click', () => { parseCronToUI(cronExpressionInput.value); cronEditorModal.show(); });
         document.getElementById('save-cron-btn').addEventListener('click', () => { cronExpressionInput.value = generateCronFromUI(); cronEditorModal.hide(); });
-        cronTabTriggers.forEach(clickedTrigger => { clickedTrigger.addEventListener('click', (event) => { event.preventDefault(); if (clickedTrigger.classList.contains('active')) return; const currentPane = document.querySelector('#cron-tabs-content .tab-pane.active'); const targetPane = document.querySelector(clickedTrigger.getAttribute('href')); currentPane?.querySelector('.cron-grid')?.classList.add('collapsed'); setTimeout(() => { cronTabTriggers.forEach(trigger => trigger.classList.remove('active')); clickedTrigger.classList.add('active'); document.querySelectorAll('#cron-tabs-content .tab-pane').forEach(pane => pane.classList.remove('active', 'show')); if (targetPane) { targetPane.classList.add('active'); setTimeout(() => targetPane.classList.add('show'), 10); } }, 350); }); });
+        
+        // Cron 编辑器标签页切换逻辑 (关键改动)
+        cronTabTriggers.forEach(clickedTrigger => {
+            clickedTrigger.addEventListener('click', (event) => {
+                event.preventDefault();
+                if (clickedTrigger.classList.contains('active')) return;
+                const currentPane = document.querySelector('#cron-tabs-content .tab-pane.active');
+                const targetPane = document.querySelector(clickedTrigger.getAttribute('href'));
+                
+                // 先收起当前的面板
+                currentPane?.querySelector('.cron-grid')?.classList.add('collapsed');
+                
+                // 等待收起动画结束后再切换
+                setTimeout(() => {
+                    cronTabTriggers.forEach(trigger => trigger.classList.remove('active'));
+                    clickedTrigger.classList.add('active');
+                    document.querySelectorAll('#cron-tabs-content .tab-pane').forEach(pane => pane.classList.remove('active', 'show'));
+                    
+                    if (targetPane) {
+                        targetPane.classList.add('active');
+                        setTimeout(() => {
+                            targetPane.classList.add('show');
+                            // 检查新面板是否需要展开
+                            const specificRadio = targetPane.querySelector('input[value="specific"]');
+                            if (specificRadio && specificRadio.checked) {
+                                targetPane.querySelector('.cron-grid')?.classList.remove('collapsed');
+                            }
+                        }, 10);
+                    }
+                }, 350); // 动画时长
+            });
+        });
+
         document.getElementById('cron-editor-modal').addEventListener('click', (e) => { if (e.target.name && e.target.name.endsWith('-mode')) { const fieldKey = e.target.name.replace('-mode', ''); cronFields[fieldKey].el.querySelector('.cron-grid').classList.toggle('collapsed', e.target.value === '*'); } });
         const editRuleFile = async (fileName) => { try { const { errno, stderr } = await exec(`am start -a android.intent.action.VIEW -d file:///data/media/0/Android/清理规则/${fileName} -t text/plain`); if (errno !== 0) throw new Error(stderr); toast(`尝试打开文件: ${fileName}`); } catch (e) { toast(`编辑文件失败: ${e.message}`); } };
         document.getElementById('edit-blacklist1').addEventListener('click', () => editRuleFile('blacklist1.txt'));
@@ -137,6 +222,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- 应用初始化 ---
     injectIcons();
+
+    // 优先检查后端进程
+    if (!await checkBackendProcess()) {
+        disableBackendFeatures('后端服务未运行');
+    }
+
     await initHomePage();
     await initEditPage();
 

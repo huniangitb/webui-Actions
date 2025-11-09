@@ -1,135 +1,96 @@
 <!DOCTYPE html>
-<!-- lang 属性将由JS动态设置 -->
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="title">Kcal Color Tuner</title>
-    
-    <!-- [修改] 从 CDN 引用 MDB-UI-Kit CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.min.css" rel="stylesheet" />
-    <!-- Font Awesome 仍然从 CDN 引用 -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
-    
-    <!-- 您的自定义样式，现在不再需要导入 MDB 的 SCSS -->
-    <link rel="stylesheet" href="main.scss">
+    <title>Cleaner 管理面板</title>
+    <link href="styles.scss" rel="stylesheet">
 </head>
 <body>
-    <div class="container mt-4 mb-5">
-        <header class="text-center mb-4">
-            <h1 data-i18n="title"></h1>
-            <p class="text-muted" data-i18n="subtitle"></p>
-        </header>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Cleaner 管理面板</h1>
 
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title" data-i18n="status.cardTitle"></h5>
-                <p class="mb-1"><span data-i18n="status.refreshRate"></span> <span id="refreshRateValue" class="badge bg-primary" data-i18n="status.reading"></span></p>
-                <label for="brightnessSlider" class="form-label mt-2" data-i18n="status.brightness"></label>
-                <div class="range"><input type="range" class="form-range" id="brightnessSlider" min="0" max="100" step="1" disabled /></div>
-                <div id="brightnessValue" class="form-text" data-i18n="status.reading"></div>
-            </div>
-        </div>
-
+        <!-- 日志数据统计卡片 -->
         <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">日志数据统计</h5>
+            </div>
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="card-title mb-0" data-i18n="config.cardTitle"></h5>
-                    <div class="config-actions-group">
-                        <button id="toggleEditModeButton" type="button" class="btn btn-success btn-sm" data-mdb-ripple-init></button>
-                        <button id="customizeRangeButton" type="button" class="btn btn-info btn-sm" data-mdb-ripple-init data-i18n="buttons.customizeRanges"></button>
-                        <button id="readNodeButton" type="button" class="btn btn-secondary btn-sm" data-mdb-ripple-init data-i18n="buttons.readNode"></button>
-                        <button id="resetConfigButton" type="button" class="btn btn-warning btn-sm" data-mdb-ripple-init data-i18n="buttons.reset"></button>
-                        <button id="saveButton" type="button" class="btn btn-primary btn-sm" data-mdb-ripple-init data-i18n="buttons.save"></button>
-                    </div>
+                <div class="mb-3">
+                    <label for="date-select" class="form-label">选择日期：</label>
+                    <input type="date" id="date-select" class="form-control" min="" max="">
                 </div>
-                <p class="text-muted small" data-i18n="config.description"></p>
-                <hr/>
-                <div id="global-config-editor">
-                    <div class="param-row">
-                        <label for="interceptSlider" class="param-label" data-i18n="params.intercept"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="interceptSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="interceptInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
-
-                    <div class="param-row">
-                        <label for="slopeSlider" class="param-label" data-i18n="params.slope"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="slopeSlider" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="slopeInput" class="form-control param-input" step="0.01" /></div>
-                        </div>
-                    </div>
-
-                    <div class="param-row">
-                        <label for="offsetSlider" class="param-label" data-i18n="params.offset"></label>
-                        <div class="slider-input-group">
-                            <div class="range flex-grow-1"><input type="range" class="form-range" id="offsetSlider" step="1" /></div>
-                            <div class="form-outline" data-mdb-input-init><input type="number" id="offsetInput" class="form-control param-input" step="1" /></div>
-                        </div>
-                    </div>
-
-                    <div class="chart-container mt-4">
-                        <canvas id="colorCurveChart"></canvas>
+                <div id="bar-chart-wrapper" class="mb-4">
+                    <canvas id="bar-chart"></canvas>
+                </div>
+                <div id="app-stats-container" class="mt-4">
+                    <h5 id="app-stats-title" class="mb-3">应用清理详情</h5>
+                    <div class="app-stats-list-wrapper">
+                        <ul id="app-stats-list" class="list-group list-group-flush"></ul>
                     </div>
                 </div>
             </div>
         </div>
-        <footer class="text-center mt-4">
-            <p class="text-muted small" data-i18n="footer.author"></p>
-        </footer>
-    </div>
-    
-    <div class="modal fade" id="nodeStatusModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" data-i18n="modals.nodeStatus.title"></h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <h6 data-i18n="modals.nodeStatus.raw"></h6><pre><code id="rawNodeOutput"></code></pre><hr/>
-                    <h6 data-i18n="modals.nodeStatus.parsed"></h6><div id="parsedNodeOutput"></div>
+
+        <!-- F2FS & 控制中心卡片 -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">控制中心</h5>
+            </div>
+            <div class="card-body">
+                <!-- F2FS GC 信息 -->
+                <div id="f2fs-gc-info-container" class="mb-3" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <p class="mb-0 fw-bold">F2FS 垃圾回收</p>
+                        <button id="customize-partitions-btn" class="btn btn-sm btn-outline-secondary" data-mdb-ripple-init style="display: none;">自定义</button>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span id="global-gc-status" class="badge bg-secondary" style="padding: 0.5em; line-height: 1.2;">未知</span>
+                        <button id="gc-control-btn" class="btn btn-sm btn-outline-secondary" data-mdb-ripple-init>状态未知</button>
+                    </div>
+                    <div id="partition-gc-status-container" class="d-flex flex-wrap justify-content-center gap-2 mb-1"></div>
+                    <div id="f2fs-charts-container" class="d-flex flex-wrap justify-content-center gap-3 mt-1"></div>
                 </div>
-                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-mdb-dismiss="modal" data-i18n="modals.nodeStatus.close"></button></div>
+                <!-- 操作按钮容器 -->
+                <div class="actions-container">
+                    <button id="clean-now-btn" class="btn btn-primary btn-sm" data-mdb-ripple-init data-mdb-ripple-color="light">立即<br>清理</button>
+                    <button id="refresh-log" class="btn btn-primary btn-sm" data-mdb-ripple-init data-mdb-ripple-color="light">刷新<br>数据</button>
+                    <button id="delete-log" class="btn btn-danger btn-sm" data-mdb-ripple-init data-mdb-ripple-color="light">删除<br>日志</button>
+                    <button id="clear-data" class="btn btn-warning btn-sm" data-mdb-ripple-init data-mdb-ripple-color="light">清除<br>缓存</button>
+                    <button id="restart-module" class="btn btn-info btn-sm" data-mdb-ripple-init data-mdb-ripple-color="light">重启<br>模块</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="modal fade" id="rangeConfigModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+    <!-- 底部导航栏 -->
+    <nav class="bottom-nav">
+        <a href="index.html" class="nav-item active">
+            <i class="bi bi-house-door fa-lg"></i>
+            <span>主页</span>
+        </a>
+        <a href="edit.html" class="nav-item">
+            <i class="bi bi-pencil-square fa-lg"></i>
+            <span>编辑</span>
+        </a>
+    </nav>
+
+    <!-- 自定义分区显示模态框 -->
+    <div class="modal fade" id="partitions-modal" tabindex="-1" aria-labelledby="partitionsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" data-i18n="modals.range.title"></h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <p class="text-muted" data-i18n="modals.range.description"></p>
-                    
-                    <p class="fw-bold mt-3 mb-1" data-i18n="modals.range.intercept"></p>
-                    <div class="row g-3">
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="interceptRangeMin" class="form-control" step="any" /><label class="form-label" for="interceptRangeMin" data-i18n="modals.range.min"></label></div></div>
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="interceptRangeMax" class="form-control" step="any" /><label class="form-label" for="interceptRangeMax" data-i18n="modals.range.max"></label></div></div>
-                    </div>
-
-                    <p class="fw-bold mt-3 mb-1" data-i18n="modals.range.slope"></p>
-                    <div class="row g-3">
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="slopeRangeMin" class="form-control" step="any" /><label class="form-label" for="slopeRangeMin" data-i18n="modals.range.min"></label></div></div>
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="slopeRangeMax" class="form-control" step="any" /><label class="form-label" for="slopeRangeMax" data-i18n="modals.range.max"></label></div></div>
-                    </div>
-
-                    <p class="fw-bold mt-3 mb-1" data-i18n="modals.range.offset"></p>
-                    <div class="row g-3">
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="offsetRangeMin" class="form-control" step="1" /><label class="form-label" for="offsetRangeMin" data-i18n="modals.range.min"></label></div></div>
-                        <div class="col"><div class="form-outline" data-mdb-input-init><input type="number" id="offsetRangeMax" class="form-control" step="1" /><label class="form-label" for="offsetRangeMax" data-i18n="modals.range.max"></label></div></div>
-                    </div>
-
+                <div class="modal-header">
+                    <h5 class="modal-title" id="partitionsModalLabel">自定义分区显示</h5>
+                    <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Close"></button>
                 </div>
+                <div class="modal-body" id="partitions-modal-body"></div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal" data-i18n="modals.range.cancel"></button>
-                    <button type="button" id="saveRangeButton" class="btn btn-primary" data-i18n="modals.range.save"></button>
+                    <button type="button" class="btn btn-primary" id="save-partitions-btn">保存</button>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- [修改] 从 CDN 引用 MDB-UI-Kit JS -->
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.min.js"></script>
-    <script type="module" src="main.js"></script>
+
+    <script type="module" src="scripts.js"></script>
 </body>
 </html>

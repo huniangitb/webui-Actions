@@ -9,8 +9,6 @@
   },
   "dependencies": {
     "chart.js": "^4.4.3",
-    "i18next": "^23.11.5",
-    "i18next-browser-languagedetector": "^7.2.0",
     "kernelsu": "^1.0.6",
     "mdb-ui-kit": "^7.3.0"
   },

@@ -1,11 +1,17 @@
 // 1. 完整引入 MDB 的所有样式
 @import 'mdb-ui-kit/src/scss/mdb.free.scss';
 
-// --- 终极版背景动画: 移动背景位置 ---
-@keyframes aurora-sweep {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+// --- 终极性能优化版动画 ---
+@keyframes aurora-1 {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.5); opacity: 0.6; }
+  50% { transform: translate(-20%, -40%) rotate(180deg) scale(2); opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(360deg) scale(1.5); opacity: 0.6; }
+}
+
+@keyframes aurora-2 {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.8); opacity: 1; }
+  50% { transform: translate(-80%, -60%) rotate(-180deg) scale(1.5); opacity: 0.7; }
+  100% { transform: translate(-50%, -50%) rotate(-360deg) scale(1.8); opacity: 1; }
 }
 
 // --- 全局和基础设置 ---
@@ -17,20 +23,32 @@ body {
   background-color: #f0f2f5;
 }
 
-// --- 高斯模糊的动态背景层 ---
-body::before {
+// --- 高斯模糊的动态背景层 (伪模糊实现) ---
+body::before, body::after {
   content: '';
   position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
+  top: 50%; left: 50%;
+  width: 150vmax; height: 150vmax; /* 使用 vmax 确保覆盖所有屏幕 */
   z-index: -2;
-  background-size: 300% 300%;
-  background-image: linear-gradient(135deg,
-    hsl(0, 90%, 75%), hsl(140, 90%, 70%), hsl(270, 90%, 75%), hsl(200, 90%, 70%)
-  );
-  animation: aurora-sweep 25s infinite linear;
-  filter: blur(100px);
-  -webkit-filter: blur(100px);
+  mix-blend-mode: screen; /* 使用滤色模式获得明亮的混合效果 */
+  transform-origin: center center;
+  
+  /* 移除: filter: blur(100px); 这是性能的关键 */
 }
+
+body::before {
+  /* 创建柔和的径向渐变 "光球" */
+  background: radial-gradient(circle at 30% 30%, hsl(0, 90%, 75%), transparent 35%),
+              radial-gradient(circle at 70% 70%, hsl(270, 90%, 75%), transparent 35%);
+  animation: aurora-1 30s infinite linear;
+}
+
+body::after {
+  background: radial-gradient(circle at 70% 30%, hsl(140, 90%, 70%), transparent 35%),
+              radial-gradient(circle at 30% 70%, hsl(200, 90%, 70%), transparent 35%);
+  animation: aurora-2 35s infinite linear reverse;
+}
+
 
 // --- 噪点图层 (抖动) ---
 html::before {
@@ -198,10 +216,12 @@ main { width: 50%; flex-shrink: 0; }
   body { color: #f5f5f5; background-color: #121212; }
   
   body::before {
-    background-image: linear-gradient(135deg,
-      hsl(0, 90%, 50%), hsl(140, 90%, 45%), hsl(270, 90%, 55%), hsl(200, 90%, 50%)
-    );
-    animation-duration: 30s;
+    background: radial-gradient(circle at 30% 30%, hsl(0, 80%, 55%), transparent 40%),
+                radial-gradient(circle at 70% 70%, hsl(270, 80%, 55%), transparent 40%);
+  }
+  body::after {
+    background: radial-gradient(circle at 70% 30%, hsl(140, 80%, 45%), transparent 40%),
+                radial-gradient(circle at 30% 70%, hsl(200, 80%, 50%), transparent 40%);
   }
   
   h1 { background: rgba(50, 50, 50, 0.3); border-color: rgba(255, 255, 255, 0.1); }
@@ -210,11 +230,7 @@ main { width: 50%; flex-shrink: 0; }
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: #f5f5f5;
   }
-  
-  /* 修复: 强制所有子元素继承亮色字体 */
-  .card *, .modal-content * {
-    color: inherit;
-  }
+  .card *, .modal-content * { color: inherit; }
 
   .card-header, .modal-header, .modal-footer {
     border-color: rgba(255, 255, 255, 0.1);

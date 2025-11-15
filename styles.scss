@@ -3,9 +3,9 @@
 
 // --- 终极性能优化版动画 ---
 @keyframes aurora-1 {
-  0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.5); opacity: 0.6; }
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.5); opacity: 0.5; /* 修复: 提升最低透明度 */ }
   50% { transform: translate(-20%, -40%) rotate(180deg) scale(2); opacity: 1; }
-  100% { transform: translate(-50%, -50%) rotate(360deg) scale(1.5); opacity: 0.6; }
+  100% { transform: translate(-50%, -50%) rotate(360deg) scale(1.5); opacity: 0.5; /* 修复: 提升最低透明度 */ }
 }
 
 @keyframes aurora-2 {
@@ -65,37 +65,36 @@ html::before {
 h1 {
   font-size: clamp(1.5rem, 4vw, 2.5rem); color: #fff; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   display: inline-block; padding: 0.5em 1em;
-  background: rgba(255, 255, 255, 0.25); /* 修复: 提升浅色模式对比度 */
+  background: rgba(255, 255, 255, 0.5); /* 修复: 提高不透明度，压低亮度 */
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border-radius: 15px; border: 1px solid rgba(255, 255, 255, 0.4); /* 修复: 提升浅色模式对比度 */
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1); /* 修复: 提升浅色模式对比度 */
+  border-radius: 15px; border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
   margin-bottom: 1rem;
   overflow: hidden;
 }
 
 // --- 毛玻璃 (Glassmorphism) 效果 ---
 .card, .modal-content, .partition-gc-status-item {
-  background: rgba(255, 255, 255, 0.25); /* 修复: 提升浅色模式对比度 */
+  background: rgba(255, 255, 255, 0.5); /* 修复: 提高不透明度，压低亮度 */
   backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-  border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.4); /* 修复: 提升浅色模式对比度 */
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1); /* 修复: 提升浅色模式对比度 */
-  margin-bottom: 1.5rem;
+  border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1); margin-bottom: 1.5rem;
   overflow: hidden;
 }
 
 .card-header, .modal-header, .modal-footer {
   background-color: transparent; 
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3); /* 修复: 提升浅色模式对比度 */
-  border-top: 1px solid rgba(255, 255, 255, 0.3); /* 修复: 提升浅色模式对比度 */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
 }
 .card-header h5 { font-size: 1.25rem; }
 .btn { white-space: normal; line-height: 1.2; text-align: center; }
 
 // --- 毛玻璃输入框样式 ---
 .input-glass-wrapper {
-  background: rgba(255, 255, 255, 0.25); /* 修复: 提升浅色模式对比度 */
+  background: rgba(255, 255, 255, 0.5); /* 修复: 提高不透明度，压低亮度 */
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.4); /* 修复: 提升浅色模式对比度 */
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 0.375rem; padding: 0.375rem 0.75rem;
   display: flex; align-items: center;
   transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
@@ -109,15 +108,15 @@ h1 {
 
 .input-group.input-glass-wrapper {
   padding: 0; flex-wrap: nowrap;
-  .btn { border-color: rgba(255, 255, 255, 0.4); } /* 修复: 提升浅色模式对比度 */
+  .btn { border-color: rgba(255, 255, 255, 0.4); }
   .form-control-transparent { padding: 0.375rem 0.75rem; }
 }
 
 // --- 分段控件 (调度模式按钮) ---
 .radio-toggle-group {
-  background: rgba(255, 255, 255, 0.25); /* 修复: 提升浅色模式对比度 */
+  background: rgba(255, 255, 255, 0.5); /* 修复: 提高不透明度，压低亮度 */
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.4); /* 修复: 提升浅色模式对比度 */
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 50px; padding: 0.25rem; display: flex; gap: 0.25rem;
   overflow: hidden;
 }
@@ -127,7 +126,8 @@ h1 {
   border-radius: 50px; cursor: pointer; transition: all 0.2s ease-in-out; color: #1a1a1a;
 }
 .radio-toggle-input:checked + .radio-toggle-label {
-  background-color: rgba(255, 255, 255, 0.6); color: #000; font-weight: 500;
+  background-color: rgba(200, 200, 200, 0.8); /* 修复: 使用柔和的浅灰色，凸显选中效果 */
+  color: #000; font-weight: 500;
 }
 
 
@@ -202,9 +202,9 @@ main { width: 50%; flex-shrink: 0; }
 // --- 底部导航栏样式 ---
 .bottom-nav {
   position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
-  background: rgba(255, 255, 255, 0.25); /* 修复: 提升浅色模式对比度 */
+  background: rgba(255, 255, 255, 0.25); /* 修复: 提升不透明度 */
   backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
-  border-top: 1px solid rgba(255, 255, 255, 0.4); /* 修复: 提升浅色模式对比度 */
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
   display: flex; justify-content: space-around; align-items: center; z-index: 1030;
   transition: all 0.3s ease-in-out;
@@ -286,7 +286,7 @@ main { width: 50%; flex-shrink: 0; }
     width: auto; max-width: 380px; bottom: 1.5rem;
     left: 50%; transform: translateX(-50%);
     right: auto; border-radius: 50px;
-    border: 1px solid rgba(255, 255, 255, 0.4); /* 修复: 提升浅色模式对比度 */
+    border: 1px solid rgba(255, 255, 255, 0.4);
   }
   @media (prefers-color-scheme: dark) {
     .bottom-nav {

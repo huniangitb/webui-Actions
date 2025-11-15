@@ -3,71 +3,50 @@
 
 // --- :root - 颜色和主题变量定义 (增强版) ---
 :root {
-  // -- 浅色模式变量 --
-  --app-bg-color: #f0f2f5;
-  --text-color: #1a1a1a;
-  --text-muted-color: rgba(0, 0, 0, 0.6);
-  --title-glow-color: rgba(255, 255, 255, 0.3);
-  --btn-close-filter: none;
-  --mdb-primary-fade-200: rgba(0, 123, 255, 0.2); // 用于聚焦光晕
+  // -- 默认 (炫彩) 模式变量 --
+  /* 核心变更: 移除背景色，让极光成为唯一背景 */
+  --app-bg-color: transparent;
+  /* 核心变更: 默认文字改为浅色以适应炫彩背景 */
+  --text-color: #f5f5f5;
+  --text-muted-color: rgba(245, 245, 245, 0.7);
+  --title-glow-color: rgba(0, 0, 0, 0.5);
+  --btn-close-filter: invert(1) grayscale(100%) brightness(200%);
+  --mdb-primary-fade-200: rgba(127, 178, 255, 0.3);
 
-  // 毛玻璃 (Glassmorphism) 样式 - 增强版
-  --glass-bg: rgba(255, 255, 255, 0.45);
-  --glass-bg-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.3));
-  --glass-border-color: rgba(255, 255, 255, 0.5);
+  // 毛玻璃 (Glassmorphism) 样式 - 核心变更: 浅色模式使用深色玻璃
+  --glass-bg: rgba(30, 30, 30, 0.35);
+  --glass-bg-gradient: linear-gradient(135deg, rgba(50, 50, 50, 0.4), rgba(20, 20, 20, 0.3));
+  --glass-border-color: rgba(255, 255, 255, 0.2);
   --glass-shadow-enhanced:
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), // 内发光，模拟玻璃顶部反光
-    0 4px 12px 0 rgba(0, 0, 0, 0.08),          // 近处的小阴影，更清晰
-    0 8px 32px 0 rgba(0, 0, 0, 0.1);           // 远处的大阴影，更柔和
-  --glass-header-border-color: rgba(255, 255, 255, 0.4);
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.08),
+    0 4px 12px 0 rgba(0, 0, 0, 0.2),
+    0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  --glass-header-border-color: rgba(255, 255, 255, 0.15);
 
-  // 交互元素
-  --interactive-hover-bg: rgba(255, 255, 255, 0.6);
-  --glass-toggle-bg: rgba(255, 255, 255, 0.4);
-  --glass-toggle-label-color: #333;
-  --glass-toggle-checked-bg: #fff;
-  --glass-toggle-checked-color: #000;
+  // 交互元素 - 核心变更: 按钮等组件颜色与深色模式保持一致
+  --interactive-hover-bg: rgba(255, 255, 255, 0.1);
+  --glass-toggle-bg: rgba(50, 50, 50, 0.3);
+  --glass-toggle-label-color: #bbb;
+  --glass-toggle-checked-bg: rgba(255, 255, 255, 0.15);
+  --glass-toggle-checked-color: #f5f5f5;
 
   // 特殊组件 (模态框, 导航栏)
-  --modal-backdrop-filter: blur(5px);
-  --cron-modal-bg: rgba(255, 255, 255, 0.6);
-  --cron-btn-bg: rgba(0, 0, 0, 0.05);
-  --cron-btn-border-color: rgba(0, 0, 0, 0.2);
-  --bottom-nav-bg: rgba(255, 255, 255, 0.4);
+  --modal-backdrop-filter: blur(8px);
+  --cron-modal-bg: rgba(30, 30, 30, 0.7);
+  --cron-btn-bg: rgba(255, 255, 255, 0.1);
+  --cron-btn-border-color: rgba(255, 255, 255, 0.2);
+  --bottom-nav-bg: rgba(30, 30, 30, 0.4);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    // -- 深色模式变量 --
-    --app-bg-color: #181a1b;
+    // -- 深色模式变量 (背景更深，与炫彩模式略有区别) --
+    --app-bg-color: #121212; // 深色模式使用纯粹的深色背景
     --text-color: #e8e6e3;
-    --text-muted-color: rgba(232, 230, 227, 0.6);
-    --title-glow-color: rgba(0, 0, 0, 0.5);
-    --btn-close-filter: invert(1) grayscale(100%) brightness(200%);
-    --mdb-primary-fade-200: rgba(0, 123, 255, 0.4); // 深色模式下光晕更亮
-
-    // 毛玻璃 (Glassmorphism) 样式 - 增强版
+    
+    // 其他变量与炫彩模式基本保持一致或微调
     --glass-bg: rgba(40, 40, 40, 0.4);
     --glass-bg-gradient: linear-gradient(135deg, rgba(50, 50, 50, 0.5), rgba(30, 30, 30, 0.3));
-    --glass-border-color: rgba(255, 255, 255, 0.2);
-    --glass-shadow-enhanced:
-      inset 0 1px 1px 0 rgba(255, 255, 255, 0.08),
-      0 4px 12px 0 rgba(0, 0, 0, 0.2),
-      0 8px 32px 0 rgba(0, 0, 0, 0.3);
-    --glass-header-border-color: rgba(255, 255, 255, 0.15);
-
-    // 交互元素
-    --interactive-hover-bg: rgba(255, 255, 255, 0.1);
-    --glass-toggle-bg: rgba(50, 50, 50, 0.3);
-    --glass-toggle-label-color: #bbb;
-    --glass-toggle-checked-bg: rgba(255, 255, 255, 0.15);
-    --glass-toggle-checked-color: #f5f5f5;
-
-    // 特殊组件 (模态框, 导航栏)
-    --modal-backdrop-filter: blur(8px);
-    --cron-modal-bg: rgba(30, 30, 30, 0.7);
-    --cron-btn-bg: rgba(255, 255, 255, 0.1);
-    --cron-btn-border-color: rgba(255, 255, 255, 0.2);
     --bottom-nav-bg: rgba(40, 40, 40, 0.4);
   }
 }
@@ -96,14 +75,14 @@ body {
   position: relative;
 }
 
-// --- 高斯模糊的动态背景层 (伪模糊实现) ---
+// --- 高斯模糊的动态背景层 ---
 body::before, body::after {
   content: ''; position: fixed; top: 50%; left: 50%;
   width: 150vmax; height: 150vmax; z-index: -2;
   mix-blend-mode: screen; transform-origin: center center;
 }
 
-// 浅色模式背景光晕
+// 默认 (炫彩) 模式背景光晕
 body::before {
   background: radial-gradient(circle at 30% 30%, hsl(340, 100%, 65%), transparent 35%),
               radial-gradient(circle at 70% 70%, hsl(260, 100%, 70%), transparent 35%);
@@ -115,7 +94,7 @@ body::after {
   animation: aurora-2 35s infinite linear reverse;
 }
 
-// 深色模式背景光晕 (通过媒体查询覆盖)
+// 深色模式背景光晕 (颜色更深邃)
 @media (prefers-color-scheme: dark) {
   body::before {
     background: radial-gradient(circle at 30% 30%, hsl(0, 80%, 55%), transparent 40%),
@@ -127,7 +106,7 @@ body::after {
   }
 }
 
-// --- 噪点图层 (抖动) ---
+// --- 噪点图层 ---
 html::before {
   content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   z-index: -1; pointer-events: none;
@@ -137,7 +116,7 @@ html::before {
 
 .container { max-width: 960px; margin: auto; padding: 0 15px; }
 
-// --- 标题毛玻璃效果 (增强) ---
+// --- 标题毛玻璃效果 ---
 h1 {
   font-size: clamp(1.5rem, 4vw, 2.5rem);
   color: var(--text-color);
@@ -156,7 +135,7 @@ h1 {
   }
 }
 
-// --- 通用毛玻璃 (Glassmorphism) 效果 (增强) ---
+// --- 通用毛玻璃效果 ---
 .card, .modal-content, .partition-gc-status-item {
   background: var(--glass-bg-gradient);
   backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
@@ -170,7 +149,7 @@ h1 {
 
   &:hover {
     transform: translateY(-5px);
-    box-shadow: var(--glass-shadow-enhanced), 0 10px 40px rgba(0,0,0,0.15);
+    box-shadow: var(--glass-shadow-enhanced), 0 10px 40px rgba(0,0,0,0.2);
   }
 }
 
@@ -196,7 +175,7 @@ h1 {
 }
 .btn-close { filter: var(--btn-close-filter); }
 
-// --- 毛玻璃输入框样式 (增强) ---
+// --- 毛玻璃输入框样式 ---
 .input-glass-wrapper {
   background: var(--glass-bg-gradient);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
@@ -224,7 +203,7 @@ h1 {
   .form-control-transparent { padding: 0.375rem 0.75rem; }
 }
 
-// --- 分段控件 (调度模式按钮) (增强) ---
+// --- 分段控件 ---
 .radio-toggle-group {
   background: var(--glass-toggle-bg);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
@@ -252,22 +231,12 @@ h1 {
 
 
 // --- 布局与滚动 ---
-.app-wrapper {
-  position: relative;
-  height: 100vh;
-  overflow: hidden;
-}
-.main-content-scroll-area {
-  height: 100%;
-  overflow-y: auto;
-  padding-bottom: 80px;
-  -webkit-overflow-scrolling: touch;
-}
-
+.app-wrapper { position: relative; height: 100vh; overflow: hidden; }
+.main-content-scroll-area { height: 100%; overflow-y: auto; padding-bottom: 80px; -webkit-overflow-scrolling: touch; }
 .pages-container { display: flex; width: 200%; transition: transform 0.3s ease-in-out; touch-action: pan-y; }
 main { width: 50%; flex-shrink: 0; }
 
-// --- 主页特定样式 ---
+// --- 主页与编辑页特定样式 ---
 .actions-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; }
 .actions-container .btn { padding-left: 0.25rem; padding-right: 0.25rem; }
 #bar-chart-wrapper { position: relative; aspect-ratio: 2 / 1; max-height: 300px; width: 100%; }
@@ -283,8 +252,6 @@ main { width: 50%; flex-shrink: 0; }
 .partition-gc-status-item p { margin-bottom: 0.25rem; font-weight: 500; }
 .partition-gc-status-item .badge { font-size: 0.7rem; padding: 0.4em 0.6em; line-height: 1.2; white-space: normal; }
 #partitions-modal-body { display: flex; flex-direction: column; gap: 0.75rem; }
-
-// --- 编辑页特定样式 ---
 #f2fs-gc-config-toggle-label { width: 100px; box-sizing: border-box; text-align: center; transition: all 0.2s ease-in-out; }
 .cron-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; transition: opacity 0.35s ease-out, max-height 0.35s ease-out; overflow: hidden; max-height: 500px; opacity: 1; }
 .cron-grid.collapsed { max-height: 0; opacity: 0; }
@@ -319,7 +286,7 @@ main { width: 50%; flex-shrink: 0; }
 }
 
 
-// --- 底部导航栏样式 (增强) ---
+// --- 底部导航栏样式 ---
 .bottom-nav {
   position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
   background: var(--bottom-nav-bg);

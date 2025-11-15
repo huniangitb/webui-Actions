@@ -1,242 +1,273 @@
 // 1. 完整引入 MDB 的所有样式
 @import 'mdb-ui-kit/src/scss/mdb.free.scss';
 
-// --- :root - 颜色和主题变量定义 (高辨识度版) ---
+// --- :root - 颜色和主题变量定义 (增强版) ---
 :root {
   // -- 浅色模式变量 --
   --app-bg-color: #f0f2f5;
-  --text-color: #212529; // 更深的黑色，对比度更高
-  --text-muted-color: #555;
+  --text-color: #1a1a1a;
+  --text-muted-color: rgba(0, 0, 0, 0.6);
+  --title-glow-color: rgba(255, 255, 255, 0.3);
   --btn-close-filter: none;
-  --focus-ring-color: var(--mdb-primary);
+  --mdb-primary-fade-200: rgba(0, 123, 255, 0.2); // 用于聚焦光晕
 
-  // 毛玻璃 (Glassmorphism) 样式 - 增强层次感
-  --glass-bg-card: rgba(255, 255, 255, 0.65); // 主要内容卡片，更不透明
-  --glass-bg-interactive: rgba(255, 255, 255, 0.55); // 输入框、按钮组等
-  --glass-bg-nav: rgba(255, 255, 255, 0.4); // 导航栏，更透明
-  --glass-border-color: rgba(255, 255, 255, 0.6); // 边框更明显
-  --glass-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.1), 0 8px 32px 0 rgba(0, 0, 0, 0.08); // 更柔和、有层次的阴影
-  --glass-header-border-color: rgba(0, 0, 0, 0.1); // 使用深色分割线，更清晰
+  // 毛玻璃 (Glassmorphism) 样式 - 增强版
+  --glass-bg: rgba(255, 255, 255, 0.45);
+  --glass-bg-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.3));
+  --glass-border-color: rgba(255, 255, 255, 0.5);
+  --glass-shadow-enhanced:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), // 内发光，模拟玻璃顶部反光
+    0 4px 12px 0 rgba(0, 0, 0, 0.08),          // 近处的小阴影，更清晰
+    0 8px 32px 0 rgba(0, 0, 0, 0.1);           // 远处的大阴影，更柔和
+  --glass-header-border-color: rgba(255, 255, 255, 0.4);
 
   // 交互元素
-  --interactive-hover-bg: rgba(255, 255, 255, 0.8);
-  --toggle-checked-bg: #fff; // 选中时使用纯白，最突出
-  --toggle-checked-color: var(--mdb-primary);
+  --interactive-hover-bg: rgba(255, 255, 255, 0.6);
+  --glass-toggle-bg: rgba(255, 255, 255, 0.4);
+  --glass-toggle-label-color: #333;
+  --glass-toggle-checked-bg: #fff;
+  --glass-toggle-checked-color: #000;
 
-  // 特殊组件 (模态框)
-  --modal-backdrop-filter: blur(6px);
-  --cron-modal-bg: rgba(255, 255, 255, 0.8); // 模态框背景更实
+  // 特殊组件 (模态框, 导航栏)
+  --modal-backdrop-filter: blur(5px);
+  --cron-modal-bg: rgba(255, 255, 255, 0.6);
   --cron-btn-bg: rgba(0, 0, 0, 0.05);
-  --cron-btn-border-color: rgba(0, 0, 0, 0.15);
+  --cron-btn-border-color: rgba(0, 0, 0, 0.2);
+  --bottom-nav-bg: rgba(255, 255, 255, 0.4);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     // -- 深色模式变量 --
-    --app-bg-color: #121212;
-    --text-color: #e8e6e3; // 柔和的白色，比纯白更护眼
-    --text-muted-color: #999;
+    --app-bg-color: #181a1b;
+    --text-color: #e8e6e3;
+    --text-muted-color: rgba(232, 230, 227, 0.6);
+    --title-glow-color: rgba(0, 0, 0, 0.5);
     --btn-close-filter: invert(1) grayscale(100%) brightness(200%);
-    --focus-ring-color: var(--mdb-info); // 深色模式下用亮蓝色作为焦点色
+    --mdb-primary-fade-200: rgba(0, 123, 255, 0.4); // 深色模式下光晕更亮
 
-    // 毛玻璃 (Glassmorphism) 样式
-    --glass-bg-card: rgba(40, 40, 40, 0.6);
-    --glass-bg-interactive: rgba(40, 40, 40, 0.5);
-    --glass-bg-nav: rgba(40, 40, 40, 0.35);
+    // 毛玻璃 (Glassmorphism) 样式 - 增强版
+    --glass-bg: rgba(40, 40, 40, 0.4);
+    --glass-bg-gradient: linear-gradient(135deg, rgba(50, 50, 50, 0.5), rgba(30, 30, 30, 0.3));
     --glass-border-color: rgba(255, 255, 255, 0.2);
-    --glass-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.25), 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+    --glass-shadow-enhanced:
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.08),
+      0 4px 12px 0 rgba(0, 0, 0, 0.2),
+      0 8px 32px 0 rgba(0, 0, 0, 0.3);
     --glass-header-border-color: rgba(255, 255, 255, 0.15);
 
     // 交互元素
-    --interactive-hover-bg: rgba(60, 60, 60, 0.7);
-    --toggle-checked-bg: rgba(255, 255, 255, 0.15);
-    --toggle-checked-color: #fff;
+    --interactive-hover-bg: rgba(255, 255, 255, 0.1);
+    --glass-toggle-bg: rgba(50, 50, 50, 0.3);
+    --glass-toggle-label-color: #bbb;
+    --glass-toggle-checked-bg: rgba(255, 255, 255, 0.15);
+    --glass-toggle-checked-color: #f5f5f5;
 
-    // 特殊组件 (模态框)
+    // 特殊组件 (模态框, 导航栏)
     --modal-backdrop-filter: blur(8px);
-    --cron-modal-bg: rgba(30, 30, 30, 0.8);
+    --cron-modal-bg: rgba(30, 30, 30, 0.7);
     --cron-btn-bg: rgba(255, 255, 255, 0.1);
     --cron-btn-border-color: rgba(255, 255, 255, 0.2);
+    --bottom-nav-bg: rgba(40, 40, 40, 0.4);
   }
 }
 
 
-// --- 动画与全局设置 (保持不变) ---
-@keyframes aurora-1 { /* ... */ }
-@keyframes aurora-2 { /* ... */ }
+// --- 终极性能优化版动画 ---
+@keyframes aurora-1 {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.5); opacity: 0.5; }
+  50% { transform: translate(-20%, -40%) rotate(180deg) scale(2); opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(360deg) scale(1.5); opacity: 0.5; }
+}
+
+@keyframes aurora-2 {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.8); opacity: 1; }
+  50% { transform: translate(-80%, -60%) rotate(-180deg) scale(1.5); opacity: 0.7; }
+  100% { transform: translate(-50%, -50%) rotate(-360deg) scale(1.8); opacity: 1; }
+}
+
+// --- 全局和基础设置 ---
 html { height: 100%; overflow: hidden; }
+
 body {
   height: 100%; font-size: 1rem; margin: 0; padding: 0;
   color: var(--text-color);
   background-color: var(--app-bg-color);
   position: relative;
 }
-body::before, body::after { /* ... */ }
-@media (prefers-color-scheme: dark) { body::before, body::after { /* ... */ } }
-html::before { /* ... */ }
+
+// --- 高斯模糊的动态背景层 (伪模糊实现) ---
+body::before, body::after {
+  content: ''; position: fixed; top: 50%; left: 50%;
+  width: 150vmax; height: 150vmax; z-index: -2;
+  mix-blend-mode: screen; transform-origin: center center;
+}
+
+// 浅色模式背景光晕
+body::before {
+  background: radial-gradient(circle at 30% 30%, hsl(340, 100%, 65%), transparent 35%),
+              radial-gradient(circle at 70% 70%, hsl(260, 100%, 70%), transparent 35%);
+  animation: aurora-1 30s infinite linear;
+}
+body::after {
+  background: radial-gradient(circle at 70% 30%, hsl(160, 100%, 60%), transparent 35%),
+              radial-gradient(circle at 30% 70%, hsl(210, 100%, 65%), transparent 35%);
+  animation: aurora-2 35s infinite linear reverse;
+}
+
+// 深色模式背景光晕 (通过媒体查询覆盖)
+@media (prefers-color-scheme: dark) {
+  body::before {
+    background: radial-gradient(circle at 30% 30%, hsl(0, 80%, 55%), transparent 40%),
+                radial-gradient(circle at 70% 70%, hsl(270, 80%, 55%), transparent 40%);
+  }
+  body::after {
+    background: radial-gradient(circle at 70% 30%, hsl(140, 80%, 45%), transparent 40%),
+                radial-gradient(circle at 30% 70%, hsl(200, 80%, 50%), transparent 40%);
+  }
+}
+
+// --- 噪点图层 (抖动) ---
+html::before {
+  content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  z-index: -1; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 250 250' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+}
+
 .container { max-width: 960px; margin: auto; padding: 0 15px; }
 
-
-// --- 标题毛玻璃效果 ---
+// --- 标题毛玻璃效果 (增强) ---
 h1 {
   font-size: clamp(1.5rem, 4vw, 2.5rem);
   color: var(--text-color);
-  // 增加更清晰的文本阴影
-  text-shadow: 0 1px 2px rgba(0,0,0,0.2), 0 3px 8px rgba(0,0,0,0.2);
+  text-shadow: 0 0 20px var(--title-glow-color), 0 2px 4px rgba(0, 0, 0, 0.5);
   display: inline-block; padding: 0.5em 1em; margin-bottom: 1rem;
-  background: var(--glass-bg-card);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border-radius: 15px; border: 1px solid var(--glass-border-color);
-  box-shadow: var(--glass-shadow);
+  background: var(--glass-bg-gradient);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-radius: 15px;
+  border: 1px solid var(--glass-border-color);
+  box-shadow: var(--glass-shadow-enhanced);
   overflow: hidden;
+  transition: transform 0.2s ease-out;
+
+  &:hover {
+    transform: scale(1.02);
+  }
 }
 
-// --- 通用毛玻璃 (Glassmorphism) 效果 ---
+// --- 通用毛玻璃 (Glassmorphism) 效果 (增强) ---
 .card, .modal-content, .partition-gc-status-item {
-  background: var(--glass-bg-card);
-  backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-  border-radius: 20px; border: 1px solid var(--glass-border-color);
-  box-shadow: var(--glass-shadow);
+  background: var(--glass-bg-gradient);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border-radius: 20px;
+  border: 1px solid var(--glass-border-color);
+  box-shadow: var(--glass-shadow-enhanced);
   margin-bottom: 1.5rem; overflow: hidden;
   color: var(--text-color);
-  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out; // 为悬浮效果添加过渡
   * { color: inherit; }
-}
-// 添加悬浮效果，让卡片“浮”起来
-.card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.12), 0 12px 40px 0 rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--glass-shadow-enhanced), 0 10px 40px rgba(0,0,0,0.15);
+  }
 }
 
 .card-header, .modal-header, .modal-footer {
   background-color: transparent;
-  border-color: var(--glass-header-border-color);
+  border-bottom: 1px solid var(--glass-header-border-color);
+  border-top: 1px solid var(--glass-header-border-color);
+}
+.card-header h5 { font-size: 1.25rem; }
+.btn {
+  white-space: normal; line-height: 1.2; text-align: center;
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+  will-change: transform;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+  &:active {
+    transform: translateY(0px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
 }
 .btn-close { filter: var(--btn-close-filter); }
 
-// --- 毛玻璃输入框样式 ---
+// --- 毛玻璃输入框样式 (增强) ---
 .input-glass-wrapper {
-  background: var(--glass-bg-interactive);
+  background: var(--glass-bg-gradient);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--glass-border-color);
-  border-radius: 0.375rem;
+  border-radius: 0.375rem; padding: 0.375rem 0.75rem;
   display: flex; align-items: center;
   transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
   overflow: hidden;
-  // 增加内阴影以模拟凹陷效果，提升输入框辨识度
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
-}
-// 聚焦时用主题色高亮边框
-.input-glass-wrapper:focus-within {
-  border-color: var(--focus-ring-color);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1), 0 0 0 3px var(--focus-ring-color)33; // 模拟 focus-ring
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.07);
+
+  &:focus-within {
+    border-color: var(--mdb-primary);
+    box-shadow: 0 0 0 3px var(--mdb-primary-fade-200), inset 0 1px 2px rgba(0,0,0,0.07);
+  }
 }
 .form-control-transparent {
   background: transparent !important; border: none !important; outline: none !important;
-  box-shadow: none !important; width: 100%; color: var(--text-color);
-  padding: 0.375rem 0.75rem; height: auto;
+  box-shadow: none !important; width: 100%; color: var(--text-color); padding: 0; height: auto;
   &::placeholder { color: var(--text-muted-color); }
   &::-webkit-calendar-picker-indicator { filter: var(--btn-close-filter); }
 }
 .input-group.input-glass-wrapper {
   padding: 0; flex-wrap: nowrap;
   .btn { border-color: var(--glass-border-color); }
+  .form-control-transparent { padding: 0.375rem 0.75rem; }
 }
 
-// --- 分段控件 (调度模式按钮) ---
+// --- 分段控件 (调度模式按钮) (增强) ---
 .radio-toggle-group {
-  background: var(--glass-bg-interactive);
+  background: var(--glass-toggle-bg);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--glass-border-color);
   border-radius: 50px; padding: 0.25rem; display: flex; gap: 0.25rem;
   overflow: hidden;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
 }
 .radio-toggle-input { display: none; }
 .radio-toggle-label {
   flex: 1; padding: 0.375rem 0.75rem; text-align: center;
   border-radius: 50px; cursor: pointer; transition: all 0.2s ease-in-out;
-  color: var(--text-muted-color);
-  font-weight: 500;
+  color: var(--glass-toggle-label-color);
+
+  &:hover {
+    background-color: var(--interactive-hover-bg);
+  }
 }
-// 悬停时提供反馈
-.radio-toggle-input:not(:checked) + .radio-toggle-label:hover {
-  background-color: var(--interactive-hover-bg);
-  color: var(--text-color);
-}
-// 选中状态对比度极高
 .radio-toggle-input:checked + .radio-toggle-label {
-  background-color: var(--toggle-checked-bg);
-  color: var(--toggle-checked-color);
-  font-weight: 600;
+  background-color: var(--glass-toggle-checked-bg);
+  color: var(--glass-toggle-checked-color);
+  font-weight: 500;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
-// --- Cron 编辑器模态框特殊样式 ---
-#cron-editor-modal.fade.show + .modal-backdrop {
-  backdrop-filter: var(--modal-backdrop-filter);
-  -webkit-backdrop-filter: var(--modal-backdrop-filter);
-  background-color: rgba(0, 0, 0, 0.2) !important;
-}
-#cron-editor-modal .modal-content {
-  background: var(--cron-modal-bg);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-}
-#cron-tabs .nav-link,
-#cron-editor-modal .modal-body .btn-outline-primary {
-    background-color: var(--cron-btn-bg) !important;
-    color: var(--text-color);
-    border-color: var(--cron-btn-border-color);
-}
-#cron-tabs .nav-link.active,
-#cron-editor-modal .modal-body .btn-check:checked + .btn-outline-primary {
-    background-color: var(--mdb-primary) !important;
-    color: #fff !important;
-    border-color: var(--mdb-primary) !important;
-}
 
-// --- 底部导航栏样式 ---
-.bottom-nav {
-  position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
-  background: var(--glass-bg-nav); // 使用更透明的背景
-  backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
-  border-top: 1px solid var(--glass-border-color);
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-  display: flex; justify-content: space-around; align-items: center; z-index: 1030;
-  transition: all 0.3s ease-in-out;
+// --- 布局与滚动 ---
+.app-wrapper {
+  position: relative;
+  height: 100vh;
   overflow: hidden;
 }
-.nav-item {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  color: var(--text-muted-color);
-  text-decoration: none; transition: color 0.2s, transform 0.2s; flex-grow: 1; height: 100%;
-  span { font-size: 0.75rem; margin-top: 4px; }
-  &:hover {
-    transform: translateY(-2px); // 悬浮反馈
-  }
-  &.active {
-    color: var(--mdb-primary);
-    font-weight: 600;
-  }
-}
-.nav-icon { width: 24px; height: 24px; fill: currentColor; }
-
-// --- 大屏幕设备的悬浮导航栏 ---
-@media (min-width: 768px) {
-  body { padding-bottom: 0; }
-  .main-content-scroll-area { padding-bottom: 0; }
-  .bottom-nav {
-    width: auto; max-width: 380px; bottom: 1.5rem;
-    left: 50%; transform: translateX(-50%);
-    right: auto; border-radius: 50px;
-    border: 1px solid var(--glass-border-color);
-  }
+.main-content-scroll-area {
+  height: 100%;
+  overflow-y: auto;
+  padding-bottom: 80px;
+  -webkit-overflow-scrolling: touch;
 }
 
-.app-wrapper { position: relative; height: 100vh; overflow: hidden; }
-.main-content-scroll-area { height: 100%; overflow-y: auto; padding-bottom: 80px; -webkit-overflow-scrolling: touch; }
 .pages-container { display: flex; width: 200%; transition: transform 0.3s ease-in-out; touch-action: pan-y; }
 main { width: 50%; flex-shrink: 0; }
+
+// --- 主页特定样式 ---
 .actions-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; }
 .actions-container .btn { padding-left: 0.25rem; padding-right: 0.25rem; }
 #bar-chart-wrapper { position: relative; aspect-ratio: 2 / 1; max-height: 300px; width: 100%; }
@@ -252,6 +283,8 @@ main { width: 50%; flex-shrink: 0; }
 .partition-gc-status-item p { margin-bottom: 0.25rem; font-weight: 500; }
 .partition-gc-status-item .badge { font-size: 0.7rem; padding: 0.4em 0.6em; line-height: 1.2; white-space: normal; }
 #partitions-modal-body { display: flex; flex-direction: column; gap: 0.75rem; }
+
+// --- 编辑页特定样式 ---
 #f2fs-gc-config-toggle-label { width: 100px; box-sizing: border-box; text-align: center; transition: all 0.2s ease-in-out; }
 .cron-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; transition: opacity 0.35s ease-out, max-height 0.35s ease-out; overflow: hidden; max-height: 500px; opacity: 1; }
 .cron-grid.collapsed { max-height: 0; opacity: 0; }
@@ -261,6 +294,78 @@ main { width: 50%; flex-shrink: 0; }
 .tab-content > .tab-pane { display: block; opacity: 0; transition: opacity .3s ease-in-out; height: 0; overflow: hidden; }
 .tab-content > .tab-pane.active { height: auto; overflow: visible; }
 .tab-content > .tab-pane.active.show { opacity: 1; }
-// 仅对列表边框应用变量
-.app-stats-list-wrapper { max-height: 220px; overflow-y: auto; border: 1px solid var(--glass-header-border-color); border-radius: .25rem; }
-.list-group-item { font-size: 0.8rem; background-color: transparent; border-color: var(--glass-header-border-color); }
+
+// --- Cron 编辑器模态框特殊样式 ---
+#cron-editor-modal.fade.show + .modal-backdrop {
+  backdrop-filter: var(--modal-backdrop-filter);
+  -webkit-backdrop-filter: var(--modal-backdrop-filter);
+  background-color: rgba(0, 0, 0, 0.1) !important;
+}
+#cron-editor-modal .modal-content {
+  background: var(--cron-modal-bg);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+}
+#cron-tabs .nav-link,
+#cron-editor-modal .modal-body .btn-outline-primary {
+    background-color: var(--cron-btn-bg) !important;
+    color: var(--text-color);
+    border-color: var(--cron-btn-border-color);
+}
+#cron-tabs .nav-link.active,
+#cron-editor-modal .modal-body .btn-check:checked + .btn-outline-primary {
+    background-color: rgba(0, 123, 255, 0.8) !important;
+    color: #fff !important;
+    border-color: rgba(0, 123, 255, 1) !important;
+}
+
+
+// --- 底部导航栏样式 (增强) ---
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
+  background: var(--bottom-nav-bg);
+  backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+  border-top: none;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  display: flex; justify-content: space-around; align-items: center; z-index: 1030;
+  transition: all 0.3s ease-in-out;
+  overflow: hidden;
+}
+.nav-item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--text-muted-color);
+  text-decoration: none; transition: color 0.2s; flex-grow: 1; height: 100%;
+  position: relative;
+  span { font-size: 0.75rem; margin-top: 4px; }
+  &.active { color: var(--mdb-primary); }
+}
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60%;
+  height: 60%;
+  background-color: var(--mdb-primary);
+  opacity: 0.15;
+  border-radius: 50px;
+  z-index: -1;
+  transition: all 0.2s ease-in-out;
+}
+.nav-item.active span {
+  font-weight: 600;
+}
+.nav-icon { width: 24px; height: 24px; fill: currentColor; }
+
+// --- 大屏幕设备的悬浮导航栏 ---
+@media (min-width: 768px) {
+  body { padding-bottom: 0; }
+  .main-content-scroll-area { padding-bottom: 0; }
+  .bottom-nav {
+    width: auto; max-width: 380px; bottom: 1.5rem;
+    left: 50%; transform: translateX(-50%);
+    right: auto; border-radius: 50px;
+    border: 1px solid var(--glass-border-color);
+    box-shadow: var(--glass-shadow-enhanced);
+  }
+}

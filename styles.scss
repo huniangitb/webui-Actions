@@ -1,52 +1,71 @@
 // 1. 完整引入 MDB 的所有样式
 @import 'mdb-ui-kit/src/scss/mdb.free.scss';
 
-// --- :root - 颜色和主题变量定义 (增强版) ---
+// --- :root - 颜色和主题变量定义 (最终版) ---
 :root {
-  // -- 默认 (炫彩) 模式变量 --
-  /* 核心变更: 移除背景色，让极光成为唯一背景 */
-  --app-bg-color: transparent;
-  /* 核心变更: 默认文字改为浅色以适应炫彩背景 */
-  --text-color: #f5f5f5;
-  --text-muted-color: rgba(245, 245, 245, 0.7);
-  --title-glow-color: rgba(0, 0, 0, 0.5);
-  --btn-close-filter: invert(1) grayscale(100%) brightness(200%);
-  --mdb-primary-fade-200: rgba(127, 178, 255, 0.3);
+  // -- 默认 (浅色) 模式变量 --
+  --app-bg-color: #f0f2f5;
+  --text-color: #1a1a1a;
+  --text-muted-color: rgba(0, 0, 0, 0.6);
+  --btn-close-filter: none;
+  --mdb-primary-fade-200: rgba(0, 123, 255, 0.2);
 
-  // 毛玻璃 (Glassmorphism) 样式 - 核心变更: 浅色模式使用深色玻璃
-  --glass-bg: rgba(30, 30, 30, 0.35);
-  --glass-bg-gradient: linear-gradient(135deg, rgba(50, 50, 50, 0.4), rgba(20, 20, 20, 0.3));
-  --glass-border-color: rgba(255, 255, 255, 0.2);
+  // 毛玻璃 (Glassmorphism) 样式 - 浅色
+  --glass-bg: rgba(255, 255, 255, 0.45);
+  --glass-bg-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.35));
+  --glass-border-color: rgba(255, 255, 255, 0.5);
   --glass-shadow-enhanced:
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.08),
-    0 4px 12px 0 rgba(0, 0, 0, 0.2),
-    0 8px 32px 0 rgba(0, 0, 0, 0.3);
-  --glass-header-border-color: rgba(255, 255, 255, 0.15);
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.6),
+    0 4px 12px 0 rgba(0, 0, 0, 0.08),
+    0 8px 32px 0 rgba(0, 0, 0, 0.1);
+  --glass-header-border-color: rgba(255, 255, 255, 0.4);
 
-  // 交互元素 - 核心变更: 按钮等组件颜色与深色模式保持一致
-  --interactive-hover-bg: rgba(255, 255, 255, 0.1);
-  --glass-toggle-bg: rgba(50, 50, 50, 0.3);
-  --glass-toggle-label-color: #bbb;
-  --glass-toggle-checked-bg: rgba(255, 255, 255, 0.15);
-  --glass-toggle-checked-color: #f5f5f5;
+  // 交互元素 - 浅色
+  --interactive-hover-bg: rgba(255, 255, 255, 0.6);
+  --glass-toggle-bg: rgba(255, 255, 255, 0.4);
+  --glass-toggle-label-color: #333;
+  --glass-toggle-checked-bg: #fff;
+  --glass-toggle-checked-color: #000;
 
-  // 特殊组件 (模态框, 导航栏)
-  --modal-backdrop-filter: blur(8px);
-  --cron-modal-bg: rgba(30, 30, 30, 0.7);
-  --cron-btn-bg: rgba(255, 255, 255, 0.1);
-  --cron-btn-border-color: rgba(255, 255, 255, 0.2);
-  --bottom-nav-bg: rgba(30, 30, 30, 0.4);
+  // 特殊组件 (模态框, 导航栏) - 浅色
+  --modal-backdrop-filter: blur(5px);
+  --cron-modal-bg: rgba(255, 255, 255, 0.6);
+  --cron-btn-bg: rgba(0, 0, 0, 0.05);
+  --cron-btn-border-color: rgba(0, 0, 0, 0.2);
+  --bottom-nav-bg: rgba(255, 255, 255, 0.4);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    // -- 深色模式变量 (背景更深，与炫彩模式略有区别) --
-    --app-bg-color: #121212; // 深色模式使用纯粹的深色背景
+    // -- 深色模式变量 --
+    --app-bg-color: #121212;
     --text-color: #e8e6e3;
-    
-    // 其他变量与炫彩模式基本保持一致或微调
+    --text-muted-color: rgba(232, 230, 227, 0.6);
+    --btn-close-filter: invert(1) grayscale(100%) brightness(200%);
+    --mdb-primary-fade-200: rgba(0, 123, 255, 0.4);
+
+    // 毛玻璃 (Glassmorphism) 样式 - 深色
     --glass-bg: rgba(40, 40, 40, 0.4);
     --glass-bg-gradient: linear-gradient(135deg, rgba(50, 50, 50, 0.5), rgba(30, 30, 30, 0.3));
+    --glass-border-color: rgba(255, 255, 255, 0.2);
+    --glass-shadow-enhanced:
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.08),
+      0 4px 12px 0 rgba(0, 0, 0, 0.2),
+      0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    --glass-header-border-color: rgba(255, 255, 255, 0.15);
+
+    // 交互元素 - 深色
+    --interactive-hover-bg: rgba(255, 255, 255, 0.1);
+    --glass-toggle-bg: rgba(50, 50, 50, 0.3);
+    --glass-toggle-label-color: #bbb;
+    --glass-toggle-checked-bg: rgba(255, 255, 255, 0.15);
+    --glass-toggle-checked-color: #f5f5f5;
+
+    // 特殊组件 - 深色
+    --modal-backdrop-filter: blur(8px);
+    --cron-modal-bg: rgba(30, 30, 30, 0.7);
+    --cron-btn-bg: rgba(255, 255, 255, 0.1);
+    --cron-btn-border-color: rgba(255, 255, 255, 0.2);
     --bottom-nav-bg: rgba(40, 40, 40, 0.4);
   }
 }
@@ -82,7 +101,7 @@ body::before, body::after {
   mix-blend-mode: screen; transform-origin: center center;
 }
 
-// 默认 (炫彩) 模式背景光晕
+// 默认 (浅色) 模式背景光晕
 body::before {
   background: radial-gradient(circle at 30% 30%, hsl(340, 100%, 65%), transparent 35%),
               radial-gradient(circle at 70% 70%, hsl(260, 100%, 70%), transparent 35%);
@@ -94,7 +113,7 @@ body::after {
   animation: aurora-2 35s infinite linear reverse;
 }
 
-// 深色模式背景光晕 (颜色更深邃)
+// 深色模式背景光晕
 @media (prefers-color-scheme: dark) {
   body::before {
     background: radial-gradient(circle at 30% 30%, hsl(0, 80%, 55%), transparent 40%),
@@ -116,11 +135,11 @@ html::before {
 
 .container { max-width: 960px; margin: auto; padding: 0 15px; }
 
-// --- 标题毛玻璃效果 ---
+// --- 标题毛玻璃效果 (简化阴影) ---
 h1 {
   font-size: clamp(1.5rem, 4vw, 2.5rem);
   color: var(--text-color);
-  text-shadow: 0 0 20px var(--title-glow-color), 0 2px 4px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3); // 简化为单一清晰阴影
   display: inline-block; padding: 0.5em 1em; margin-bottom: 1rem;
   background: var(--glass-bg-gradient);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -149,7 +168,7 @@ h1 {
 
   &:hover {
     transform: translateY(-5px);
-    box-shadow: var(--glass-shadow-enhanced), 0 10px 40px rgba(0,0,0,0.2);
+    box-shadow: var(--glass-shadow-enhanced), 0 10px 40px rgba(0,0,0,0.15);
   }
 }
 

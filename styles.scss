@@ -1,8 +1,5 @@
---- START OF FILE styles.scss.css ---
-
 // 1. 完整引入 MDB 的所有样式
 @import 'mdb-ui-kit/src/scss/mdb.free.scss';
-
 // --- 终极性能优化版动画 ---
 @keyframes aurora-1 {
   0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.5); opacity: 0.7; }

@@ -1,3 +1,5 @@
+--- START OF FILE styles.scss.css ---
+
 // 1. 完整引入 MDB 的所有样式
 @import 'mdb-ui-kit/src/scss/mdb.free.scss';
 
@@ -20,18 +22,17 @@ html { height: 100%; overflow: hidden; }
 body {
   height: 100%; font-size: 1rem; margin: 0; padding: 0;
   color: #1a1a1a; position: relative;
-  /* 移除: background-color: #f0f2f5; */
 }
 
-// --- 高斯模糊的动态背景层 (伪模糊实现) ---
+// --- 高斯模糊的动态背景层 ---
 body::before, body::after {
   content: '';
   position: fixed;
   top: 50%; left: 50%;
   width: 150vmax; height: 150vmax;
-  z-index: -1; /* 修改: z-index 设为 -1 即可，不再需要噪点层 */
+  z-index: -1;
   transform-origin: center center;
-  mix-blend-mode: normal; /* 修复: 默认(浅色模式)下不使用混合模式 */
+  mix-blend-mode: normal;
 }
 
 body::before {
@@ -46,9 +47,7 @@ body::after {
   animation: aurora-2 35s infinite linear reverse;
 }
 
-// --- 噪点图层 (已移除) ---
 html::before { display: none; }
-
 
 .container { max-width: 960px; margin-left: auto; margin-right: auto; padding-left: 15px; padding-right: 15px; }
 
@@ -121,18 +120,22 @@ h1 {
   color: #000; font-weight: 500;
 }
 
-
 // --- 布局与滚动 ---
 .app-wrapper {
   position: relative;
   height: 100vh;
   overflow: hidden;
+  /* 关键修复: 建立新的堆叠上下文，帮助子元素正确渲染混合模式 */
+  isolation: isolate; 
 }
 .main-content-scroll-area {
   height: 100%;
   overflow-y: auto;
   padding-bottom: 80px;
   -webkit-overflow-scrolling: touch;
+  /* 关键修复: 明确层级，确保导航栏和模态框能识别此层内容进行模糊 */
+  position: relative;
+  z-index: 0;
 }
 
 .pages-container { display: flex; width: 200%; transition: transform 0.3s ease-in-out; touch-action: pan-y; }
@@ -166,12 +169,14 @@ main { width: 50%; flex-shrink: 0; }
 .tab-content > .tab-pane.active { height: auto; overflow: visible; }
 .tab-content > .tab-pane.active.show { opacity: 1; }
 
-// --- Cron 编辑器模态框特殊样式 ---
-#cron-editor-modal.fade.show + .modal-backdrop {
+// --- 模态框样式 (关键修复: 全局应用模糊背景) ---
+.modal-backdrop {
+  /* 修复: 强制所有模态框背景模糊，而不仅仅是 Cron 编辑器 */
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
-  background-color: rgba(0, 0, 0, 0.1) !important;
+  background-color: rgba(0, 0, 0, 0.2) !important; /* 稍微加深颜色以增强对比 */
 }
+
 #cron-editor-modal .modal-content {
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
@@ -189,11 +194,11 @@ main { width: 50%; flex-shrink: 0; }
     border-color: rgba(0, 123, 255, 1) !important;
 }
 
-
 // --- 底部导航栏样式 ---
 .bottom-nav {
   position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
-  background: rgba(255, 255, 255, 0.15);
+  /* 修复: 增加不透明度，确保在卡片上方时能体现出层级感 */
+  background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
   border-top: 1px solid rgba(255, 255, 255, 0.4);
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
@@ -211,7 +216,6 @@ main { width: 50%; flex-shrink: 0; }
   #loader { background-color: #121212; }
   body { color: #f5f5f5; background-color: #121212; }
   
-  /* 修复: 仅在深色模式下开启混合模式 */
   body::before, body::after {
     mix-blend-mode: screen;
   }
@@ -269,7 +273,11 @@ main { width: 50%; flex-shrink: 0; }
   .app-stats-list-wrapper, .list-group-item { border-color: rgba(255, 255, 255, 0.1); }
   .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
   
-  .bottom-nav { background: rgba(50, 50, 50, 0.3); border-top: 1px solid rgba(255, 255, 255, 0.1); }
+  .bottom-nav { 
+    /* 修复: 深色模式下增加不透明度 */
+    background: rgba(50, 50, 50, 0.4); 
+    border-top: 1px solid rgba(255, 255, 255, 0.1); 
+  }
   .nav-item { color: #bbb; }
   .nav-item.active { color: var(--mdb-primary); }
 }

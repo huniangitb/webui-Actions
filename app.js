@@ -1,19 +1,25 @@
-// 关键修改: 智能 API 封装
-const isKernelSU = typeof window.kernelsu !== 'undefined' && typeof window.kernelsu.exec === 'function';
-
-const safeExec = isKernelSU ? window.kernelsu.exec : async (cmd) => {
-    console.log(`[DEBUG MODE] EXEC: ${cmd}`);
-    // 返回一个模拟的失败结果，防止应用崩溃
-    return Promise.resolve({ errno: 1, stdout: '', stderr: 'KernelSU API not available' });
-};
-
-const safeToast = isKernelSU ? window.kernelsu.toast : (msg, duration) => {
-    console.log(`[DEBUG MODE] TOAST: ${msg} (Duration: ${duration})`);
-};
-
-// 导入 Chart.js 和图标
+// 关键修改: 显式导入 API 以满足打包器需求
+import { exec as originalExec, toast as originalToast } from 'kernelsu';
 import Chart from 'chart.js/auto';
 import { mdiHome, mdiPencilBoxOutline } from '@mdi/js';
+
+// 运行时检查 API 是否真实可用
+const isKernelSUAvailable = typeof window.kernelsu !== 'undefined' && typeof originalExec === 'function';
+
+// 创建安全调用的封装函数，供整个应用使用
+const safeExec = isKernelSUAvailable 
+    ? originalExec 
+    : async (cmd) => {
+        console.log(`[DEBUG MODE] EXEC: ${cmd}`);
+        // 返回一个模拟的失败结果，防止应用崩溃
+        return Promise.resolve({ errno: 1, stdout: '', stderr: 'KernelSU API not available' });
+      };
+
+const safeToast = isKernelSUAvailable 
+    ? originalToast 
+    : (msg, duration) => {
+        console.log(`[DEBUG MODE] TOAST: ${msg} (Duration: ${duration})`);
+      };
 
 // --- 内联模块: logParser.js ---
 function parseLogContent(ndjsonContent) { if (!ndjsonContent || ndjsonContent.trim() === '') return []; const parsedEntries = []; const lines = ndjsonContent.split('\n'); lines.forEach(line => { if (line.trim() === '') return; try { const stats = JSON.parse(line); if (!stats.timestamp || !stats.global_stats) return; const formattedTimestamp = stats.timestamp.replace('T', ' ').replace('Z', ''); const reclaimedSegments = (stats.gc_trim_stats && stats.gc_trim_stats.reclaimed_segments) ? stats.gc_trim_stats.reclaimed_segments : 0; const trimmedMBValue = (stats.gc_trim_stats && stats.gc_trim_stats.trimmed_mb) ? stats.gc_trim_stats.trimmed_mb : 0; const parsedEntry = { timestamp: formattedTimestamp, date: stats.timestamp.split('T')[0], deletedFiles: stats.global_stats.files_deleted || 0, deletedDirs: stats.global_stats.dirs_deleted || 0, dirtySegments: reclaimedSegments, fileCleanedMB: stats.global_stats.megabytes_deleted || 0, trimMB: trimmedMBValue, appStats: stats.app_stats || [] }; parsedEntries.push(parsedEntry); } catch (error) { console.error("解析 JSON 行失败:", error, "行内容:", line); } }); return parsedEntries; }
@@ -35,7 +41,7 @@ const NativeUI = {
         }
     },
     closeModal(modalOrId) {
-        const modal = typeof modalOrId === 'string' ? document.getElementById(modalOrId) : modalOrId;
+1        const modal = typeof modalOrId === 'string' ? document.getElementById(modalOrId) : modalOrId;
         if (modal) {
             document.querySelector('.app-wrapper').classList.remove('is-blurred');
             modal.classList.remove('show');
@@ -105,7 +111,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }, { once: true });
     };
-    setTimeout(finishLoading, 1000);
+    setTimeout(finishLoading, 5000);
 
     // --- 辅助函数 ---
     function generateRandomAurora() {
@@ -311,7 +317,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const appStats = Array.from(aggregatedStats.values());
             appStatsList.innerHTML = '';
             
-            // 关键修改: 联动隐藏
             if (!appStats || appStats.length === 0) {
                 appStatsContainer.style.cssText = 'max-height: 0; margin: 0; padding: 0; opacity: 0; border: none;';
                 barChartWrapper.style.marginBottom = '0';
@@ -426,7 +431,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             disableBackendFeatures('后端服务未运行');
         }
 
-        // 并行执行初始化任务
         await Promise.all([
             initHomePage(),
             initEditPage()

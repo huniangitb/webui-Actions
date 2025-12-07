@@ -2,16 +2,16 @@ import { exec, toast } from 'kernelsu';
 import Chart from 'chart.js/auto';
 import { mdiHome, mdiPencilBoxOutline } from '@mdi/js';
 
-// --- 内联模块: logParser.js (保持不变) ---
+// --- 内联模块: logParser.js ---
 function parseLogContent(ndjsonContent) { if (!ndjsonContent || ndjsonContent.trim() === '') return []; const parsedEntries = []; const lines = ndjsonContent.split('\n'); lines.forEach(line => { if (line.trim() === '') return; try { const stats = JSON.parse(line); if (!stats.timestamp || !stats.global_stats) return; const formattedTimestamp = stats.timestamp.replace('T', ' ').replace('Z', ''); const reclaimedSegments = (stats.gc_trim_stats && stats.gc_trim_stats.reclaimed_segments) ? stats.gc_trim_stats.reclaimed_segments : 0; const trimmedMBValue = (stats.gc_trim_stats && stats.gc_trim_stats.trimmed_mb) ? stats.gc_trim_stats.trimmed_mb : 0; const parsedEntry = { timestamp: formattedTimestamp, date: stats.timestamp.split('T')[0], deletedFiles: stats.global_stats.files_deleted || 0, deletedDirs: stats.global_stats.dirs_deleted || 0, dirtySegments: reclaimedSegments, fileCleanedMB: stats.global_stats.megabytes_deleted || 0, trimMB: trimmedMBValue, appStats: stats.app_stats || [] }; parsedEntries.push(parsedEntry); } catch (error) { console.error("解析 JSON 行失败:", error, "行内容:", line); } }); return parsedEntries; }
 function updateLocalStorage(newData) { if (!newData || newData.length === 0) return; const storedData = JSON.parse(localStorage.getItem('logData') || '[]'); const dataMap = new Map(storedData.map(entry => [entry.timestamp, entry])); newData.forEach(newEntry => { dataMap.set(newEntry.timestamp, newEntry); }); const combinedData = Array.from(dataMap.values()); const cutoffDate = new Date(); cutoffDate.setDate(cutoffDate.getDate() - 6); const filteredData = combinedData.filter(entry => new Date(entry.date) >= cutoffDate); localStorage.setItem('logData', JSON.stringify(filteredData)); }
 function getStoredData() { return JSON.parse(localStorage.getItem('logData') || '[]'); }
 function clearStoredData() { localStorage.removeItem('logData'); }
 
-// --- 内联模块: icons.js (保持不变) ---
+// --- 内联模块: icons.js ---
 const icons = { home: mdiHome, edit: mdiPencilBoxOutline };
 
-// --- 新增: 原生 UI 控制模块 ---
+// --- 原生 UI 控制模块 ---
 const NativeUI = {
     openModal(modalId) {
         const modal = document.getElementById(modalId);
@@ -35,8 +35,13 @@ const NativeUI = {
                 this.openModal(targetId);
                 return;
             }
+            const dismissBtn = e.target.closest('[data-dismiss="modal"]');
             const modal = e.target.closest('.modal');
-            if (modal && (e.target === modal || e.target.closest('[data-dismiss="modal"]'))) {
+            if (dismissBtn && modal) {
+                this.closeModal(modal);
+                return;
+            }
+            if (modal && e.target === modal) {
                 this.closeModal(modal);
             }
         });
@@ -47,18 +52,14 @@ const NativeUI = {
             if (!trigger) return;
             e.preventDefault();
             if (trigger.classList.contains('active')) return;
-
             const parent = trigger.closest('.nav-pills');
             const contentContainer = parent.nextElementSibling;
-
             parent.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
             trigger.classList.add('active');
-
             contentContainer.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active', 'show'));
             const targetPane = contentContainer.querySelector(trigger.getAttribute('href'));
             if (targetPane) {
                 targetPane.classList.add('active');
-                // 强制重绘以触发动画
                 void targetPane.offsetWidth;
                 targetPane.classList.add('show');
             }
@@ -76,7 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isBackendOnline = true;
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
-    // --- SPA 页面切换逻辑 (保持不变) ---
+    // --- SPA 页面切换逻辑 ---
     const pages = { home: document.getElementById('page-home'), edit: document.getElementById('page-edit') };
     const navItems = document.querySelectorAll('.nav-item');
     let currentPageId = 'home';
@@ -102,7 +103,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    // --- 后端通信与状态检查 (保持不变) ---
+    // --- 后端通信与状态检查 ---
     function disableBackendFeatures(reason) {
         if (!isBackendOnline) return;
         isBackendOnline = false;
@@ -133,7 +134,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) { disableBackendFeatures('后端通信异常'); return null; }
     }
 
-    // --- 辅助函数 (保持不变) ---
+    // --- 辅助函数 ---
     function injectIcons() { document.querySelectorAll('[data-icon]').forEach(el => { const iconName = el.getAttribute('data-icon'); if (icons[iconName]) el.setAttribute('d', icons[iconName]); }); }
 
     // --- 主页逻辑 ---
@@ -233,7 +234,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         function updatePartitionGcStatus(gcStatusArray) { if (isExt4) return; partitionGcStatusContainer.innerHTML = ''; const runningPartitions = gcStatusArray.filter(p => p.is_running && !hiddenPartitions.has(p.device_name)); const anyGcRunning = runningPartitions.length > 0; if (anyGcRunning) { document.getElementById('global-gc-status').style.display = 'none'; partitionGcStatusContainer.style.display = 'flex'; runningPartitions.forEach(({ device_name, is_paused, elapsed_seconds, reclaimed_segments, pause_reason }) => { const itemDiv = document.createElement('div'); itemDiv.className = 'partition-gc-status-item'; itemDiv.innerHTML = `<p>${device_name}</p><span class="badge ${is_paused ? 'bg-warning' : 'bg-success'}">${is_paused ? `暂停<br>原因: ${pause_reason || "未知"}` : '运行中'}<br>运行: ${formatDuration(elapsed_seconds || 0)} | 回收: ${reclaimed_segments || 0}</span>`; partitionGcStatusContainer.appendChild(itemDiv); }); gcControlButton.textContent = '停止所有'; gcControlButton.className = 'btn btn-sm btn-danger'; gcControlButton.dataset.action = 'stop'; } else { partitionGcStatusContainer.style.display = 'none'; const globalGcStatusSpan = document.getElementById('global-gc-status'); globalGcStatusSpan.style.display = 'inline-block'; globalGcStatusSpan.textContent = 'GC回收: 关闭'; globalGcStatusSpan.className = 'badge bg-secondary'; gcControlButton.textContent = '开始'; gcControlButton.className = 'btn btn-sm btn-success'; gcControlButton.dataset.action = 'start'; } }
         async function initDatePicker() { try { const { stdout } = await exec('date +"%F"'); const today = new Date(stdout.trim()); const sixDaysAgo = new Date(today); sixDaysAgo.setDate(today.getDate() - 6); const formatDate = (d) => d.toISOString().split('T')[0]; dateSelect.min = formatDate(sixDaysAgo); dateSelect.max = dateSelect.value = formatDate(today); } catch (e) { toast(`初始化日期选择器失败`); } }
         async function loadLogFile() { try { const { errno, stdout, stderr } = await exec('cat /data/adb/modules/Clean-C/stats.json'); if (errno === 0 && stdout.trim() !== '') updateLocalStorage(parseLogContent(stdout)); else if (errno !== 0 && !stderr.includes('No such file')) throw new Error(stderr); } catch (e) { toast(`加载统计数据失败: ${e.message}`); } updateDisplaysForSelectedDate(); }
-        function updateDisplaysForSelectedDate() { const selectedDate = dateSelect.value; const storedData = getStoredData(); const filteredData = selectedDate ? storedData.filter(entry => entry.date === selectedDate) : storedData; const aggregatedData = {}; filteredData.forEach(entry => { const date = entry.date; if (!aggregatedData[date]) aggregatedData[date] = { deletedFiles: 0, deletedDirs: 0, dirtySegments: 0, fileCleanedMB: 0 }; aggregatedData[date].deletedFiles += entry.deletedFiles || 0; aggregatedData[date].deletedDirs += entry.deletedDirs || 0; aggregatedData[date].dirtySegments += entry.dirtySegments || 0; aggregatedData[date].fileCleanedMB += entry.fileCleanedMB || 0; }); barChart.data.datasets.forEach(ds => { if (ds.label.includes('脏段')) ds.hidden = isExt4; }); const dates = Object.keys(aggregatedData).sort(); barChart.data.labels = dates; barChart.data.datasets[0].data = dates.map(d => aggregatedData[d].fileCleanedMB); barChart.data.datasets[1].data = dates.map(d => aggregatedData[d].dirtySegments); barChart.data.datasets[2].data = dates.map(d => aggregatedData[d].deletedFiles); barChart.data.datasets[3].data = dates.map(d => aggregatedData[d].deletedDirs); barChart.update('none'); appStatsTitle.textContent = `应用清理详情 (${selectedDate})`; const dailyEntries = getStoredData().filter(entry => entry.date === selectedDate); const aggregatedStats = new Map(); dailyEntries.forEach(entry => entry.appStats?.forEach(app => { const existing = aggregatedStats.get(app.package_name) || { ...app, bytes_deleted: 0, megabytes_deleted: 0 }; existing.bytes_deleted += app.bytes_deleted; existing.megabytes_deleted += app.megabytes_deleted; aggregatedStats.set(app.package_name, existing); })); const appStats = Array.from(aggregatedStats.values()); appStatsList.innerHTML = ''; appStatsContainer.classList.toggle('hidden', !appStats || appStats.length === 0); if (!appStats || appStats.length === 0) { appStatsList.innerHTML = '<li class="list-group-item text-muted">该日无应用数据清理记录。</li>'; return; } appStats.sort((a, b) => b.bytes_deleted - a.bytes_deleted).forEach(app => { const displayName = appNamesMap.get(app.package_name) || app.package_name; appStatsList.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center"><span class="text-truncate me-3" title="${app.package_name}">${displayName}</span><span class="badge bg-primary rounded-pill">${app.megabytes_deleted.toFixed(2)} MB</span></li>`; }); }
+        function updateDisplaysForSelectedDate() {
+            const selectedDate = dateSelect.value;
+            const storedData = getStoredData();
+            const filteredData = selectedDate ? storedData.filter(entry => entry.date === selectedDate) : storedData;
+            const aggregatedData = {};
+            filteredData.forEach(entry => {
+                const date = entry.date;
+                if (!aggregatedData[date]) aggregatedData[date] = { deletedFiles: 0, deletedDirs: 0, dirtySegments: 0, fileCleanedMB: 0 };
+                aggregatedData[date].deletedFiles += entry.deletedFiles || 0;
+                aggregatedData[date].deletedDirs += entry.deletedDirs || 0;
+                aggregatedData[date].dirtySegments += entry.dirtySegments || 0;
+                aggregatedData[date].fileCleanedMB += entry.fileCleanedMB || 0;
+            });
+            barChart.data.datasets.forEach(ds => { if (ds.label.includes('脏段')) ds.hidden = isExt4; });
+            const dates = Object.keys(aggregatedData).sort();
+            barChart.data.labels = dates;
+            barChart.data.datasets[0].data = dates.map(d => aggregatedData[d].fileCleanedMB);
+            barChart.data.datasets[1].data = dates.map(d => aggregatedData[d].dirtySegments);
+            barChart.data.datasets[2].data = dates.map(d => aggregatedData[d].deletedFiles);
+            barChart.data.datasets[3].data = dates.map(d => aggregatedData[d].deletedDirs);
+            barChart.update('none');
+            appStatsTitle.textContent = `应用清理详情 (${selectedDate})`;
+            const dailyEntries = getStoredData().filter(entry => entry.date === selectedDate);
+            const aggregatedStats = new Map();
+            dailyEntries.forEach(entry => entry.appStats?.forEach(app => {
+                const existing = aggregatedStats.get(app.package_name) || { ...app, bytes_deleted: 0, megabytes_deleted: 0 };
+                existing.bytes_deleted += app.bytes_deleted;
+                existing.megabytes_deleted += app.megabytes_deleted;
+                aggregatedStats.set(app.package_name, existing);
+            }));
+            const appStats = Array.from(aggregatedStats.values());
+            appStatsList.innerHTML = '';
+            if (!appStats || appStats.length === 0) {
+                appStatsContainer.classList.add('hidden');
+                return;
+            }
+            appStatsContainer.classList.remove('hidden');
+            appStats.sort((a, b) => b.bytes_deleted - a.bytes_deleted).forEach(app => {
+                const displayName = appNamesMap.get(app.package_name) || app.package_name;
+                appStatsList.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center"><span class="text-truncate me-3" title="${app.package_name}">${displayName}</span><span class="badge bg-primary rounded-pill">${app.megabytes_deleted.toFixed(2)} MB</span></li>`;
+            });
+        }
         
         dateSelect.addEventListener('change', updateDisplaysForSelectedDate);
         document.getElementById('clear-data').addEventListener('click', () => { clearStoredData(); updateDisplaysForSelectedDate(); toast('数据已清除'); });
@@ -272,8 +314,40 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function updateGcConfigToggleLabel(isChecked) { f2fsGcConfigToggleLabel.textContent = isChecked ? '已开启' : '已关闭'; f2fsGcConfigToggleLabel.classList.toggle('btn-success', isChecked); f2fsGcConfigToggleLabel.classList.toggle('btn-outline-secondary', !isChecked); }
         function updateScheduleModeUI() { const isCron = scheduleModeCronRadio.checked; intervalInputGroup.classList.toggle('hidden', isCron); cronInputGroup.classList.toggle('hidden', !isCron); cleanIntervalInput.required = !isCron; cronExpressionInput.required = isCron; }
-        function generateCronEditorUI() { for (const key in cronFields) { const { el, min, max, name, labels } = cronFields[key]; let gridHtml = '<div class="cron-grid collapsed">'; for (let i = min; i <= max; i++) { gridHtml += `<div><input type="checkbox" class="btn-check" id="${key}-${i}" value="${i}"><label class="btn btn-outline-primary" for="${key}-${i}">${labels ? labels[i - min] : i}</label></div>`; } el.innerHTML = `<div class="btn-group mb-3 w-100"><input type="radio" class="btn-check" name="${key}-mode" id="${key}-every" value="*" checked><label class="btn btn-outline-primary" for="${key}-every">每${(labels ? '个' : '') + name}</label><input type="radio" class="btn-check" name="${key}-mode" id="${key}-specific" value="specific"><label class="btn btn-outline-primary" for="${key}-specific">指定</label></div>` + gridHtml + '</div>'; } }
-        function parseCronToUI(expression) { const parts = expression.split(' '); if (parts.length !== 5) return; ['minutes', 'hours', 'dom', 'months', 'dow'].forEach((key, i) => { const part = parts[i], field = cronFields[key]; field.el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); if (part === '*') { field.el.querySelector(`#${key}-every`).checked = true; field.el.querySelector('.cron-grid').classList.add('collapsed'); } else { field.el.querySelector(`#${key}-specific`).checked = true; field.el.querySelector('.cron-grid').classList.remove('collapsed'); part.split(',').forEach(range => { if (range.includes('-')) { const [start, end] = range.split('-').map(Number); for (let j = start; j <= end; j++) { const cb = field.el.querySelector(`#${key}-${j}`); if (cb) cb.checked = true; } } else if (range.includes('/')) { const [_, step] = range.split('/').map(Number); for (let j = field.min; j <= field.max; j += step) { const cb = field.el.querySelector(`#${key}-${j}`); if (cb) cb.checked = true; } } else { const cb = field.el.querySelector(`#${key}-${Number(range)}`); if (cb) cb.checked = true; } }); } }); }
+        function generateCronEditorUI() {
+            for (const key in cronFields) {
+                const { el, min, max, name, labels } = cronFields[key];
+                let gridHtml = '<div class="cron-grid collapsed">';
+                for (let i = min; i <= max; i++) { gridHtml += `<div><input type="checkbox" class="btn-check" id="${key}-${i}" value="${i}"><label class="btn btn-outline-primary" for="${key}-${i}">${labels ? labels[i - min] : i}</label></div>`; }
+                el.innerHTML = `<div class="btn-group mb-3 w-100"><input type="radio" class="btn-check mode-selector" name="${key}-mode" id="${key}-every" value="*" checked><label class="btn btn-outline-primary" for="${key}-every">每${(labels ? '个' : '') + name}</label><input type="radio" class="btn-check mode-selector" name="${key}-mode" id="${key}-specific" value="specific"><label class="btn btn-outline-primary" for="${key}-specific">指定</label></div>` + gridHtml + '</div>';
+            }
+            document.querySelectorAll('.mode-selector').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    const grid = e.target.closest('.tab-pane').querySelector('.cron-grid');
+                    grid.classList.toggle('collapsed', e.target.value === '*');
+                });
+            });
+        }
+        function parseCronToUI(expression) {
+            const parts = expression.split(' ');
+            if (parts.length !== 5) return;
+            ['minutes', 'hours', 'dom', 'months', 'dow'].forEach((key, i) => {
+                const part = parts[i], field = cronFields[key], grid = field.el.querySelector('.cron-grid');
+                field.el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+                if (part === '*') {
+                    field.el.querySelector(`#${key}-every`).checked = true;
+                    grid.classList.add('collapsed');
+                } else {
+                    field.el.querySelector(`#${key}-specific`).checked = true;
+                    grid.classList.remove('collapsed');
+                    part.split(',').forEach(range => {
+                        if (range.includes('-')) { const [start, end] = range.split('-').map(Number); for (let j = start; j <= end; j++) { const cb = field.el.querySelector(`#${key}-${j}`); if (cb) cb.checked = true; } }
+                        else if (range.includes('/')) { const [_, step] = range.split('/').map(Number); for (let j = field.min; j <= field.max; j += step) { const cb = field.el.querySelector(`#${key}-${j}`); if (cb) cb.checked = true; } }
+                        else { const cb = field.el.querySelector(`#${key}-${Number(range)}`); if (cb) cb.checked = true; }
+                    });
+                }
+            });
+        }
         function generateCronFromUI() { return ['minutes', 'hours', 'dom', 'months', 'dow'].map(key => { const field = cronFields[key]; if (field.el.querySelector(`input[name="${key}-mode"]:checked`).value === '*') return '*'; const selected = Array.from(field.el.querySelectorAll('.cron-grid input:checked')).map(cb => Number(cb.value)); if (selected.length === 0 || selected.length === (field.max - field.min + 1)) return '*'; selected.sort((a, b) => a - b); const ranges = []; for (let i = 0; i < selected.length; i++) { let start = selected[i]; while (i + 1 < selected.length && selected[i+1] === selected[i] + 1) i++; ranges.push(start === selected[i] ? `${start}` : `${start}-${selected[i]}`); } return ranges.join(','); }).join(' '); }
         async function loadConfigFile() { try { const { errno, stdout } = await exec('cat /data/media/0/Android/清理规则/配置.txt'); if (errno === 0) { const config = {}; stdout.split('\n').forEach(line => { if (line.includes('=')) { const [key, value] = line.split('=').map(item => item.trim()); if (key && value) config[key] = value; } }); retentionDaysInput.value = config.保留天数 || '30'; if (config.cron表达式 && config.cron表达式.trim() !== '') { scheduleModeCronRadio.checked = true; cronExpressionInput.value = config.cron表达式; } else { cronExpressionInput.value = '0 * * * *'; } cleanIntervalInput.value = config.程序清理间隔秒数 || '3600'; const f2fsGcValue = config['f2fs-GC'] || 'n'; f2fsGcConfigToggle.checked = f2fsGcValue === 'y'; } } catch (e) { toast(`加载配置失败: ${e.message}`); } updateScheduleModeUI(); updateGcConfigToggleLabel(f2fsGcConfigToggle.checked); }
         
@@ -283,7 +357,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('edit-cron-btn').addEventListener('click', () => { parseCronToUI(cronExpressionInput.value); NativeUI.openModal('cron-editor-modal'); });
         document.getElementById('save-cron-btn').addEventListener('click', () => { cronExpressionInput.value = generateCronFromUI(); NativeUI.closeModal(cronEditorModalEl); });
         
-        document.getElementById('cron-editor-modal').addEventListener('click', (e) => { if (e.target.name && e.target.name.endsWith('-mode')) { const fieldKey = e.target.name.replace('-mode', ''); cronFields[fieldKey].el.querySelector('.cron-grid').classList.toggle('collapsed', e.target.value === '*'); } });
         const editRuleFile = async (fileName) => { try { const { errno, stderr } = await exec(`am start -a android.intent.action.VIEW -d file:///data/media/0/Android/清理规则/${fileName} -t text/plain`); if (errno !== 0) throw new Error(stderr); toast(`尝试打开文件: ${fileName}`); } catch (e) { toast(`编辑文件失败: ${e.message}`); } };
         document.getElementById('edit-blacklist1').addEventListener('click', () => editRuleFile('blacklist1.txt'));
         document.getElementById('edit-blacklist2').addEventListener('click', () => editRuleFile('blacklist2.txt'));

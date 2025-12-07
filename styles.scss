@@ -1,3 +1,5 @@
+--- START OF FILE styles.scss.css ---
+
 /* --- 1. 全局重置与核心变量 --- */
 :root {
   --primary-color: #3b71ca; --danger-color: #dc4c64; --success-color: #14a44d;
@@ -35,8 +37,7 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .card-header { padding: 0.6rem 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.15); font-weight: 600; font-size: 1.2rem; position: relative; z-index: 2; }
 .card-header h5 { margin: 0; font-size: 1.1rem; }
 .card-body { padding: 0.75rem; position: relative; z-index: 2; }
-/* 修改点：减小控制中心卡片内边距 */
-.control-center-body { padding: 0.25rem; }
+.control-center-body { padding: 0.25rem; } /* 修正：紧凑化 */
 .card-body.config-body { padding-bottom: calc(1rem + 5px); }
 .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.5rem 1rem; font-size: 1rem; border-radius: 12px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s; text-decoration: none; line-height: 1.2; background: rgba(255,255,255,0.2); color: var(--text-main); }
 .btn:active { transform: scale(0.96); }
@@ -93,7 +94,16 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .nav-link { display: block; padding: 8px; text-decoration: none; color: var(--text-muted); border-radius: 8px; font-size: 0.9rem; transition: all 0.2s; }
 .nav-link.active { background: #fff; color: var(--primary-color); font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
 .tab-content > .tab-pane { display: none; } .tab-content > .tab-pane.active { display: block; animation: fadeIn 0.3s; } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-.cron-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 6px; max-height: 300px; opacity: 1; overflow-y: auto; padding: 4px; transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease; }
+.cron-grid { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); 
+    gap: 6px; 
+    max-height: 300px; 
+    opacity: 1; 
+    overflow-y: auto; 
+    padding: 4px; 
+    transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease; 
+}
 .cron-grid.collapsed { max-height: 0; opacity: 0; padding: 0; pointer-events: none; margin: 0; }
 .cron-grid .btn-check { position: absolute; clip: rect(0,0,0,0); pointer-events: none; }
 .cron-grid .btn-outline-primary { display: flex; align-items: center; justify-content: center; width: 100%; height: 40px; margin: 0; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.05); color: var(--text-main); border-radius: 8px; font-size: 0.9rem; }
@@ -118,9 +128,12 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .btn-close { background: none; border: none; font-size: 1.5rem; line-height: 1; color: #666; cursor: pointer; padding: 0 0.5rem; }
 .modal-body { padding: 1rem; overflow-y: auto; }
 .modal-footer { padding: 1rem; border-top: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: flex-end; gap: 10px; }
+.modal-lg {
+    max-width: 90%; /* 修正：增加 Cron 编辑器宽度 */
+    width: 90%;
+}
 
 /* --- 11. 其他辅助与微调样式 --- */
-/* 修改点：减小操作按钮与上方元素的间距 */
 .actions-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 0.75rem; }
 #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; display: flex; justify-content: center; align-items: center; transition: opacity 0.3s ease-out; }
 .spinner-border { width: 3rem; height: 3rem; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
@@ -139,14 +152,12 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
     justify-content: space-between; 
     align-items: center; 
     z-index: 5; 
-    /* 修改点：减小与下方图表的间距 */
-    margin-bottom: 5px;
+    margin-bottom: 5px; /* 修正：紧贴标题 */
 }
 #f2fs-charts-container { 
     display: flex; 
     flex-wrap: wrap; 
     justify-content: center; 
-    /* 修改点：减小图表之间的间距 */
     gap: 0.5rem; 
     padding: 0; 
     margin: 0; 
@@ -157,7 +168,7 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
     flex-direction: column; 
     align-items: center; 
     transition: transform 0.3s ease; 
-    width: 130px;
+    width: 130px; /* 修正：增大图表尺寸 */
 }
 .partition-chart-wrapper:hover { transform: scale(1.05); }
 .partition-chart-canvas-container { 
@@ -167,7 +178,7 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 }
 .partition-chart-label {
     font-size: 0.85rem;
-    margin-top: -25px;
+    margin-top: -35px; /* 修正：紧贴图表 */
     margin-bottom: 0;
     line-height: 1;
     text-align: center;
@@ -199,6 +210,7 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
   .cron-grid .btn-outline-primary { background: rgba(255,255,255,0.1); }
 }
 @media (min-width: 768px) {
+  .modal-lg { max-width: 700px; }
   .bottom-nav { width: 400px; left: 50%; transform: translateX(-50%); bottom: 20px; border-radius: 20px; }
   .bottom-nav::before { border-radius: 20px; border: 1px solid var(--glass-border); }
 }

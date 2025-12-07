@@ -285,12 +285,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const appStats = Array.from(aggregatedStats.values());
             appStatsList.innerHTML = '';
             if (!appStats || appStats.length === 0) {
-                appStatsContainer.style.visibility = 'hidden';
-                appStatsContainer.style.opacity = '0';
-                appStatsContainer.style.maxHeight = '0';
-                appStatsContainer.style.marginTop = '0';
+                // 关键修改：无数据时彻底隐藏，不占空间
+                appStatsContainer.style.display = 'none';
                 return;
             }
+            // 关键修改：有数据时恢复显示
+            appStatsContainer.style.display = 'flex';
             appStatsContainer.style.visibility = 'visible';
             appStatsContainer.style.opacity = '1';
             appStatsContainer.style.maxHeight = '500px';

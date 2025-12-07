@@ -56,23 +56,24 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 #log-stats-card .card-body {
     display: flex;
     flex-direction: column;
-    min-height: 480px; /* 关键: 固定最小高度 */
+    min-height: auto; /* 移除强制最小高度 */
 }
 #bar-chart-wrapper {
-    flex-shrink: 0; /* 防止图表被压缩 */
+    flex-shrink: 0;
     position: relative;
     width: 100%;
     max-height: 300px;
 }
 #app-stats-container {
-    flex-grow: 1; /* 占据剩余空间 */
+    flex-grow: 1;
     display: flex;
     flex-direction: column;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
+    /* 注意：当 JS 设置 display: none 时，此处的 flex 布局会被覆盖 */
 }
 .app-stats-list-wrapper {
-    overflow-y: auto; /* 关键: 使列表内容可滚动 */
+    overflow-y: auto;
     flex-grow: 1;
 }
 #app-stats-title { margin-bottom: 0.5rem; font-size: 1rem; font-weight: 600; }
@@ -126,14 +127,15 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .f2fs-interactive-wrapper { position: relative; }
 .gc-overlay-controls { position: absolute; top: 0; left: 5px; right: 5px; display: flex; justify-content: space-between; align-items: flex-start; z-index: 5; pointer-events: none; }
 .gc-overlay-controls > * { pointer-events: auto; }
-#f2fs-charts-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; padding-top: 0; margin-top: 0; }
-.partition-chart-wrapper { display: flex; flex-direction: column; align-items: center; transition: transform 0.3s ease; width: 120px; }
+/* 环形图紧凑化 */
+#f2fs-charts-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem; padding-top: 0; margin-top: 0; }
+.partition-chart-wrapper { display: flex; flex-direction: column; align-items: center; transition: transform 0.3s ease; width: 85px; }
 .partition-chart-wrapper:hover { transform: scale(1.05); }
 .partition-chart-canvas-container { width: 100%; aspect-ratio: 1 / 1; position: relative; }
 .partition-chart-label {
-    font-size: 0.85rem;
-    margin-top: -5px; /* 关键: 负外边距将文字向上拉 */
-    line-height: 1.2;
+    font-size: 0.75rem; /* 缩小字体 */
+    margin-top: -8px; /* 向上拉近 */
+    line-height: 1.1;
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
@@ -143,13 +145,18 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 
 /* --- 12. 深色模式与大屏适配 --- */
 @media (prefers-color-scheme: dark) {
-  :root { --text-main: #f0f0f0; --text-muted: #aaa; --glass-bg: rgba(30, 30, 30, 0.4); --glass-border: rgba(255, 255, 255, 0.1); }
+  :root { 
+      --text-main: #ffffff; /* 纯白文字 */
+      --text-muted: #ccc; 
+      --glass-bg: rgba(80, 80, 80, 0.35); /* 提亮背景 */
+      --glass-border: rgba(255, 255, 255, 0.15); 
+  }
   body::before, body::after { mix-blend-mode: screen; }
   .radio-toggle-group, .nav-pills { background: rgba(255,255,255,0.1); }
   .radio-toggle-input:checked + .radio-toggle-label, .nav-link.active { background: rgba(255,255,255,0.2); color: #fff; }
   .bottom-nav::before { background: rgba(30, 30, 30, 0.4); }
   .modal { background: rgba(10, 10, 10, 0.2); }
-  .modal-content { background: rgba(40, 40, 40, 0.7); border-color: rgba(255,255,255,0.1); }
+  .modal-content { background: rgba(60, 60, 60, 0.85); border-color: rgba(255,255,255,0.2); }
   .modal-header, .modal-footer { border-color: rgba(255,255,255,0.1); }
   .btn-close { color: #fff; }
   .cron-grid .btn-outline-primary { background: rgba(255,255,255,0.1); }

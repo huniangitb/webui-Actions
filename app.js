@@ -79,6 +79,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isBackendOnline = true;
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
+    // --- 辅助函数 ---
+    function generateRandomAurora() {
+        const baseHue = Math.floor(Math.random() * 360);
+        const hues = [
+            baseHue,
+            (baseHue + 60) % 360,
+            (baseHue + 180) % 360,
+            (baseHue + 240) % 360
+        ];
+        hues.forEach((hue, i) => {
+            document.documentElement.style.setProperty(`--aurora-color-${i + 1}`, `hsl(${hue}, 90%, 70%)`);
+        });
+    }
+    function injectIcons() { document.querySelectorAll('[data-icon]').forEach(el => { const iconName = el.getAttribute('data-icon'); if (icons[iconName]) el.setAttribute('d', icons[iconName]); }); }
+
     // --- SPA 页面切换逻辑 ---
     const pages = { home: document.getElementById('page-home'), edit: document.getElementById('page-edit') };
     const navItems = document.querySelectorAll('.nav-item');
@@ -135,9 +150,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else { disableBackendFeatures('后端通信失败'); return null; }
         } catch (error) { disableBackendFeatures('后端通信异常'); return null; }
     }
-
-    // --- 辅助函数 ---
-    function injectIcons() { document.querySelectorAll('[data-icon]').forEach(el => { const iconName = el.getAttribute('data-icon'); if (icons[iconName]) el.setAttribute('d', icons[iconName]); }); }
 
     // --- 主页逻辑 ---
     const initHomePage = (() => {
@@ -369,6 +381,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     })();
 
     // --- 应用初始化 ---
+    generateRandomAurora();
     injectIcons();
     NativeUI.initModals();
     NativeUI.initTabs();
@@ -394,12 +407,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     navItems.forEach(item => item.classList.toggle('active', item.dataset.page === currentPageId));
     
-    // 修复: 平滑淡出加载动画
     loader.style.opacity = '0';
-    setTimeout(() => {
+    loader.addEventListener('transitionend', () => {
         loader.style.display = 'none';
         requestAnimationFrame(() => {
             appWrapper.classList.add('loaded');
         });
-    }, 300); // 匹配 CSS 过渡时间
+    }, { once: true });
 });

@@ -4,17 +4,22 @@
   --text-main: #1a1a1a; --text-muted: #666;
   --glass-bg: rgba(255, 255, 255, 0.2); --glass-border: rgba(255, 255, 255, 0.4);
   --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1); --blur-strength: 20px;
+  /* 随机背景颜色变量 (带默认值) */
+  --aurora-color-1: hsl(340, 100%, 65%);
+  --aurora-color-2: hsl(260, 100%, 70%);
+  --aurora-color-3: hsl(160, 100%, 60%);
+  --aurora-color-4: hsl(210, 100%, 65%);
 }
 *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; width: 100%; margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--text-main); background-color: transparent; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; user-select: none; -webkit-user-select: none; font-size: 16px; }
 svg, .nav-icon { transform: translateZ(0); backface-visibility: hidden; }
 
-/* --- 2. 极光背景动画 --- */
+/* --- 2. 极光背景动画 (使用CSS变量) --- */
 @keyframes aurora-1 { 0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.5); opacity: 0.7; } 50% { transform: translate(-20%, -40%) rotate(180deg) scale(2); opacity: 1; } 100% { transform: translate(-50%, -50%) rotate(360deg) scale(1.5); opacity: 0.7; } }
 @keyframes aurora-2 { 0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.8); opacity: 1; } 50% { transform: translate(-80%, -60%) rotate(-180deg) scale(1.5); opacity: 0.8; } 100% { transform: translate(-50%, -50%) rotate(-360deg) scale(1.8); opacity: 1; } }
 body::before, body::after { content: ''; position: fixed; top: 50%; left: 50%; width: 150vmax; height: 150vmax; z-index: -1; pointer-events: none; transform-origin: center center; }
-body::before { background: radial-gradient(circle at 30% 30%, hsl(340, 100%, 65%), transparent 35%), radial-gradient(circle at 70% 70%, hsl(260, 100%, 70%), transparent 35%); animation: aurora-1 30s infinite linear; }
-body::after { background: radial-gradient(circle at 70% 30%, hsl(160, 100%, 60%), transparent 35%), radial-gradient(circle at 30% 70%, hsl(210, 100%, 65%), transparent 35%); animation: aurora-2 35s infinite linear reverse; }
+body::before { background: radial-gradient(circle at 30% 30%, var(--aurora-color-1), transparent 35%), radial-gradient(circle at 70% 70%, var(--aurora-color-2), transparent 35%); animation: aurora-1 30s infinite linear; }
+body::after { background: radial-gradient(circle at 70% 30%, var(--aurora-color-3), transparent 35%), radial-gradient(circle at 30% 70%, var(--aurora-color-4), transparent 35%); animation: aurora-2 35s infinite linear reverse; }
 
 /* --- 3. 布局容器 (增加进入动画) --- */
 .app-wrapper { position: relative; height: 100%; width: 100%; overflow: hidden; display: flex; flex-direction: column; opacity: 0; transition: opacity 0.4s ease-in-out, transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), filter 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -101,7 +106,7 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .f2fs-interactive-wrapper { position: relative; min-height: 150px; }
 .gc-overlay-controls { position: absolute; top: 0; left: 5px; right: 5px; display: flex; justify-content: space-between; align-items: flex-start; z-index: 5; pointer-events: none; }
 .gc-overlay-controls > * { pointer-events: auto; }
-#f2fs-charts-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; padding-top: 1rem; }
+#f2fs-charts-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; padding-top: 0; }
 .partition-chart-wrapper { display: flex; flex-direction: column; align-items: center; transition: transform 0.3s ease; width: 120px; }
 .partition-chart-wrapper:hover { transform: scale(1.05); }
 .partition-chart-canvas-container { width: 100%; aspect-ratio: 1 / 1; position: relative; }

@@ -1,18 +1,70 @@
 import { exec, toast } from 'kernelsu';
-import { Ripple, Modal, initMDB } from 'mdb-ui-kit';
 import Chart from 'chart.js/auto';
 import { mdiHome, mdiPencilBoxOutline } from '@mdi/js';
 
-initMDB({ Ripple });
-
-// --- 内联模块: logParser.js ---
+// --- 内联模块: logParser.js (保持不变) ---
 function parseLogContent(ndjsonContent) { if (!ndjsonContent || ndjsonContent.trim() === '') return []; const parsedEntries = []; const lines = ndjsonContent.split('\n'); lines.forEach(line => { if (line.trim() === '') return; try { const stats = JSON.parse(line); if (!stats.timestamp || !stats.global_stats) return; const formattedTimestamp = stats.timestamp.replace('T', ' ').replace('Z', ''); const reclaimedSegments = (stats.gc_trim_stats && stats.gc_trim_stats.reclaimed_segments) ? stats.gc_trim_stats.reclaimed_segments : 0; const trimmedMBValue = (stats.gc_trim_stats && stats.gc_trim_stats.trimmed_mb) ? stats.gc_trim_stats.trimmed_mb : 0; const parsedEntry = { timestamp: formattedTimestamp, date: stats.timestamp.split('T')[0], deletedFiles: stats.global_stats.files_deleted || 0, deletedDirs: stats.global_stats.dirs_deleted || 0, dirtySegments: reclaimedSegments, fileCleanedMB: stats.global_stats.megabytes_deleted || 0, trimMB: trimmedMBValue, appStats: stats.app_stats || [] }; parsedEntries.push(parsedEntry); } catch (error) { console.error("解析 JSON 行失败:", error, "行内容:", line); } }); return parsedEntries; }
 function updateLocalStorage(newData) { if (!newData || newData.length === 0) return; const storedData = JSON.parse(localStorage.getItem('logData') || '[]'); const dataMap = new Map(storedData.map(entry => [entry.timestamp, entry])); newData.forEach(newEntry => { dataMap.set(newEntry.timestamp, newEntry); }); const combinedData = Array.from(dataMap.values()); const cutoffDate = new Date(); cutoffDate.setDate(cutoffDate.getDate() - 6); const filteredData = combinedData.filter(entry => new Date(entry.date) >= cutoffDate); localStorage.setItem('logData', JSON.stringify(filteredData)); }
 function getStoredData() { return JSON.parse(localStorage.getItem('logData') || '[]'); }
 function clearStoredData() { localStorage.removeItem('logData'); }
 
-// --- 内联模块: icons.js ---
+// --- 内联模块: icons.js (保持不变) ---
 const icons = { home: mdiHome, edit: mdiPencilBoxOutline };
+
+// --- 新增: 原生 UI 控制模块 ---
+const NativeUI = {
+    openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+    },
+    closeModal(modalOrId) {
+        const modal = typeof modalOrId === 'string' ? document.getElementById(modalOrId) : modalOrId;
+        if (modal) {
+            modal.classList.remove('show');
+            document.body.style.overflow = '';
+        }
+    },
+    initModals() {
+        document.body.addEventListener('click', (e) => {
+            const trigger = e.target.closest('[data-toggle="modal"]');
+            if (trigger) {
+                const targetId = trigger.getAttribute('data-target').substring(1);
+                this.openModal(targetId);
+                return;
+            }
+            const modal = e.target.closest('.modal');
+            if (modal && (e.target === modal || e.target.closest('[data-dismiss="modal"]'))) {
+                this.closeModal(modal);
+            }
+        });
+    },
+    initTabs() {
+        document.body.addEventListener('click', (e) => {
+            const trigger = e.target.closest('.nav-pills .nav-link');
+            if (!trigger) return;
+            e.preventDefault();
+            if (trigger.classList.contains('active')) return;
+
+            const parent = trigger.closest('.nav-pills');
+            const contentContainer = parent.nextElementSibling;
+
+            parent.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            trigger.classList.add('active');
+
+            contentContainer.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active', 'show'));
+            const targetPane = contentContainer.querySelector(trigger.getAttribute('href'));
+            if (targetPane) {
+                targetPane.classList.add('active');
+                // 强制重绘以触发动画
+                void targetPane.offsetWidth;
+                targetPane.classList.add('show');
+            }
+        });
+    }
+};
 
 document.addEventListener('DOMContentLoaded', async () => {
     // --- 全局状态和元素 ---
@@ -24,7 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isBackendOnline = true;
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
-    // --- SPA 页面切换逻辑 ---
+    // --- SPA 页面切换逻辑 (保持不变) ---
     const pages = { home: document.getElementById('page-home'), edit: document.getElementById('page-edit') };
     const navItems = document.querySelectorAll('.nav-item');
     let currentPageId = 'home';
@@ -50,7 +102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    // --- 后端通信与状态检查 ---
+    // --- 后端通信与状态检查 (保持不变) ---
     function disableBackendFeatures(reason) {
         if (!isBackendOnline) return;
         isBackendOnline = false;
@@ -81,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) { disableBackendFeatures('后端通信异常'); return null; }
     }
 
-    // --- 辅助函数 ---
+    // --- 辅助函数 (保持不变) ---
     function injectIcons() { document.querySelectorAll('[data-icon]').forEach(el => { const iconName = el.getAttribute('data-icon'); if (icons[iconName]) el.setAttribute('d', icons[iconName]); }); }
 
     // --- 主页逻辑 ---
@@ -95,7 +147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const f2fsChartsContainer = document.getElementById('f2fs-charts-container');
         const partitionGcStatusContainer = document.getElementById('partition-gc-status-container');
         const customizePartitionsBtn = document.getElementById('customize-partitions-btn');
-        const partitionsModal = new Modal(document.getElementById('partitions-modal'));
+        const partitionsModalEl = document.getElementById('partitions-modal');
         const partitionsModalBody = document.getElementById('partitions-modal-body');
         const savePartitionsBtn = document.getElementById('save-partitions-btn');
         let partitionCharts = new Map();
@@ -103,7 +155,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         let allDiscoveredPartitions = new Set();
         let hiddenPartitions = new Set(JSON.parse(localStorage.getItem('hiddenF2fsPartitions') || '[]'));
 
-        // --- 修复: 图表颜色管理 ---
         const getChartColors = () => {
             const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
             return {
@@ -119,35 +170,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             data: { labels: [], datasets: [{ label: '文件清理 (MB)', data: [], backgroundColor: 'rgba(153, 102, 255, 0.2)', borderColor: 'rgba(153, 102, 255, 1)', borderWidth: 1 }, { label: '回收脏段数', data: [], backgroundColor: 'rgba(75, 192, 192, 0.2)', borderColor: 'rgba(75, 192, 192, 1)', borderWidth: 1 }, { label: '已删除文件数', data: [], backgroundColor: 'rgba(255, 99, 132, 0.2)', borderColor: 'rgba(255, 99, 132, 1)', borderWidth: 1 }, { label: '已删除目录数', data: [], backgroundColor: 'rgba(54, 162, 235, 0.2)', borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1 }] },
             options: {
                 scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: initialChartColors.gridColor },
-                        ticks: { color: initialChartColors.textColor },
-                    },
-                    x: {
-                        grid: { color: initialChartColors.gridColor },
-                        ticks: { color: initialChartColors.textColor },
-                    }
+                    y: { beginAtZero: true, grid: { color: initialChartColors.gridColor }, ticks: { color: initialChartColors.textColor } },
+                    x: { grid: { color: initialChartColors.gridColor }, ticks: { color: initialChartColors.textColor } }
                 },
-                plugins: {
-                    legend: {
-                        labels: { color: initialChartColors.textColor }
-                    }
-                }
+                plugins: { legend: { labels: { color: initialChartColors.textColor } } }
             }
         });
 
         const updateChartTheme = () => {
             const newColors = getChartColors();
-            // 更新柱状图
             barChart.options.scales.y.grid.color = newColors.gridColor;
             barChart.options.scales.y.ticks.color = newColors.textColor;
             barChart.options.scales.x.grid.color = newColors.gridColor;
             barChart.options.scales.x.ticks.color = newColors.textColor;
             barChart.options.plugins.legend.labels.color = newColors.textColor;
             barChart.update('none');
-
-            // 更新所有饼图
             partitionCharts.forEach(chart => {
                 chart.data.datasets[0].borderColor = newColors.doughnutBorderColor;
                 chart.update('none');
@@ -178,11 +215,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         type: 'doughnut',
                         data: {
                             labels: [`脏段 (${dirty_segments})`, `空闲段 (${free_segments})`],
-                            datasets: [{
-                                data: [dirty_segments, free_segments],
-                                backgroundColor: ['#ff6384', '#36a2eb'],
-                                borderColor: currentChartColors.doughnutBorderColor
-                            }]
+                            datasets: [{ data: [dirty_segments, free_segments], backgroundColor: ['#ff6384', '#36a2eb'], borderColor: currentChartColors.doughnutBorderColor }]
                         },
                         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
                     });
@@ -209,8 +242,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('refresh-log').addEventListener('click', async () => { toast('正在手动刷新...'); if (!isExt4 && !gcInfoIntervalId && isBackendOnline) { gcInfoIntervalId = setInterval(updateAllF2fsInfo, 2000); toast('已重新启动自动刷新'); } await loadLogFile(); if (!isExt4) await updateAllF2fsInfo(true); toast('数据已刷新'); });
         document.getElementById('delete-log').addEventListener('click', async () => { try { await exec('rm -f /data/adb/modules/Clean-C/run.log /data/adb/modules/Clean-C/stats.json'); await loadLogFile(); toast('日志文件已删除'); } catch (e) { toast(`删除日志失败: ${e.message}`); } });
         document.getElementById('restart-module').addEventListener('click', async () => { toast('正在请求重启模块...'); await sendTcpCommand('restart'); toast('重启命令已发送'); });
-        customizePartitionsBtn.addEventListener('click', () => { partitionsModalBody.innerHTML = ''; Array.from(allDiscoveredPartitions).sort().forEach(deviceName => { partitionsModalBody.innerHTML += `<div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="switch-${deviceName}" data-device-name="${deviceName}" ${!hiddenPartitions.has(deviceName) ? 'checked' : ''}><label class="form-check-label" for="switch-${deviceName}">${deviceName}</label></div>`; }); partitionsModal.show(); });
-        savePartitionsBtn.addEventListener('click', () => { const newHidden = new Set(); partitionsModalBody.querySelectorAll('.form-check-input').forEach(cb => { if (!cb.checked) newHidden.add(cb.dataset.deviceName); }); hiddenPartitions = newHidden; localStorage.setItem('hiddenF2fsPartitions', JSON.stringify(Array.from(hiddenPartitions))); partitionsModal.hide(); toast('显示偏好已保存'); updateAllF2fsInfo(true); });
+        customizePartitionsBtn.addEventListener('click', () => { partitionsModalBody.innerHTML = ''; Array.from(allDiscoveredPartitions).sort().forEach(deviceName => { partitionsModalBody.innerHTML += `<div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="switch-${deviceName}" data-device-name="${deviceName}" ${!hiddenPartitions.has(deviceName) ? 'checked' : ''}><label class="form-check-label" for="switch-${deviceName}">${deviceName}</label></div>`; }); NativeUI.openModal('partitions-modal'); });
+        savePartitionsBtn.addEventListener('click', () => { const newHidden = new Set(); partitionsModalBody.querySelectorAll('.form-check-input').forEach(cb => { if (!cb.checked) newHidden.add(cb.dataset.deviceName); }); hiddenPartitions = newHidden; localStorage.setItem('hiddenF2fsPartitions', JSON.stringify(Array.from(hiddenPartitions))); NativeUI.closeModal(partitionsModalEl); toast('显示偏好已保存'); updateAllF2fsInfo(true); });
 
         return async function() {
             await checkFileSystem();
@@ -218,7 +251,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             try { const { stdout } = await exec('cat /data/media/0/Android/清理规则/list.config'); stdout.split('\n').forEach(line => { if (line.includes('=')) { const [pkg, name] = line.split('=').map(item => item.trim()); if (pkg && name) appNamesMap.set(pkg, name); } }); } catch (e) { console.error("Error loading app names:", e); }
             await loadLogFile();
             if (!isExt4) await updateAllF2fsInfo(true);
-            // --- 修复: 添加主题变化监听器 ---
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateChartTheme);
         };
     })();
@@ -235,49 +267,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         const intervalInputGroup = document.getElementById('interval-input-group');
         const cronInputGroup = document.getElementById('cron-input-group');
         const cronExpressionInput = document.getElementById('cron-expression');
-        const cronEditorModal = new Modal(document.getElementById('cron-editor-modal'));
-        const cronTabTriggers = document.querySelectorAll('#cron-tabs a[data-mdb-toggle="pill"]');
+        const cronEditorModalEl = document.getElementById('cron-editor-modal');
         const cronFields = { minutes: { el: document.getElementById('cron-minutes'), min: 0, max: 59, name: '分钟' }, hours: { el: document.getElementById('cron-hours'), min: 0, max: 23, name: '小时' }, dom: { el: document.getElementById('cron-dom'), min: 1, max: 31, name: '日' }, months: { el: document.getElementById('cron-months'), min: 1, max: 12, name: '月', labels: ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'] }, dow: { el: document.getElementById('cron-dow'), min: 0, max: 6, name: '星期', labels: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] } };
 
         function updateGcConfigToggleLabel(isChecked) { f2fsGcConfigToggleLabel.textContent = isChecked ? '已开启' : '已关闭'; f2fsGcConfigToggleLabel.classList.toggle('btn-success', isChecked); f2fsGcConfigToggleLabel.classList.toggle('btn-outline-secondary', !isChecked); }
         function updateScheduleModeUI() { const isCron = scheduleModeCronRadio.checked; intervalInputGroup.classList.toggle('hidden', isCron); cronInputGroup.classList.toggle('hidden', !isCron); cleanIntervalInput.required = !isCron; cronExpressionInput.required = isCron; }
         function generateCronEditorUI() { for (const key in cronFields) { const { el, min, max, name, labels } = cronFields[key]; let gridHtml = '<div class="cron-grid collapsed">'; for (let i = min; i <= max; i++) { gridHtml += `<div><input type="checkbox" class="btn-check" id="${key}-${i}" value="${i}"><label class="btn btn-outline-primary" for="${key}-${i}">${labels ? labels[i - min] : i}</label></div>`; } el.innerHTML = `<div class="btn-group mb-3 w-100"><input type="radio" class="btn-check" name="${key}-mode" id="${key}-every" value="*" checked><label class="btn btn-outline-primary" for="${key}-every">每${(labels ? '个' : '') + name}</label><input type="radio" class="btn-check" name="${key}-mode" id="${key}-specific" value="specific"><label class="btn btn-outline-primary" for="${key}-specific">指定</label></div>` + gridHtml + '</div>'; } }
-        function parseCronToUI(expression) { const parts = expression.split(' '); if (parts.length !== 5) return; ['minutes', 'hours', 'dom', 'months', 'dow'].forEach((key, i) => { const part = parts[i], field = cronFields[key]; field.el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); if (part === '*') { field.el.querySelector(`#${key}-every`).checked = true; field.el.querySelector('.cron-grid').classList.add('collapsed'); } else { field.el.querySelector(`#${key}-specific`).checked = true; field.el.querySelector('.cron-grid').classList.remove('collapsed'); part.split(',').forEach(range => { if (range.includes('-')) { const [start, end] = range.split('-').map(Number); for (let j = start; j <= end; j++) { const cb = field.el.querySelector(`#${key}-${j}`); if (cb) cb.checked = true; } } else if (range.includes('/')) { const [_, step] = range.split('/').map(Number); for (let j = field.min; j <= field.max; j += step) { const cb = field.el.querySelector(`#${key}-${j}`); if (cb) cb = true; } } else { const cb = field.el.querySelector(`#${key}-${Number(range)}`); if (cb) cb.checked = true; } }); } }); }
+        function parseCronToUI(expression) { const parts = expression.split(' '); if (parts.length !== 5) return; ['minutes', 'hours', 'dom', 'months', 'dow'].forEach((key, i) => { const part = parts[i], field = cronFields[key]; field.el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); if (part === '*') { field.el.querySelector(`#${key}-every`).checked = true; field.el.querySelector('.cron-grid').classList.add('collapsed'); } else { field.el.querySelector(`#${key}-specific`).checked = true; field.el.querySelector('.cron-grid').classList.remove('collapsed'); part.split(',').forEach(range => { if (range.includes('-')) { const [start, end] = range.split('-').map(Number); for (let j = start; j <= end; j++) { const cb = field.el.querySelector(`#${key}-${j}`); if (cb) cb.checked = true; } } else if (range.includes('/')) { const [_, step] = range.split('/').map(Number); for (let j = field.min; j <= field.max; j += step) { const cb = field.el.querySelector(`#${key}-${j}`); if (cb) cb.checked = true; } } else { const cb = field.el.querySelector(`#${key}-${Number(range)}`); if (cb) cb.checked = true; } }); } }); }
         function generateCronFromUI() { return ['minutes', 'hours', 'dom', 'months', 'dow'].map(key => { const field = cronFields[key]; if (field.el.querySelector(`input[name="${key}-mode"]:checked`).value === '*') return '*'; const selected = Array.from(field.el.querySelectorAll('.cron-grid input:checked')).map(cb => Number(cb.value)); if (selected.length === 0 || selected.length === (field.max - field.min + 1)) return '*'; selected.sort((a, b) => a - b); const ranges = []; for (let i = 0; i < selected.length; i++) { let start = selected[i]; while (i + 1 < selected.length && selected[i+1] === selected[i] + 1) i++; ranges.push(start === selected[i] ? `${start}` : `${start}-${selected[i]}`); } return ranges.join(','); }).join(' '); }
         async function loadConfigFile() { try { const { errno, stdout } = await exec('cat /data/media/0/Android/清理规则/配置.txt'); if (errno === 0) { const config = {}; stdout.split('\n').forEach(line => { if (line.includes('=')) { const [key, value] = line.split('=').map(item => item.trim()); if (key && value) config[key] = value; } }); retentionDaysInput.value = config.保留天数 || '30'; if (config.cron表达式 && config.cron表达式.trim() !== '') { scheduleModeCronRadio.checked = true; cronExpressionInput.value = config.cron表达式; } else { cronExpressionInput.value = '0 * * * *'; } cleanIntervalInput.value = config.程序清理间隔秒数 || '3600'; const f2fsGcValue = config['f2fs-GC'] || 'n'; f2fsGcConfigToggle.checked = f2fsGcValue === 'y'; } } catch (e) { toast(`加载配置失败: ${e.message}`); } updateScheduleModeUI(); updateGcConfigToggleLabel(f2fsGcConfigToggle.checked); }
         
         configForm.addEventListener('submit', async (e) => { e.preventDefault(); try { const { errno, stdout, stderr } = await exec('cat /data/media/0/Android/清理规则/配置.txt'); let lines = (errno === 0) ? stdout.split('\n') : []; if (errno !== 0 && !stderr.includes('No such file')) throw new Error(`读取配置失败: ${stderr}`); const otherLines = lines.filter(l => !/^(保留天数=|程序清理间隔秒数=|cron表达式=|f2fs-GC=)/.test(l) && l.trim() !== ''); const newConfig = [...otherLines, `保留天数=${retentionDaysInput.value}`, `f2fs-GC=${f2fsGcConfigToggle.checked ? 'y' : 'n'}`]; if (scheduleModeCronRadio.checked) { newConfig.push(`cron表达式=${cronExpressionInput.value}`, `程序清理间隔秒数=${cleanIntervalInput.value}`); } else { newConfig.push(`程序清理间隔秒数=${cleanIntervalInput.value}`, `cron表达式=${cronExpressionInput.value || '0 * * * *'}`); } const updatedConfig = newConfig.join('\n'); const { errno: writeErrno, stderr: writeStderr } = await exec(`printf "%s" "${updatedConfig.replace(/"/g, '\\"')}" > /data/media/0/Android/清理规则/配置.txt`); if (writeErrno !== 0) throw new Error(`写入配置失败: ${writeStderr}`); toast('配置已保存，正在请求重启模块...'); await sendTcpCommand('restart'); toast('重启命令已发送'); } catch (error) { toast(`操作失败: ${error.message}`); } });
         f2fsGcConfigToggle.addEventListener('change', () => updateGcConfigToggleLabel(f2fsGcConfigToggle.checked));
         document.querySelectorAll('input[name="schedule-mode"]').forEach(el => el.addEventListener('change', updateScheduleModeUI));
-        document.getElementById('edit-cron-btn').addEventListener('click', () => { parseCronToUI(cronExpressionInput.value); cronEditorModal.show(); });
-        document.getElementById('save-cron-btn').addEventListener('click', () => { cronExpressionInput.value = generateCronFromUI(); cronEditorModal.hide(); });
+        document.getElementById('edit-cron-btn').addEventListener('click', () => { parseCronToUI(cronExpressionInput.value); NativeUI.openModal('cron-editor-modal'); });
+        document.getElementById('save-cron-btn').addEventListener('click', () => { cronExpressionInput.value = generateCronFromUI(); NativeUI.closeModal(cronEditorModalEl); });
         
-        cronTabTriggers.forEach(clickedTrigger => {
-            clickedTrigger.addEventListener('click', (event) => {
-                event.preventDefault();
-                if (clickedTrigger.classList.contains('active')) return;
-                const currentPane = document.querySelector('#cron-tabs-content .tab-pane.active');
-                const targetPane = document.querySelector(clickedTrigger.getAttribute('href'));
-                const currentGrid = currentPane?.querySelector('.cron-grid');
-                if (currentGrid) { currentGrid.classList.add('collapsed'); }
-                cronTabTriggers.forEach(trigger => trigger.classList.remove('active'));
-                document.querySelectorAll('#cron-tabs-content .tab-pane').forEach(pane => {
-                    pane.classList.remove('active', 'show');
-                });
-                clickedTrigger.classList.add('active');
-                if (targetPane) {
-                    targetPane.classList.add('active');
-                    void targetPane.offsetWidth; 
-                    targetPane.classList.add('show');
-                    const targetIsSpecific = targetPane.querySelector('input[value="specific"]')?.checked;
-                    const targetGrid = targetPane.querySelector('.cron-grid');
-                    if (targetIsSpecific && targetGrid) {
-                        setTimeout(() => { targetGrid.classList.remove('collapsed'); }, 50); 
-                    }
-                }
-            });
-        });
-
         document.getElementById('cron-editor-modal').addEventListener('click', (e) => { if (e.target.name && e.target.name.endsWith('-mode')) { const fieldKey = e.target.name.replace('-mode', ''); cronFields[fieldKey].el.querySelector('.cron-grid').classList.toggle('collapsed', e.target.value === '*'); } });
         const editRuleFile = async (fileName) => { try { const { errno, stderr } = await exec(`am start -a android.intent.action.VIEW -d file:///data/media/0/Android/清理规则/${fileName} -t text/plain`); if (errno !== 0) throw new Error(stderr); toast(`尝试打开文件: ${fileName}`); } catch (e) { toast(`编辑文件失败: ${e.message}`); } };
         document.getElementById('edit-blacklist1').addEventListener('click', () => editRuleFile('blacklist1.txt'));
@@ -293,6 +298,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- 应用初始化 ---
     injectIcons();
+    NativeUI.initModals();
+    NativeUI.initTabs();
+
     if (!await checkBackendProcess()) {
         disableBackendFeatures('后端服务未运行');
     }

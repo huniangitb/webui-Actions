@@ -1,16 +1,17 @@
-name: Build and Maintain yarn.lock
+name: Build, Maintain yarn.lock, and Deploy
 
 # 触发工作流的事件
 on:
-  # 1. 当代码推送到 main 或 develop 分支时自动触发
+  # 1. 当代码推送到目标分支时自动触发
   push:
     branches:
       - Clean-C-webui
 
-  # 2. 当有 Pull Request 指向 main 分支时自动触发
+  # 2. 当有 Pull Request 指向目标分支时自动触发
   pull_request:
     branches:
       - Clean-C-webui
+      # 也可以增加 types: [opened, synchronize, reopened] 来优化 PR 触发
 
   # 3. 保留手动触发功能
   workflow_dispatch:
@@ -18,47 +19,58 @@ on:
       branch:
         description: '要构建的仓库分支 (The branch to build)'
         required: true
-        default: 'Clean-C-webui' # 默认使用 main 分支
+        default: 'Clean-C-webui'
         type: string
 
+# 定义环境变量，方便后续步骤使用
+env:
+  NODE_VERSION: '20'
+  BUILD_ARTIFACT_NAME: 'webui-dist'
+  DIST_FOLDER: 'dist'
+
 jobs:
+  # ==============================
+  # 1. 构建与锁定依赖 Job
+  # ==============================
   build:
     runs-on: ubuntu-24.04
 
-    # 新增：为工作流授权，允许它将代码推送回仓库
+    # 授权：允许工作流将代码推送回仓库 (用于 yarn.lock 提交)
     permissions:
       contents: write
 
     steps:
-      # 检出代码
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # 动态决定检出哪个分支：
-          # - 如果是手动触发(workflow_dispatch)，使用用户输入的分支。
-          # - 如果是自动触发(push/pull_request)，使用事件对应的分支 (github.ref)。
+          # 动态决定检出哪个分支
           ref: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.branch) || github.ref }}
+          # 确保拉取整个历史记录，对于自动提交是必需的
+          fetch-depth: 0
 
-      # 设置 Node.js 环境，这里不使用缓存
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
+          # 启用 yarn 缓存
+          cache: 'yarn'
 
-      # 安装依赖。这一步会自动创建 yarn.lock 文件
-      - name: Install dependencies
-        # 注意：这里不能使用 --frozen-lockfile，因为它要求 lock 文件必须存在且最新
+      - name: Install and update dependencies (If yarn.lock is missing or outdated)
+        # 即使 yarn.lock 存在，如果 package.json 变动，也会更新它
         run: yarn install
 
-      # 新增：检查 yarn.lock 文件是否有变动，如果有则自动提交
-      - name: Commit yarn.lock
+      # 关键步骤：检查 yarn.lock 文件是否有变动，如果有则自动提交
+      - name: Commit updated yarn.lock
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: Add/update yarn.lock"
-          # 仅追踪 yarn.lock 文件的变化
+          commit_message: "chore: Auto-update yarn.lock (via CI)"
           file_pattern: yarn.lock
-          # 将代码推送到当前检出的分支
-          push_options: '--force-with-lease' # 使用更安全的推送方式
+          # 仅在 push 事件 (或手动触发) 时推送，防止在 PR 上创建冲突提交
+          commit_options: '--no-verify'
+          push_options: '--force-with-lease'
+          branch: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.branch) || github.ref_name }}
+        # 仅在 push 或 workflow_dispatch 触发时运行此步骤
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
       - name: Build project
         run: yarn build
@@ -66,5 +78,47 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: webui-dist
-          path: dist/
+          name: ${{ env.BUILD_ARTIFACT_NAME }}
+          path: ${{ env.DIST_FOLDER }}
+          # 增加保留时间，例如 7 天
+          retention-days: 7
+
+  # ==============================
+  # 2. 部署 Job (可选：例如 GitHub Pages)
+  # ==============================
+  deploy:
+    # 确保在 build job 成功后才运行
+    needs: build
+    runs-on: ubuntu-24.04
+
+    # 部署权限 (如果是 GitHub Pages，需要 pages 和 id-token)
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    # 仅在推送到目标分支时才部署 (排除 PR 和其他非主线分支)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/Clean-C-webui'
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.BUILD_ARTIFACT_NAME }}
+          path: ${{ env.DIST_FOLDER }}
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact for Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ env.DIST_FOLDER }}
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

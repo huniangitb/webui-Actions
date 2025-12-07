@@ -41,7 +41,7 @@ const NativeUI = {
         }
     },
     closeModal(modalOrId) {
-1        const modal = typeof modalOrId === 'string' ? document.getElementById(modalOrId) : modalOrId;
+        const modal = typeof modalOrId === 'string' ? document.getElementById(modalOrId) : modalOrId;
         if (modal) {
             document.querySelector('.app-wrapper').classList.remove('is-blurred');
             modal.classList.remove('show');

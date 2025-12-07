@@ -12,9 +12,9 @@
         <div class="spinner-border"></div>
     </div>
 
-    <!-- 应用主容器 (不再滚动) -->
+    <!-- 应用主容器 (现在包含导航栏) -->
     <div class="app-wrapper">
-        <!-- 真正可滚动的内容区域 -->
+        <!-- 可滚动的内容区域 -->
         <div class="main-content-scroll-area">
             <div class="pages-container">
                 <!-- 主页内容 -->
@@ -128,21 +128,21 @@
                 </main>
             </div>
         </div>
+
+        <!-- 导航栏 (移入 app-wrapper 内部) -->
+        <nav class="bottom-nav">
+            <a href="#home" class="nav-item active" data-page="home" draggable="false">
+                <svg class="nav-icon" viewBox="0 0 24 24"><path data-icon="home"></path></svg>
+                <span>主页</span>
+            </a>
+            <a href="#edit" class="nav-item" data-page="edit" draggable="false">
+                <svg class="nav-icon" viewBox="0 0 24 24"><path data-icon="edit"></path></svg>
+                <span>编辑</span>
+            </a>
+        </nav>
     </div>
 
-    <!-- 导航栏 (现在是独立图层) -->
-    <nav class="bottom-nav">
-        <a href="#home" class="nav-item active" data-page="home" draggable="false">
-            <svg class="nav-icon" viewBox="0 0 24 24"><path data-icon="home"></path></svg>
-            <span>主页</span>
-        </a>
-        <a href="#edit" class="nav-item" data-page="edit" draggable="false">
-            <svg class="nav-icon" viewBox="0 0 24 24"><path data-icon="edit"></path></svg>
-            <span>编辑</span>
-        </a>
-    </nav>
-
-    <!-- 所有模态框 (保持不变) -->
+    <!-- 所有模态框 (保持在 body 外部) -->
     <div class="modal" id="partitions-modal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">

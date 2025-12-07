@@ -33,8 +33,7 @@
                                     </div>
                                 </div>
                                 <div id="bar-chart-wrapper"><canvas id="bar-chart"></canvas></div>
-                                <!-- 移除 mt-3, mb-3 -->
-                                <div id="app-stats-container" class="hidden">
+                                <div id="app-stats-container">
                                     <h5 id="app-stats-title">应用清理详情</h5>
                                     <div class="app-stats-list-wrapper"><ul id="app-stats-list" class="list-group list-group-flush"></ul></div>
                                 </div>
@@ -45,14 +44,14 @@
                                 <h5>控制中心</h5>
                                 <button id="customize-partitions-btn" class="btn btn-sm btn-outline-secondary" data-toggle="modal" data-target="#partitions-modal" style="display: none;">自定义</button>
                             </div>
-                            <div class="card-body">
+                            <div class="card-body control-center-body">
                                 <div id="f2fs-gc-info-container" style="display: none;">
                                     <div class="f2fs-interactive-wrapper">
                                         <div class="gc-overlay-controls">
                                             <span id="global-gc-status" class="badge bg-secondary">未知</span>
                                             <button id="gc-control-btn" class="btn btn-sm btn-outline-secondary">状态未知</button>
                                         </div>
-                                        <div id="partition-gc-status-container" class="d-flex flex-wrap justify-content-center gap-2 mb-1"></div>
+                                        <div id="partition-gc-status-container" class="d-flex flex-wrap justify-content-center gap-2"></div>
                                         <div id="f2fs-charts-container"></div>
                                     </div>
                                 </div>

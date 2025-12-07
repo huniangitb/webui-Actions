@@ -79,6 +79,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isBackendOnline = true;
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
+    // --- 强制加载逻辑 ---
+    let isLoaded = false;
+    const finishLoading = () => {
+        if (isLoaded) return;
+        isLoaded = true;
+        loader.style.opacity = '0';
+        loader.addEventListener('transitionend', () => {
+            loader.style.display = 'none';
+            requestAnimationFrame(() => {
+                appWrapper.classList.add('loaded');
+            });
+        }, { once: true });
+    };
+    setTimeout(finishLoading, 5000);
+
     // --- 辅助函数 ---
     function generateRandomAurora() {
         const baseHue = Math.floor(Math.random() * 360);
@@ -248,6 +263,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         function updatePartitionGcStatus(gcStatusArray) { if (isExt4) return; partitionGcStatusContainer.innerHTML = ''; const runningPartitions = gcStatusArray.filter(p => p.is_running && !hiddenPartitions.has(p.device_name)); const anyGcRunning = runningPartitions.length > 0; if (anyGcRunning) { document.getElementById('global-gc-status').style.display = 'none'; partitionGcStatusContainer.style.display = 'flex'; runningPartitions.forEach(({ device_name, is_paused, elapsed_seconds, reclaimed_segments, pause_reason }) => { const itemDiv = document.createElement('div'); itemDiv.className = 'partition-gc-status-item'; itemDiv.innerHTML = `<p>${device_name}</p><span class="badge ${is_paused ? 'bg-warning' : 'bg-success'}">${is_paused ? `暂停<br>原因: ${pause_reason || "未知"}` : '运行中'}<br>运行: ${formatDuration(elapsed_seconds || 0)} | 回收: ${reclaimed_segments || 0}</span>`; partitionGcStatusContainer.appendChild(itemDiv); }); gcControlButton.textContent = '停止所有'; gcControlButton.className = 'btn btn-sm btn-danger'; gcControlButton.dataset.action = 'stop'; } else { partitionGcStatusContainer.style.display = 'none'; const globalGcStatusSpan = document.getElementById('global-gc-status'); globalGcStatusSpan.style.display = 'inline-block'; globalGcStatusSpan.textContent = 'GC回收: 关闭'; globalGcStatusSpan.className = 'badge bg-secondary'; gcControlButton.textContent = '开始'; gcControlButton.className = 'btn btn-sm btn-success'; gcControlButton.dataset.action = 'start'; } }
         async function initDatePicker() { try { const { stdout } = await exec('date +"%F"'); const today = new Date(stdout.trim()); const sixDaysAgo = new Date(today); sixDaysAgo.setDate(today.getDate() - 6); const formatDate = (d) => d.toISOString().split('T')[0]; dateSelect.min = formatDate(sixDaysAgo); dateSelect.max = dateSelect.value = formatDate(today); } catch (e) { toast(`初始化日期选择器失败`); } }
         async function loadLogFile() { try { const { errno, stdout, stderr } = await exec('cat /data/adb/modules/Clean-C/stats.json'); if (errno === 0 && stdout.trim() !== '') updateLocalStorage(parseLogContent(stdout)); else if (errno !== 0 && !stderr.includes('No such file')) throw new Error(stderr); } catch (e) { toast(`加载统计数据失败: ${e.message}`); } updateDisplaysForSelectedDate(); }
+        
+        // 关键修改: 使用内联样式强制收缩
         function updateDisplaysForSelectedDate() {
             const selectedDate = dateSelect.value;
             const storedData = getStoredData();
@@ -281,10 +298,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             const appStats = Array.from(aggregatedStats.values());
             appStatsList.innerHTML = '';
             if (!appStats || appStats.length === 0) {
-                appStatsContainer.classList.add('hidden');
+                appStatsContainer.style.maxHeight = '0';
+                appStatsContainer.style.opacity = '0';
+                appStatsContainer.style.margin = '0';
+                appStatsContainer.style.padding = '0';
+                appStatsContainer.style.border = 'none';
                 return;
             }
-            appStatsContainer.classList.remove('hidden');
+            appStatsContainer.style.maxHeight = '';
+            appStatsContainer.style.opacity = '';
+            appStatsContainer.style.margin = '';
+            appStatsContainer.style.padding = '';
+            appStatsContainer.style.border = '';
+            
             appStats.sort((a, b) => b.bytes_deleted - a.bytes_deleted).forEach(app => {
                 const displayName = appNamesMap.get(app.package_name) || app.package_name;
                 appStatsList.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center"><span class="text-truncate me-3" title="${app.package_name}">${displayName}</span><span class="badge bg-primary rounded-pill">${app.megabytes_deleted.toFixed(2)} MB</span></li>`;
@@ -374,9 +400,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('edit-whitelist').addEventListener('click', () => editRuleFile('whitelist.txt'));
 
         return async function() {
-            try { const { stdout } = await exec(`mount | grep " /data " | awk '{print $5}'`); f2fsGcConfigContainer.style.display = (stdout.trim() === 'ext4') ? 'none' : 'flex'; } catch (e) { console.error("Failed to check file system:", e); }
-            generateCronEditorUI();
-            await loadConfigFile();
+            await checkFileSystem();
+            await initDatePicker();
+            try { const { stdout } = await exec('cat /data/media/0/Android/清理规则/list.config'); stdout.split('\n').forEach(line => { if (line.includes('=')) { const [pkg, name] = line.split('=').map(item => item.trim()); if (pkg && name) appNamesMap.set(pkg, name); } }); } catch (e) { console.error("Error loading app names:", e); }
+            await loadLogFile();
+            if (!isExt4) await updateAllF2fsInfo(true);
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateChartTheme);
         };
     })();
 
@@ -407,11 +436,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     navItems.forEach(item => item.classList.toggle('active', item.dataset.page === currentPageId));
     
-    loader.style.opacity = '0';
-    loader.addEventListener('transitionend', () => {
-        loader.style.display = 'none';
-        requestAnimationFrame(() => {
-            appWrapper.classList.add('loaded');
-        });
-    }, { once: true });
+    finishLoading();
 });

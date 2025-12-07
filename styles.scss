@@ -16,16 +16,15 @@ body::before, body::after { content: ''; position: fixed; top: 50%; left: 50%; w
 body::before { background: radial-gradient(circle at 30% 30%, hsl(340, 100%, 65%), transparent 35%), radial-gradient(circle at 70% 70%, hsl(260, 100%, 70%), transparent 35%); animation: aurora-1 30s infinite linear; }
 body::after { background: radial-gradient(circle at 70% 30%, hsl(160, 100%, 60%), transparent 35%), radial-gradient(circle at 30% 70%, hsl(210, 100%, 65%), transparent 35%); animation: aurora-2 35s infinite linear reverse; }
 
-/* --- 3. 布局容器 (增加模糊逻辑) --- */
-.app-wrapper { position: relative; height: 100%; width: 100%; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), filter 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+/* --- 3. 布局容器 (结构重构) --- */
+.app-wrapper { position: relative; height: 100%; width: 100%; overflow-x: hidden; overflow-y: auto; display: block; transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), filter 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
 .app-wrapper.is-blurred { filter: blur(10px); transform: scale(0.97); pointer-events: none; }
-.main-content-scroll-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: 80px; position: relative; z-index: 1; scroll-behavior: smooth; }
 .pages-container { display: flex; width: 200%; height: auto; min-height: 100%; transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); will-change: transform; }
-main { width: 50%; flex-shrink: 0; padding: 0 15px; }
+main { width: 50%; flex-shrink: 0; padding: 0 15px 90px 15px; /* 增加底部内边距以避开导航栏 */ }
 .container { width: 100%; max-width: 800px; margin: 0 auto; text-align: center; }
 
 /* --- 4. 组件样式 (视觉对齐) --- */
-.main-title-wrapper { display: inline-block; margin: 1.5rem 0; padding: 0.75rem 2rem; background: var(--glass-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid var(--glass-border); border-radius: 99px; }
+.main-title-wrapper { display: inline-block; margin: 1rem 0 1.5rem; padding: 0.75rem 2rem; background: var(--glass-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid var(--glass-border); border-radius: 99px; }
 h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); font-weight: 600; margin: 0; }
 .card { text-align: left; background: transparent; border: none; margin-bottom: 1.5rem; overflow: hidden; box-shadow: var(--glass-shadow); position: relative; z-index: 1; }
 .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--glass-bg); backdrop-filter: blur(20px) saturate(150%); -webkit-backdrop-filter: blur(20px) saturate(150%); border: 1px solid var(--glass-border); border-radius: 20px; z-index: -1; }
@@ -70,9 +69,9 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .cron-grid .btn-outline-primary { display: flex; align-items: center; justify-content: center; width: 100%; height: 40px; margin: 0; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.05); color: var(--text-main); border-radius: 8px; font-size: 0.9rem; }
 .cron-grid .btn-check:checked + .btn-outline-primary { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
 
-/* --- 8. 底部导航栏 --- */
-.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 70px; background: transparent; border-top: none; display: flex; justify-content: space-around; align-items: center; z-index: 1000; padding-bottom: env(safe-area-inset-bottom); transform: translateZ(0); }
-.bottom-nav::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(25px) saturate(180%); -webkit-backdrop-filter: blur(25px) saturate(180%); border-top: 1px solid rgba(255, 255, 255, 0.2); z-index: -1; }
+/* --- 8. 底部导航栏 (结构重构) --- */
+.bottom-nav { position: sticky; bottom: 0; left: 0; right: 0; height: 70px; background: transparent; border-top: none; display: flex; justify-content: space-around; align-items: center; z-index: 1000; padding-bottom: env(safe-area-inset-bottom); }
+.bottom-nav::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(25px) saturate(180%); -webkit-backdrop-filter: blur(25px) saturate(180%); border-top: 1px solid rgba(255, 255, 255, 0.2); z-index: -1; }
 .bottom-nav a { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: var(--text-muted); width: 100%; height: 100%; transition: color 0.2s; position: relative; z-index: 2; }
 .bottom-nav a.active { color: var(--primary-color); } .bottom-nav a.active .nav-icon { fill: var(--primary-color); transform: scale(1.1); }
 .nav-icon { width: 24px; height: 24px; fill: currentColor; margin-bottom: 4px; transition: transform 0.2s; }
@@ -96,10 +95,10 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; display: flex; justify-content: center; align-items: center; }
 .spinner-border { width: 3rem; height: 3rem; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-.partition-chart-wrapper { width: 100px; height: 120px; display: flex; flex-direction: column; align-items: center; transition: transform 0.3s ease; }
+.partition-chart-wrapper { width: 30%; max-width: 140px; display: flex; flex-direction: column; align-items: center; transition: transform 0.3s ease; }
 .partition-chart-wrapper:hover { transform: scale(1.05); }
-.partition-chart-canvas-container { width: 80px; height: 80px; position: relative; }
-.partition-chart-label { font-size: 0.75rem; margin-top: 5px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+.partition-chart-canvas-container { width: 100%; aspect-ratio: 1 / 1; position: relative; }
+.partition-chart-label { font-size: 0.85rem; margin-top: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
 
 /* --- 11. 深色模式适配 --- */
 @media (prefers-color-scheme: dark) {
@@ -117,6 +116,6 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 
 /* --- 12. 大屏适配 --- */
 @media (min-width: 768px) {
-  .bottom-nav { width: 400px; left: 50%; transform: translateX(-50%) translateZ(0); bottom: 20px; }
+  .bottom-nav { width: 400px; left: 50%; transform: translateX(-50%); bottom: 20px; border-radius: 20px; }
   .bottom-nav::before { border-radius: 20px; border: 1px solid var(--glass-border); }
 }

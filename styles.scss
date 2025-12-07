@@ -1,5 +1,3 @@
---- START OF FILE styles.scss.css ---
-
 /* --- 1. 全局重置与核心变量 --- */
 :root {
   --primary-color: #3b71ca; --danger-color: #dc4c64; --success-color: #14a44d;
@@ -37,19 +35,13 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .card-header { padding: 0.6rem 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.15); font-weight: 600; font-size: 1.2rem; position: relative; z-index: 2; }
 .card-header h5 { margin: 0; font-size: 1.1rem; }
 .card-body { padding: 0.75rem; position: relative; z-index: 2; }
+/* 修改点：减小控制中心卡片内边距 */
 .control-center-body { padding: 0.25rem; }
 .card-body.config-body { padding-bottom: calc(1rem + 5px); }
-.btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.5rem 1rem; font-size: 1rem; border-radius: 12px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s; text-decoration: none; line-height: 1.2; background-color: rgba(255,255,255,0.2); color: var(--text-main); }
+.btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.5rem 1rem; font-size: 1rem; border-radius: 12px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s; text-decoration: none; line-height: 1.2; background: rgba(255,255,255,0.2); color: var(--text-main); }
 .btn:active { transform: scale(0.96); }
-/* --- 关键修改点：将 background 替换为 background-color --- */
-.btn-primary { background-color: var(--primary-color); color: #fff; } 
-.btn-danger { background-color: var(--danger-color); color: #fff; } 
-.btn-warning { background-color: #e4a11b; color: #fff; } 
-.btn-info { background-color: #54b4d3; color: #fff; } 
-.btn-success { background-color: var(--success-color); color: #fff; }
-.btn-outline-secondary { border-color: var(--text-muted); color: var(--text-muted); background-color: transparent; } 
-.btn-outline-primary { border-color: var(--primary-color); color: var(--primary-color); background-color: transparent; }
-/* --- 结束修改 --- */
+.btn-primary { background: var(--primary-color); color: #fff; } .btn-danger { background: var(--danger-color); color: #fff; } .btn-warning { background: #e4a11b; color: #fff; } .btn-info { background: #54b4d3; color: #fff; } .btn-success { background: var(--success-color); color: #fff; }
+.btn-outline-secondary { border-color: var(--text-muted); color: var(--text-muted); background: transparent; } .btn-outline-primary { border-color: var(--primary-color); color: var(--primary-color); background: transparent; }
 .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.8rem; } .d-grid { display: grid; } .gap-3 { gap: 1rem; }
 .form-label { display: block; margin-bottom: 0.5rem; font-size: 1rem; font-weight: 500; }
 .input-glass-wrapper { background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); border-radius: 10px; padding: 0.5rem 1rem; display: flex; align-items: center; }
@@ -126,8 +118,12 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .btn-close { background: none; border: none; font-size: 1.5rem; line-height: 1; color: #666; cursor: pointer; padding: 0 0.5rem; }
 .modal-body { padding: 1rem; overflow-y: auto; }
 .modal-footer { padding: 1rem; border-top: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: flex-end; gap: 10px; }
-
+.modal-lg {
+    max-width: 90%; /* 占据屏幕宽度的 90% */
+    width: 90%;
+}
 /* --- 11. 其他辅助与微调样式 --- */
+/* 修改点：减小操作按钮与上方元素的间距 */
 .actions-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 0.75rem; }
 #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; display: flex; justify-content: center; align-items: center; transition: opacity 0.3s ease-out; }
 .spinner-border { width: 3rem; height: 3rem; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
@@ -146,12 +142,14 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
     justify-content: space-between; 
     align-items: center; 
     z-index: 5; 
+    /* 修改点：减小与下方图表的间距 */
     margin-bottom: 5px;
 }
 #f2fs-charts-container { 
     display: flex; 
     flex-wrap: wrap; 
     justify-content: center; 
+    /* 修改点：减小图表之间的间距 */
     gap: 0.5rem; 
     padding: 0; 
     margin: 0; 

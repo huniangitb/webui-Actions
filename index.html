@@ -46,12 +46,14 @@
                                     <div class="d-flex justify-content-end mb-2">
                                         <button id="customize-partitions-btn" class="btn btn-sm btn-outline-secondary" data-toggle="modal" data-target="#partitions-modal" style="display: none;">自定义</button>
                                     </div>
-                                    <div class="gc-control-stack">
-                                        <span id="global-gc-status" class="badge bg-secondary">未知</span>
-                                        <button id="gc-control-btn" class="btn btn-sm btn-outline-secondary">状态未知</button>
+                                    <div class="f2fs-interactive-wrapper">
+                                        <div class="gc-overlay-controls">
+                                            <span id="global-gc-status" class="badge bg-secondary">未知</span>
+                                            <button id="gc-control-btn" class="btn btn-sm btn-outline-secondary">状态未知</button>
+                                        </div>
+                                        <div id="partition-gc-status-container" class="d-flex flex-wrap justify-content-center gap-2 mb-1"></div>
+                                        <div id="f2fs-charts-container"></div>
                                     </div>
-                                    <div id="partition-gc-status-container" class="d-flex flex-wrap justify-content-center gap-2 mb-1"></div>
-                                    <div id="f2fs-charts-container" class="mt-2"></div>
                                 </div>
                                 <div class="actions-container">
                                     <button id="clean-now-btn" class="btn btn-primary btn-sm">立即<br>清理</button>

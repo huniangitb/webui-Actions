@@ -393,7 +393,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     navItems.forEach(item => item.classList.toggle('active', item.dataset.page === currentPageId));
-
+    requestAnimationFrame(() => {
+        appWrapper.classList.add('loaded');
+        loader.style.display = 'none';
     appWrapper.classList.add('loaded');
     loader.style.display = 'none';
 });

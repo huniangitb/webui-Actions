@@ -16,8 +16,9 @@ body::before, body::after { content: ''; position: fixed; top: 50%; left: 50%; w
 body::before { background: radial-gradient(circle at 30% 30%, hsl(340, 100%, 65%), transparent 35%), radial-gradient(circle at 70% 70%, hsl(260, 100%, 70%), transparent 35%); animation: aurora-1 30s infinite linear; }
 body::after { background: radial-gradient(circle at 70% 30%, hsl(160, 100%, 60%), transparent 35%), radial-gradient(circle at 30% 70%, hsl(210, 100%, 65%), transparent 35%); animation: aurora-2 35s infinite linear reverse; }
 
-/* --- 3. 布局容器 (结构重构) --- */
-.app-wrapper { position: relative; height: 100%; width: 100%; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), filter 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+/* --- 3. 布局容器 (增加进入动画) --- */
+.app-wrapper { position: relative; height: 100%; width: 100%; overflow: hidden; display: flex; flex-direction: column; opacity: 0; transition: opacity 0.4s ease-in-out, transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), filter 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+.app-wrapper.loaded { opacity: 1; }
 .app-wrapper.is-blurred { filter: blur(10px); transform: scale(0.97); pointer-events: none; }
 .main-content-scroll-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: 80px; }
 .pages-container { display: flex; width: 200%; height: auto; min-height: 100%; transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); will-change: transform; }
@@ -27,11 +28,11 @@ main { width: 50%; flex-shrink: 0; padding: 0 15px; }
 /* --- 4. 组件样式 (视觉收缩) --- */
 .main-title-wrapper { display: inline-block; margin: 0.75rem 0; padding: 0.75rem 2rem; background: var(--glass-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid var(--glass-border); border-radius: 99px; }
 h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); font-weight: 600; margin: 0; }
-.card { text-align: left; background: transparent; border: none; margin-bottom: 0.75rem; box-shadow: var(--glass-shadow); position: relative; z-index: 1; border-radius: 20px; overflow: hidden; /* 关键: 裁剪伪元素，防止模糊效果溢出 */ }
+.card { text-align: left; background: transparent; border: none; margin-bottom: 0.75rem; box-shadow: var(--glass-shadow); position: relative; z-index: 1; border-radius: 20px; overflow: hidden; }
 .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--glass-bg); backdrop-filter: blur(20px) saturate(150%); -webkit-backdrop-filter: blur(20px) saturate(150%); border: 1px solid var(--glass-border); z-index: -1; }
-.card-header { padding: 0.6rem 1.25rem; border-bottom: 1px solid rgba(255, 255, 255, 0.15); font-weight: 600; font-size: 1.2rem; position: relative; z-index: 2; }
-.card-header h5 { margin: 0; }
-.card-body { padding: 1rem; position: relative; z-index: 2; }
+.card-header { padding: 0.6rem 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.15); font-weight: 600; font-size: 1.2rem; position: relative; z-index: 2; }
+.card-header h5 { margin: 0; font-size: 1.1rem; }
+.card-body { padding: 0.75rem; position: relative; z-index: 2; }
 .card-body.config-body { padding-bottom: calc(1rem + 5px); }
 #bar-chart-wrapper { position: relative; width: 100%; aspect-ratio: 4 / 3; max-height: 350px; margin-bottom: 1rem; }
 .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.5rem 1rem; font-size: 1rem; border-radius: 12px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s; text-decoration: none; line-height: 1.2; background: rgba(255,255,255,0.2); color: var(--text-main); }
@@ -53,11 +54,11 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .form-check-input { width: 3.5em; height: 1.75em; background-color: rgba(0,0,0,0.2); background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba(255,255,255,0.8)'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: left center; border-radius: 2em; transition: background-position .15s ease-in-out; appearance: none; -webkit-appearance: none; border: 0; cursor: pointer; }
 .form-check-input:checked { background-position: right center; background-color: var(--primary-color); }
 
-/* --- 6. 动画与交互 --- */
+/* --- 6. 动画与交互 (收缩优化) --- */
 .schedule-input-group { overflow: hidden; transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, margin 0.4s ease; max-height: 200px; opacity: 1; }
-.schedule-input-group.hidden { max-height: 0; opacity: 0; margin-top: 0 !important; margin-bottom: 0 !important; padding: 0 !important; pointer-events: none; }
+.schedule-input-group.hidden { max-height: 0; opacity: 0; margin: 0 !important; padding: 0 !important; pointer-events: none; border: none !important; }
 #app-stats-container { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); opacity: 1; max-height: 1000px; overflow: hidden; }
-#app-stats-container.hidden { opacity: 0; max-height: 0; margin-top: 0 !important; margin-bottom: 0 !important; }
+#app-stats-container.hidden { opacity: 0; max-height: 0; margin: 0 !important; padding: 0 !important; border: none !important; overflow: hidden; }
 
 /* --- 7. Cron 编辑器 --- */
 .nav-pills { display: flex; list-style: none; padding: 4px; margin: 0 0 1rem 0; background: rgba(0,0,0,0.05); border-radius: 10px; }
@@ -80,10 +81,10 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .bottom-nav span { font-size: 12px; font-weight: 500; }
 
 /* --- 9. 模态框 (增加动画) --- */
-.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.1); opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
-.modal.show { display: flex; opacity: 1; pointer-events: auto; }
-.modal-dialog { position: relative; width: 90%; max-width: 500px; z-index: 2001; transform: scale(0.95); opacity: 0; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease; }
-.modal.show .modal-dialog { transform: scale(1); opacity: 1; }
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.2); opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
+.modal.show { opacity: 1; pointer-events: auto; }
+.modal-dialog { transform: scale(0.95) translateY(10px); opacity: 0; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease; }
+.modal.show .modal-dialog { transform: scale(1) translateY(0); opacity: 1; }
 .modal-content { background: rgba(255, 255, 255, 0.6); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.4); box-shadow: 0 20px 40px rgba(0,0,0,0.2); display: flex; flex-direction: column; max-height: 85vh; }
 .modal-header { padding: 1rem; border-bottom: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
 .modal-title { margin: 0; font-size: 1.1rem; font-weight: 600; }
@@ -91,13 +92,15 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .modal-body { padding: 1rem; overflow-y: auto; }
 .modal-footer { padding: 1rem; border-top: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: flex-end; gap: 10px; }
 
-/* --- 10. 其他辅助与微调样式 --- */
+/* --- 10. 其他辅助与微调样式 (控件叠加) --- */
 .actions-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .actions-container .btn { padding: 8px 4px; font-size: 0.8rem; flex-direction: column; text-align: center; height: auto; }
 #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; display: flex; justify-content: center; align-items: center; }
 .spinner-border { width: 3rem; height: 3rem; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-.gc-control-stack { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.f2fs-interactive-wrapper { position: relative; min-height: 150px; }
+.gc-overlay-controls { position: absolute; top: 50%; left: 15px; right: 15px; transform: translateY(-50%); display: flex; justify-content: space-between; align-items: center; z-index: 5; pointer-events: none; }
+.gc-overlay-controls > * { pointer-events: auto; }
 #f2fs-charts-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; }
 .partition-chart-wrapper { display: flex; flex-direction: column; align-items: center; transition: transform 0.3s ease; width: 120px; }
 .partition-chart-wrapper:hover { transform: scale(1.05); }

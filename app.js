@@ -11,11 +11,14 @@ function clearStoredData() { localStorage.removeItem('logData'); }
 // --- 内联模块: icons.js ---
 const icons = { home: mdiHome, edit: mdiPencilBoxOutline };
 
-// --- 原生 UI 控制模块 ---
+
+// --- 原生 UI 控制模块 (已修改) ---
 const NativeUI = {
     openModal(modalId) {
         const modal = document.getElementById(modalId);
         if (modal) {
+            // 模糊页面背景
+            document.querySelector('.app-wrapper').classList.add('is-blurred');
             modal.classList.add('show');
             document.body.style.overflow = 'hidden';
         }
@@ -23,6 +26,8 @@ const NativeUI = {
     closeModal(modalOrId) {
         const modal = typeof modalOrId === 'string' ? document.getElementById(modalOrId) : modalOrId;
         if (modal) {
+            // 恢复页面背景
+            document.querySelector('.app-wrapper').classList.remove('is-blurred');
             modal.classList.remove('show');
             document.body.style.overflow = '';
         }

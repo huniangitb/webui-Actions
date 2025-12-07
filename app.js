@@ -393,10 +393,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     navItems.forEach(item => item.classList.toggle('active', item.dataset.page === currentPageId));
-    requestAnimationFrame(() => {
-        appWrapper.classList.add('loaded');
+    
+    // 修复: 平滑淡出加载动画
+    loader.style.opacity = '0';
+    setTimeout(() => {
         loader.style.display = 'none';
-    appWrapper.classList.add('loaded');
-    loader.style.display = 'none';
-    });
+        requestAnimationFrame(() => {
+            appWrapper.classList.add('loaded');
+        });
+    }, 300); // 匹配 CSS 过渡时间
 });

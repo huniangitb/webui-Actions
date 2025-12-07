@@ -66,6 +66,12 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .schedule-input-group.hidden { max-height: 0; opacity: 0; margin: 0 !important; padding: 0 !important; pointer-events: none; border: none !important; }
 #app-stats-container { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); opacity: 1; max-height: 1000px; overflow: hidden; }
 #app-stats-title { margin-bottom: 0.5rem; font-size: 1rem; font-weight: 600; }
+/* 关键修改: 限制列表高度并添加滚动条 */
+.app-stats-list-wrapper { max-height: 250px; overflow-y: auto; }
+/* 美化滚动条 */
+.app-stats-list-wrapper::-webkit-scrollbar { width: 5px; }
+.app-stats-list-wrapper::-webkit-scrollbar-track { background: transparent; }
+.app-stats-list-wrapper::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.2); border-radius: 10px; }
 
 /* --- 7. Cron 编辑器 --- */
 .nav-pills { display: flex; list-style: none; padding: 4px; margin: 0 0 1rem 0; background: rgba(0,0,0,0.05); border-radius: 10px; }

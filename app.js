@@ -1,12 +1,14 @@
-// 关键修改: 调试模式和API封装
-const isKernelSU = typeof kernelsu !== 'undefined';
-const safeExec = isKernelSU ? kernelsu.exec : async (cmd) => {
-    console.log(`[DEBUG] EXEC: ${cmd}`);
+// 关键修改: 智能 API 封装
+const isKernelSU = typeof window.kernelsu !== 'undefined' && typeof window.kernelsu.exec === 'function';
+
+const safeExec = isKernelSU ? window.kernelsu.exec : async (cmd) => {
+    console.log(`[DEBUG MODE] EXEC: ${cmd}`);
     // 返回一个模拟的失败结果，防止应用崩溃
     return Promise.resolve({ errno: 1, stdout: '', stderr: 'KernelSU API not available' });
 };
-const safeToast = isKernelSU ? kernelsu.toast : (msg) => {
-    console.log(`[DEBUG] TOAST: ${msg}`);
+
+const safeToast = isKernelSU ? window.kernelsu.toast : (msg, duration) => {
+    console.log(`[DEBUG MODE] TOAST: ${msg} (Duration: ${duration})`);
 };
 
 // 导入 Chart.js 和图标
@@ -103,7 +105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }, { once: true });
     };
-    setTimeout(finishLoading, 5000);
+    setTimeout(finishLoading, 1000);
 
     // --- 辅助函数 ---
     function generateRandomAurora() {
@@ -180,6 +182,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- 主页逻辑 ---
     const initHomePage = (() => {
         const dateSelect = document.getElementById('date-select');
+        const barChartWrapper = document.getElementById('bar-chart-wrapper');
         const appStatsList = document.getElementById('app-stats-list');
         const appStatsContainer = document.getElementById('app-stats-container');
         const appStatsTitle = document.getElementById('app-stats-title');
@@ -307,11 +310,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             }));
             const appStats = Array.from(aggregatedStats.values());
             appStatsList.innerHTML = '';
+            
+            // 关键修改: 联动隐藏
             if (!appStats || appStats.length === 0) {
                 appStatsContainer.style.cssText = 'max-height: 0; margin: 0; padding: 0; opacity: 0; border: none;';
+                barChartWrapper.style.marginBottom = '0';
                 return;
             }
             appStatsContainer.style.cssText = '';
+            barChartWrapper.style.marginBottom = '';
             
             appStats.sort((a, b) => b.bytes_deleted - a.bytes_deleted).forEach(app => {
                 const displayName = appNamesMap.get(app.package_name) || app.package_name;
@@ -402,41 +409,46 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('edit-whitelist').addEventListener('click', () => editRuleFile('whitelist.txt'));
 
         return async function() {
-            await checkFileSystem();
-            await initDatePicker();
-            try { const { stdout } = await safeExec('cat /data/media/0/Android/清理规则/list.config'); stdout.split('\n').forEach(line => { if (line.includes('=')) { const [pkg, name] = line.split('=').map(item => item.trim()); if (pkg && name) appNamesMap.set(pkg, name); } }); } catch (e) { console.error("Error loading app names:", e); }
-            await loadLogFile();
-            if (!isExt4) await updateAllF2fsInfo(true);
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateChartTheme);
+            try { const { stdout } = await safeExec(`mount | grep " /data " | awk '{print $5}'`); f2fsGcConfigContainer.style.display = (stdout.trim() === 'ext4') ? 'none' : 'flex'; } catch (e) { console.error("Failed to check file system:", e); }
+            generateCronEditorUI();
+            await loadConfigFile();
         };
     })();
 
     // --- 应用初始化 ---
-    generateRandomAurora();
-    injectIcons();
-    NativeUI.initModals();
-    NativeUI.initTabs();
+    async function initializeApp() {
+        generateRandomAurora();
+        injectIcons();
+        NativeUI.initModals();
+        NativeUI.initTabs();
 
-    if (!await checkBackendProcess()) {
-        disableBackendFeatures('后端服务未运行');
+        if (!await checkBackendProcess()) {
+            disableBackendFeatures('后端服务未运行');
+        }
+
+        // 并行执行初始化任务
+        await Promise.all([
+            initHomePage(),
+            initEditPage()
+        ]);
+        
+        const initialPageId = window.location.hash.substring(1) || 'home';
+        const initialPageIndex = Object.keys(pages).indexOf(initialPageId);
+        const validPageIndex = initialPageIndex > -1 ? initialPageIndex : 0;
+        const initialTranslateX = validPageIndex * -50;
+        currentPageId = Object.keys(pages)[validPageIndex];
+
+        if (pagesContainer) {
+            pagesContainer.style.transition = 'none';
+            pagesContainer.style.transform = `translateX(${initialTranslateX}%)`;
+            void pagesContainer.offsetWidth;
+            pagesContainer.style.transition = '';
+        }
+
+        navItems.forEach(item => item.classList.toggle('active', item.dataset.page === currentPageId));
+        
+        finishLoading();
     }
-    await initHomePage();
-    await initEditPage();
-    
-    const initialPageId = window.location.hash.substring(1) || 'home';
-    const initialPageIndex = Object.keys(pages).indexOf(initialPageId);
-    const validPageIndex = initialPageIndex > -1 ? initialPageIndex : 0;
-    const initialTranslateX = validPageIndex * -50;
-    currentPageId = Object.keys(pages)[validPageIndex];
 
-    if (pagesContainer) {
-        pagesContainer.style.transition = 'none';
-        pagesContainer.style.transform = `translateX(${initialTranslateX}%)`;
-        void pagesContainer.offsetWidth;
-        pagesContainer.style.transition = '';
-    }
-
-    navItems.forEach(item => item.classList.toggle('active', item.dataset.page === currentPageId));
-    
-    finishLoading();
+    initializeApp();
 });

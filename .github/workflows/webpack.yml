@@ -7,7 +7,7 @@ on:
     branches:
       - Clean-C-webui
 
-  # 2. 当有 Pull Request 指向 Clean-C-webui 分支时自动触发 (仅用于构建和检查)
+  # 2. 当有 Pull Request 指向 Clean-C-webui 分支时自动触发
   pull_request:
     branches:
       - Clean-C-webui
@@ -20,17 +20,12 @@ on:
         required: true
         default: 'Clean-C-webui' # 默认使用 Clean-C-webui 分支
         type: string
-      tag:
-        description: 'Release Tag (e.g., v1.0.0). 留空则不创建 Release.'
-        required: false
-        default: ''
-        type: string
 
 jobs:
   build:
     runs-on: ubuntu-24.04
 
-    # 授权：允许工作流将代码推送回仓库 (用于 yarn.lock 维护)
+    # 授权：允许工作流将代码推送回仓库 (用于 yarn.lock 提交)
     permissions:
       contents: write
 
@@ -48,41 +43,42 @@ jobs:
         with:
           node-version: '20'
 
-      # 安装依赖。这一步会自动创建或更新 yarn.lock 文件
+      # 安装依赖。这一步会自动创建/更新 yarn.lock 文件
       - name: Install dependencies
         run: yarn install
 
       # 检查 yarn.lock 文件是否有变动，如果有则自动提交
       - name: Commit yarn.lock
+        id: commit_lockfile
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: Add/update yarn.lock"
           file_pattern: yarn.lock
           push_options: '--force-with-lease'
+        # 关键：将提交结果保存到输出，以便后续 Job 判断是否需要 Release
 
-      # 构建项目
       - name: Build project
         run: yarn build
 
-      # 上传构建产物 (供后续 Release Job 下载)
+      # 将构建产物打包成 zip 文件，方便 Release 附加
+      - name: Archive production artifacts
+        run: zip -r webui-dist.zip dist/
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
-        with
-          name: webui-dist
-          path: dist/
-          # 确保产物在 1 天后过期
-          retention-days: 1
+        with:
+          name: webui-dist-archive
+          path: webui-dist.zip
+          retention-days: 1 # 临时保留，主要用于 Release Job 下载
 
-  # 自动发行 Job
+  # 新增 Release Job
   release:
-    # 仅在 push 事件或手动触发时运行 Release
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '')
-    
-    # 依赖于 build Job
+    # 仅在 push 事件触发，并且 build 成功时运行
+    if: github.event_name == 'push'
     needs: build
     runs-on: ubuntu-24.04
-
-    # 授权：允许工作流创建 Release
+    
+    # 授权：允许创建 Release
     permissions:
       contents: write
 
@@ -91,36 +87,27 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: webui-dist
-          path: dist/
+          name: webui-dist-archive
 
-      # 2. 确定 Tag 名称
-      - name: Determine Tag Name
-        id: tag_name
-        run: |
-          # 如果是手动触发，使用用户输入的 tag
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            TAG="${{ github.event.inputs.tag }}"
-          # 如果是 push 触发，使用当前时间戳或版本号 (这里使用时间戳作为示例)
-          else
-            # 假设您希望使用 package.json 中的版本号作为 Tag
-            VERSION=$(node -p "require('./package.json').version")
-            TAG="v$VERSION-${{ github.sha }}"
-          fi
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
+      # 2. 获取当前版本号或生成 Tag
+      # 假设您使用 git tag 来管理版本，或者使用日期时间作为版本
+      - name: Get current date for tag
+        id: date
+        run: echo "RELEASE_TAG=v$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
 
       # 3. 创建 GitHub Release
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2.5.0
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          # 使用确定的 Tag 名称
-          tag_name: ${{ steps.tag_name.outputs.tag }}
-          name: Release ${{ steps.tag_name.outputs.tag }}
+          tag_name: ${{ steps.date.outputs.RELEASE_TAG }}
+          name: WebUI Release ${{ steps.date.outputs.RELEASE_TAG }}
           body: |
-            Automated release from branch ${{ github.ref_name }}.
-          draft: false
+            Automated release of the WebUI build.
+            
+            Changes:
+            - Updated dependencies (yarn.lock)
+            - Latest build artifacts included.
+          draft: false # 立即发布
           prerelease: false
-          # 将 dist 目录下的所有文件作为附件上传
-          files: dist/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 附加构建产物 (webui-dist.zip)
+          files: webui-dist.zip

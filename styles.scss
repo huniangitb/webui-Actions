@@ -122,7 +122,7 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .partition-chart-wrapper { display: flex; flex-direction: column; align-items: center; transition: transform 0.3s ease; width: 120px; }
 .partition-chart-wrapper:hover { transform: scale(1.05); }
 .partition-chart-canvas-container { width: 100%; aspect-ratio: 1 / 1; position: relative; }
-.partition-chart-label { font-size: 0.85rem; margin-top: 0; line-height: 1.2; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+.partition-chart-label { font-size: 0.85rem; margin-top: 2px; line-height: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
 
 /* --- 11. 深色模式适配 --- */
 @media (prefers-color-scheme: dark) {

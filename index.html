@@ -84,7 +84,7 @@
                         </div>
                         <div class="card mt-4">
                             <div class="card-header"><h5 class="mb-0">配置文件编辑</h5></div>
-                            <div class="card-body">
+                            <div class="card-body config-body">
                                 <form id="config-form">
                                     <div class="mb-3">
                                         <label for="retention-days" class="form-label">保留天数 (黑名单2)</label>
@@ -114,11 +114,11 @@
                                             <button class="btn btn-outline-primary" type="button" id="edit-cron-btn" data-toggle="modal" data-target="#cron-editor-modal">编辑</button>
                                         </div>
                                     </div>
-                                    <div id="f2fs-gc-config-container" class="mb-4" style="display: none;">
-                                        <label class="form-label">开机自动GC (F2FS)</label>
-                                        <div>
-                                            <input type="checkbox" id="f2fs-gc-config-toggle" class="btn-check" autocomplete="off">
-                                            <label id="f2fs-gc-config-toggle-label" class="btn btn-outline-secondary" for="f2fs-gc-config-toggle">关闭</label>
+                                    <!-- F2FS GC 开关 - 新结构 -->
+                                    <div id="f2fs-gc-config-container" class="d-flex justify-content-between align-items-center mb-4" style="display: none;">
+                                        <label class="form-label mb-0" for="f2fs-gc-config-toggle">开机自动GC (F2FS)</label>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="f2fs-gc-config-toggle">
                                         </div>
                                     </div>
                                     <button type="submit" class="btn btn-success">保存并重启模块</button>

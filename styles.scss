@@ -120,7 +120,10 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .btn-close { background: none; border: none; font-size: 1.5rem; line-height: 1; color: #666; cursor: pointer; padding: 0 0.5rem; }
 .modal-body { padding: 1rem; overflow-y: auto; }
 .modal-footer { padding: 1rem; border-top: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: flex-end; gap: 10px; }
-
+.modal-lg {
+    max-width: 90%; /* 占据屏幕宽度的 90% */
+    width: 90%;
+}
 /* --- 11. 其他辅助与微调样式 --- */
 /* 修改点：减小操作按钮与上方元素的间距 */
 .actions-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 0.75rem; }
@@ -142,7 +145,7 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
     align-items: center; 
     z-index: 5; 
     /* 修改点：减小与下方图表的间距 */
-    margin-bottom: 5px;
+    margin-bottom: -90px;
 }
 #f2fs-charts-container { 
     display: flex; 
@@ -169,7 +172,7 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 }
 .partition-chart-label {
     font-size: 0.85rem;
-    margin-top: -25px;
+    margin-top: -80px;
     margin-bottom: 0;
     line-height: 1;
     text-align: center;

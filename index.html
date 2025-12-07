@@ -12,7 +12,7 @@
         <div class="spinner-border"></div>
     </div>
 
-    <!-- 应用主容器 (现在包含导航栏) -->
+    <!-- 应用主容器 -->
     <div class="app-wrapper">
         <!-- 可滚动的内容区域 -->
         <div class="main-content-scroll-area">
@@ -33,7 +33,7 @@
                                     </div>
                                 </div>
                                 <div id="bar-chart-wrapper"><canvas id="bar-chart"></canvas></div>
-                                <div id="app-stats-container" class="mt-4 hidden">
+                                <div id="app-stats-container" class="mt-3 hidden">
                                     <h5 id="app-stats-title" class="mb-3">应用清理详情</h5>
                                     <div class="app-stats-list-wrapper"><ul id="app-stats-list" class="list-group list-group-flush"></ul></div>
                                 </div>
@@ -42,17 +42,16 @@
                         <div class="card">
                             <div class="card-header"><h5>控制中心</h5></div>
                             <div class="card-body">
-                                <div id="f2fs-gc-info-container" class="mb-3" style="display: none;">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <p class="mb-0 fw-bold">F2FS 垃圾回收</p>
+                                <div id="f2fs-gc-info-container" style="display: none;">
+                                    <div class="d-flex justify-content-end mb-2">
                                         <button id="customize-partitions-btn" class="btn btn-sm btn-outline-secondary" data-toggle="modal" data-target="#partitions-modal" style="display: none;">自定义</button>
                                     </div>
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="gc-control-stack">
                                         <span id="global-gc-status" class="badge bg-secondary">未知</span>
                                         <button id="gc-control-btn" class="btn btn-sm btn-outline-secondary">状态未知</button>
                                     </div>
                                     <div id="partition-gc-status-container" class="d-flex flex-wrap justify-content-center gap-2 mb-1"></div>
-                                    <div id="f2fs-charts-container" class="mt-1"></div>
+                                    <div id="f2fs-charts-container" class="mt-2"></div>
                                 </div>
                                 <div class="actions-container">
                                     <button id="clean-now-btn" class="btn btn-primary btn-sm">立即<br>清理</button>
@@ -129,7 +128,7 @@
             </div>
         </div>
 
-        <!-- 导航栏 (移入 app-wrapper 内部) -->
+        <!-- 导航栏 -->
         <nav class="bottom-nav">
             <a href="#home" class="nav-item active" data-page="home" draggable="false">
                 <svg class="nav-icon" viewBox="0 0 24 24"><path data-icon="home"></path></svg>
@@ -142,7 +141,7 @@
         </nav>
     </div>
 
-    <!-- 所有模态框 (保持在 body 外部) -->
+    <!-- 所有模态框 -->
     <div class="modal" id="partitions-modal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">

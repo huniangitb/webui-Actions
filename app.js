@@ -398,4 +398,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         loader.style.display = 'none';
     appWrapper.classList.add('loaded');
     loader.style.display = 'none';
+    });
 });

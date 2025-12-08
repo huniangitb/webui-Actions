@@ -1,5 +1,3 @@
---- START OF FILE app.js ---
-
 import { exec, toast } from 'kernelsu';
 import Chart from 'chart.js/auto';
 import { mdiHome, mdiPencilBoxOutline } from '@mdi/js';

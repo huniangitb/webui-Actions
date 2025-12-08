@@ -2,16 +2,13 @@ import { exec, toast } from 'kernelsu';
 import Chart from 'chart.js/auto';
 import { mdiHome, mdiPencilBoxOutline } from '@mdi/js';
 
-// --- 内联模块: logParser.js ---
 function parseLogContent(ndjsonContent) { if (!ndjsonContent || ndjsonContent.trim() === '') return []; const parsedEntries = []; const lines = ndjsonContent.split('\n'); lines.forEach(line => { if (line.trim() === '') return; try { const stats = JSON.parse(line); if (!stats.timestamp || !stats.global_stats) return; const formattedTimestamp = stats.timestamp.replace('T', ' ').replace('Z', ''); const reclaimedSegments = (stats.gc_trim_stats && stats.gc_trim_stats.reclaimed_segments) ? stats.gc_trim_stats.reclaimed_segments : 0; const trimmedMBValue = (stats.gc_trim_stats && stats.gc_trim_stats.trimmed_mb) ? stats.gc_trim_stats.trimmed_mb : 0; const parsedEntry = { timestamp: formattedTimestamp, date: stats.timestamp.split('T')[0], deletedFiles: stats.global_stats.files_deleted || 0, deletedDirs: stats.global_stats.dirs_deleted || 0, dirtySegments: reclaimedSegments, fileCleanedMB: stats.global_stats.megabytes_deleted || 0, trimMB: trimmedMBValue, appStats: stats.app_stats || [] }; parsedEntries.push(parsedEntry); } catch (error) { console.error("解析 JSON 行失败:", error, "行内容:", line); } }); return parsedEntries; }
 function updateLocalStorage(newData) { if (!newData || newData.length === 0) return; const storedData = JSON.parse(localStorage.getItem('logData') || '[]'); const dataMap = new Map(storedData.map(entry => [entry.timestamp, entry])); newData.forEach(newEntry => { dataMap.set(newEntry.timestamp, newEntry); }); const combinedData = Array.from(dataMap.values()); const cutoffDate = new Date(); cutoffDate.setDate(cutoffDate.getDate() - 6); const filteredData = combinedData.filter(entry => new Date(entry.date) >= cutoffDate); localStorage.setItem('logData', JSON.stringify(filteredData)); }
 function getStoredData() { return JSON.parse(localStorage.getItem('logData') || '[]'); }
 function clearStoredData() { localStorage.removeItem('logData'); }
 
-// --- 内联模块: icons.js ---
 const icons = { home: mdiHome, edit: mdiPencilBoxOutline };
 
-// --- 原生 UI 控制模块 ---
 const NativeUI = {
     openModal(modalId) {
         const modal = document.getElementById(modalId);
@@ -70,7 +67,6 @@ const NativeUI = {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // --- 全局状态和元素 ---
     const loader = document.getElementById('loader');
     const appWrapper = document.querySelector('.app-wrapper');
     const pagesContainer = document.querySelector('.pages-container');
@@ -79,7 +75,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isBackendOnline = true;
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
-    // --- 加载逻辑修复 ---
     let isLoaded = false;
     const finishLoading = () => {
         if (isLoaded) return;
@@ -92,10 +87,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }, { once: true });
     };
-    // 启动5秒超时保险
     setTimeout(finishLoading, 5000);
 
-    // --- 辅助函数 ---
     function generateRandomAurora() {
         const baseHue = Math.floor(Math.random() * 360);
         const hues = [baseHue, (baseHue + 60) % 360, (baseHue + 180) % 360, (baseHue + 240) % 360];
@@ -105,7 +98,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     function injectIcons() { document.querySelectorAll('[data-icon]').forEach(el => { const iconName = el.getAttribute('data-icon'); if (icons[iconName]) el.setAttribute('d', icons[iconName]); }); }
 
-    // --- SPA 页面切换逻辑 ---
     const pages = { home: document.getElementById('page-home'), edit: document.getElementById('page-edit') };
     const navItems = document.querySelectorAll('.nav-item');
     let currentPageId = 'home';
@@ -126,7 +118,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    // --- 后端通信与状态检查 ---
     function disableBackendFeatures(reason) {
         if (!isBackendOnline) return;
         isBackendOnline = false;
@@ -154,7 +145,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) { disableBackendFeatures('后端通信异常'); return null; }
     }
 
-    // --- 主页逻辑 ---
     const initHomePage = (() => {
         const dateSelect = document.getElementById('date-select');
         const appStatsList = document.getElementById('app-stats-list');
@@ -212,7 +202,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         function formatDuration(s) { if (isNaN(s) || s < 0) return "0s"; if (s < 60) return `${s}s`; const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h > 0 ? `${h}h ${m}m` : `${m}m ${s % 60}s`; }
         async function checkFileSystem() { try { const { stdout } = await exec(`mount | grep " /data " | awk '{print $5}'`); isExt4 = (stdout.trim() === 'ext4'); f2fsGcInfoContainer.style.display = isExt4 ? 'none' : 'block'; if (isExt4 && gcInfoIntervalId) { clearInterval(gcInfoIntervalId); gcInfoIntervalId = null; } if (!isExt4 && !gcInfoIntervalId && isBackendOnline) { gcInfoIntervalId = setInterval(updateAllF2fsInfo, 2000); } } catch (error) { toast(`检查文件系统失败`); } }
         
-        // 核心修改：F2FS 逻辑优化，只显示脏段最多的一个分区
         async function updateAllF2fsInfo() {
             const partitionsData = await sendTcpCommand('stats');
             if (partitionsData === null) {
@@ -227,7 +216,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 if (visiblePartitions.length > 1) {
                     visiblePartitions.sort((a, b) => b.dirty_segments - a.dirty_segments);
-                    visiblePartitions = [visiblePartitions[0]]; // 只保留脏段最多的一个
+                    visiblePartitions = [visiblePartitions[0]];
                 }
 
                 updatePartitionCharts(visiblePartitions);
@@ -318,7 +307,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             appStats.sort((a, b) => b.bytes_deleted - a.bytes_deleted).forEach(app => {
                 const displayName = appNamesMap.get(app.package_name) || app.package_name;
-                // 核心修改：优化列表项 HTML 结构以配合新 CSS
                 appStatsList.innerHTML += `
                     <li class="list-group-item">
                         <div class="app-name text-truncate" title="${app.package_name}">${displayName}</div>
@@ -347,7 +335,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     })();
 
-    // --- 编辑页逻辑 ---
     const initEditPage = (() => {
         const configForm = document.getElementById('config-form');
         const retentionDaysInput = document.getElementById('retention-days');
@@ -416,7 +403,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     })();
 
-    // --- 应用初始化 ---
     try {
         generateRandomAurora();
         injectIcons();
@@ -446,7 +432,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("初始化失败:", error);
         toast("应用初始化失败，请检查日志。", 5000);
     } finally {
-        // 关键: 无论成功与否，都尝试结束加载动画
         finishLoading();
     }
 });

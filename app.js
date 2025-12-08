@@ -1,3 +1,5 @@
+--- START OF FILE app.js ---
+
 import { exec, toast } from 'kernelsu';
 import Chart from 'chart.js/auto';
 import { mdiHome, mdiPencilBoxOutline } from '@mdi/js';
@@ -211,7 +213,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function formatDuration(s) { if (isNaN(s) || s < 0) return "0s"; if (s < 60) return `${s}s`; const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h > 0 ? `${h}h ${m}m` : `${m}m ${s % 60}s`; }
         async function checkFileSystem() { try { const { stdout } = await exec(`mount | grep " /data " | awk '{print $5}'`); isExt4 = (stdout.trim() === 'ext4'); f2fsGcInfoContainer.style.display = isExt4 ? 'none' : 'block'; if (isExt4 && gcInfoIntervalId) { clearInterval(gcInfoIntervalId); gcInfoIntervalId = null; } if (!isExt4 && !gcInfoIntervalId && isBackendOnline) { gcInfoIntervalId = setInterval(updateAllF2fsInfo, 2000); } } catch (error) { toast(`检查文件系统失败`); } }
-        async function updateAllF2fsInfo() { const partitionsData = await sendTcpCommand('stats'); if (partitionsData === null) { if (gcInfoIntervalId) { clearInterval(gcInfoIntervalId); gcInfoIntervalId = null; } return; } if (Array.isArray(partitionsData)) { partitionsData.forEach(p => allDiscoveredPartitions.add(p.device_name)); customizePartitionsBtn.style.display = allDiscoveredPartitions.size >= 2 ? 'block' : 'none'; const visiblePartitions = partitionsData.filter(p => !hiddenPartitions.has(p.device_name)); updatePartitionCharts(visiblePartitions); updatePartitionGcStatus(visiblePartitions); } }
+        
+        // 核心修改：F2FS 逻辑优化，只显示脏段最多的一个分区
+        async function updateAllF2fsInfo() {
+            const partitionsData = await sendTcpCommand('stats');
+            if (partitionsData === null) {
+                if (gcInfoIntervalId) { clearInterval(gcInfoIntervalId); gcInfoIntervalId = null; }
+                return;
+            }
+            if (Array.isArray(partitionsData)) {
+                partitionsData.forEach(p => allDiscoveredPartitions.add(p.device_name));
+                customizePartitionsBtn.style.display = allDiscoveredPartitions.size >= 2 ? 'block' : 'none';
+                
+                let visiblePartitions = partitionsData.filter(p => !hiddenPartitions.has(p.device_name));
+                
+                if (visiblePartitions.length > 1) {
+                    visiblePartitions.sort((a, b) => b.dirty_segments - a.dirty_segments);
+                    visiblePartitions = [visiblePartitions[0]]; // 只保留脏段最多的一个
+                }
+
+                updatePartitionCharts(visiblePartitions);
+                updatePartitionGcStatus(visiblePartitions);
+            }
+        }
+
         function updatePartitionCharts(partitionsData) {
             const currentChartColors = getChartColors();
             const currentVisibleDevices = new Set(partitionsData.map(p => p.device_name));
@@ -285,20 +310,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             const appStats = Array.from(aggregatedStats.values());
             appStatsList.innerHTML = '';
             if (!appStats || appStats.length === 0) {
-                // 关键修改：无数据时彻底隐藏，不占空间
                 appStatsContainer.style.display = 'none';
                 return;
             }
-            // 关键修改：有数据时恢复显示
             appStatsContainer.style.display = 'flex';
             appStatsContainer.style.visibility = 'visible';
             appStatsContainer.style.opacity = '1';
             appStatsContainer.style.maxHeight = '500px';
-            appStatsContainer.style.marginTop = '';
             
             appStats.sort((a, b) => b.bytes_deleted - a.bytes_deleted).forEach(app => {
                 const displayName = appNamesMap.get(app.package_name) || app.package_name;
-                appStatsList.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center"><span class="text-truncate me-3" title="${app.package_name}">${displayName}</span><span class="badge bg-primary rounded-pill">${app.megabytes_deleted.toFixed(2)} MB</span></li>`;
+                // 核心修改：优化列表项 HTML 结构以配合新 CSS
+                appStatsList.innerHTML += `
+                    <li class="list-group-item">
+                        <div class="app-name text-truncate" title="${app.package_name}">${displayName}</div>
+                        <div class="app-size badge bg-primary rounded-pill">${app.megabytes_deleted.toFixed(2)} MB</div>
+                    </li>`;
             });
         }
         

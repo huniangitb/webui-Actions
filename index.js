@@ -1,4 +1,4 @@
-import 'mdb-ui-kit/css/mdb.min.css';
+import 'mdb-ui-kit/css/mdb.min.css'; // 关键：在 JS 中引入
 import './style.scss';
 import { exec, toast } from 'kernelsu';
 import * as mdb from 'mdb-ui-kit';
@@ -93,20 +93,18 @@ const loadLogs = async () => {
     logViewer.scrollTop = logViewer.scrollHeight;
 };
 
-// --- IO 监控 (新增包名识别) ---
 const updateIOTable = async () => {
     const tbody = document.getElementById('ioTableBody');
-    // grep 会输出文件名，例如: /data/.../log/com.pkg.log:[时间] [IO] ...
     const raw = await run(`find ${LOG_DIR} -name "*.log" ! -name "injector.log" -exec grep "\\[IO\\]" {} + | tail -n 150`);
     
     if (!raw) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted small">暂无应用监控数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted small">暂无监控数据</td></tr>';
         return;
     }
 
     const searchTerm = document.getElementById('ioSearch').value.toLowerCase();
     const rows = raw.split('\n').reverse().map(line => {
-        // 正则提取：1.包名(文件名) 2.时间 3.操作 4.详情
+        // 提取包名(文件名)、时间、操作、详情
         const m = line.match(/([\w\.]+)\.log:\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
         if (!m) return null;
         
@@ -137,7 +135,7 @@ const switchTab = (tabId) => {
 
 document.getElementById('btnSaveMain').onclick = async () => {
     await run(`echo '${document.getElementById('mainConfig').value}' > ${BASE_DIR}/injector.conf`);
-    toast("主配置已保存");
+    toast("主配置保存成功");
 };
 
 document.getElementById('btnModalSave').onclick = async () => {

@@ -1,10 +1,8 @@
-@import "mdb-ui-kit/css/mdb.min.css";
-
 :root { --code-font: "JetBrains Mono", monospace; }
 body { background-color: #f8f9fa !important; font-size: 14px; }
 .font-monospace { font-family: var(--code-font) !important; font-size: 12px !important; }
 
-// 解决文本重叠
+// 解决文本重叠：为 textarea 提供足够的顶部间距
 .form-outline .form-control { padding-top: 1.2rem; }
 
 #logViewer {
@@ -13,7 +11,7 @@ body { background-color: #f8f9fa !important; font-size: 14px; }
     padding: 12px; height: 500px; overflow-y: auto; border: none;
 }
 
-// 颜色映射
+// IO 操作颜色
 .op-OPEN   { background-color: #00bcd4 !important; }
 .op-READ   { background-color: #4caf50 !important; }
 .op-WRITE  { background-color: #ff9800 !important; }
@@ -21,7 +19,14 @@ body { background-color: #f8f9fa !important; font-size: 14px; }
 .op-RENAME { background-color: #3f51b5 !important; }
 .op-UNLINK, .op-RMDIR { background-color: #f44336 !important; }
 
-.pkg-badge { font-family: var(--code-font); font-size: 10px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.pkg-badge { 
+    font-family: var(--code-font); 
+    font-size: 10px; 
+    max-width: 140px; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+    display: inline-block;
+}
 
 .log-time    { color: #888; }
 .log-io-tag  { color: #555; font-weight: bold; }

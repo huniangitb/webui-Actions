@@ -14,7 +14,7 @@ body { background-color: #f8f9fa !important; font-size: 14px; }
 /* 运行模式选择器 */
 .mode-selector .btn-check:not(:checked) + .btn { border-color: #e0e0e0; color: #999; opacity: 0.8; }
 .mode-selector .btn-check:checked + .btn-outline-warning { background-color: #ffa900; color: white; border-color: #ffa900; }
-.mode-selector .btn-check:checked + .btn-outline-danger { background-color: #f93154; color: white; border-color: #f93154; }
+.mode-selector .btn-check:checked + .btn-outline-success { background-color: #00b74a; color: white; border-color: #00b74a; }
 .mode-selector .btn-check:checked + .btn-outline-secondary { background-color: #757575; color: white; border-color: #757575; }
 
 /* 监控颜色 */
@@ -26,16 +26,24 @@ body { background-color: #f8f9fa !important; font-size: 14px; }
 
 /* 建议框样式 - 深色背景 */
 #suggestionBox {
-    background-color: #424242; /* 深灰色背景 */
+    background-color: #424242;
     border: 1px solid #616161;
 }
 #suggestionBox .suggestion-item {
     background-color: transparent;
-    color: #e0e0e0; /* 浅色文字 */
+    color: #e0e0e0;
 }
 #suggestionBox .suggestion-item:hover {
-    background-color: #616161; /* Hover 颜色 */
+    background-color: #616161;
     cursor: pointer;
+}
+
+/* 悬浮按钮动作条 */
+.visual-footer-action {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    box-shadow: 0 -5px 10px rgba(0,0,0,0.05);
 }
 
 @media (max-width: 768px) {

@@ -92,9 +92,9 @@
     <!-- 模态框：应用绑定配置 -->
     <div class="modal fade" id="appConfigModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0">
-            <div class="modal-header border-bottom-0 pb-0">
+            <div class="modal-header border-bottom-0 pb-0 d-flex align-items-center">
                 <h5 class="modal-title fw-bold">应用绑定</h5>
-                <button type="button" class="btn-close" data-mdb-dismiss="modal"></button>
+                <button type="button" class="btn-close ms-auto" data-mdb-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="d-flex align-items-center mb-4">
@@ -106,7 +106,7 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label small text-muted fw-bold">选择环境</label>
-                    <select id="bindEnvSelect" class="form-select"><option value="">未绑定 (默认)</option></select>
+                    <select id="bindEnvSelect" class="form-select"><option value="">未绑定 (清除)</option></select>
                 </div>
                 <div class="mb-3">
                     <label class="form-label small text-muted fw-bold">运行模式</label>
@@ -116,7 +116,7 @@
                         <input type="radio" class="btn-check" name="bindMode" id="modeMonitor" value="MONITOR">
                         <label class="btn btn-outline-warning" for="modeMonitor">监控</label>
                         <input type="radio" class="btn-check" name="bindMode" id="modePassthrough" value="PASSTHROUGH">
-                        <label class="btn btn-outline-danger" for="modePassthrough">直通</label>
+                        <label class="btn btn-outline-success" for="modePassthrough">直通</label>
                     </div>
                     <div class="form-text small mt-2 text-muted"><i class="fas fa-info-circle me-1"></i> <span id="modeDesc">默认：规则生效。监控：仅记录。直通：忽略规则。</span></div>
                 </div>
@@ -130,7 +130,10 @@
     <!-- 模态框：新建环境 -->
     <div class="modal fade" id="newEnvModal" tabindex="-1">
         <div class="modal-dialog modal-sm modal-dialog-centered"><div class="modal-content border-0">
-            <div class="modal-body">
+            <div class="modal-header border-0 pb-0 d-flex align-items-center">
+                <button type="button" class="btn-close ms-auto" data-mdb-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-0">
                 <h6 class="fw-bold mb-3">新建环境</h6>
                 <div class="form-outline border rounded mb-3">
                     <input type="text" id="newEnvName" class="form-control" placeholder="例如: GameScope" />
@@ -144,33 +147,42 @@
     <div class="modal fade" id="envEditorModal" tabindex="-1" data-mdb-backdrop="static">
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0" style="height: 85vh;">
-                <div class="modal-header bg-light border-bottom-0 py-2">
+                <div class="modal-header bg-light border-bottom-0 py-2 d-flex align-items-center">
                     <div>
                         <h5 class="modal-title fw-bold"><i class="fas fa-layer-group me-2"></i><span id="editorEnvName">Env</span></h5>
                         <small class="text-muted">环境规则配置</small>
                     </div>
-                    <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center gap-2 ms-auto">
                          <div class="btn-group shadow-0 btn-group-sm">
                             <input type="radio" class="btn-check" name="editorMode" id="modeVisual" value="visual" checked />
                             <label class="btn btn-outline-secondary" for="modeVisual">图形</label>
                             <input type="radio" class="btn-check" name="editorMode" id="modeRaw" value="raw" />
                             <label class="btn btn-outline-secondary" for="modeRaw">源码</label>
                         </div>
-                        <button type="button" class="btn-close ms-2" data-mdb-dismiss="modal"></button>
+                        <button type="button" class="btn-close" data-mdb-dismiss="modal"></button>
                     </div>
                 </div>
-                <div class="modal-body bg-light p-0 position-relative">
+                <div class="modal-body bg-light p-0 position-relative d-flex flex-column">
                     <!-- 自动补全建议框 -->
                     <div id="suggestionBox" class="list-group shadow-lg position-absolute" style="display:none; z-index: 1050; max-height: 250px; overflow-y: auto;"></div>
 
-                    <div id="editorVisual" class="p-3 h-100 overflow-auto">
+                    <div id="editorVisual" class="p-3 flex-grow-1 overflow-auto">
                         <div class="alert alert-info py-2 small mb-3">
                             <i class="fas fa-info-circle me-1"></i> 
                             <b>重定向至</b>: 输入 <b>/</b> 开头为绝对路径，否则自动映射到 <b>/data/media/0/</b>。
                         </div>
-                        <div id="ruleBuilderContainer" style="padding-bottom: 250px;"></div>
-                        <button id="btnAddRuleRow" class="btn btn-outline-primary btn-sm btn-rounded shadow-0 mt-2 w-100 border-dashed"><i class="fas fa-plus"></i> 添加规则</button>
+                        <div id="ruleBuilderContainer"></div>
+                        <!-- 占位符防止被悬浮按钮遮挡 -->
+                        <div style="height: 60px;"></div>
                     </div>
+                    
+                    <!-- 悬浮添加按钮容器 -->
+                    <div class="visual-footer-action p-3 bg-light border-top">
+                        <button id="btnAddRuleRow" class="btn btn-primary btn-sm btn-rounded shadow-0 w-100">
+                            <i class="fas fa-plus me-1"></i> 添加规则
+                        </button>
+                    </div>
+
                     <div id="editorRaw" class="h-100 d-none">
                         <textarea class="form-control font-monospace border-0 h-100 bg-dark text-light raw-editor-padding" id="envRuleContent" style="resize: none;"></textarea>
                     </div>

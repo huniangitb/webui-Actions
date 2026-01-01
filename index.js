@@ -167,7 +167,7 @@ document.getElementById('btnCreateEnv').onclick = async () => {
     loadData();
 };
 
-// --- 智能自动补全 ---
+// --- 智能自动补全 (核心修复) ---
 const setupAutocomplete = (input) => {
     const box = document.getElementById('suggestionBox');
     
@@ -177,7 +177,6 @@ const setupAutocomplete = (input) => {
             const container = document.getElementById('editorVisual');
             const row = input.closest('.rule-row');
             if (row && container) {
-                // 将输入框滚动到容器顶部约 20% 的位置，留出上方空间
                 const rowRect = row.getBoundingClientRect();
                 const containerRect = container.getBoundingClientRect();
                 const currentOffset = rowRect.top - containerRect.top;
@@ -188,62 +187,76 @@ const setupAutocomplete = (input) => {
     });
 
     const performSearch = debounce(async (val) => {
-        let parentDir = "";
-        let searchPrefix = "";
-        let displayBase = "";
+        let listDir = ""; // ls 的目录
+        let matchPrefix = ""; // 过滤前缀
+        let displayBase = ""; // 回填基准
 
-        // 1. 路径解析: 区分绝对/相对，分离目录和前缀
+        // 1. 路径解析逻辑
         if (!val || !val.startsWith('/')) {
-            // 相对路径: 默认为 /data/media/0/
-            const fullPath = val ? (PATH_PREFIX_REAL + '/' + val) : PATH_PREFIX_REAL;
+            // 相对路径: 强制在 /data/media/0/ 下搜索
+            const lsBase = PATH_PREFIX_REAL;
             
-            if (val && val.endsWith('/')) {
-                // 输入 "Download/" -> 列出该目录下所有文件
-                parentDir = fullPath;
-                searchPrefix = "";
-                displayBase = val;
+            if (!val) {
+                // 空输入 -> 列出 /data/media/0/
+                listDir = lsBase;
+                matchPrefix = "";
+                displayBase = "";
             } else {
-                // 输入 "Download/Sub" -> 列出 Download 下匹配 Sub 的文件
-                const lastSlash = fullPath.lastIndexOf('/');
-                parentDir = fullPath.substring(0, lastSlash + 1);
-                searchPrefix = fullPath.substring(lastSlash + 1);
-                
-                const lastSlashVal = val.lastIndexOf('/');
-                displayBase = lastSlashVal !== -1 ? val.substring(0, lastSlashVal + 1) : "";
+                // 有输入
+                if (val.endsWith('/')) {
+                    // "Download/" -> ls /data/media/0/Download/
+                    listDir = lsBase + '/' + val;
+                    matchPrefix = "";
+                    displayBase = val;
+                } else {
+                    // "Download/Su" -> ls /data/media/0/Download/ 过滤 Su
+                    const lastSlash = val.lastIndexOf('/');
+                    if (lastSlash === -1) {
+                        // "Do" -> ls /data/media/0/ 过滤 Do
+                        listDir = lsBase;
+                        matchPrefix = val;
+                        displayBase = "";
+                    } else {
+                        const dirPart = val.substring(0, lastSlash + 1);
+                        listDir = lsBase + '/' + dirPart;
+                        matchPrefix = val.substring(lastSlash + 1);
+                        displayBase = dirPart;
+                    }
+                }
             }
         } else {
             // 绝对路径
-            let absPath = val;
+            let effectivePath = val;
             if (val.startsWith(PATH_PREFIX_STORAGE)) {
-                absPath = val.replace(PATH_PREFIX_STORAGE, PATH_PREFIX_REAL);
+                effectivePath = val.replace(PATH_PREFIX_STORAGE, PATH_PREFIX_REAL);
             }
-
+            
             if (val.endsWith('/')) {
-                parentDir = absPath;
-                searchPrefix = "";
+                listDir = effectivePath;
+                matchPrefix = "";
                 displayBase = val;
             } else {
-                const lastSlash = absPath.lastIndexOf('/');
-                parentDir = absPath.substring(0, lastSlash + 1) || '/';
-                searchPrefix = absPath.substring(lastSlash + 1);
+                const lastSlash = effectivePath.lastIndexOf('/');
+                listDir = effectivePath.substring(0, lastSlash + 1) || '/';
+                matchPrefix = effectivePath.substring(lastSlash + 1);
                 
-                const lastSlashVal = val.lastIndexOf('/');
-                displayBase = val.substring(0, lastSlashVal + 1);
+                const valLastSlash = val.lastIndexOf('/');
+                displayBase = val.substring(0, valLastSlash + 1);
             }
         }
         
-        // 规范化 parentDir
-        parentDir = parentDir.replace(/\/+/g, '/');
-        if (!parentDir.endsWith('/')) parentDir += '/';
+        // 清理路径
+        listDir = listDir.replace(/\/+/g, '/');
+        if (listDir !== '/' && listDir.endsWith('/')) listDir = listDir.slice(0, -1);
 
         try {
             // ls -F -1: 列出文件，目录带/
-            const res = await exec(`ls -F -1 "${parentDir}" 2>/dev/null | head -n 30`);
+            const res = await exec(`ls -F -1 "${listDir}" 2>/dev/null | head -n 30`);
             if (!res || !res.stdout) { box.style.display = 'none'; return; }
 
             const lines = res.stdout.split('\n');
             const suggestions = lines
-                .filter(line => line.startsWith(searchPrefix))
+                .filter(line => line.startsWith(matchPrefix))
                 .map(line => {
                     const isDir = line.endsWith('/');
                     const name = isDir ? line.slice(0, -1) : line;
@@ -266,23 +279,19 @@ const setupAutocomplete = (input) => {
             const maxWidth = Math.min(300, window.innerWidth / 2);
             box.style.width = maxWidth + 'px';
             
-            // 右对齐计算
+            // 右对齐
             let leftPos = (rect.right - containerRect.left) - maxWidth;
             if (leftPos < 0) leftPos = 10;
             
-            // 垂直定位：判断下方空间是否足够
-            const boxHeight = Math.min(suggestions.length * 40, 250); // 估算高度
+            const boxHeight = Math.min(suggestions.length * 40, 250);
             const spaceBelow = window.innerHeight - rect.bottom;
             
-            // 如果下方空间不足 250px 且上方空间充足，则向上弹出
+            // 向上弹出判断
             if (spaceBelow < 250 && rect.top > 250) {
-                // 向上: top = input顶部 - box高度 - 滚动偏移
                 const topPos = (rect.top - containerRect.top + document.querySelector('#editorVisual').scrollTop) - boxHeight - 5;
                 box.style.top = topPos + 'px';
-                // 修正 box 高度以防溢出顶部
                 box.style.maxHeight = '250px';
             } else {
-                // 向下 (默认)
                 box.style.top = (rect.bottom - containerRect.top + document.querySelector('#editorVisual').scrollTop) + 'px';
                 box.style.maxHeight = '250px';
             }
@@ -292,7 +301,7 @@ const setupAutocomplete = (input) => {
             window._currentInput = input;
 
         } catch (e) { box.style.display = 'none'; }
-    }, 150); // 降低延迟提高响应
+    }, 100); // 100ms 快速响应
 
     input.addEventListener('input', (e) => performSearch(e.target.value));
     input.addEventListener('focus', (e) => performSearch(e.target.value));

@@ -1,0 +1,127 @@
+import 'mdb-ui-kit/css/mdb.min.css';
+import './style.scss';
+import { exec, toast } from 'kernelsu';
+import * as mdb from 'mdb-ui-kit';
+
+const BASE_DIR = "/data/Namespace-Proxy";
+const LOG_DIR = `${BASE_DIR}/log`;
+const SERVICE_SH = "/data/adb/modules/Namespace-Proxy/service.sh";
+let ruleModal;
+
+const run = async (cmd) => {
+    const res = await exec(cmd);
+    return res.stdout || "";
+};
+
+const initMDB = () => {
+    document.querySelectorAll('.form-outline').forEach(el => new mdb.Input(el).init());
+};
+
+const loadConfigs = async () => {
+    const main = await run(`[ -f ${BASE_DIR}/injector.conf ] && cat ${BASE_DIR}/injector.conf`);
+    document.getElementById('mainConfig').value = main;
+    const files = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
+    const ruleList = document.getElementById('ruleList');
+    ruleList.innerHTML = files.split('\n').filter(f => f && !f.endsWith('injector.conf')).map(f => {
+        const name = f.split('/').pop();
+        return `<div class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+            <div class="fw-bold text-dark text-truncate">${name}</div>
+            <div class="btn-group shadow-0">
+                <button class="btn btn-light btn-sm" onclick="editRuleFile('${name}')"><i class="fas fa-edit"></i></button>
+                <button class="btn btn-light btn-sm text-danger" onclick="deleteRuleFile('${name}')"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`;
+    }).join('');
+    initMDB();
+};
+
+window.editRuleFile = async (filename) => {
+    document.getElementById('modalRuleName').value = filename.replace('.conf', '');
+    document.getElementById('modalRuleContent').value = await run(`cat ${BASE_DIR}/${filename}`);
+    ruleModal.show();
+    setTimeout(initMDB, 200);
+};
+
+window.deleteRuleFile = async (filename) => {
+    if(confirm(`确定删除 ${filename}?`)) {
+        await run(`rm ${BASE_DIR}/${filename}`);
+        toast("已删除"); loadConfigs();
+    }
+};
+
+const loadLogs = async () => {
+    const files = await run(`[ -d ${LOG_DIR} ] && ls ${LOG_DIR}/*.log 2>/dev/null`);
+    const select = document.getElementById('logFileSelect');
+    const current = select.value;
+    const fileList = files.split('\n').filter(f => f);
+    if (fileList.length === 0) {
+        select.innerHTML = '<option>无日志文件</option>';
+        document.getElementById('logViewer').textContent = "等待日志生成...";
+        return;
+    }
+    select.innerHTML = fileList.map(f => {
+        const name = f.split('/').pop();
+        return `<option value="${name}" ${name === current ? 'selected' : ''}>${name}</option>`;
+    }).join('');
+    if (select.value) {
+        const content = await run(`tail -c 30000 ${LOG_DIR}/${select.value} 2>/dev/null`);
+        document.getElementById('logViewer').textContent = content || "文件为空";
+    }
+};
+
+const updateIOTable = async () => {
+    const hasLogs = await run(`[ -d ${LOG_DIR} ] && grep -l "\\[IO\\]" ${LOG_DIR}/*.log 2>/dev/null`);
+    if (!hasLogs) {
+        document.getElementById('ioTableBody').innerHTML = '<tr><td colspan="3" class="text-center p-4 text-muted">暂无监控数据</td></tr>';
+        return;
+    }
+    const raw = await run(`grep "\\[IO\\]" ${LOG_DIR}/*.log 2>/dev/null | tail -n 100`);
+    const searchTerm = document.getElementById('ioSearch').value.toLowerCase();
+    const rows = raw.split('\n').filter(l => l.includes('[IO]')).reverse().map(line => {
+        const m = line.match(/\[(.*?)\]\s+\[IO\]\s+(\w+)\s+(.*)/);
+        if (!m) return null;
+        const [_, time, op, path] = m;
+        if (searchTerm && !path.toLowerCase().includes(searchTerm)) return null;
+        return `<tr><td class="text-muted small">${time}</td><td class="text-center"><span class="badge badge-primary">${op}</span></td><td class="text-wrap-path">${path}</td></tr>`;
+    }).filter(r => r).join('');
+    document.getElementById('ioTableBody').innerHTML = rows || '<tr><td colspan="3" class="text-center p-4">无匹配结果</td></tr>';
+};
+
+document.getElementById('btnSaveMain').onclick = async () => {
+    await run(`echo '${document.getElementById('mainConfig').value}' > ${BASE_DIR}/injector.conf`);
+    toast("已保存");
+};
+
+document.getElementById('btnModalSave').onclick = async () => {
+    const name = document.getElementById('modalRuleName').value;
+    if(!name) return toast("包名无效");
+    await run(`echo '${document.getElementById('modalRuleContent').value}' > ${BASE_DIR}/${name}.conf`);
+    ruleModal.hide(); toast("已保存"); loadConfigs();
+};
+
+document.getElementById('btnReload').onclick = async () => {
+    toast("正在通过 service.sh 重启...");
+    await run(`sh ${SERVICE_SH}`);
+    toast("指令已发送");
+};
+
+document.getElementById('btnAddRule').onclick = () => {
+    document.getElementById('modalRuleName').value = "";
+    document.getElementById('modalRuleContent').value = "REDIRECT /storage/emulated/0/xxx /data/media/0/xxx";
+    ruleModal.show(); setTimeout(initMDB, 200);
+};
+
+document.querySelectorAll('[data-mdb-tab-init]').forEach(el => {
+    el.addEventListener('shown.mdb.tab', (e) => {
+        if (e.target.id === 'tab-log') loadLogs();
+        if (e.target.id === 'tab-io') updateIOTable();
+    });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    ruleModal = new mdb.Modal(document.getElementById('ruleModal'));
+    loadConfigs();
+    run("pgrep injector").then(pid => {
+        document.getElementById('statusInfo').textContent = pid ? `服务运行中 (PID: ${pid.trim()})` : "服务未启动";
+    });
+});

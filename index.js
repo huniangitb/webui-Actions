@@ -157,7 +157,7 @@ document.getElementById('btnCreateEnv').onclick = async () => {
     loadData();
 };
 
-// --- 自动补全核心逻辑 (RAF 实时定位版) ---
+// --- 自动补全核心逻辑 (RAF + 焦点保护) ---
 const updateBoxPosition = (input) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none' || !input) return;
@@ -174,9 +174,8 @@ const updateBoxPosition = (input) => {
     if (leftPos + maxWidth > window.innerWidth) leftPos = window.innerWidth - maxWidth - 10;
     box.style.left = leftPos + 'px';
 
-    // Y轴定位 (智能上下翻转)
+    // Y轴定位 (紧贴)
     const spaceBelow = viewportHeight - rect.bottom;
-    // 强制紧贴：+2 或 -2 像素微调
     if (spaceBelow < boxHeight && rect.top > boxHeight) {
         box.style.top = (rect.top - boxHeight - 2) + 'px';
     } else {
@@ -218,11 +217,8 @@ const setupAutocomplete = (input) => {
                 scrollContainer.scrollBy({ top: (rowRect.top - containerRect.top) - containerRect.height * 0.2, behavior: 'smooth' });
             }
         }, 300);
-        // 聚焦时如果已有内容，触发一次搜索以显示建议
         if(input.value) input.dispatchEvent(new Event('input'));
     });
-
-    // 移除 blur 事件监听，防止误隐藏
 
     const performSearch = debounce(async (val) => {
         let parentDir = PATH_PREFIX_REAL, searchPrefix = "", displayBase = "/";
@@ -242,15 +238,29 @@ const setupAutocomplete = (input) => {
         parentDir = parentDir.replace(/\/+/g, '/');
         try {
             const res = await exec(`ls -F -1 "${parentDir}" 2>/dev/null | head -n 30`);
-            if (!res?.stdout) { box.style.display = 'none'; return; }
+            if (!res?.stdout) { 
+                // 如果目录为空或无结果，不立即隐藏，除非输入内容明显无效
+                // 这里选择保持显示（如果之前显示），或者隐藏。
+                // 为了体验，如果ls失败，隐藏
+                box.style.display = 'none'; return; 
+            }
             const suggestions = res.stdout.split('\n').filter(l => l.startsWith(searchPrefix)).map(line => {
                 const isDir = line.endsWith('/'), name = isDir ? line.slice(0, -1) : line;
                 return { text: displayBase + name + (isDir ? '/' : ''), icon: isDir ? ICONS.FOLDER : ICONS.FILE };
             });
             if (suggestions.length === 0) { box.style.display = 'none'; return; }
-            box.innerHTML = suggestions.map(s => `<div class="list-group-item list-group-item-action py-2 px-3 border-0 d-flex align-items-center suggestion-item" onmousedown="applySuggestion('${s.text}')"><div class="me-3" style="width:16px">${s.icon}</div><div class="fw-bold font-monospace small text-truncate">${s.text}</div></div>`).join('');
+            
+            // 关键：onmousedown 阻止默认行为，防止输入框失焦导致键盘收起
+            box.innerHTML = suggestions.map(s => `
+                <div class="list-group-item list-group-item-action py-2 px-3 border-0 d-flex align-items-center suggestion-item" 
+                     onmousedown="event.preventDefault(); applySuggestion('${s.text}')">
+                    <div class="me-3" style="width:16px">${s.icon}</div>
+                    <div class="fw-bold font-monospace small text-truncate">${s.text}</div>
+                </div>
+            `).join('');
+            
             box.style.display = 'block';
-            startAutoUpdate(input); // 启动实时定位循环
+            startAutoUpdate(input);
         } catch (e) { box.style.display = 'none'; }
     }, 100);
 
@@ -260,7 +270,8 @@ const setupAutocomplete = (input) => {
 window.applySuggestion = (text) => {
     if (window._currentInput) {
         window._currentInput.value = text;
-        setTimeout(() => { window._currentInput.focus(); window._currentInput.dispatchEvent(new Event('input')); }, 10);
+        // 立即触发 input 事件以加载下一级目录，无需等待
+        window._currentInput.dispatchEvent(new Event('input'));
     }
 };
 

@@ -9,12 +9,12 @@ body { background-color: #f8f9fa !important; font-size: 14px; }
 .border-dashed { border-style: dashed !important; }
 
 /* 源码编辑器内边距 */
-.raw-editor-padding { padding: 1rem !important; line-height: 1.5; }
+.raw-editor-padding { padding: 5rem !important; line-height: 1.5; }
 
 /* 运行模式选择器 */
 .mode-selector .btn-check:not(:checked) + .btn { border-color: #e0e0e0; color: #999; opacity: 0.8; }
 .mode-selector .btn-check:checked + .btn-outline-warning { background-color: #ffa900; color: white; border-color: #ffa900; }
-.mode-selector .btn-check:checked + .btn-outline-danger { background-color: #f93154; color: white; border-color: #f93154; }
+.mode-selector .btn-check:checked + .btn-outline-danger { background-color: #44B642; color: white; border-color: #f93154; }
 .mode-selector .btn-check:checked + .btn-outline-secondary { background-color: #757575; color: white; border-color: #757575; }
 
 /* 监控颜色 */

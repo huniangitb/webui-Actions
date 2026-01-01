@@ -2,7 +2,7 @@ import 'mdb-ui-kit/css/mdb.min.css';
 import './style.scss';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import * as mdb from 'mdb-ui-kit';
-import { mdiAndroid, mdiLayers, mdiDelete, mdiPencil, mdiFolder } from '@mdi/js';
+import { mdiAndroid, mdiLayers, mdiDelete, mdiPencil, mdiFolder, mdiFile } from '@mdi/js';
 
 // --- 常量 ---
 const BASE_DIR = "/data/Namespace-Proxy";
@@ -10,10 +10,8 @@ const LOG_DIR = `${BASE_DIR}/log`;
 const INJECTOR_CONF = `${BASE_DIR}/injector.conf`;
 const SERVICE_SH = "/data/adb/modules/Namespace-Proxy/service.sh";
 
-// 路径映射常量
-const PATH_PREFIX_DISPLAY = '/'; // 显示时的根
-const PATH_PREFIX_STORAGE = '/storage/emulated/0'; // 目标路径的真实前缀
-const PATH_PREFIX_REAL = '/data/media/0'; // 物理路径前缀 (用于 ls 和 Source)
+const PATH_PREFIX_STORAGE = '/storage/emulated/0';
+const PATH_PREFIX_REAL = '/data/media/0';
 
 // --- 状态 ---
 let appConfigModal, envEditorModal, newEnvModal;
@@ -29,14 +27,14 @@ const ICONS = {
     ANDROID: getSvg(mdiAndroid, 32, '#757575'),
     ENV: getSvg(mdiLayers, 24, '#1266f1'),
     DELETE: getSvg(mdiDelete, 16, 'currentColor'),
-    FOLDER: getSvg(mdiFolder, 16, '#ffca28')
+    FOLDER: getSvg(mdiFolder, 16, '#ffca28'),
+    FILE: getSvg(mdiFile, 16, '#9e9e9e')
 };
 
 const run = async (cmd) => {
     try { const res = await exec(cmd); return res.stdout ? res.stdout.trim() : ""; } catch (e) { return ""; }
 };
 
-// --- 防抖函数 ---
 const debounce = (func, wait) => {
     let timeout;
     return function(...args) {
@@ -45,69 +43,50 @@ const debounce = (func, wait) => {
     };
 };
 
-// --- 路径处理工具 ---
-
-// 将完整路径转换为显示路径 (/storage/emulated/0/A -> /A)
+// --- 路径处理 (核心修改) ---
 const normalizeToDisplay = (path) => {
     if (!path) return "";
-    // 优先匹配 /data/media/0，因为这是我们操作的物理路径
+    // 仅简化标准路径，其他绝对路径保持原样
     if (path.startsWith(PATH_PREFIX_REAL)) return path.substring(PATH_PREFIX_REAL.length) || "/";
     if (path.startsWith(PATH_PREFIX_STORAGE)) return path.substring(PATH_PREFIX_STORAGE.length) || "/";
     return path;
 };
 
-// 将显示路径转换为 Config 路径
-// isTarget=true: 强制使用 /storage/emulated/0 (App 看到的路径)
-// isTarget=false: 优先使用 /data/media/0 (物理路径)
 const normalizeToConfig = (path, isTarget) => {
     if (!path) return "";
     path = path.trim();
-    if (!path.startsWith('/')) path = '/' + path; // 确保 / 开头
     
-    // 如果用户已经输入了完整前缀，则保留，否则添加前缀
-    if (path.startsWith('/data/') || path.startsWith('/storage/') || path.startsWith('/system/') || path.startsWith('/vendor/')) {
-        return path;
+    // 如果是目标路径 (Target - App View)
+    if (isTarget) {
+        // 强制 /storage/emulated/0 除非用户输入了其他绝对路径
+        if (path.startsWith('/')) return path; // 允许 /data/data 等
+        // 相对路径默认补全
+        return (PATH_PREFIX_STORAGE + '/' + path).replace(/\/+/g, '/');
+    } 
+    // 如果是源路径 (Source - Redirect To)
+    else {
+        // 任意路径支持：如果以 / 开头，直接保存
+        if (path.startsWith('/')) return path;
+        // 否则补全为 /data/media/0/
+        return (PATH_PREFIX_REAL + '/' + path).replace(/\/+/g, '/');
     }
-    
-    const prefix = isTarget ? PATH_PREFIX_STORAGE : PATH_PREFIX_REAL;
-    // 避免双斜杠 //
-    return (prefix + path).replace(/\/+/g, '/');
 };
 
-// 获取用于 ls 的物理路径
-const getLsPath = (inputPath) => {
-    if (!inputPath) return PATH_PREFIX_REAL;
-    
-    // 如果输入包含 /storage/emulated/0，替换为 /data/media/0 以加速
-    if (inputPath.startsWith(PATH_PREFIX_STORAGE)) {
-        return inputPath.replace(PATH_PREFIX_STORAGE, PATH_PREFIX_REAL);
-    }
-    // 如果是其他绝对路径，直接用
-    if (inputPath.startsWith('/')) {
-        return inputPath;
-    }
-    // 否则视为相对路径，基于 /data/media/0
-    return (PATH_PREFIX_REAL + '/' + inputPath).replace(/\/+/g, '/');
-};
-
-// --- 数据加载 (保持不变) ---
+// --- 数据加载 ---
 const loadData = async () => {
     try {
         const files = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
         envList = files.split('\n').map(f => f.split('/').pop().replace('.conf', '')).filter(n => n && n !== 'injector');
-        
         const regContent = await run(`cat ${INJECTOR_CONF} 2>/dev/null`);
         registry.clear();
         regContent.split('\n').forEach(line => {
             const parts = line.trim().split(/\s+/);
             if (parts.length >= 2 && !line.trim().startsWith('#')) registry.set(parts[0], { env: parts[1], param: parts[2] || "" });
         });
-
         const userPkgs = await listPackages('user') || [];
         const systemPkgs = await listPackages('system') || [];
         const allPkgs = [...new Set([...userPkgs, ...systemPkgs])];
         const infos = await getPackagesInfo(allPkgs);
-        
         appMap.clear();
         if (Array.isArray(infos)) {
             infos.forEach(info => {
@@ -122,7 +101,6 @@ const loadData = async () => {
     } catch (e) { toast("加载失败: " + e.message); }
 };
 
-// --- 渲染逻辑 (保持不变) ---
 const renderAppList = () => {
     const listEl = document.getElementById('appList');
     const search = document.getElementById('appSearch').value.toLowerCase();
@@ -198,62 +176,76 @@ document.getElementById('btnCreateEnv').onclick = async () => {
     loadData();
 };
 
-// --- 高级自动补全 (实时搜索) ---
+// --- 升级版自动补全 ---
 const setupAutocomplete = (input) => {
     const box = document.getElementById('suggestionBox');
     
-    // 核心搜索逻辑
-    const performSearch = debounce(async (val) => {
-        if (!val) { box.style.display = 'none'; return; }
-
-        // 1. 确定要列出的父目录
-        // 将用户输入转换为物理路径 /data/media/0/...
-        const searchPath = getLsPath(val);
-        
-        let parentDir, filePrefix;
-        if (val.endsWith('/')) {
-            parentDir = searchPath;
-            filePrefix = "";
-        } else {
-            const lastSlash = searchPath.lastIndexOf('/');
-            if (lastSlash === -1) { // 相对路径根
-                parentDir = PATH_PREFIX_REAL;
-                filePrefix = searchPath;
-            } else {
-                parentDir = searchPath.substring(0, lastSlash) || '/';
-                filePrefix = searchPath.substring(lastSlash + 1);
+    // 聚焦时自动滚动到上方 (输入法避让)
+    input.addEventListener('focus', () => {
+        setTimeout(() => {
+            const container = document.getElementById('editorVisual');
+            // 将输入框滚动到容器顶部附近 (保留一点 padding)
+            // offsetTop 是相对于父定位元素的，这里需要计算相对于滚动容器的位置
+            // 简单处理：将当前行滚动到顶部
+            const row = input.closest('.rule-row');
+            if (row && container) {
+                // 计算 row 相对于 container 的位置
+                container.scrollTo({
+                    top: row.offsetTop - 10, // 留 10px 顶部间距
+                    behavior: 'smooth'
+                });
             }
-        }
+        }, 300); // 延时等待键盘弹出
+    });
 
-        // 2. 执行 ls -F (标记目录) -1 (单列)
-        // 限制输出数量以防卡顿
+    const performSearch = debounce(async (val) => {
+        let searchPath = ""; 
+        let displayPrefix = ""; 
+        
+        // 1. 路径解析逻辑
+        if (!val || !val.startsWith('/')) {
+            // 相对路径 -> 默认在 /data/media/0 下搜索
+            searchPath = PATH_PREFIX_REAL;
+            if (val) {
+                if (val.endsWith('/')) {
+                    searchPath += '/' + val;
+                }
+            }
+            displayPrefix = ""; 
+        } else {
+            // 绝对路径 -> 尝试搜索
+            if (val.startsWith(PATH_PREFIX_STORAGE)) {
+                const rel = val.substring(PATH_PREFIX_STORAGE.length);
+                searchPath = PATH_PREFIX_REAL + rel;
+            } else {
+                searchPath = val;
+            }
+            if (!searchPath.endsWith('/')) {
+                const lastSlash = searchPath.lastIndexOf('/');
+                searchPath = searchPath.substring(0, lastSlash + 1) || '/';
+            }
+            const lastSlashVal = val.lastIndexOf('/');
+            displayPrefix = val.substring(0, lastSlashVal + 1);
+        }
+        
+        const filterKey = val.endsWith('/') ? "" : val.split('/').pop();
+
         try {
-            const res = await exec(`ls -F -1 "${parentDir}" | head -n 20`);
+            const res = await exec(`ls -F -1 "${searchPath}" 2>/dev/null | head -n 20`);
             if (!res || !res.stdout) { box.style.display = 'none'; return; }
 
             const lines = res.stdout.split('\n');
             const suggestions = lines
-                .filter(line => line.startsWith(filePrefix)) // 简单的客户端过滤
+                .filter(line => line.startsWith(filterKey))
                 .map(line => {
                     const isDir = line.endsWith('/');
                     const name = isDir ? line.slice(0, -1) : line;
-                    // 构造回填路径：如果用户输入是 /Dow，父目录是 /data/media/0，结果是 Download
-                    // 我们需要回填为 /Download
-                    
-                    // 获取用户输入中的父目录部分 (用于显示)
-                    const userParent = val.lastIndexOf('/') !== -1 ? val.substring(0, val.lastIndexOf('/') + 1) : (val.startsWith('/') ? '/' : '');
-                    const fullPath = userParent + name + (isDir ? '/' : '');
-                    
-                    return {
-                        text: fullPath,
-                        type: isDir ? 'Folder' : 'File',
-                        icon: isDir ? ICONS.FOLDER : '<i class="fas fa-file text-muted"></i>'
-                    };
+                    const fullPath = displayPrefix + name + (isDir ? '/' : '');
+                    return { text: fullPath, icon: isDir ? ICONS.FOLDER : ICONS.FILE };
                 });
 
             if (suggestions.length === 0) { box.style.display = 'none'; return; }
 
-            // 渲染
             box.innerHTML = suggestions.map(s => `
                 <button class="list-group-item list-group-item-action py-2 px-3 border-0 d-flex align-items-center" onclick="applySuggestion('${s.text}')">
                     <div class="me-3" style="width:16px">${s.icon}</div>
@@ -261,19 +253,26 @@ const setupAutocomplete = (input) => {
                 </button>
             `).join('');
 
-            // 定位
+            // 定位逻辑 (右对齐 + 宽度限制)
             const rect = input.getBoundingClientRect();
             const containerRect = document.querySelector('.modal-body').getBoundingClientRect();
+            
+            // 宽度限制：屏幕一半，或者最大 300
+            const maxWidth = Math.min(300, window.innerWidth / 2);
+            box.style.width = maxWidth + 'px';
+            
+            // 右对齐：Box 右边缘与 Input 右边缘对齐
+            // left = (Input右边缘相对Container距离) - Box宽度
+            // Input右边缘相对Container = (rect.right - containerRect.left)
+            const leftPos = (rect.right - containerRect.left) - maxWidth;
+            
             box.style.top = (rect.bottom - containerRect.top + document.querySelector('#editorVisual').scrollTop) + 'px';
-            box.style.left = (rect.left - containerRect.left) + 'px';
-            box.style.width = rect.width + 'px';
+            box.style.left = leftPos + 'px';
             box.style.display = 'block';
             window._currentInput = input;
 
-        } catch (e) {
-            box.style.display = 'none'; // 目录不存在或无权限
-        }
-    }, 300); // 300ms 防抖
+        } catch (e) { box.style.display = 'none'; }
+    }, 200);
 
     input.addEventListener('input', (e) => performSearch(e.target.value));
     input.addEventListener('focus', (e) => performSearch(e.target.value));
@@ -284,7 +283,6 @@ window.applySuggestion = (text) => {
     if (window._currentInput) {
         window._currentInput.value = text;
         window._currentInput.focus();
-        // 触发一次 input 事件以便继续搜索子目录
         window._currentInput.dispatchEvent(new Event('input'));
     }
 };
@@ -295,7 +293,6 @@ window.openEnvEditor = async (envName) => {
     document.getElementById('editorEnvName').textContent = envName;
     const content = await run(`cat ${BASE_DIR}/${envName}.conf 2>/dev/null`);
     document.getElementById('envRuleContent').value = content;
-    
     parseConfigToVisual(content);
     document.getElementById('modeVisual').click();
     switchEditorMode('visual');
@@ -322,14 +319,11 @@ const parseConfigToVisual = (text) => {
     container.innerHTML = '';
     text.split('\n').forEach(line => {
         const parts = line.trim().split(/\s+/);
-        // REDIRECT <Target(Virtual)> <Source(Real)>
         if (parts[0] === 'REDIRECT' && parts.length >= 3) {
-            // 转换为显示路径
             const displayTarget = normalizeToDisplay(parts[1]);
             const displaySource = normalizeToDisplay(parts.slice(2).join(' '));
             addRuleRow('REDIRECT', displayTarget, displaySource);
-        }
-        else if (parts[0] === 'HIDE' && parts.length >= 2) {
+        } else if (parts[0] === 'HIDE' && parts.length >= 2) {
             const displayTarget = normalizeToDisplay(parts.slice(1).join(' '));
             addRuleRow('HIDE', displayTarget, '');
         }
@@ -346,14 +340,14 @@ const addRuleRow = (type, target, source) => {
             <div class="flex-grow-1 d-flex flex-column gap-1">
                 <div class="input-group input-group-sm">
                     <span class="input-group-text border-0 bg-light text-muted" style="width: 80px;">原始路径</span>
-                    <input type="text" class="form-control font-monospace rule-target" placeholder="/Download (App看到的)" value="${target}">
+                    <input type="text" class="form-control font-monospace rule-target" placeholder="App看到的 (如 Download)" value="${target}">
                 </div>
                 <div class="input-group input-group-sm rule-source-group">
                     <span class="input-group-text border-0 bg-light text-muted" style="width: 80px;">重定向至</span>
-                    <input type="text" class="form-control font-monospace rule-source" placeholder="/MyFolder (实际存储的)" value="${source}">
+                    <input type="text" class="form-control font-monospace rule-source" placeholder="实际存储 (如 MyFolder)" value="${source}">
                 </div>
             </div>
-            <button class="btn btn-link text-danger px-2 btn-del">${ICONS.DELETE}</button>
+            <button class="btn btn-link text-danger px-2 btn-del ms-auto align-self-center">${ICONS.DELETE}</button>
         </div>`;
     
     div.querySelector('.rule-type').value = type;
@@ -362,7 +356,6 @@ const addRuleRow = (type, target, source) => {
     const sourceInput = div.querySelector('.rule-source');
     
     if(type==='HIDE') sourceGroup.classList.add('d-none');
-    
     div.querySelector('.rule-type').onchange = (e) => sourceGroup.classList.toggle('d-none', e.target.value === 'HIDE');
     div.querySelector('.btn-del').onclick = () => div.remove();
     
@@ -377,13 +370,9 @@ const generateConfigFromVisual = () => {
         const type = row.querySelector('.rule-type').value;
         const targetDisplay = row.querySelector('.rule-target').value.trim();
         const sourceDisplay = row.querySelector('.rule-source').value.trim();
-        
         if(targetDisplay) {
-            // 转换为 Config 路径：Target 强制 /storage/emulated/0
             const configTarget = normalizeToConfig(targetDisplay, true);
-            
             if (type === 'REDIRECT' && sourceDisplay) {
-                // Source 优先 /data/media/0
                 const configSource = normalizeToConfig(sourceDisplay, false);
                 res += `REDIRECT ${configTarget} ${configSource}\n`;
             } else if (type === 'HIDE') {

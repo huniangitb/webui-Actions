@@ -1,8 +1,17 @@
-:root { --code-font: "JetBrains Mono", monospace; }
-body { background-color: #f8f9fa !important; font-size: 14px; }
+:root { 
+    --code-font: "JetBrains Mono", monospace; 
+}
+
+body { 
+    background-color: #f8f9fa !important; 
+    font-size: 14px; 
+    // 使用 KernelSU 提供的 Insets 变量
+    padding-top: var(--ksu-status-bar-height);
+    padding-bottom: var(--ksu-navigation-bar-height);
+}
+
 .font-monospace { font-family: var(--code-font) !important; font-size: 12px !important; }
 
-// 解决文本重叠：为 textarea 提供足够的顶部间距
 .form-outline .form-control { padding-top: 1.2rem; }
 
 #logViewer {
@@ -11,7 +20,7 @@ body { background-color: #f8f9fa !important; font-size: 14px; }
     padding: 12px; height: 500px; overflow-y: auto; border: none;
 }
 
-// IO 操作颜色
+// 颜色定义
 .op-OPEN   { background-color: #00bcd4 !important; }
 .op-READ   { background-color: #4caf50 !important; }
 .op-WRITE  { background-color: #ff9800 !important; }

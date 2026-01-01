@@ -2,16 +2,17 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Namespace Proxy</title>
+    <link rel="stylesheet" type="text/css" href="/internal/insets.css" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
 </head>
 <body class="bg-light">
-    <div class="container py-3">
+    <div class="container py-3" id="main-container">
         <div class="d-flex justify-content-between align-items-center mb-4 px-2">
             <div>
                 <h4 class="mb-0 text-primary fw-bold">NAMESPACE PROXY</h4>
-                <small id="statusInfo" class="text-muted font-monospace">STATUS</small>
+                <small id="statusInfo" class="text-muted font-monospace small">STATUS</small>
             </div>
             <button id="btnReload" class="btn btn-warning btn-floating shadow-0"><i class="fas fa-sync"></i></button>
         </div>
@@ -23,6 +24,7 @@
         </ul>
 
         <div class="tab-content">
+            <!-- 配置页 -->
             <div class="tab-pane fade show active" id="content-config">
                 <div class="card shadow-0 border mb-3">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
@@ -44,6 +46,7 @@
                 </div>
             </div>
 
+            <!-- 日志页 -->
             <div class="tab-pane fade" id="content-log">
                 <div class="card shadow-0 bg-white border"><div class="card-body">
                     <select id="logFileSelect" class="form-select mb-3 border bg-light shadow-none font-monospace"></select>
@@ -51,6 +54,7 @@
                 </div></div>
             </div>
 
+            <!-- IO 监控页 -->
             <div class="tab-pane fade" id="content-io">
                 <div class="card shadow-0 bg-white border"><div class="card-body">
                     <div class="form-outline mb-3 border rounded">
@@ -75,6 +79,7 @@
         </div>
     </div>
 
+    <!-- Modal -->
     <div class="modal fade" id="ruleModal" tabindex="-1">
         <div class="modal-dialog modal-lg"><div class="modal-content border-0">
             <div class="modal-header bg-primary text-white">

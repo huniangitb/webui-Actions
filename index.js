@@ -1,12 +1,16 @@
-import 'mdb-ui-kit/css/mdb.min.css'; // 关键：在 JS 中引入
+import 'mdb-ui-kit/css/mdb.min.css';
 import './style.scss';
-import { exec, toast } from 'kernelsu';
+import { exec, toast, fullScreen, enableInsets } from 'kernelsu';
 import * as mdb from 'mdb-ui-kit';
 
 const BASE_DIR = "/data/Namespace-Proxy";
 const LOG_DIR = `${BASE_DIR}/log`;
 const SERVICE_SH = "/data/adb/modules/Namespace-Proxy/service.sh";
 let ruleModal;
+
+// 初始化 KSU WebView 特性
+fullScreen(false); // 关闭网页全屏
+enableInsets(true); // 启用安全区域适配
 
 const run = async (cmd) => {
     try {
@@ -74,7 +78,7 @@ window.deleteRuleFile = async (filename) => {
 const loadLogs = async () => {
     const logViewer = document.getElementById('logViewer');
     const select = document.getElementById('logFileSelect');
-    const files = await run(`[ -d ${LOG_DIR} ] && ls ${LOG_DIR}/*.log 2>/dev/null`);
+    const files = await run(`ls ${LOG_DIR}/*.log 2>/dev/null`);
     const fileList = files.split('\n').filter(f => f);
     
     if (fileList.length === 0) {
@@ -104,7 +108,6 @@ const updateIOTable = async () => {
 
     const searchTerm = document.getElementById('ioSearch').value.toLowerCase();
     const rows = raw.split('\n').reverse().map(line => {
-        // 提取包名(文件名)、时间、操作、详情
         const m = line.match(/([\w\.]+)\.log:\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
         if (!m) return null;
         
@@ -135,7 +138,7 @@ const switchTab = (tabId) => {
 
 document.getElementById('btnSaveMain').onclick = async () => {
     await run(`echo '${document.getElementById('mainConfig').value}' > ${BASE_DIR}/injector.conf`);
-    toast("主配置保存成功");
+    toast("主配置已保存");
 };
 
 document.getElementById('btnModalSave').onclick = async () => {
@@ -169,6 +172,6 @@ document.addEventListener('DOMContentLoaded', () => {
     ruleModal = new mdb.Modal(document.getElementById('ruleModal'));
     loadConfigs();
     run("pgrep injector").then(pid => {
-        document.getElementById('statusInfo').textContent = pid ? `运行中 (PID: ${pid.trim()})` : "未启动";
+        document.getElementById('statusInfo').textContent = pid ? `ONLINE (PID: ${pid.trim()})` : "OFFLINE";
     });
 });

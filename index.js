@@ -3,14 +3,13 @@ import './style.scss';
 import { exec, toast, fullScreen, enableInsets } from 'kernelsu';
 import * as mdb from 'mdb-ui-kit';
 
+fullScreen(false); 
+enableInsets(true); 
+
 const BASE_DIR = "/data/Namespace-Proxy";
 const LOG_DIR = `${BASE_DIR}/log`;
 const SERVICE_SH = "/data/adb/modules/Namespace-Proxy/service.sh";
 let ruleModal;
-
-// 初始化 KSU WebView 特性
-fullScreen(false); // 关闭网页全屏
-enableInsets(true); // 启用安全区域适配
 
 const run = async (cmd) => {
     try {
@@ -138,7 +137,7 @@ const switchTab = (tabId) => {
 
 document.getElementById('btnSaveMain').onclick = async () => {
     await run(`echo '${document.getElementById('mainConfig').value}' > ${BASE_DIR}/injector.conf`);
-    toast("主配置已保存");
+    toast("保存成功");
 };
 
 document.getElementById('btnModalSave').onclick = async () => {
@@ -151,7 +150,7 @@ document.getElementById('btnReload').onclick = async () => {
     toast("重启中..."); await run(`sh ${SERVICE_SH}`);
     setTimeout(() => {
         run("pgrep injector").then(pid => {
-            document.getElementById('statusInfo').textContent = pid ? `PID: ${pid.trim()}` : "已停止";
+            document.getElementById('statusInfo').textContent = pid ? `ONLINE (PID: ${pid.trim()})` : "OFFLINE";
         });
     }, 1000);
 };

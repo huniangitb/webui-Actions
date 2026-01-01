@@ -1,17 +1,14 @@
-:root { 
-    --code-font: "JetBrains Mono", monospace; 
-}
+:root { --code-font: "JetBrains Mono", monospace; }
 
 body { 
     background-color: #f8f9fa !important; 
     font-size: 14px; 
-    // 使用 KernelSU 提供的 Insets 变量
+    // 适配系统栏
     padding-top: var(--ksu-status-bar-height);
     padding-bottom: var(--ksu-navigation-bar-height);
 }
 
 .font-monospace { font-family: var(--code-font) !important; font-size: 12px !important; }
-
 .form-outline .form-control { padding-top: 1.2rem; }
 
 #logViewer {
@@ -20,7 +17,7 @@ body {
     padding: 12px; height: 500px; overflow-y: auto; border: none;
 }
 
-// 颜色定义
+// IO 颜色
 .op-OPEN   { background-color: #00bcd4 !important; }
 .op-READ   { background-color: #4caf50 !important; }
 .op-WRITE  { background-color: #ff9800 !important; }
@@ -29,12 +26,8 @@ body {
 .op-UNLINK, .op-RMDIR { background-color: #f44336 !important; }
 
 .pkg-badge { 
-    font-family: var(--code-font); 
-    font-size: 10px; 
-    max-width: 140px; 
-    overflow: hidden; 
-    text-overflow: ellipsis; 
-    display: inline-block;
+    font-family: var(--code-font); font-size: 10px; 
+    max-width: 140px; overflow: hidden; text-overflow: ellipsis; display: inline-block;
 }
 
 .log-time    { color: #888; }

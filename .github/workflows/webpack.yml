@@ -5,12 +5,12 @@ on:
   # 1. 当代码推送到 Clean-C-webui 分支时自动触发
   push:
     branches:
-      - Clean-C-webui
+      - fuse_webui
 
   # 2. 当有 Pull Request 指向 Clean-C-webui 分支时自动触发
   pull_request:
     branches:
-      - Clean-C-webui
+      - fuse_webui
 
   # 3. 保留手动触发功能
   workflow_dispatch:

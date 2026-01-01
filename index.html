@@ -7,11 +7,11 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
 </head>
 <body class="bg-light">
-    <div class="container py-3">
-        <!-- 头部状态栏 -->
-        <div class="d-flex justify-content-between align-items-center mb-4 px-2">
+    <div class="container-fluid px-0 px-md-3 py-3" style="max-width: 800px; margin: 0 auto;">
+        <!-- 头部 -->
+        <div class="d-flex justify-content-between align-items-center mb-3 px-3">
             <div>
-                <h4 class="mb-0 text-primary fw-bold">NAMESPACE PROXY</h4>
+                <h5 class="mb-0 text-primary fw-bold">NAMESPACE PROXY</h5>
                 <div class="d-flex align-items-center">
                     <span class="badge badge-success me-2" id="statusBadge">...</span>
                     <small id="statusInfo" class="text-muted font-monospace small">Checking</small>
@@ -20,123 +20,168 @@
             <button id="btnReload" class="btn btn-warning btn-floating shadow-0"><i class="fas fa-sync"></i></button>
         </div>
 
-        <!-- 导航栏 -->
-        <ul class="nav nav-tabs mb-3 shadow-0 bg-white rounded px-2" role="tablist">
-            <li class="nav-item"><a class="nav-link active" href="#content-apps">环境配置</a></li>
-            <li class="nav-item"><a class="nav-link" href="#content-global">全局设置</a></li>
-            <li class="nav-item"><a class="nav-link" href="#content-io">文件监控</a></li>
-            <li class="nav-item"><a class="nav-link" href="#content-log">运行日志</a></li>
+        <!-- 导航 -->
+        <ul class="nav nav-pills nav-fill mb-3 shadow-0 bg-white rounded mx-3 p-1" role="tablist">
+            <li class="nav-item"><a class="nav-link active rounded-5" href="#content-apps">应用绑定</a></li>
+            <li class="nav-item"><a class="nav-link rounded-5" href="#content-envs">环境管理</a></li>
+            <li class="nav-item"><a class="nav-link rounded-5" href="#content-io">监控</a></li>
+            <li class="nav-item"><a class="nav-link rounded-5" href="#content-log">日志</a></li>
         </ul>
 
-        <div class="tab-content">
-            <!-- 1. 环境配置 (应用列表) -->
+        <div class="tab-content px-3">
+            <!-- 1. 应用绑定列表 -->
             <div class="tab-pane fade show active" id="content-apps">
                 <div class="card shadow-0 border">
-                    <div class="card-body p-3">
-                        <!-- 筛选工具栏 -->
-                        <div class="d-flex gap-2 mb-3">
-                            <div class="flex-grow-1 form-outline border rounded bg-white">
-                                <input type="text" id="appSearch" class="form-control" />
-                                <label class="form-label">搜索应用或包名...</label>
-                            </div>
-                            <div class="btn-group shadow-0">
-                                <input type="radio" class="btn-check" name="appFilter" id="filterUser" autocomplete="off" checked />
-                                <label class="btn btn-outline-primary" for="filterUser">用户</label>
-                                
-                                <input type="radio" class="btn-check" name="appFilter" id="filterSystem" autocomplete="off" />
-                                <label class="btn btn-outline-primary" for="filterSystem">系统</label>
-                                
-                                <input type="radio" class="btn-check" name="appFilter" id="filterConfigured" autocomplete="off" />
-                                <label class="btn btn-outline-primary" for="filterConfigured">已配置</label>
-                            </div>
+                    <div class="card-body p-2">
+                        <!-- 筛选 -->
+                        <div class="input-group form-outline mb-3 border rounded bg-white">
+                            <input type="text" id="appSearch" class="form-control" placeholder="搜索应用..." />
+                            <button class="btn btn-light bg-transparent shadow-0" type="button"><i class="fas fa-search"></i></button>
                         </div>
-                        <!-- 应用列表容器 -->
-                        <div id="appList" class="list-group list-group-light border-0" style="min-height: 300px;">
-                            <div class="text-center p-5 text-muted"><i class="fas fa-circle-notch fa-spin fa-2x"></i></div>
+                        <div class="d-flex gap-2 mb-3 overflow-auto pb-1 no-scrollbar">
+                            <input type="radio" class="btn-check" name="appFilter" id="filterUser" checked />
+                            <label class="btn btn-sm btn-outline-primary rounded-pill flex-shrink-0" for="filterUser">用户应用</label>
+                            
+                            <input type="radio" class="btn-check" name="appFilter" id="filterSystem" />
+                            <label class="btn btn-sm btn-outline-primary rounded-pill flex-shrink-0" for="filterSystem">系统应用</label>
+                            
+                            <input type="radio" class="btn-check" name="appFilter" id="filterBound" />
+                            <label class="btn btn-sm btn-outline-primary rounded-pill flex-shrink-0" for="filterBound">已绑定</label>
                         </div>
+                        <!-- 列表 -->
+                        <div id="appList" class="list-group list-group-light border-0" style="min-height: 300px;"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- 2. 全局设置 -->
-            <div class="tab-pane fade" id="content-global">
+            <!-- 2. 环境管理 -->
+            <div class="tab-pane fade" id="content-envs">
                 <div class="card shadow-0 border">
-                    <div class="card-header bg-white"><h6 class="mb-0 fw-bold text-primary">全局注入脚本 (injector.conf)</h6></div>
-                    <div class="card-body">
-                        <textarea class="form-control font-monospace border bg-light mb-3" id="mainConfig" rows="15" style="resize: none;" placeholder="# 全局通用规则..."></textarea>
-                        <div class="text-end"><button id="btnSaveMain" class="btn btn-primary shadow-0"><i class="fas fa-save me-1"></i>保存全局配置</button></div>
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0 fw-bold">环境列表 (Environments)</h6>
+                            <button id="btnNewEnv" class="btn btn-primary btn-sm btn-rounded shadow-0"><i class="fas fa-plus me-1"></i>新建</button>
+                        </div>
+                        <div id="envList" class="row g-2"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- 3. 文件监控 -->
+            <!-- 3. 监控 -->
             <div class="tab-pane fade" id="content-io">
-                <div class="card shadow-0 bg-white border"><div class="card-body">
-                    <div class="form-outline mb-3 border rounded"><input type="text" id="ioSearch" class="form-control" /><label class="form-label">搜索日志...</label></div>
-                    <div class="table-responsive border" style="height: 500px;">
-                        <table class="table table-sm table-hover text-nowrap align-middle">
-                            <thead class="table-light sticky-top"><tr><th>时间</th><th>应用</th><th class="text-center">操作</th><th>详情</th></tr></thead>
-                            <tbody id="ioTableBody" class="font-monospace"></tbody>
+                <div class="card shadow-0 bg-white border"><div class="card-body p-2">
+                    <div class="form-outline mb-2 border rounded"><input type="text" id="ioSearch" class="form-control form-control-sm" placeholder="搜索..." /></div>
+                    <div class="table-responsive border rounded" style="height: 500px;">
+                        <table class="table table-sm table-hover text-nowrap align-middle mb-0">
+                            <thead class="table-light sticky-top"><tr><th>时间</th><th>应用</th><th>操作</th><th>详情</th></tr></thead>
+                            <tbody id="ioTableBody" class="font-monospace" style="font-size: 11px;"></tbody>
                         </table>
                     </div>
                 </div></div>
             </div>
 
-            <!-- 4. 运行日志 -->
+            <!-- 4. 日志 -->
             <div class="tab-pane fade" id="content-log">
-                <div class="card shadow-0 bg-white border"><div class="card-body">
-                    <select id="logFileSelect" class="form-select mb-3 border bg-light shadow-none font-monospace"></select>
-                    <div id="logViewer" class="rounded font-monospace"></div>
+                <div class="card shadow-0 bg-white border"><div class="card-body p-2">
+                    <select id="logFileSelect" class="form-select form-select-sm mb-2 font-monospace"></select>
+                    <div id="logViewer" class="rounded font-monospace p-2 bg-dark text-light" style="height: 500px; overflow: auto; font-size: 11px;"></div>
                 </div></div>
             </div>
         </div>
     </div>
 
-    <!-- 规则编辑模态框 -->
-    <div class="modal fade" id="ruleModal" tabindex="-1" data-mdb-backdrop="static">
+    <!-- 模态框：应用绑定配置 -->
+    <div class="modal fade" id="appConfigModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold">应用绑定</h5>
+                <button type="button" class="btn-close" data-mdb-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex align-items-center mb-4">
+                    <div id="bindAppIcon" class="me-3" style="width: 48px; height: 48px;"></div>
+                    <div>
+                        <div class="fw-bold" id="bindAppName">App Name</div>
+                        <small class="text-muted font-monospace" id="bindAppPkg">com.pkg</small>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small text-muted fw-bold">选择环境 (Environment)</label>
+                    <select id="bindEnvSelect" class="form-select">
+                        <option value="">未绑定 (默认)</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small text-muted fw-bold">运行模式 (Mode)</label>
+                    <div class="btn-group w-100 shadow-0" role="group">
+                        <input type="radio" class="btn-check" name="bindMode" id="modeDefault" value="" checked>
+                        <label class="btn btn-outline-secondary" for="modeDefault">默认</label>
+
+                        <input type="radio" class="btn-check" name="bindMode" id="modeMonitor" value="MONITOR">
+                        <label class="btn btn-outline-warning" for="modeMonitor">MONITOR</label>
+
+                        <input type="radio" class="btn-check" name="bindMode" id="modePassthrough" value="PASSTHROUGH">
+                        <label class="btn btn-outline-danger" for="modePassthrough">PASSTHROUGH</label>
+                    </div>
+                    <div class="form-text small mt-2">
+                        <i class="fas fa-info-circle me-1"></i>
+                        <span id="modeDesc">默认模式：应用规则生效。MONITOR：仅记录日志。PASSTHROUGH：直通模式(忽略规则)。</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-top-0">
+                <button type="button" class="btn btn-primary w-100 shadow-0" id="btnSaveBinding">保存绑定</button>
+            </div>
+        </div></div>
+    </div>
+
+    <!-- 模态框：新建环境 -->
+    <div class="modal fade" id="newEnvModal" tabindex="-1">
+        <div class="modal-dialog modal-sm modal-dialog-centered"><div class="modal-content border-0">
+            <div class="modal-body">
+                <h6 class="fw-bold mb-3">新建环境</h6>
+                <div class="form-outline border rounded mb-3">
+                    <input type="text" id="newEnvName" class="form-control" />
+                    <label class="form-label">环境名称 (英文)</label>
+                </div>
+                <button id="btnCreateEnv" class="btn btn-primary w-100 shadow-0">创建</button>
+            </div>
+        </div></div>
+    </div>
+
+    <!-- 模态框：环境规则编辑 (复用之前的逻辑) -->
+    <div class="modal fade" id="envEditorModal" tabindex="-1" data-mdb-backdrop="static">
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0" style="height: 85vh;">
-                <div class="modal-header bg-light border-bottom-0 pb-2">
-                    <div class="d-flex align-items-center">
-                        <div id="modalAppIconContainer" class="me-3" style="width: 48px; height: 48px;"></div>
-                        <div>
-                            <h5 class="modal-title fw-bold" id="modalAppName">Application</h5>
-                            <div class="d-flex align-items-center gap-2">
-                                <small class="text-muted font-monospace" id="modalAppPkg">com.example.app</small>
-                                <span class="badge badge-light text-dark border" id="modalAppUid">UID: -</span>
-                            </div>
-                        </div>
+                <div class="modal-header bg-light border-bottom-0 py-2">
+                    <div>
+                        <h5 class="modal-title fw-bold"><i class="fas fa-layer-group me-2"></i><span id="editorEnvName">Env</span></h5>
+                        <small class="text-muted">环境规则配置</small>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                          <div class="btn-group shadow-0 btn-group-sm">
-                            <input type="radio" class="btn-check" name="editorMode" id="modeVisual" autocomplete="off" checked />
-                            <label class="btn btn-outline-secondary" for="modeVisual">图形模式</label>
-                            <input type="radio" class="btn-check" name="editorMode" id="modeRaw" autocomplete="off" />
-                            <label class="btn btn-outline-secondary" for="modeRaw">源码模式</label>
+                            <input type="radio" class="btn-check" name="editorMode" id="modeVisual" checked />
+                            <label class="btn btn-outline-secondary" for="modeVisual">图形</label>
+                            <input type="radio" class="btn-check" name="editorMode" id="modeRaw" />
+                            <label class="btn btn-outline-secondary" for="modeRaw">源码</label>
                         </div>
                         <button type="button" class="btn-close ms-2" data-mdb-dismiss="modal"></button>
                     </div>
                 </div>
-                
                 <div class="modal-body bg-light p-0">
-                    <!-- 图形编辑器 -->
                     <div id="editorVisual" class="p-3 h-100 overflow-auto">
-                        <div class="alert alert-info py-2 small mb-3"><i class="fas fa-info-circle me-1"></i> 配置该应用访问文件系统时的重定向或隐藏规则。</div>
                         <div id="ruleBuilderContainer"></div>
-                        <button id="btnAddRuleRow" class="btn btn-outline-primary btn-sm btn-rounded shadow-0 mt-2 w-100 border-dashed">
-                            <i class="fas fa-plus me-1"></i> 添加规则
-                        </button>
+                        <button id="btnAddRuleRow" class="btn btn-outline-primary btn-sm btn-rounded shadow-0 mt-2 w-100 border-dashed"><i class="fas fa-plus"></i> 添加规则</button>
                     </div>
-                    <!-- 源码编辑器 -->
                     <div id="editorRaw" class="h-100 d-none">
-                        <textarea class="form-control font-monospace border-0 h-100 p-3" id="modalRuleContent" style="resize: none; background: #1e1e1e; color: #d4d4d4;"></textarea>
+                        <textarea class="form-control font-monospace border-0 h-100 p-3 bg-dark text-light" id="envRuleContent" style="resize: none;"></textarea>
                     </div>
                 </div>
-
-                <div class="modal-footer border-top-0 pt-2">
-                    <button id="btnDeleteRule" class="btn btn-danger shadow-0 me-auto"><i class="fas fa-trash me-1"></i> 清除配置</button>
-                    <button class="btn btn-light shadow-0" data-mdb-dismiss="modal">取消</button>
-                    <button id="btnModalSave" class="btn btn-primary shadow-0 px-4"><i class="fas fa-save me-1"></i> 保存配置</button>
+                <div class="modal-footer border-top-0 py-2">
+                    <button id="btnDeleteEnv" class="btn btn-outline-danger btn-sm shadow-0 me-auto">删除环境</button>
+                    <button id="btnSaveEnv" class="btn btn-primary shadow-0 px-4">保存</button>
                 </div>
             </div>
         </div>

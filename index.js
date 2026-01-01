@@ -2,410 +2,369 @@ import 'mdb-ui-kit/css/mdb.min.css';
 import './style.scss';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import * as mdb from 'mdb-ui-kit';
-import { mdiAndroid, mdiFolderGoogleDrive, mdiEyeOff, mdiSwapHorizontal, mdiDelete } from '@mdi/js';
+import { mdiAndroid, mdiLayers, mdiSwapHorizontal, mdiEyeOff, mdiDelete, mdiPencil } from '@mdi/js';
 
-// --- 常量与全局变量 ---
+// --- 常量 ---
 const BASE_DIR = "/data/Namespace-Proxy";
 const LOG_DIR = `${BASE_DIR}/log`;
+const INJECTOR_CONF = `${BASE_DIR}/injector.conf`;
 const SERVICE_SH = "/data/adb/modules/Namespace-Proxy/service.sh";
 
-let ruleModalInstance;
-let appMap = new Map(); // 缓存所有应用信息: pkg -> info
-let configMap = new Set(); // 缓存有配置文件的包名
-let currentEditingPkg = null;
+// --- 状态 ---
+let appConfigModal, envEditorModal, newEnvModal;
+let appMap = new Map(); // Pkg -> Info
+let envList = []; // Array of strings (env names)
+let registry = new Map(); // Pkg -> { env: string, param: string }
+let currentEditingEnv = null;
+let currentBindingPkg = null;
 
-// SVG 图标生成器
+// --- 图标 ---
 const getSvg = (path, size = 24, color = 'currentColor') => 
     `<svg viewBox="0 0 24 24" fill="${color}" width="${size}" height="${size}"><path d="${path}"/></svg>`;
-
 const ICONS = {
     ANDROID: getSvg(mdiAndroid, 32, '#757575'),
-    REDIRECT: getSvg(mdiSwapHorizontal, 18, '#00b74a'),
-    HIDE: getSvg(mdiEyeOff, 18, '#f93154'),
-    DELETE: getSvg(mdiDelete, 16, 'currentColor')
+    ENV: getSvg(mdiLayers, 24, '#1266f1'),
+    DELETE: getSvg(mdiDelete, 16, 'currentColor'),
+    EDIT: getSvg(mdiPencil, 16, 'currentColor')
 };
 
-// --- 工具函数 ---
+// --- 核心工具 ---
 const run = async (cmd) => {
-    try {
-        const res = await exec(cmd);
-        return res && res.stdout ? res.stdout.trim() : "";
-    } catch (e) { return ""; }
+    try { const res = await exec(cmd); return res.stdout ? res.stdout.trim() : ""; } catch (e) { return ""; }
 };
 
-const highlightLog = (text) => {
-    if (!text) return '';
-    return text
-        .replace(/#(.*)/g, '<span class="log-comment">#$1</span>')
-        .replace(/\b(REDIRECT|HIDE)\b/g, '<span class="log-keyword">$1</span>')
-        .replace(/\[([\d:]+)\]/g, '<span class="log-time">[$1]</span>')
-        .replace(/\[IO\]/g, '<span class="log-io-tag">[IO]</span>');
-};
-
-// --- 核心逻辑: 数据加载 ---
-const loadAllData = async () => {
-    const listContainer = document.getElementById('appList');
-    listContainer.innerHTML = '<div class="text-center p-5 text-muted"><i class="fas fa-circle-notch fa-spin fa-2x"></i><div class="mt-2">加载应用列表...</div></div>';
-
+// --- 数据加载 ---
+const loadData = async () => {
     try {
-        // 1. 获取已存在的配置文件
-        const confFiles = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
-        configMap.clear();
-        confFiles.split('\n').forEach(f => {
-            const name = f.split('/').pop().replace('.conf', '');
-            if (name && name !== 'injector') configMap.add(name);
+        // 1. 读取环境列表 (*.conf 排除 injector.conf)
+        const files = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
+        envList = files.split('\n')
+            .map(f => f.split('/').pop().replace('.conf', ''))
+            .filter(n => n && n !== 'injector');
+
+        // 2. 读取注册表 (injector.conf)
+        // 格式: com.pkg EnvName [PARAM]
+        const regContent = await run(`cat ${INJECTOR_CONF} 2>/dev/null`);
+        registry.clear();
+        regContent.split('\n').forEach(line => {
+            line = line.trim();
+            if (!line || line.startsWith('#')) return;
+            const parts = line.split(/\s+/);
+            if (parts.length >= 2) {
+                registry.set(parts[0], {
+                    env: parts[1],
+                    param: parts[2] || "" // PASSTHROUGH or MONITOR
+                });
+            }
         });
 
-        // 2. 获取已安装应用列表 (用户+系统)
-        // 注意：listPackages 行为取决于 KSU 版本，这里尝试获取所有并合并
+        // 3. 读取应用列表
         const userPkgs = await listPackages('user') || [];
         const systemPkgs = await listPackages('system') || [];
-        const allPkgs = [...new Set([...userPkgs, ...systemPkgs])]; // 去重
-
-        // 3. 批量获取应用详情
+        const allPkgs = [...new Set([...userPkgs, ...systemPkgs])];
+        
         const infos = await getPackagesInfo(allPkgs);
         appMap.clear();
-        
         if (Array.isArray(infos)) {
             infos.forEach(info => {
                 if (info && info.packageName) {
+                    const reg = registry.get(info.packageName);
                     appMap.set(info.packageName, {
                         ...info,
-                        hasConfig: configMap.has(info.packageName)
+                        boundEnv: reg ? reg.env : null,
+                        boundParam: reg ? reg.param : null
                     });
                 }
             });
         }
 
-        // 4. 渲染列表
         renderAppList();
+        renderEnvList();
 
-    } catch (e) {
-        toast("数据加载失败: " + e.message);
-        listContainer.innerHTML = `<div class="text-center p-4 text-danger">加载失败<br>${e.message}</div>`;
-    }
+    } catch (e) { toast("加载失败: " + e.message); }
 };
 
-// --- 核心逻辑: 列表渲染 ---
+// --- 渲染: 应用列表 ---
 const renderAppList = () => {
-    const listContainer = document.getElementById('appList');
-    const searchTerm = document.getElementById('appSearch').value.toLowerCase();
-    const filterType = document.querySelector('input[name="appFilter"]:checked').id; // filterUser, filterSystem, filterConfigured
+    const listEl = document.getElementById('appList');
+    const search = document.getElementById('appSearch').value.toLowerCase();
+    const filter = document.querySelector('input[name="appFilter"]:checked').id;
 
     const items = [];
     appMap.forEach(app => {
-        // 筛选逻辑
-        if (filterType === 'filterUser' && app.isSystem) return;
-        if (filterType === 'filterSystem' && !app.isSystem) return;
-        if (filterType === 'filterConfigured' && !app.hasConfig) return;
+        if (filter === 'filterUser' && app.isSystem) return;
+        if (filter === 'filterSystem' && !app.isSystem) return;
+        if (filter === 'filterBound' && !app.boundEnv) return;
 
-        // 搜索逻辑
         const label = app.appLabel || app.packageName;
-        if (searchTerm && !label.toLowerCase().includes(searchTerm) && !app.packageName.toLowerCase().includes(searchTerm)) return;
-
+        if (search && !label.toLowerCase().includes(search) && !app.packageName.toLowerCase().includes(search)) return;
         items.push(app);
     });
 
-    // 排序: 已配置优先 -> 中文名排序
-    items.sort((a, b) => {
-        if (a.hasConfig !== b.hasConfig) return b.hasConfig - a.hasConfig;
-        return (a.appLabel || "").localeCompare(b.appLabel || "", 'zh');
-    });
+    // 排序: 已绑定优先
+    items.sort((a, b) => (!!b.boundEnv - !!a.boundEnv) || (a.appLabel||"").localeCompare(b.appLabel||""));
 
-    if (items.length === 0) {
-        listContainer.innerHTML = '<div class="p-5 text-center text-muted">未找到匹配的应用</div>';
-        return;
-    }
+    listEl.innerHTML = items.length ? items.map(app => {
+        let badge = "";
+        if (app.boundEnv) {
+            let color = "primary";
+            let text = app.boundEnv;
+            if (app.boundParam === 'MONITOR') { color = "warning"; text += " (M)"; }
+            if (app.boundParam === 'PASSTHROUGH') { color = "danger"; text += " (P)"; }
+            badge = `<span class="badge badge-${color} shadow-0 ms-auto">${text}</span>`;
+        }
 
-    listContainer.innerHTML = items.map(app => {
-        const label = app.appLabel || app.packageName;
-        const statusBadge = app.hasConfig 
-            ? `<span class="badge badge-success shadow-0 ms-2">已配置</span>` 
-            : ``;
-        
         return `
-        <div class="list-group-item list-group-item-action d-flex align-items-center px-3 py-2 border-0 border-bottom" 
-             onclick="openRuleEditor('${app.packageName}')">
-            <div class="me-3 app-icon-wrapper">${ICONS.ANDROID}</div>
+        <div class="list-group-item list-group-item-action d-flex align-items-center px-2 py-2 border-0 border-bottom" 
+             onclick="openAppConfig('${app.packageName}')">
+            <div class="me-3">${ICONS.ANDROID}</div>
             <div class="flex-grow-1 overflow-hidden">
-                <div class="d-flex align-items-center">
-                    <div class="fw-bold text-dark text-truncate">${label}</div>
-                    ${statusBadge}
+                <div class="d-flex align-items-center w-100">
+                    <div class="fw-bold text-dark text-truncate me-2">${app.appLabel}</div>
+                    ${badge}
                 </div>
-                <div class="d-flex justify-content-between">
-                    <small class="text-muted font-monospace text-truncate" style="max-width: 80%">${app.packageName}</small>
-                    <small class="text-muted ms-2">${app.isSystem ? 'System' : 'User'}</small>
+                <small class="text-muted font-monospace text-truncate d-block">${app.packageName}</small>
+            </div>
+        </div>`;
+    }).join('') : '<div class="text-center p-4 text-muted">无匹配应用</div>';
+};
+
+// --- 渲染: 环境列表 ---
+const renderEnvList = () => {
+    const listEl = document.getElementById('envList');
+    listEl.innerHTML = envList.map(env => `
+        <div class="col-12 col-md-6">
+            <div class="card shadow-0 border h-100 hover-shadow" onclick="openEnvEditor('${env}')" style="cursor:pointer">
+                <div class="card-body p-3 d-flex align-items-center">
+                    <div class="me-3 text-primary">${ICONS.ENV}</div>
+                    <div class="flex-grow-1">
+                        <h6 class="mb-0 fw-bold">${env}</h6>
+                        <small class="text-muted">点击编辑规则</small>
+                    </div>
+                    <i class="fas fa-chevron-right text-muted opacity-25"></i>
                 </div>
             </div>
-            <i class="fas fa-chevron-right text-muted opacity-25 ms-2"></i>
-        </div>`;
-    }).join('');
+        </div>
+    `).join('') + `
+        <div class="col-12 text-center mt-3 text-muted small" style="display: ${envList.length===0?'block':'none'}">
+            暂无环境，请点击右上角新建
+        </div>
+    `;
 };
 
-// --- 核心逻辑: 规则编辑器 ---
-window.openRuleEditor = async (pkgName) => {
-    currentEditingPkg = pkgName;
-    const app = appMap.get(pkgName) || { packageName: pkgName, appLabel: pkgName, uid: '?' };
+// --- 交互: 应用绑定 ---
+window.openAppConfig = (pkg) => {
+    currentBindingPkg = pkg;
+    const app = appMap.get(pkg);
+    document.getElementById('bindAppName').textContent = app.appLabel;
+    document.getElementById('bindAppPkg').textContent = pkg;
+    document.getElementById('bindAppIcon').innerHTML = ICONS.ANDROID;
+
+    // 填充环境下拉
+    const select = document.getElementById('bindEnvSelect');
+    select.innerHTML = '<option value="">未绑定 (清除)</option>' + 
+        envList.map(e => `<option value="${e}">${e}</option>`).join('');
+    select.value = app.boundEnv || "";
+
+    // 设置模式
+    const mode = app.boundParam || ""; // "MONITOR", "PASSTHROUGH", or ""
+    document.getElementById(mode === 'MONITOR' ? 'modeMonitor' : (mode === 'PASSTHROUGH' ? 'modePassthrough' : 'modeDefault')).checked = true;
+
+    appConfigModal.show();
+};
+
+document.getElementById('btnSaveBinding').onclick = async () => {
+    const env = document.getElementById('bindEnvSelect').value;
+    const modeEl = document.querySelector('input[name="bindMode"]:checked');
+    const mode = modeEl ? modeEl.value : "";
+
+    if (env) {
+        registry.set(currentBindingPkg, { env, param: mode });
+    } else {
+        registry.delete(currentBindingPkg);
+    }
+
+    // 保存 injector.conf
+    let content = "# Generated by WebUI\n";
+    registry.forEach((val, key) => {
+        content += `${key} ${val.env} ${val.param}\n`;
+    });
     
-    // UI 初始化
-    document.getElementById('modalAppName').textContent = app.appLabel;
-    document.getElementById('modalAppPkg').textContent = app.packageName;
-    document.getElementById('modalAppUid').textContent = `UID: ${app.uid}`;
-    document.getElementById('modalAppIconContainer').innerHTML = ICONS.ANDROID;
+    await exec(`echo '${content}' > ${INJECTOR_CONF}`);
+    toast("绑定已更新");
+    appConfigModal.hide();
+    loadData(); // 刷新
+};
+
+// --- 交互: 环境管理 ---
+document.getElementById('btnNewEnv').onclick = () => {
+    document.getElementById('newEnvName').value = '';
+    newEnvModal.show();
+};
+
+document.getElementById('btnCreateEnv').onclick = async () => {
+    const name = document.getElementById('newEnvName').value.trim();
+    if (!name || !/^[a-zA-Z0-9_-]+$/.test(name)) { toast("名称非法"); return; }
+    if (envList.includes(name)) { toast("环境已存在"); return; }
+
+    await exec(`touch ${BASE_DIR}/${name}.conf`);
+    newEnvModal.hide();
+    loadData();
+};
+
+window.openEnvEditor = async (envName) => {
+    currentEditingEnv = envName;
+    document.getElementById('editorEnvName').textContent = envName;
+    const content = await run(`cat ${BASE_DIR}/${envName}.conf 2>/dev/null`);
+    document.getElementById('envRuleContent').value = content;
     
-    // 加载内容
-    const content = await run(`cat ${BASE_DIR}/${pkgName}.conf 2>/dev/null`);
-    document.getElementById('modalRuleContent').value = content;
-    
-    // 初始化图形界面
     parseConfigToVisual(content);
-    
-    // 默认切回图形模式
-    document.getElementById('modeVisual').click();
-    
-    ruleModalInstance.show();
+    document.getElementById('modeVisual').click(); // 默认图形
+    envEditorModal.show();
 };
 
-// 解析 Config 文本到图形界面
+document.getElementById('btnSaveEnv').onclick = async () => {
+    const isVisual = document.getElementById('modeVisual').checked;
+    const content = isVisual ? generateConfigFromVisual() : document.getElementById('envRuleContent').value;
+    
+    await exec(`echo '${content}' > ${BASE_DIR}/${currentEditingEnv}.conf`);
+    toast("规则已保存");
+    envEditorModal.hide();
+};
+
+document.getElementById('btnDeleteEnv').onclick = async () => {
+    if(!confirm(`删除环境 ${currentEditingEnv} ?\n绑定此环境的应用将失效。`)) return;
+    await run(`rm ${BASE_DIR}/${currentEditingEnv}.conf`);
+    
+    // 清理注册表中的无效引用 (可选，这里做清理)
+    let dirty = false;
+    registry.forEach((val, key) => {
+        if (val.env === currentEditingEnv) {
+            registry.delete(key);
+            dirty = true;
+        }
+    });
+    if (dirty) {
+        let content = "# Generated by WebUI\n";
+        registry.forEach((val, key) => content += `${key} ${val.env} ${val.param}\n`);
+        await exec(`echo '${content}' > ${INJECTOR_CONF}`);
+    }
+
+    envEditorModal.hide();
+    loadData();
+};
+
+// --- 图形编辑器逻辑 (复用并简化) ---
 const parseConfigToVisual = (text) => {
     const container = document.getElementById('ruleBuilderContainer');
     container.innerHTML = '';
-    
-    const lines = text.split('\n');
-    lines.forEach(line => {
-        line = line.trim();
-        if (!line || line.startsWith('#')) return; // 忽略注释和空行
-
-        // 简单解析: REDIRECT <target> <source> 或 HIDE <target>
-        // 注意：路径中可能包含空格，这里假设标准格式为空格分隔
-        // 更健壮的解析可能需要正则，这里简化处理
-        const parts = line.split(/\s+/);
-        const type = parts[0];
-        
-        if (type === 'REDIRECT' && parts.length >= 3) {
-            const target = parts[1];
-            const source = parts.slice(2).join(' '); // 剩余部分作为 source
-            addRuleRow('REDIRECT', target, source);
-        } else if (type === 'HIDE' && parts.length >= 2) {
-            const target = parts.slice(1).join(' ');
-            addRuleRow('HIDE', target, '');
-        }
+    text.split('\n').forEach(line => {
+        const parts = line.trim().split(/\s+/);
+        if (parts[0] === 'REDIRECT' && parts.length >= 3) addRuleRow('REDIRECT', parts[1], parts.slice(2).join(' '));
+        else if (parts[0] === 'HIDE' && parts.length >= 2) addRuleRow('HIDE', parts.slice(1).join(' '), '');
     });
-    
-    if (container.children.length === 0) {
-        // 如果没有规则，默认添加一行空的
-        addRuleRow('REDIRECT', '', '');
-    }
+    if (container.children.length === 0) addRuleRow('REDIRECT', '', '');
 };
 
-// 添加一行规则输入框
-const addRuleRow = (type = 'REDIRECT', target = '', source = '') => {
-    const container = document.getElementById('ruleBuilderContainer');
+const addRuleRow = (type, target, source) => {
     const div = document.createElement('div');
     div.className = 'rule-row card shadow-0 border mb-2 bg-white';
     div.innerHTML = `
         <div class="card-body p-2 d-flex align-items-center gap-2">
-            <select class="form-select form-select-sm rule-type" style="width: 110px; flex-shrink: 0;">
-                <option value="REDIRECT" ${type === 'REDIRECT' ? 'selected' : ''}>重定向</option>
-                <option value="HIDE" ${type === 'HIDE' ? 'selected' : ''}>隐藏</option>
-            </select>
+            <select class="form-select form-select-sm rule-type" style="width:100px"><option value="REDIRECT">重定向</option><option value="HIDE">隐藏</option></select>
             <div class="flex-grow-1 d-flex flex-column gap-1">
-                <input type="text" class="form-control form-control-sm font-monospace rule-target" placeholder="目标路径 (Target)" value="${target}">
-                <input type="text" class="form-control form-control-sm font-monospace rule-source ${type === 'HIDE' ? 'd-none' : ''}" placeholder="源路径 (Source)" value="${source}">
+                <input type="text" class="form-control form-control-sm font-monospace rule-target" placeholder="Target" value="${target}">
+                <input type="text" class="form-control form-control-sm font-monospace rule-source" placeholder="Source" value="${source}">
             </div>
-            <button class="btn btn-link text-danger px-2 btn-del-row">${ICONS.DELETE}</button>
-        </div>
-    `;
+            <button class="btn btn-link text-danger px-2 btn-del">${ICONS.DELETE}</button>
+        </div>`;
+    div.querySelector('.rule-type').value = type;
+    if(type==='HIDE') div.querySelector('.rule-source').classList.add('d-none');
     
-    // 事件绑定
-    const select = div.querySelector('.rule-type');
-    const sourceInput = div.querySelector('.rule-source');
-    select.onchange = () => {
-        if (select.value === 'HIDE') sourceInput.classList.add('d-none');
-        else sourceInput.classList.remove('d-none');
+    div.querySelector('.rule-type').onchange = (e) => {
+        div.querySelector('.rule-source').classList.toggle('d-none', e.target.value === 'HIDE');
     };
-    
-    div.querySelector('.btn-del-row').onclick = () => div.remove();
-    container.appendChild(div);
+    div.querySelector('.btn-del').onclick = () => div.remove();
+    document.getElementById('ruleBuilderContainer').appendChild(div);
 };
 
-// 从图形界面生成 Config 文本
 const generateConfigFromVisual = () => {
-    const rows = document.querySelectorAll('.rule-row');
-    let config = "# Generated by GUI\n";
-    rows.forEach(row => {
+    let res = "";
+    document.querySelectorAll('.rule-row').forEach(row => {
         const type = row.querySelector('.rule-type').value;
         const target = row.querySelector('.rule-target').value.trim();
         const source = row.querySelector('.rule-source').value.trim();
-        
-        if (!target) return;
-        
-        if (type === 'REDIRECT' && source) {
-            config += `REDIRECT ${target} ${source}\n`;
-        } else if (type === 'HIDE') {
-            config += `HIDE ${target}\n`;
-        }
+        if(target) res += type === 'REDIRECT' ? `REDIRECT ${target} ${source}\n` : `HIDE ${target}\n`;
     });
-    return config;
+    return res;
 };
+document.getElementById('btnAddRuleRow').onclick = () => addRuleRow('REDIRECT', '', '');
 
-// 保存规则
-document.getElementById('btnModalSave').onclick = async () => {
-    const isVisual = document.getElementById('modeVisual').checked;
-    let content = "";
-    
-    if (isVisual) {
-        content = generateConfigFromVisual();
-    } else {
-        content = document.getElementById('modalRuleContent').value;
-    }
-    
-    const res = await exec(`echo '${content}' > ${BASE_DIR}/${currentEditingPkg}.conf`);
-    if (res.errno === 0) {
-        toast("保存成功");
-        ruleModalInstance.hide();
-        // 更新缓存状态
-        const app = appMap.get(currentEditingPkg);
-        if (app) app.hasConfig = true;
-        renderAppList();
-    } else {
-        toast("保存失败");
-    }
-};
-
-// 删除规则
-document.getElementById('btnDeleteRule').onclick = async () => {
-    if (!confirm("确定要删除此应用的所有环境规则吗？")) return;
-    await run(`rm ${BASE_DIR}/${currentEditingPkg}.conf`);
-    const app = appMap.get(currentEditingPkg);
-    if (app) app.hasConfig = false;
-    ruleModalInstance.hide();
-    renderAppList();
-    toast("规则已删除");
-};
-
-// 编辑器模式切换
-document.querySelectorAll('input[name="editorMode"]').forEach(el => {
-    el.onchange = () => {
-        const visual = document.getElementById('editorVisual');
-        const raw = document.getElementById('editorRaw');
-        if (document.getElementById('modeVisual').checked) {
-            // Raw -> Visual (尝试解析)
-            parseConfigToVisual(document.getElementById('modalRuleContent').value);
-            visual.classList.remove('d-none');
-            raw.classList.add('d-none');
-        } else {
-            // Visual -> Raw
-            document.getElementById('modalRuleContent').value = generateConfigFromVisual();
-            visual.classList.add('d-none');
-            raw.classList.remove('d-none');
-        }
-    };
-});
-
-document.getElementById('btnAddRuleRow').onclick = () => addRuleRow();
-
-// --- 监控逻辑优化 ---
+// --- 监控与日志 (保持原有逻辑简化) ---
 const updateIOTable = async () => {
     const tbody = document.getElementById('ioTableBody');
     const raw = await run(`grep -H "\\[IO\\]" ${LOG_DIR}/*.log | grep -v "injector.log" | tail -n 100`);
-    if (!raw) { tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted small">暂无活动</td></tr>'; return; }
+    if (!raw) { tbody.innerHTML = '<tr><td colspan="4" class="text-center p-3 text-muted">无活动</td></tr>'; return; }
     
-    const searchTerm = (document.getElementById('ioSearch').value || "").toLowerCase();
-    
+    const term = document.getElementById('ioSearch').value.toLowerCase();
     tbody.innerHTML = raw.split('\n').reverse().map(line => {
         const m = line.match(/\/([^\/]+)\.log:\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
         if (!m) return null;
-        
         const [_, pkg, time, op, details] = m;
-        // 使用 appMap 获取应用名称
-        const appInfo = appMap.get(pkg);
-        const appName = appInfo ? appInfo.appLabel : pkg;
-        
-        // 搜索过滤
-        if (searchTerm && 
-            !appName.toLowerCase().includes(searchTerm) && 
-            !pkg.toLowerCase().includes(searchTerm) && 
-            !details.toLowerCase().includes(searchTerm)) return null;
-        
-        const displayDetails = details.replace(' -> ', ' <i class="fas fa-arrow-right mx-1 opacity-50"></i> ');
-        
+        const app = appMap.get(pkg);
+        const name = app ? app.appLabel : pkg;
+        if (term && !name.toLowerCase().includes(term) && !details.toLowerCase().includes(term)) return null;
         return `<tr>
-            <td class="text-muted small">${time}</td>
-            <td>
-                <div class="fw-bold text-dark" style="font-size: 12px;">${appName}</div>
-                <div class="text-muted" style="font-size: 10px;">${pkg}</div>
-            </td>
-            <td class="text-center"><span class="badge shadow-0 op-${op}">${op}</span></td>
-            <td class="text-wrap-path small">${displayDetails}</td>
+            <td class="text-muted">${time}</td>
+            <td><div class="fw-bold">${name}</div></td>
+            <td><span class="badge shadow-0 op-${op}">${op}</span></td>
+            <td class="text-wrap-path">${details.replace(' -> ', ' <i class="fas fa-arrow-right opacity-50"></i> ')}</td>
         </tr>`;
-    }).filter(r => r).join('');
-};
-
-// --- 通用事件 ---
-document.getElementById('appSearch').oninput = renderAppList;
-document.querySelectorAll('input[name="appFilter"]').forEach(el => el.onchange = renderAppList);
-
-// Tab 切换逻辑
-document.querySelectorAll('.nav-link').forEach(el => {
-    el.onclick = (e) => {
-        e.preventDefault();
-        document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('show', 'active'));
-        
-        el.classList.add('active');
-        const targetId = el.getAttribute('href').replace('#', '');
-        document.getElementById(targetId).classList.add('show', 'active');
-        
-        if (targetId === 'content-global') loadGlobalConfig();
-        if (targetId === 'content-log') loadLogs();
-        if (targetId === 'content-io') updateIOTable();
-    };
-});
-
-const loadGlobalConfig = async () => {
-    const main = await run(`cat ${BASE_DIR}/injector.conf 2>/dev/null`);
-    document.getElementById('mainConfig').value = main;
-};
-
-document.getElementById('btnSaveMain').onclick = async () => {
-    const res = await exec(`echo '${document.getElementById('mainConfig').value}' > ${BASE_DIR}/injector.conf`);
-    if (res.errno === 0) toast("全局配置已保存");
+    }).filter(r=>r).join('');
 };
 
 const loadLogs = async () => {
     const select = document.getElementById('logFileSelect');
-    const viewer = document.getElementById('logViewer');
-    const filesRaw = await run(`ls ${LOG_DIR}/*.log 2>/dev/null`);
-    const fileList = filesRaw.split('\n').filter(f => f);
-    
-    // 保持选中状态
-    const current = select.value;
-    select.innerHTML = fileList.map(f => {
-        const name = f.split('/').pop();
-        const label = name === 'injector.log' ? '系统日志 (injector.log)' : name;
-        return `<option value="${name}" ${name === current ? 'selected' : ''}>${label}</option>`;
+    const files = (await run(`ls ${LOG_DIR}/*.log 2>/dev/null`)).split('\n').filter(f=>f);
+    const cur = select.value;
+    select.innerHTML = files.map(f => {
+        const n = f.split('/').pop();
+        return `<option value="${n}" ${n===cur?'selected':''}>${n}</option>`;
     }).join('');
-    
-    const target = select.value || (fileList[0] ? fileList[0].split('/').pop() : "");
-    if (target) {
-        const content = await run(`tail -c 50000 ${LOG_DIR}/${target} 2>/dev/null`);
-        viewer.innerHTML = highlightLog(content);
-        viewer.scrollTop = viewer.scrollHeight;
+    if (select.value) {
+        document.getElementById('logViewer').innerHTML = (await run(`tail -c 50000 ${LOG_DIR}/${select.value} 2>/dev/null`))
+            .replace(/\[IO\]/g, '<span class="text-info">[IO]</span>');
     }
 };
-document.getElementById('logFileSelect').onchange = loadLogs;
 
-// 初始化
+// --- 初始化 ---
 document.addEventListener('DOMContentLoaded', () => {
-    ruleModalInstance = new mdb.Modal(document.getElementById('ruleModal'));
-    loadAllData();
+    appConfigModal = new mdb.Modal(document.getElementById('appConfigModal'));
+    envEditorModal = new mdb.Modal(document.getElementById('envEditorModal'));
+    newEnvModal = new mdb.Modal(document.getElementById('newEnvModal'));
+    loadData();
+    
+    // 绑定事件
+    document.getElementById('appSearch').oninput = renderAppList;
+    document.querySelectorAll('input[name="appFilter"]').forEach(el => el.onchange = renderAppList);
+    document.getElementById('btnReload').onclick = async () => { await exec(`sh ${SERVICE_SH}`); toast("Reloading..."); setTimeout(loadData, 1000); };
+    
+    // Tab 切换
+    document.querySelectorAll('.nav-link').forEach(el => el.onclick = (e) => {
+        e.preventDefault();
+        document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('show', 'active'));
+        el.classList.add('active');
+        const target = el.getAttribute('href').replace('#', '');
+        document.getElementById(target).classList.add('show', 'active');
+        if (target === 'content-io') updateIOTable();
+        if (target === 'content-log') loadLogs();
+    });
     
     // 状态检查
     run("pgrep -f 'injector$'").then(pid => {
-        const badge = document.getElementById('statusBadge');
-        badge.className = pid ? "badge badge-success me-2" : "badge badge-danger me-2";
-        badge.textContent = pid ? "RUNNING" : "STOPPED";
+        document.getElementById('statusBadge').className = pid ? "badge badge-success me-2" : "badge badge-danger me-2";
+        document.getElementById('statusBadge').textContent = pid ? "RUNNING" : "STOPPED";
         document.getElementById('statusInfo').textContent = pid ? `PID: ${pid}` : "OFFLINE";
     });
 });

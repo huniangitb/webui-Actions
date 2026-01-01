@@ -32,10 +32,10 @@ body { background-color: #f8f9fa !important; font-size: 14px; }
 #suggestionBox .suggestion-item {
     background-color: transparent;
     color: #e0e0e0;
+    cursor: pointer;
 }
 #suggestionBox .suggestion-item:hover {
     background-color: #616161;
-    cursor: pointer;
 }
 
 /* 悬浮按钮动作条 */

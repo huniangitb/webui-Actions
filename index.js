@@ -1,6 +1,6 @@
 import 'mdb-ui-kit/css/mdb.min.css';
 import './style.scss';
-import { exec, toast, listPackages, getPackagesInfo, fullScreen } from 'kernelsu';
+import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import * as mdb from 'mdb-ui-kit';
 import { mdiAndroid, mdiLayers, mdiDelete, mdiPencil, mdiFolder, mdiFile } from '@mdi/js';
 
@@ -10,7 +10,7 @@ const INJECTOR_CONF = `${BASE_DIR}/injector.conf`;
 const SERVICE_SH = "/data/adb/modules/Namespace-Proxy/service.sh";
 const PATH_PREFIX_STORAGE = '/storage/emulated/0';
 const PATH_PREFIX_REAL = '/data/media/0';
-fullScreen(false);
+
 let appConfigModal, envEditorModal, newEnvModal;
 let appMap = new Map(), envList = [], registry = new Map(), currentEditingEnv = null, currentBindingPkg = null;
 
@@ -239,9 +239,6 @@ const setupAutocomplete = (input) => {
         try {
             const res = await exec(`ls -F -1 "${parentDir}" 2>/dev/null | head -n 30`);
             if (!res?.stdout) { 
-                // 如果目录为空或无结果，不立即隐藏，除非输入内容明显无效
-                // 这里选择保持显示（如果之前显示），或者隐藏。
-                // 为了体验，如果ls失败，隐藏
                 box.style.display = 'none'; return; 
             }
             const suggestions = res.stdout.split('\n').filter(l => l.startsWith(searchPrefix)).map(line => {
@@ -250,10 +247,11 @@ const setupAutocomplete = (input) => {
             });
             if (suggestions.length === 0) { box.style.display = 'none'; return; }
             
-            // 关键：onmousedown 阻止默认行为，防止输入框失焦导致键盘收起
+            // 关键修复：ontouchstart + onmousedown 且 preventDefault，防止输入框失焦导致键盘重载
             box.innerHTML = suggestions.map(s => `
                 <div class="list-group-item list-group-item-action py-2 px-3 border-0 d-flex align-items-center suggestion-item" 
-                     onmousedown="event.preventDefault(); applySuggestion('${s.text}')">
+                     onmousedown="event.preventDefault(); applySuggestion('${s.text}')"
+                     ontouchstart="event.preventDefault(); applySuggestion('${s.text}')">
                     <div class="me-3" style="width:16px">${s.icon}</div>
                     <div class="fw-bold font-monospace small text-truncate">${s.text}</div>
                 </div>

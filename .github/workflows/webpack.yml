@@ -45,7 +45,7 @@ jobs:
 
       # 安装依赖。这一步会自动创建/更新 yarn.lock 文件
       - name: Install dependencies
-        run: yarn install
+        run: yarn install&npm install vconsole
 
       # 检查 yarn.lock 文件是否有变动，如果有则自动提交
       - name: Commit yarn.lock

@@ -11,9 +11,9 @@
         <div class="d-flex justify-content-between align-items-center mb-4 px-2">
             <div>
                 <h4 class="mb-0 text-primary fw-bold">NAMESPACE PROXY</h4>
-                <div class="d-flex align-items-center mt-1">
-                    <span class="badge badge-success me-2" id="statusBadge">Checking</span>
-                    <small id="statusInfo" class="text-muted font-monospace small">...</small>
+                <div class="d-flex align-items-center">
+                    <span class="badge badge-success me-2" id="statusBadge">...</span>
+                    <small id="statusInfo" class="text-muted font-monospace small">Checking</small>
                 </div>
             </div>
             <button id="btnReload" class="btn btn-warning btn-floating shadow-0"><i class="fas fa-sync"></i></button>
@@ -29,8 +29,8 @@
             <div class="tab-pane fade show active" id="content-config">
                 <div class="card shadow-0 border mb-3">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center py-2" data-mdb-collapse-init href="#collapseGlobal" role="button">
-                        <h6 class="mb-0 fw-bold"><i class="fas fa-sliders-h me-2 text-primary"></i>全局配置</h6>
-                        <i class="fas fa-chevron-down text-muted"></i>
+                        <h6 class="mb-0 fw-bold text-primary">全局配置</h6>
+                        <i class="fas fa-chevron-down text-muted small"></i>
                     </div>
                     <div class="collapse" id="collapseGlobal">
                         <div class="card-body p-0 border-top">
@@ -39,11 +39,10 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="card shadow-0 border">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0 fw-bold">已配置列表</h6>
+                            <h6 class="mb-0 fw-bold">应用规则</h6>
                             <button id="btnOpenAppPicker" class="btn btn-success btn-sm shadow-0 btn-rounded"><i class="fas fa-plus me-1"></i>添加</button>
                         </div>
                         <div id="ruleList" class="list-group list-group-light border-0"></div>
@@ -60,7 +59,7 @@
 
             <div class="tab-pane fade" id="content-io">
                 <div class="card shadow-0 bg-white border"><div class="card-body">
-                    <div class="form-outline mb-3 border rounded"><input type="text" id="ioSearch" class="form-control"/><label class="form-label">搜索...</label></div>
+                    <div class="form-outline mb-3 border rounded"><input type="text" id="ioSearch" class="form-control" /><label class="form-label">搜索...</label></div>
                     <div class="table-responsive border" style="height: 450px;">
                         <table class="table table-sm table-hover text-nowrap align-middle">
                             <thead class="table-light sticky-top"><tr><th>时间</th><th>应用</th><th class="text-center">操作</th><th>详情</th></tr></thead>
@@ -72,6 +71,7 @@
         </div>
     </div>
 
+    <!-- 模态框 -->
     <div class="modal fade" id="ruleModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content border-0">
             <div class="modal-header bg-light border-0">
@@ -93,7 +93,7 @@
 
     <div class="modal fade" id="appPickerModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered"><div class="modal-content border-0" style="height: 80vh;">
-            <div class="modal-header border-0"><h5 class="modal-title fw-bold">选择应用</h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
+            <div class="modal-header border-0 pb-0"><h5 class="modal-title fw-bold">选择应用</h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
             <div class="modal-body pt-0">
                 <div class="form-outline mb-3 border rounded sticky-top bg-white"><input type="text" id="appPickerSearch" class="form-control"/><label class="form-label">搜索...</label></div>
                 <div id="appPickerList" class="list-group list-group-light"></div>

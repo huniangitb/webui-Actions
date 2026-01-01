@@ -3,9 +3,9 @@
 body { 
     background-color: #f8f9fa !important; 
     font-size: 14px; 
-    // 适配系统栏
-    padding-top: var(--ksu-status-bar-height);
-    padding-bottom: var(--ksu-navigation-bar-height);
+    // 安全区域适配
+    padding-top: var(--ksu-status-bar-height, 0px);
+    padding-bottom: var(--ksu-navigation-bar-height, 0px);
 }
 
 .font-monospace { font-family: var(--code-font) !important; font-size: 12px !important; }
@@ -27,7 +27,7 @@ body {
 
 .pkg-badge { 
     font-family: var(--code-font); font-size: 10px; 
-    max-width: 140px; overflow: hidden; text-overflow: ellipsis; display: inline-block;
+    max-width: 120px; overflow: hidden; text-overflow: ellipsis; display: inline-block;
 }
 
 .log-time    { color: #888; }

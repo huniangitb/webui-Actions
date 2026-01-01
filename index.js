@@ -3,8 +3,15 @@ import './style.scss';
 import { exec, toast, fullScreen, enableInsets } from 'kernelsu';
 import * as mdb from 'mdb-ui-kit';
 
+// 1. 初始化环境
 fullScreen(false); 
-enableInsets(true); 
+enableInsets(true);
+
+// 2. 动态注入 KernelSU 提供的 CSS (解决 Parcel 构建报错)
+const ksuCss = document.createElement('link');
+ksuCss.rel = 'stylesheet';
+ksuCss.href = '/internal/insets.css';
+document.head.appendChild(ksuCss);
 
 const BASE_DIR = "/data/Namespace-Proxy";
 const LOG_DIR = `${BASE_DIR}/log`;
@@ -34,6 +41,7 @@ const highlightContent = (text) => {
         .replace(/\[IO\]/g, '<span class="log-io-tag">[IO]</span>');
 };
 
+// --- 配置管理 ---
 const loadConfigs = async () => {
     const main = await run(`[ -f ${BASE_DIR}/injector.conf ] && cat ${BASE_DIR}/injector.conf`);
     document.getElementById('mainConfig').value = main;
@@ -74,6 +82,7 @@ window.deleteRuleFile = async (filename) => {
     }
 };
 
+// --- 日志查看 ---
 const loadLogs = async () => {
     const logViewer = document.getElementById('logViewer');
     const select = document.getElementById('logFileSelect');
@@ -84,6 +93,8 @@ const loadLogs = async () => {
         select.innerHTML = '<option value="">无日志</option>';
         logViewer.textContent = "未找到日志"; return;
     }
+    
+    // 保持当前选中状态
     const current = select.value;
     select.innerHTML = fileList.map(f => {
         const name = f.split('/').pop();
@@ -96,22 +107,38 @@ const loadLogs = async () => {
     logViewer.scrollTop = logViewer.scrollHeight;
 };
 
+// --- IO 监控 (修复正则) ---
 const updateIOTable = async () => {
     const tbody = document.getElementById('ioTableBody');
-    const raw = await run(`find ${LOG_DIR} -name "*.log" ! -name "injector.log" -exec grep "\\[IO\\]" {} + | tail -n 150`);
+    
+    // 1. 使用 grep -H 强制输出文件名
+    // 2. 排除 injector.log
+    // 3. 提取带有 [IO] 的行
+    const cmd = `grep -H "\\[IO\\]" ${LOG_DIR}/*.log | grep -v "injector.log" | tail -n 200`;
+    const raw = await run(cmd);
     
     if (!raw) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted small">暂无监控数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted small">暂无应用监控数据</td></tr>';
         return;
     }
 
     const searchTerm = document.getElementById('ioSearch').value.toLowerCase();
     const rows = raw.split('\n').reverse().map(line => {
-        const m = line.match(/([\w\.]+)\.log:\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
+        // 格式: /data/Namespace-Proxy/log/com.pkg.log:[12:00:00] [IO] READ /path
+        // 正则: 匹配最后一个斜杠后的文件名，直到冒号，然后匹配时间、操作、路径
+        const m = line.match(/\/([^\/]+)\.log:\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
+        
         if (!m) return null;
         
         const [_, pkg, time, op, details] = m;
-        if (searchTerm && !details.toLowerCase().includes(searchTerm) && !pkg.toLowerCase().includes(searchTerm)) return null;
+        
+        // 搜索过滤
+        if (searchTerm && 
+            !details.toLowerCase().includes(searchTerm) && 
+            !pkg.toLowerCase().includes(searchTerm) &&
+            !op.toLowerCase().includes(searchTerm)) {
+            return null;
+        }
         
         const displayDetails = details.replace(' -> ', ' <i class="fas fa-arrow-right mx-1 opacity-50"></i> ');
 
@@ -126,6 +153,7 @@ const updateIOTable = async () => {
     tbody.innerHTML = rows || '<tr><td colspan="4" class="text-center p-4 small">无匹配结果</td></tr>';
 };
 
+// --- Tab 切换 ---
 const switchTab = (tabId) => {
     document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('show', 'active'));
@@ -135,9 +163,10 @@ const switchTab = (tabId) => {
     if (tabId === 'content-io') updateIOTable();
 };
 
+// --- 事件绑定 ---
 document.getElementById('btnSaveMain').onclick = async () => {
     await run(`echo '${document.getElementById('mainConfig').value}' > ${BASE_DIR}/injector.conf`);
-    toast("保存成功");
+    toast("主配置已保存");
 };
 
 document.getElementById('btnModalSave').onclick = async () => {
@@ -148,11 +177,7 @@ document.getElementById('btnModalSave').onclick = async () => {
 
 document.getElementById('btnReload').onclick = async () => {
     toast("重启中..."); await run(`sh ${SERVICE_SH}`);
-    setTimeout(() => {
-        run("pgrep injector").then(pid => {
-            document.getElementById('statusInfo').textContent = pid ? `ONLINE (PID: ${pid.trim()})` : "OFFLINE";
-        });
-    }, 1000);
+    setTimeout(checkStatus, 1500);
 };
 
 document.querySelectorAll('.nav-link').forEach(el => {
@@ -167,10 +192,24 @@ document.getElementById('btnAddRule').onclick = () => {
     ruleModal.show(); setTimeout(refreshMDB, 250);
 };
 
+const checkStatus = () => {
+    run("pgrep -f 'injector$'").then(pid => {
+        const badge = document.getElementById('statusBadge');
+        const info = document.getElementById('statusInfo');
+        if (pid) {
+            badge.className = "badge badge-success me-2";
+            badge.textContent = "RUNNING";
+            info.textContent = `PID: ${pid.trim()}`;
+        } else {
+            badge.className = "badge badge-danger me-2";
+            badge.textContent = "STOPPED";
+            info.textContent = "服务未运行";
+        }
+    });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     ruleModal = new mdb.Modal(document.getElementById('ruleModal'));
     loadConfigs();
-    run("pgrep injector").then(pid => {
-        document.getElementById('statusInfo').textContent = pid ? `ONLINE (PID: ${pid.trim()})` : "OFFLINE";
-    });
+    checkStatus();
 });

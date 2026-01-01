@@ -1,30 +1,32 @@
 import { exec, toast } from 'kernelsu';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import { Tab, Modal } from 'bootstrap';
+import * as mdb from 'mdb-ui-kit';
 
 const BASE_DIR = "/data/Namespace-Proxy";
 const LOG_DIR = `${BASE_DIR}/log`;
 let ruleModal;
 
-// 工具：执行命令
+// 初始化 MDB 组件
+document.querySelectorAll('.form-outline').forEach((el) => new mdb.Input(el).init());
+
 const run = async (cmd) => {
     const res = await exec(cmd);
-    if (res.errno !== 0) console.error(`CMD: ${cmd} Failed`, res.stderr);
     return res.stdout;
 };
 
-// --- 配置管理 ---
+// --- 配置加载 ---
 const loadConfigs = async () => {
     document.getElementById('mainConfig').value = await run(`cat ${BASE_DIR}/injector.conf`);
     const files = await run(`ls ${BASE_DIR}/*.conf`);
     const ruleList = document.getElementById('ruleList');
+    
     ruleList.innerHTML = files.split('\n').filter(f => f && !f.endsWith('injector.conf')).map(f => {
         const name = f.split('/').pop();
-        return `<div class="list-group-item d-flex justify-content-between align-items-center">
-            <span>${name}</span>
+        return `
+        <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div class="text-truncate" style="max-width: 70%">${name}</div>
             <div>
-                <button class="btn btn-outline-primary btn-sm me-2" onclick="editRuleFile('${name}')">编辑</button>
-                <button class="btn btn-outline-danger btn-sm" onclick="deleteRuleFile('${name}')">删除</button>
+                <button class="btn btn-link btn-sm text-primary" onclick="editRuleFile('${name}')"><i class="fas fa-edit"></i></button>
+                <button class="btn btn-link btn-sm text-danger" onclick="deleteRuleFile('${name}')"><i class="fas fa-trash"></i></button>
             </div>
         </div>`;
     }).join('');
@@ -37,11 +39,9 @@ window.editRuleFile = async (filename) => {
 };
 
 window.deleteRuleFile = async (filename) => {
-    if (confirm(`确认删除 ${filename}?`)) {
-        await run(`rm ${BASE_DIR}/${filename}`);
-        toast("规则已删除");
-        loadConfigs();
-    }
+    await run(`rm ${BASE_DIR}/${filename}`);
+    toast("已删除");
+    loadConfigs();
 };
 
 // --- 日志与 IO 监控 ---
@@ -61,58 +61,59 @@ const loadLogs = async () => {
 const updateIOTable = async () => {
     const raw = await run(`grep "\\[IO\\]" ${LOG_DIR}/*.log | tail -n 200`);
     const searchTerm = document.getElementById('ioSearch').value.toLowerCase();
+    
     const rows = raw.split('\n').filter(l => l.includes('[IO]')).reverse().map(line => {
         const m = line.match(/\[(.*?)\]\s+\[IO\]\s+(\w+)\s+(.*)/);
         if (!m) return null;
         const [_, time, op, path] = m;
         if (searchTerm && !path.toLowerCase().includes(searchTerm) && !op.toLowerCase().includes(searchTerm)) return null;
-        return `<tr><td class="text-muted">${time}</td><td class="fw-bold text-primary">${op}</td><td class="text-break">${path}</td></tr>`;
+        
+        return `<tr>
+            <td class="text-muted">${time}</td>
+            <td class="fw-bold text-primary">${op}</td>
+            <td class="text-wrap">${path}</td>
+        </tr>`;
     }).filter(r => r).join('');
+    
     document.getElementById('ioTableBody').innerHTML = rows;
 };
 
-// --- 事件绑定 ---
+// --- 事件监听 ---
 document.getElementById('btnSaveMain').onclick = async () => {
     const val = document.getElementById('mainConfig').value;
     await run(`echo '${val}' > ${BASE_DIR}/injector.conf`);
-    toast("主配置已保存");
+    toast("保存成功");
 };
 
 document.getElementById('btnModalSave').onclick = async () => {
     const name = document.getElementById('modalRuleName').value;
     const content = document.getElementById('modalRuleContent').value;
-    if (!name) return toast("包名不能为空");
     await run(`echo '${content}' > ${BASE_DIR}/${name}.conf`);
     ruleModal.hide();
     toast("规则已保存");
     loadConfigs();
 };
 
-document.getElementById('btnReload').onclick = () => run("pkill -HUP injector").then(() => toast("已发送重载信号"));
+document.getElementById('btnReload').onclick = () => run("pkill -HUP injector").then(() => toast("已重载"));
 document.getElementById('btnStop').onclick = () => run("pkill -TERM injector").then(() => toast("服务已停止"));
 document.getElementById('btnAddRule').onclick = () => {
     document.getElementById('modalRuleName').value = "";
-    document.getElementById('modalRuleContent').value = "# REDIRECT /storage/emulated/0/xxx /data/media/0/xxx";
+    document.getElementById('modalRuleContent').value = "REDIRECT /storage/emulated/0/xxx /data/media/0/xxx";
     ruleModal.show();
 };
 
-// 切换 Tab 刷新数据
-document.querySelectorAll('button[data-bs-target]').forEach(btn => {
-    btn.onclick = () => {
-        const target = btn.getAttribute('data-bs-target');
-        document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('show', 'active'));
-        document.querySelector(target).classList.add('show', 'active');
-        if (target === '#tabLog') loadLogs();
-        if (target === '#tabIO') updateIOTable();
-    };
+// Tab 切换逻辑
+document.querySelectorAll('[data-mdb-tab-init]').forEach(el => {
+    el.addEventListener('shown.mdb.tab', (e) => {
+        const id = e.target.id;
+        if (id === 'tab-log') loadLogs();
+        if (id === 'tab-io') updateIOTable();
+    });
 });
 
-// 定时刷新 IO 列表
-setInterval(() => {
-    if (document.getElementById('tabIO').classList.contains('active')) updateIOTable();
-}, 3000);
+document.getElementById('ioSearch').oninput = updateIOTable;
 
 document.addEventListener('DOMContentLoaded', () => {
-    ruleModal = new Modal(document.getElementById('ruleModal'));
+    ruleModal = new mdb.Modal(document.getElementById('ruleModal'));
     loadConfigs();
 });

@@ -2,73 +2,112 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <title>Namespace Proxy UI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Namespace Proxy</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
 </head>
 <body class="bg-light">
     <div class="container py-4">
+        <!-- Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="text-primary">Namespace Proxy</h2>
+            <h4 class="mb-0 text-primary fw-bold"><i class="fas fa-network-wired me-2"></i>Namespace Proxy</h4>
             <div>
-                <button id="btnReload" class="btn btn-warning btn-sm">重载配置</button>
-                <button id="btnStop" class="btn btn-danger btn-sm">停止服务</button>
+                <button id="btnReload" class="btn btn-outline-warning btn-floating" title="重载"><i class="fas fa-sync"></i></button>
+                <button id="btnStop" class="btn btn-outline-danger btn-floating ms-2" title="停止"><i class="fas fa-power-off"></i></button>
             </div>
         </div>
 
-        <ul class="nav nav-tabs mb-3" id="proxyTabs">
-            <li class="nav-item"><button class="nav-link active" data-bs-target="#tabConfig">配置管理</button></li>
-            <li class="nav-item"><button class="nav-link" data-bs-target="#tabLog">运行日志</button></li>
-            <li class="nav-item"><button class="nav-link" data-bs-target="#tabIO">IO 监控</button></li>
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3" id="mainTabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="tab-config" data-mdb-tab-init href="#content-config">配置</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="tab-log" data-mdb-tab-init href="#content-log">日志</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="tab-io" data-mdb-tab-init href="#content-io">IO监控</a>
+            </li>
         </ul>
 
-        <div class="tab-content border bg-white p-3 rounded">
+        <div class="tab-content" id="mainTabsContent">
             <!-- 配置页 -->
-            <div class="tab-pane fade show active" id="tabConfig">
-                <h5>主配置 (injector.conf)</h5>
-                <textarea id="mainConfig" class="form-control mb-3 font-monospace" rows="6"></textarea>
-                <button id="btnSaveMain" class="btn btn-primary btn-sm mb-4">保存主配置</button>
-
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h5>应用规则</h5>
-                    <button id="btnAddRule" class="btn btn-success btn-sm">+ 新增规则</button>
+            <div class="tab-pane fade show active" id="content-config">
+                <div class="card shadow-0 border">
+                    <div class="card-body">
+                        <h6 class="card-title fw-bold">injector.conf</h6>
+                        <div class="form-outline mb-3" data-mdb-input-init>
+                            <textarea class="form-control font-monospace text-sm" id="mainConfig" rows="8"></textarea>
+                        </div>
+                        <button id="btnSaveMain" class="btn btn-primary btn-sm">保存主配置</button>
+                        
+                        <hr class="my-4">
+                        
+                        <div class="d-flex justify-content-between mb-3">
+                            <h6 class="fw-bold">应用规则 (.conf)</h6>
+                            <button id="btnAddRule" class="btn btn-success btn-sm"><i class="fas fa-plus me-1"></i>新增</button>
+                        </div>
+                        <div id="ruleList" class="list-group list-group-light"></div>
+                    </div>
                 </div>
-                <div id="ruleList" class="list-group"></div>
             </div>
 
             <!-- 日志页 -->
-            <div class="tab-pane fade" id="tabLog">
-                <select id="logFileSelect" class="form-select mb-2"></select>
-                <pre id="logViewer" class="bg-dark text-light p-3 rounded overflow-auto" style="height: 500px; font-size: 12px;"></pre>
+            <div class="tab-pane fade" id="content-log">
+                <div class="card shadow-0 border">
+                    <div class="card-body">
+                        <select id="logFileSelect" class="form-select mb-3"></select>
+                        <pre id="logViewer" class="bg-dark text-light p-3 rounded" style="height: 500px; font-size: 11px; overflow: auto;"></pre>
+                    </div>
+                </div>
             </div>
 
-            <!-- IO 监控 -->
-            <div class="tab-pane fade" id="tabIO">
-                <input type="text" id="ioSearch" class="form-control mb-3" placeholder="搜索路径或操作 (如: WRITE /data/...)">
-                <div class="table-responsive" style="height: 500px;">
-                    <table class="table table-sm table-hover text-nowrap">
-                        <thead class="table-light sticky-top">
-                            <tr><th>时间</th><th>操作</th><th>路径</th></tr>
-                        </thead>
-                        <tbody id="ioTableBody"></tbody>
-                    </table>
+            <!-- IO监控 -->
+            <div class="tab-pane fade" id="content-io">
+                <div class="card shadow-0 border">
+                    <div class="card-body">
+                        <div class="form-outline mb-3" data-mdb-input-init>
+                            <input type="text" id="ioSearch" class="form-control" />
+                            <label class="form-label" for="ioSearch">搜索路径或操作...</label>
+                        </div>
+                        <div class="table-responsive" style="height: 450px;">
+                            <table class="table table-sm table-hover border text-nowrap">
+                                <thead class="table-light sticky-top">
+                                    <tr><th>时间</th><th>操作</th><th>路径</th></tr>
+                                </thead>
+                                <tbody id="ioTableBody" style="font-size: 11px;"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 编辑规则 Modal -->
+    <!-- Rule Modal -->
     <div class="modal fade" id="ruleModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title">编辑规则</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <input type="text" id="modalRuleName" class="form-control mb-2" placeholder="包名 (不含 .conf)">
-                    <textarea id="modalRuleContent" class="form-control font-monospace" rows="10"></textarea>
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑规则</h5>
+                    <button type="button" class="btn-close" data-mdb-ripple-init data-mdb-dismiss="modal"></button>
                 </div>
-                <div class="modal-footer"><button id="btnModalSave" class="btn btn-primary">保存</button></div>
+                <div class="modal-body">
+                    <div class="form-outline mb-3" data-mdb-input-init>
+                        <input type="text" id="modalRuleName" class="form-control" />
+                        <label class="form-label" for="modalRuleName">包名 (pkg_name)</label>
+                    </div>
+                    <div class="form-outline" data-mdb-input-init>
+                        <textarea class="form-control font-monospace" id="modalRuleContent" rows="10"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btnModalSave" class="btn btn-primary">保存规则</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="./src/index.js" type="module"></script>
+    <script src="src/index.js" type="module"></script>
 </body>
 </html>

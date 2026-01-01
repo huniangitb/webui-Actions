@@ -5,89 +5,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Namespace Proxy</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
-    <link rel="stylesheet" href="style.scss">
 </head>
 <body class="bg-light">
     <div class="container py-3">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h4 class="mb-0 text-primary fw-bold">Namespace Proxy</h4>
-                <small class="text-muted" id="statusInfo">检测服务状态...</small>
-            </div>
-            <div class="d-flex">
-                <button id="btnReload" class="btn btn-warning btn-floating shadow-0" title="重启服务">
-                    <i class="fas fa-sync"></i>
-                </button>
-            </div>
+            <div><h4 class="mb-0 text-primary fw-bold text-uppercase">Namespace Proxy</h4><small id="statusInfo">检测中...</small></div>
+            <button id="btnReload" class="btn btn-warning btn-floating shadow-0"><i class="fas fa-sync"></i></button>
         </div>
-
-        <ul class="nav nav-tabs mb-3 shadow-sm bg-white rounded" id="mainTabs" role="tablist">
+        <ul class="nav nav-tabs mb-3 shadow-sm bg-white rounded" role="tablist">
             <li class="nav-item"><a class="nav-link active" id="tab-config" data-mdb-tab-init href="#content-config">配置</a></li>
             <li class="nav-item"><a class="nav-link" id="tab-log" data-mdb-tab-init href="#content-log">日志</a></li>
-            <li class="nav-item"><a class="nav-link" id="tab-io" data-mdb-tab-init href="#content-io">IO监控</a></li>
+            <li class="nav-item"><a class="nav-link" id="tab-io" data-mdb-tab-init href="#content-io">监控</a></li>
         </ul>
-
         <div class="tab-content">
             <div class="tab-pane fade show active" id="content-config">
-                <div class="card shadow-0 border-0 mb-3">
-                    <div class="card-body bg-white rounded shadow-sm">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="fw-bold mb-0">injector.conf</h6>
-                            <button id="btnSaveMain" class="btn btn-primary btn-sm">保存</button>
-                        </div>
-                        <div class="form-outline border rounded"><textarea class="form-control font-monospace" id="mainConfig" rows="8"></textarea></div>
-                    </div>
-                </div>
-                <div class="card shadow-0 border-0">
-                    <div class="card-body bg-white rounded shadow-sm">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="fw-bold mb-0">规则列表</h6>
-                            <button id="btnAddRule" class="btn btn-success btn-sm"><i class="fas fa-plus"></i></button>
-                        </div>
-                        <div id="ruleList" class="list-group list-group-light border-top"></div>
-                    </div>
-                </div>
+                <div class="card shadow-0 mb-3"><div class="card-body bg-white rounded">
+                    <div class="d-flex justify-content-between mb-2"><h6 class="fw-bold">injector.conf</h6><button id="btnSaveMain" class="btn btn-primary btn-sm">保存</button></div>
+                    <div class="form-outline border rounded"><textarea class="form-control font-monospace" id="mainConfig" rows="8"></textarea></div>
+                </div></div>
+                <div class="card shadow-0"><div class="card-body bg-white rounded">
+                    <div class="d-flex justify-content-between mb-3"><h6 class="fw-bold">规则列表</h6><button id="btnAddRule" class="btn btn-success btn-sm"><i class="fas fa-plus"></i></button></div>
+                    <div id="ruleList" class="list-group list-group-light border-top"></div>
+                </div></div>
             </div>
-
             <div class="tab-pane fade" id="content-log">
-                <div class="card shadow-0 border-0">
-                    <div class="card-body bg-white rounded shadow-sm">
-                        <select id="logFileSelect" class="form-select mb-3 shadow-0 border"></select>
-                        <pre id="logViewer" class="rounded font-monospace" style="height: 500px;"></pre>
-                    </div>
-                </div>
+                <div class="card shadow-0 bg-white rounded"><div class="card-body">
+                    <select id="logFileSelect" class="form-select mb-3 border"></select>
+                    <pre id="logViewer" class="rounded font-monospace" style="height: 500px;"></pre>
+                </div></div>
             </div>
-
             <div class="tab-pane fade" id="content-io">
-                <div class="card shadow-0 border-0">
-                    <div class="card-body bg-white rounded shadow-sm">
-                        <div class="form-outline mb-3 border rounded">
-                            <input type="text" id="ioSearch" class="form-control" />
-                            <label class="form-label" for="ioSearch">搜索路径...</label>
-                        </div>
-                        <div class="table-responsive border" style="height: 450px;">
-                            <table class="table table-sm table-hover">
-                                <thead class="table-light sticky-top"><tr><th>时间</th><th class="text-center">操作</th><th>路径</th></tr></thead>
-                                <tbody id="ioTableBody" class="font-monospace"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                <div class="card shadow-0 bg-white rounded"><div class="card-body">
+                    <div class="form-outline mb-3 border rounded"><input type="text" id="ioSearch" class="form-control"/><label class="form-label">过滤路径</label></div>
+                    <div class="table-responsive border" style="height: 450px;"><table class="table table-sm table-hover">
+                        <thead class="table-light sticky-top"><tr><th>时间</th><th class="text-center">操作</th><th>路径</th></tr></thead>
+                        <tbody id="ioTableBody" class="font-monospace"></tbody>
+                    </table></div>
+                </div></div>
             </div>
         </div>
     </div>
-
     <div class="modal fade" id="ruleModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header border-0 pb-0"><h5 class="modal-title fw-bold">编辑规则</h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <div class="form-outline mb-3 border rounded"><input type="text" id="modalRuleName" class="form-control" /><label class="form-label">包名</label></div>
-                    <div class="form-outline border rounded"><textarea class="form-control font-monospace" id="modalRuleContent" rows="10"></textarea></div>
-                </div>
-                <div class="modal-footer border-0"><button id="btnModalSave" class="btn btn-primary w-100">保存</button></div>
+        <div class="modal-dialog modal-lg"><div class="modal-content">
+            <div class="modal-header border-0 pb-0"><h5 class="modal-title fw-bold">编辑规则</h5><button type="button" class="btn-close" data-mdb-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="form-outline mb-3 border rounded"><input type="text" id="modalRuleName" class="form-control"/><label class="form-label">包名</label></div>
+                <div class="form-outline border rounded"><textarea class="form-control font-monospace" id="modalRuleContent" rows="10"></textarea></div>
             </div>
-        </div>
+            <div class="modal-footer border-0"><button id="btnModalSave" class="btn btn-primary w-100">保存</button></div>
+        </div></div>
     </div>
     <script src="index.js" type="module"></script>
 </body>

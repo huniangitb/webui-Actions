@@ -1,4 +1,3 @@
-@import "mdb-ui-kit/css/mdb.min.css";
 :root { --code-font: "JetBrains Mono", monospace; }
 body { background-color: #fbfbfb !important; font-size: 14px; }
 .font-monospace { font-family: var(--code-font) !important; font-size: 12px !important; }
@@ -13,5 +12,3 @@ body { background-color: #fbfbfb !important; font-size: 14px; }
 }
 .text-wrap-path { white-space: normal !important; word-break: break-all; min-width: 150px; }
 .btn-floating { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
-.nav-tabs .nav-link { padding: 10px 15px; color: #666; }
-.nav-tabs .nav-link.active { color: var(--mdb-primary); font-weight: bold; }

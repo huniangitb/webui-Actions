@@ -52,30 +52,27 @@ window.deleteRuleFile = async (filename) => {
 const loadLogs = async () => {
     const files = await run(`[ -d ${LOG_DIR} ] && ls ${LOG_DIR}/*.log 2>/dev/null`);
     const select = document.getElementById('logFileSelect');
-    const current = select.value;
     const fileList = files.split('\n').filter(f => f);
     if (fileList.length === 0) {
-        select.innerHTML = '<option>无日志文件</option>';
+        select.innerHTML = '<option>无日志</option>';
         document.getElementById('logViewer').textContent = "等待日志生成...";
         return;
     }
+    const current = select.value;
     select.innerHTML = fileList.map(f => {
         const name = f.split('/').pop();
         return `<option value="${name}" ${name === current ? 'selected' : ''}>${name}</option>`;
     }).join('');
-    if (select.value) {
-        const content = await run(`tail -c 30000 ${LOG_DIR}/${select.value} 2>/dev/null`);
-        document.getElementById('logViewer').textContent = content || "文件为空";
-    }
+    const content = await run(`tail -c 30000 ${LOG_DIR}/${select.value} 2>/dev/null`);
+    document.getElementById('logViewer').textContent = content || "文件为空";
 };
 
 const updateIOTable = async () => {
-    const hasLogs = await run(`[ -d ${LOG_DIR} ] && grep -l "\\[IO\\]" ${LOG_DIR}/*.log 2>/dev/null`);
-    if (!hasLogs) {
-        document.getElementById('ioTableBody').innerHTML = '<tr><td colspan="3" class="text-center p-4 text-muted">暂无监控数据</td></tr>';
+    const raw = await run(`[ -d ${LOG_DIR} ] && grep "\\[IO\\]" ${LOG_DIR}/*.log 2>/dev/null | tail -n 100`);
+    if (!raw) {
+        document.getElementById('ioTableBody').innerHTML = '<tr><td colspan="3" class="text-center p-4">暂无监控数据</td></tr>';
         return;
     }
-    const raw = await run(`grep "\\[IO\\]" ${LOG_DIR}/*.log 2>/dev/null | tail -n 100`);
     const searchTerm = document.getElementById('ioSearch').value.toLowerCase();
     const rows = raw.split('\n').filter(l => l.includes('[IO]')).reverse().map(line => {
         const m = line.match(/\[(.*?)\]\s+\[IO\]\s+(\w+)\s+(.*)/);
@@ -94,13 +91,12 @@ document.getElementById('btnSaveMain').onclick = async () => {
 
 document.getElementById('btnModalSave').onclick = async () => {
     const name = document.getElementById('modalRuleName').value;
-    if(!name) return toast("包名无效");
     await run(`echo '${document.getElementById('modalRuleContent').value}' > ${BASE_DIR}/${name}.conf`);
     ruleModal.hide(); toast("已保存"); loadConfigs();
 };
 
 document.getElementById('btnReload').onclick = async () => {
-    toast("正在通过 service.sh 重启...");
+    toast("重启中...");
     await run(`sh ${SERVICE_SH}`);
     toast("指令已发送");
 };
@@ -122,6 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
     ruleModal = new mdb.Modal(document.getElementById('ruleModal'));
     loadConfigs();
     run("pgrep injector").then(pid => {
-        document.getElementById('statusInfo').textContent = pid ? `服务运行中 (PID: ${pid.trim()})` : "服务未启动";
+        document.getElementById('statusInfo').textContent = pid ? `运行中 (PID: ${pid.trim()})` : "未启动";
     });
 });

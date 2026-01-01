@@ -13,6 +13,7 @@
     "mdb-ui-kit": "^7.3.0"
   },
   "devDependencies": {
+    "@mdi/js": "^7.4.47",
     "@parcel/transformer-sass": "^2.16.3",
     "parcel": "^2.16.2",
     "sass": "^1.97.1"

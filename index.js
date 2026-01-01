@@ -1,6 +1,6 @@
 import 'mdb-ui-kit/css/mdb.min.css';
 import './style.scss';
-import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
+import { exec, toast, listPackages, getPackagesInfo, fullScreen } from 'kernelsu';
 import * as mdb from 'mdb-ui-kit';
 import { mdiAndroid, mdiLayers, mdiDelete, mdiPencil, mdiFolder, mdiFile } from '@mdi/js';
 
@@ -10,7 +10,7 @@ const INJECTOR_CONF = `${BASE_DIR}/injector.conf`;
 const SERVICE_SH = "/data/adb/modules/Namespace-Proxy/service.sh";
 const PATH_PREFIX_STORAGE = '/storage/emulated/0';
 const PATH_PREFIX_REAL = '/data/media/0';
-
+fullScreen(false);
 let appConfigModal, envEditorModal, newEnvModal;
 let appMap = new Map(), envList = [], registry = new Map(), currentEditingEnv = null, currentBindingPkg = null;
 

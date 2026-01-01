@@ -11,7 +11,7 @@ let ruleModalInstance;
 let appPickerModalInstance;
 let allInstalledApps = [];
 
-// 动态注入安全区域样式 (Parcel 兼容性处理)
+// 动态注入安全区域样式
 if (!document.getElementById('ksu-insets-style')) {
     const link = document.createElement('link');
     link.id = 'ksu-insets-style';
@@ -22,11 +22,15 @@ if (!document.getElementById('ksu-insets-style')) {
 
 // 通用执行函数
 const run = async (cmd) => {
-    const res = await exec(cmd);
-    return res.stdout ? res.stdout.trim() : "";
+    try {
+        const res = await exec(cmd);
+        return res && res.stdout ? res.stdout.trim() : "";
+    } catch (e) {
+        return "";
+    }
 };
 
-// 刷新 MDB 输入框状态，解决文字重叠
+// 刷新 MDB 输入框状态
 const refreshMDB = () => {
     document.querySelectorAll('.form-outline').forEach(el => {
         const input = el.querySelector('input, textarea');
@@ -35,7 +39,7 @@ const refreshMDB = () => {
     });
 };
 
-// 语法高亮处理器 (增加类型检查)
+// 语法高亮处理器
 const highlightContent = (text) => {
     if (typeof text !== 'string' || !text) return '';
     return text
@@ -49,11 +53,9 @@ const highlightContent = (text) => {
 const loadConfigs = async () => {
     const ruleList = document.getElementById('ruleList');
     try {
-        // 加载主配置
         const main = await run(`[ -f ${BASE_DIR}/injector.conf ] && cat ${BASE_DIR}/injector.conf`);
         document.getElementById('mainConfig').value = main || "";
 
-        // 获取规则文件列表
         const filesRaw = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
         const pkgNames = filesRaw.split('\n')
             .filter(f => f && !f.includes('injector.conf'))
@@ -66,17 +68,17 @@ const loadConfigs = async () => {
         if (pkgNames.length === 0) {
             ruleList.innerHTML = '<div class="p-5 text-center text-muted small">暂无应用规则</div>';
         } else {
-            // 批量获取应用信息
             const packagesInfo = await getPackagesInfo(pkgNames);
             const infoMap = new Map();
-            if (packagesInfo) {
-                packagesInfo.forEach(info => infoMap.set(info.packageName, info));
+            if (packagesInfo && Array.isArray(packagesInfo)) {
+                packagesInfo.forEach(info => {
+                    if (info && info.packageName) infoMap.set(info.packageName, info);
+                });
             }
 
             ruleList.innerHTML = pkgNames.map(pkg => {
                 const info = infoMap.get(pkg);
                 const label = (info && info.label) ? info.label : pkg;
-                // 关键修复：安全处理 replace 调用
                 const safeLabel = label.toString().replace(/'/g, "\\'");
                 const iconSrc = info ? `ksu://icon/${pkg}` : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
                 
@@ -139,15 +141,24 @@ document.getElementById('btnOpenAppPicker').onclick = async () => {
     appPickerModalInstance.show();
     try {
         const packages = await listPackages('user');
-        if (packages && packages.length > 0) {
-            allInstalledApps = await getPackagesInfo(packages);
-            allInstalledApps.sort((a, b) => (a.label || "").localeCompare(b.label || "", 'zh'));
+        if (packages && Array.isArray(packages)) {
+            const infos = await getPackagesInfo(packages);
+            
+            // 关键修复：1. 过滤掉 API 返回的空值 2. 增强排序安全性
+            allInstalledApps = (infos || []).filter(app => app && (app.label || app.packageName));
+            
+            allInstalledApps.sort((a, b) => {
+                const labelA = a.label || a.packageName || "";
+                const labelB = b.label || b.packageName || "";
+                return labelA.localeCompare(labelB, 'zh');
+            });
+            
             renderAppPickerList(allInstalledApps);
         } else {
-            throw new Error("未获取到应用列表");
+            throw new Error("无法获取安装包列表");
         }
     } catch (e) {
-        listContainer.innerHTML = `<div class="text-danger p-3 small">应用拉取失败: ${e.message}</div>`;
+        listContainer.innerHTML = `<div class="text-danger p-3 small">加载失败: ${e.message}</div>`;
     }
 };
 
@@ -185,8 +196,8 @@ window.selectAppToConfig = async (pkgName, label) => {
 document.getElementById('appPickerSearch').oninput = (e) => {
     const term = (e.target.value || "").toLowerCase();
     const filtered = allInstalledApps.filter(app => 
-        (app.label || "").toLowerCase().includes(term) || 
-        (app.packageName || "").toLowerCase().includes(term)
+        (app.label && app.label.toLowerCase().includes(term)) || 
+        (app.packageName && app.packageName.toLowerCase().includes(term))
     );
     renderAppPickerList(filtered);
 };
@@ -200,13 +211,13 @@ const loadLogs = async () => {
     
     if (fileList.length === 0) {
         select.innerHTML = '<option value="">无日志</option>';
-        viewer.textContent = "日志目录为空";
+        viewer.textContent = "未找到日志文件";
         return;
     }
     const current = select.value;
     select.innerHTML = fileList.map(f => {
         const name = f.split('/').pop() || "";
-        return `<option value="${name}" ${name === current ? 'selected' : ''}>${name === 'injector.log' ? '系统服务日志' : name}</option>`;
+        return `<option value="${name}" ${name === current ? 'selected' : ''}>${name === 'injector.log' ? '系统日志' : name}</option>`;
     }).join('');
 
     const target = select.value || (fileList[0] ? fileList[0].split('/').pop() : "");
@@ -228,7 +239,6 @@ const updateIOTable = async () => {
 
     const searchTerm = (document.getElementById('ioSearch').value || "").toLowerCase();
     tbody.innerHTML = raw.split('\n').reverse().map(line => {
-        // 匹配 1.包名 2.时间 3.操作 4.详情
         const m = line.match(/\/([^\/]+)\.log:\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
         if (!m) return null;
         
@@ -263,18 +273,18 @@ const switchTab = (tabId) => {
 document.getElementById('btnSaveMain').onclick = async () => {
     const val = document.getElementById('mainConfig').value;
     const res = await exec(`echo '${val}' > ${BASE_DIR}/injector.conf`);
-    if (res.errno === 0) toast("主配置已保存");
-    else toast("保存失败: " + res.stderr);
+    if (res && res.errno === 0) toast("主配置已保存");
+    else toast("保存失败");
 };
 
 document.getElementById('btnReload').onclick = async () => {
-    toast("正在重启服务...");
+    toast("正在重启...");
     const res = await exec(`sh ${SERVICE_SH}`);
-    if (res.errno === 0) {
+    if (res && res.errno === 0) {
         toast("重启指令已发送");
         setTimeout(checkStatus, 2000);
     } else {
-        toast("重启失败: " + res.stderr);
+        toast("重启失败");
     }
 };
 
@@ -303,7 +313,6 @@ const checkStatus = () => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 实例化 MDB 组件
     ruleModalInstance = new mdb.Modal(document.getElementById('ruleModal'));
     appPickerModalInstance = new mdb.Modal(document.getElementById('appPickerModal'));
     

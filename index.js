@@ -167,52 +167,43 @@ document.getElementById('btnCreateEnv').onclick = async () => {
     loadData();
 };
 
-// --- 智能视口适配与多层级补全 ---
+// --- 智能自动补全 ---
 const setupAutocomplete = (input) => {
     const box = document.getElementById('suggestionBox');
     
-    // 智能滚动：聚焦时将输入框移动到屏幕上半部分 (约 30% 处)
+    // 聚焦时自动滚动到上方 (输入法避让)
     input.addEventListener('focus', () => {
         setTimeout(() => {
             const container = document.getElementById('editorVisual');
             const row = input.closest('.rule-row');
             if (row && container) {
-                // 计算 row 在容器内的相对位置
+                // 将输入框滚动到容器顶部约 20% 的位置，留出上方空间
                 const rowRect = row.getBoundingClientRect();
                 const containerRect = container.getBoundingClientRect();
                 const currentOffset = rowRect.top - containerRect.top;
-                
-                // 目标位置：容器高度的 20%
-                const targetOffset = containerRect.height * 0.2;
-                
-                // 需要滚动的距离 = 当前相对位置 - 目标相对位置
-                const scrollAmount = currentOffset - targetOffset;
-                
-                container.scrollBy({
-                    top: scrollAmount,
-                    behavior: 'smooth'
-                });
+                const targetOffset = containerRect.height * 0.2; 
+                container.scrollBy({ top: currentOffset - targetOffset, behavior: 'smooth' });
             }
         }, 300);
     });
 
     const performSearch = debounce(async (val) => {
-        let parentDir = ""; // 用于 ls 的父目录
-        let searchPrefix = ""; // ls 后的 grep 关键字
-        let displayBase = ""; // 补全回填时的前缀
+        let parentDir = "";
+        let searchPrefix = "";
+        let displayBase = "";
 
-        // 1. 路径解析逻辑 (支持多层级)
+        // 1. 路径解析: 区分绝对/相对，分离目录和前缀
         if (!val || !val.startsWith('/')) {
-            // 相对路径处理
+            // 相对路径: 默认为 /data/media/0/
             const fullPath = val ? (PATH_PREFIX_REAL + '/' + val) : PATH_PREFIX_REAL;
             
             if (val && val.endsWith('/')) {
-                // 输入 "Download/" -> 列出 /data/media/0/Download/ 下的内容
+                // 输入 "Download/" -> 列出该目录下所有文件
                 parentDir = fullPath;
                 searchPrefix = "";
                 displayBase = val;
             } else {
-                // 输入 "Download/No" -> 列出 /data/media/0/Download/ 下匹配 No* 的内容
+                // 输入 "Download/Sub" -> 列出 Download 下匹配 Sub 的文件
                 const lastSlash = fullPath.lastIndexOf('/');
                 parentDir = fullPath.substring(0, lastSlash + 1);
                 searchPrefix = fullPath.substring(lastSlash + 1);
@@ -221,7 +212,7 @@ const setupAutocomplete = (input) => {
                 displayBase = lastSlashVal !== -1 ? val.substring(0, lastSlashVal + 1) : "";
             }
         } else {
-            // 绝对路径处理
+            // 绝对路径
             let absPath = val;
             if (val.startsWith(PATH_PREFIX_STORAGE)) {
                 absPath = val.replace(PATH_PREFIX_STORAGE, PATH_PREFIX_REAL);
@@ -241,11 +232,13 @@ const setupAutocomplete = (input) => {
             }
         }
         
-        // 清理双斜杠
+        // 规范化 parentDir
         parentDir = parentDir.replace(/\/+/g, '/');
+        if (!parentDir.endsWith('/')) parentDir += '/';
 
         try {
-            const res = await exec(`ls -F -1 "${parentDir}" 2>/dev/null | head -n 20`);
+            // ls -F -1: 列出文件，目录带/
+            const res = await exec(`ls -F -1 "${parentDir}" 2>/dev/null | head -n 30`);
             if (!res || !res.stdout) { box.style.display = 'none'; return; }
 
             const lines = res.stdout.split('\n');
@@ -261,33 +254,45 @@ const setupAutocomplete = (input) => {
             if (suggestions.length === 0) { box.style.display = 'none'; return; }
 
             box.innerHTML = suggestions.map(s => `
-                <button class="list-group-item list-group-item-action py-2 px-3 border-0 d-flex align-items-center" onclick="applySuggestion('${s.text}')">
+                <button class="list-group-item list-group-item-action py-2 px-3 border-0 d-flex align-items-center suggestion-item" onclick="applySuggestion('${s.text}')">
                     <div class="me-3" style="width:16px">${s.icon}</div>
                     <div class="fw-bold font-monospace small text-truncate">${s.text}</div>
                 </button>
             `).join('');
 
-            // 定位逻辑
+            // 2. 智能定位 (Flip Logic)
             const rect = input.getBoundingClientRect();
             const containerRect = document.querySelector('.modal-body').getBoundingClientRect();
-            
             const maxWidth = Math.min(300, window.innerWidth / 2);
             box.style.width = maxWidth + 'px';
             
-            // 计算 Left: 尽量靠右，但不能溢出屏幕
-            // 理想位置：Input 右边对齐
+            // 右对齐计算
             let leftPos = (rect.right - containerRect.left) - maxWidth;
-            
-            // 溢出修正 (防止左侧溢出)
             if (leftPos < 0) leftPos = 10;
             
-            box.style.top = (rect.bottom - containerRect.top + document.querySelector('#editorVisual').scrollTop) + 'px';
+            // 垂直定位：判断下方空间是否足够
+            const boxHeight = Math.min(suggestions.length * 40, 250); // 估算高度
+            const spaceBelow = window.innerHeight - rect.bottom;
+            
+            // 如果下方空间不足 250px 且上方空间充足，则向上弹出
+            if (spaceBelow < 250 && rect.top > 250) {
+                // 向上: top = input顶部 - box高度 - 滚动偏移
+                const topPos = (rect.top - containerRect.top + document.querySelector('#editorVisual').scrollTop) - boxHeight - 5;
+                box.style.top = topPos + 'px';
+                // 修正 box 高度以防溢出顶部
+                box.style.maxHeight = '250px';
+            } else {
+                // 向下 (默认)
+                box.style.top = (rect.bottom - containerRect.top + document.querySelector('#editorVisual').scrollTop) + 'px';
+                box.style.maxHeight = '250px';
+            }
+            
             box.style.left = leftPos + 'px';
             box.style.display = 'block';
             window._currentInput = input;
 
         } catch (e) { box.style.display = 'none'; }
-    }, 200);
+    }, 150); // 降低延迟提高响应
 
     input.addEventListener('input', (e) => performSearch(e.target.value));
     input.addEventListener('focus', (e) => performSearch(e.target.value));

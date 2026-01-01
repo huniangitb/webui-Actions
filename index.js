@@ -1,17 +1,7 @@
 import 'mdb-ui-kit/css/mdb.min.css';
 import './style.scss';
-import { exec, toast, fullScreen, enableInsets } from 'kernelsu';
+import { exec, toast } from 'kernelsu';
 import * as mdb from 'mdb-ui-kit';
-
-// 1. 初始化环境
-fullScreen(false); 
-enableInsets(true);
-
-// 2. 动态注入 KernelSU 提供的 CSS (解决 Parcel 构建报错)
-const ksuCss = document.createElement('link');
-ksuCss.rel = 'stylesheet';
-ksuCss.href = '/internal/insets.css';
-document.head.appendChild(ksuCss);
 
 const BASE_DIR = "/data/Namespace-Proxy";
 const LOG_DIR = `${BASE_DIR}/log`;
@@ -33,6 +23,7 @@ const refreshMDB = () => {
     });
 };
 
+// 语法高亮逻辑
 const highlightContent = (text) => {
     return text
         .replace(/#(.*)/g, '<span class="log-comment">#$1</span>')
@@ -41,7 +32,6 @@ const highlightContent = (text) => {
         .replace(/\[IO\]/g, '<span class="log-io-tag">[IO]</span>');
 };
 
-// --- 配置管理 ---
 const loadConfigs = async () => {
     const main = await run(`[ -f ${BASE_DIR}/injector.conf ] && cat ${BASE_DIR}/injector.conf`);
     document.getElementById('mainConfig').value = main;
@@ -82,7 +72,6 @@ window.deleteRuleFile = async (filename) => {
     }
 };
 
-// --- 日志查看 ---
 const loadLogs = async () => {
     const logViewer = document.getElementById('logViewer');
     const select = document.getElementById('logFileSelect');
@@ -93,8 +82,6 @@ const loadLogs = async () => {
         select.innerHTML = '<option value="">无日志</option>';
         logViewer.textContent = "未找到日志"; return;
     }
-    
-    // 保持当前选中状态
     const current = select.value;
     select.innerHTML = fileList.map(f => {
         const name = f.split('/').pop();
@@ -102,18 +89,14 @@ const loadLogs = async () => {
     }).join('');
 
     const target = select.value || fileList[0].split('/').pop();
-    const content = await run(`tail -c 30000 ${LOG_DIR}/${target} 2>/dev/null`);
+    const content = await run(`tail -c 50000 ${LOG_DIR}/${target} 2>/dev/null`);
     logViewer.innerHTML = highlightContent(content);
     logViewer.scrollTop = logViewer.scrollHeight;
 };
 
-// --- IO 监控 (修复正则) ---
 const updateIOTable = async () => {
     const tbody = document.getElementById('ioTableBody');
-    
-    // 1. 使用 grep -H 强制输出文件名
-    // 2. 排除 injector.log
-    // 3. 提取带有 [IO] 的行
+    // 使用 grep -H 确保输出文件名，排除系统日志
     const cmd = `grep -H "\\[IO\\]" ${LOG_DIR}/*.log | grep -v "injector.log" | tail -n 200`;
     const raw = await run(cmd);
     
@@ -124,21 +107,12 @@ const updateIOTable = async () => {
 
     const searchTerm = document.getElementById('ioSearch').value.toLowerCase();
     const rows = raw.split('\n').reverse().map(line => {
-        // 格式: /data/Namespace-Proxy/log/com.pkg.log:[12:00:00] [IO] READ /path
-        // 正则: 匹配最后一个斜杠后的文件名，直到冒号，然后匹配时间、操作、路径
+        // 兼容双时间戳和文件路径解析
         const m = line.match(/\/([^\/]+)\.log:\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
-        
         if (!m) return null;
         
         const [_, pkg, time, op, details] = m;
-        
-        // 搜索过滤
-        if (searchTerm && 
-            !details.toLowerCase().includes(searchTerm) && 
-            !pkg.toLowerCase().includes(searchTerm) &&
-            !op.toLowerCase().includes(searchTerm)) {
-            return null;
-        }
+        if (searchTerm && !details.toLowerCase().includes(searchTerm) && !pkg.toLowerCase().includes(searchTerm)) return null;
         
         const displayDetails = details.replace(' -> ', ' <i class="fas fa-arrow-right mx-1 opacity-50"></i> ');
 
@@ -153,7 +127,6 @@ const updateIOTable = async () => {
     tbody.innerHTML = rows || '<tr><td colspan="4" class="text-center p-4 small">无匹配结果</td></tr>';
 };
 
-// --- Tab 切换 ---
 const switchTab = (tabId) => {
     document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('show', 'active'));
@@ -163,7 +136,6 @@ const switchTab = (tabId) => {
     if (tabId === 'content-io') updateIOTable();
 };
 
-// --- 事件绑定 ---
 document.getElementById('btnSaveMain').onclick = async () => {
     await run(`echo '${document.getElementById('mainConfig').value}' > ${BASE_DIR}/injector.conf`);
     toast("主配置已保存");
@@ -181,7 +153,10 @@ document.getElementById('btnReload').onclick = async () => {
 };
 
 document.querySelectorAll('.nav-link').forEach(el => {
-    el.onclick = (e) => { e.preventDefault(); switchTab(el.getAttribute('href').substring(1)); };
+    el.onclick = (e) => {
+        e.preventDefault();
+        switchTab(el.getAttribute('href').substring(1));
+    };
 });
 
 document.getElementById('logFileSelect').onchange = loadLogs;

@@ -1,14 +1,41 @@
 :root { --code-font: "JetBrains Mono", monospace; }
 body { background-color: #fbfbfb !important; font-size: 14px; }
-.font-monospace { font-family: var(--code-font) !important; font-size: 12px !important; }
+.font-monospace { font-family: var(--code-font) !important; font-size: 11px !important; }
+
 #logViewer {
-    white-space: pre-wrap; word-break: break-all;
-    background: #1e1e1e !important; color: #d4d4d4 !important;
-    padding: 15px; border: 1px solid #333; overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: #1e1e1e !important;
+    color: #d4d4d4 !important;
+    padding: 12px;
+    border: none;
+    height: 500px;
+    overflow-y: auto;
 }
+
 .table-responsive {
     background: white;
-    thead th { background: #f8f9fa; position: sticky; top: 0; z-index: 5; }
+    thead th {
+        background: #f8f9fa;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        font-size: 11px;
+    }
 }
-.text-wrap-path { white-space: normal !important; word-break: break-all; min-width: 150px; }
-.btn-floating { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
+
+.text-wrap-path {
+    white-space: normal !important;
+    word-break: break-all;
+    min-width: 150px;
+    line-height: 1.2;
+}
+
+.btn-floating {
+    width: 38px; height: 38px;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+
+.badge-primary { font-size: 9px; padding: 4px 6px; }
+.nav-tabs .nav-link { color: #777; border: none; }
+.nav-tabs .nav-link.active { font-weight: bold; border-bottom: 3px solid #1266f1; }

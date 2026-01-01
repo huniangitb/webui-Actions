@@ -4,22 +4,15 @@ import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import * as mdb from 'mdb-ui-kit';
 import { mdiAndroid, mdiLayers, mdiDelete, mdiPencil, mdiFolder, mdiFile } from '@mdi/js';
 
-// --- 常量 ---
 const BASE_DIR = "/data/Namespace-Proxy";
 const LOG_DIR = `${BASE_DIR}/log`;
 const INJECTOR_CONF = `${BASE_DIR}/injector.conf`;
 const SERVICE_SH = "/data/adb/modules/Namespace-Proxy/service.sh";
-
 const PATH_PREFIX_STORAGE = '/storage/emulated/0';
 const PATH_PREFIX_REAL = '/data/media/0';
 
-// --- 状态 ---
 let appConfigModal, envEditorModal, newEnvModal;
-let appMap = new Map();
-let envList = [];
-let registry = new Map();
-let currentEditingEnv = null;
-let currentBindingPkg = null;
+let appMap = new Map(), envList = [], registry = new Map(), currentEditingEnv = null, currentBindingPkg = null;
 
 const getSvg = (path, size = 24, color = 'currentColor') => 
     `<svg viewBox="0 0 24 24" fill="${color}" width="${size}" height="${size}"><path d="${path}"/></svg>`;
@@ -43,7 +36,6 @@ const debounce = (func, wait) => {
     };
 };
 
-// --- 路径处理 ---
 const normalizeToDisplay = (path) => {
     if (!path) return "";
     if (path.startsWith(PATH_PREFIX_REAL)) return path.substring(PATH_PREFIX_REAL.length) || "/";
@@ -63,7 +55,6 @@ const normalizeToConfig = (path, isTarget) => {
     }
 };
 
-// --- 数据加载 ---
 const loadData = async () => {
     try {
         const files = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
@@ -130,7 +121,6 @@ const renderEnvList = () => {
         </div></div>`).join('') + `<div class="col-12 text-center mt-3 text-muted small" style="display: ${envList.length===0?'block':'none'}">暂无环境，请点击右上角新建</div>`;
 };
 
-// --- 交互逻辑 ---
 window.openAppConfig = (pkg) => {
     currentBindingPkg = pkg;
     const app = appMap.get(pkg);
@@ -167,134 +157,91 @@ document.getElementById('btnCreateEnv').onclick = async () => {
     loadData();
 };
 
-// --- 智能自动补全 (修复版) ---
 const setupAutocomplete = (input) => {
     const box = document.getElementById('suggestionBox');
-    
-    // 聚焦时自动滚动到上方
+    const scrollContainer = document.getElementById('editorVisual');
+
+    const updateBoxPosition = () => {
+        if (box.style.display === 'none') return;
+        const rect = input.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const boxHeight = box.offsetHeight || 200;
+        const maxWidth = Math.min(300, window.innerWidth - 20);
+        box.style.width = maxWidth + 'px';
+        let leftPos = rect.left;
+        if (leftPos + maxWidth > window.innerWidth) leftPos = window.innerWidth - maxWidth - 10;
+        box.style.left = leftPos + 'px';
+        const spaceBelow = viewportHeight - rect.bottom;
+        if (spaceBelow < boxHeight && rect.top > boxHeight) {
+            box.style.top = (rect.top - boxHeight - 5) + 'px';
+        } else {
+            box.style.top = (rect.bottom + 5) + 'px';
+        }
+    };
+
     input.addEventListener('focus', () => {
         setTimeout(() => {
-            const container = document.getElementById('editorVisual');
             const row = input.closest('.rule-row');
-            if (row && container) {
+            if (row && scrollContainer) {
                 const rowRect = row.getBoundingClientRect();
-                const containerRect = container.getBoundingClientRect();
-                const currentOffset = rowRect.top - containerRect.top;
-                const targetOffset = containerRect.height * 0.2; 
-                container.scrollBy({ top: currentOffset - targetOffset, behavior: 'smooth' });
+                const containerRect = scrollContainer.getBoundingClientRect();
+                scrollContainer.scrollBy({ top: (rowRect.top - containerRect.top) - containerRect.height * 0.2, behavior: 'smooth' });
             }
         }, 300);
+        scrollContainer.addEventListener('scroll', updateBoxPosition);
+        window.addEventListener('resize', updateBoxPosition);
+        if(input.value) input.dispatchEvent(new Event('input'));
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => {
+            box.style.display = 'none';
+            scrollContainer.removeEventListener('scroll', updateBoxPosition);
+            window.removeEventListener('resize', updateBoxPosition);
+        }, 200);
     });
 
     const performSearch = debounce(async (val) => {
-        let parentDir = PATH_PREFIX_REAL; // 默认基准目录
-        let searchPrefix = ""; 
-        let displayBase = "/"; // 显示结果必须以 / 开头
-
-        // 1. 统一路径解析逻辑：强制映射到 /data/media/0/
-        // 去除开头的 /，统一视为相对于 /data/media/0/ 的路径
+        let parentDir = PATH_PREFIX_REAL, searchPrefix = "", displayBase = "/";
         const cleanVal = val ? val.replace(/^\/+/, '') : "";
-        
-        if (!cleanVal) {
-            // 输入为空或只有 / -> 列出根目录
-            parentDir = PATH_PREFIX_REAL + '/';
-            searchPrefix = "";
-            displayBase = "/";
-        } else {
-            if (cleanVal.endsWith('/')) {
-                // 输入 "Download/" -> 列出该目录
-                parentDir = PATH_PREFIX_REAL + '/' + cleanVal;
-                searchPrefix = "";
-                displayBase = "/" + cleanVal;
-            } else {
-                // 输入 "Download/Su" -> 列出父目录并过滤
-                const lastSlashIndex = cleanVal.lastIndexOf('/');
-                if (lastSlashIndex === -1) {
-                    // "Do" -> 在根目录下找
-                    parentDir = PATH_PREFIX_REAL + '/';
-                    searchPrefix = cleanVal;
-                    displayBase = "/";
-                } else {
-                    // "Download/Su"
-                    const dirPart = cleanVal.substring(0, lastSlashIndex + 1);
-                    parentDir = PATH_PREFIX_REAL + '/' + dirPart;
-                    searchPrefix = cleanVal.substring(lastSlashIndex + 1);
-                    displayBase = "/" + dirPart;
-                }
+        if (!cleanVal) { parentDir = PATH_PREFIX_REAL + '/'; }
+        else if (cleanVal.endsWith('/')) { parentDir = PATH_PREFIX_REAL + '/' + cleanVal; displayBase = "/" + cleanVal; }
+        else {
+            const lastSlashIndex = cleanVal.lastIndexOf('/');
+            if (lastSlashIndex === -1) { searchPrefix = cleanVal; }
+            else {
+                const dirPart = cleanVal.substring(0, lastSlashIndex + 1);
+                parentDir = PATH_PREFIX_REAL + '/' + dirPart;
+                searchPrefix = cleanVal.substring(lastSlashIndex + 1);
+                displayBase = "/" + dirPart;
             }
         }
-        
-        // 规范化路径，避免双斜杠
         parentDir = parentDir.replace(/\/+/g, '/');
-
         try {
             const res = await exec(`ls -F -1 "${parentDir}" 2>/dev/null | head -n 30`);
-            if (!res || !res.stdout) { box.style.display = 'none'; return; }
-
-            const lines = res.stdout.split('\n');
-            const suggestions = lines
-                .filter(line => line.startsWith(searchPrefix))
-                .map(line => {
-                    const isDir = line.endsWith('/');
-                    const name = isDir ? line.slice(0, -1) : line;
-                    const fullPath = displayBase + name + (isDir ? '/' : '');
-                    return { text: fullPath, icon: isDir ? ICONS.FOLDER : ICONS.FILE };
-                });
-
+            if (!res?.stdout) { box.style.display = 'none'; return; }
+            const suggestions = res.stdout.split('\n').filter(l => l.startsWith(searchPrefix)).map(line => {
+                const isDir = line.endsWith('/'), name = isDir ? line.slice(0, -1) : line;
+                return { text: displayBase + name + (isDir ? '/' : ''), icon: isDir ? ICONS.FOLDER : ICONS.FILE };
+            });
             if (suggestions.length === 0) { box.style.display = 'none'; return; }
-
-            // 使用 mousedown 阻止失焦，修复点击无效问题
-            box.innerHTML = suggestions.map(s => `
-                <div class="list-group-item list-group-item-action py-2 px-3 border-0 d-flex align-items-center suggestion-item" onmousedown="applySuggestion('${s.text}')">
-                    <div class="me-3" style="width:16px">${s.icon}</div>
-                    <div class="fw-bold font-monospace small text-truncate">${s.text}</div>
-                </div>
-            `).join('');
-
-            const rect = input.getBoundingClientRect();
-            const containerRect = document.querySelector('.modal-body').getBoundingClientRect();
-            const maxWidth = Math.min(300, window.innerWidth / 2);
-            box.style.width = maxWidth + 'px';
-            
-            let leftPos = (rect.right - containerRect.left) - maxWidth;
-            if (leftPos < 0) leftPos = 10;
-            
-            const boxHeight = Math.min(suggestions.length * 40, 250);
-            const spaceBelow = window.innerHeight - rect.bottom;
-            
-            if (spaceBelow < 250 && rect.top > 250) {
-                const topPos = (rect.top - containerRect.top + document.querySelector('#editorVisual').scrollTop) - boxHeight - 5;
-                box.style.top = topPos + 'px';
-            } else {
-                box.style.top = (rect.bottom - containerRect.top + document.querySelector('#editorVisual').scrollTop) + 'px';
-            }
-            
-            box.style.left = leftPos + 'px';
+            box.innerHTML = suggestions.map(s => `<div class="list-group-item list-group-item-action py-2 px-3 border-0 d-flex align-items-center suggestion-item" onmousedown="applySuggestion('${s.text}')"><div class="me-3" style="width:16px">${s.icon}</div><div class="fw-bold font-monospace small text-truncate">${s.text}</div></div>`).join('');
             box.style.display = 'block';
+            updateBoxPosition();
             window._currentInput = input;
-
         } catch (e) { box.style.display = 'none'; }
     }, 100);
 
     input.addEventListener('input', (e) => performSearch(e.target.value));
-    input.addEventListener('focus', (e) => performSearch(e.target.value));
-    
-    // 延时隐藏，确保点击事件能触发
-    input.addEventListener('blur', () => setTimeout(() => box.style.display = 'none', 200));
 };
 
 window.applySuggestion = (text) => {
     if (window._currentInput) {
         window._currentInput.value = text;
-        // 保持焦点以便继续输入
-        setTimeout(() => {
-            window._currentInput.focus();
-            window._currentInput.dispatchEvent(new Event('input'));
-        }, 10);
+        setTimeout(() => { window._currentInput.focus(); window._currentInput.dispatchEvent(new Event('input')); }, 10);
     }
 };
 
-// --- 环境编辑器 ---
 window.openEnvEditor = async (envName) => {
     currentEditingEnv = envName;
     document.getElementById('editorEnvName').textContent = envName;
@@ -307,19 +254,13 @@ window.openEnvEditor = async (envName) => {
 };
 
 const switchEditorMode = (mode) => {
-    const visual = document.getElementById('editorVisual');
-    const raw = document.getElementById('editorRaw');
-    const footer = document.querySelector('.visual-footer-action');
+    const visual = document.getElementById('editorVisual'), raw = document.getElementById('editorRaw'), footer = document.querySelector('.visual-footer-action');
     if (mode === 'visual') {
         parseConfigToVisual(document.getElementById('envRuleContent').value);
-        visual.classList.remove('d-none');
-        footer.classList.remove('d-none');
-        raw.classList.add('d-none');
+        visual.classList.remove('d-none'); footer.classList.remove('d-none'); raw.classList.add('d-none');
     } else {
         document.getElementById('envRuleContent').value = generateConfigFromVisual();
-        visual.classList.add('d-none');
-        footer.classList.add('d-none');
-        raw.classList.remove('d-none');
+        visual.classList.add('d-none'); footer.classList.add('d-none'); raw.classList.remove('d-none');
     }
 };
 document.querySelectorAll('input[name="editorMode"]').forEach(el => el.addEventListener('change', (e) => switchEditorMode(e.target.value)));
@@ -329,14 +270,8 @@ const parseConfigToVisual = (text) => {
     container.innerHTML = '';
     text.split('\n').forEach(line => {
         const parts = line.trim().split(/\s+/);
-        if (parts[0] === 'REDIRECT' && parts.length >= 3) {
-            const displayTarget = normalizeToDisplay(parts[1]);
-            const displaySource = normalizeToDisplay(parts.slice(2).join(' '));
-            addRuleRow('REDIRECT', displayTarget, displaySource);
-        } else if (parts[0] === 'HIDE' && parts.length >= 2) {
-            const displayTarget = normalizeToDisplay(parts.slice(1).join(' '));
-            addRuleRow('HIDE', displayTarget, '');
-        }
+        if (parts[0] === 'REDIRECT' && parts.length >= 3) addRuleRow('REDIRECT', normalizeToDisplay(parts[1]), normalizeToDisplay(parts.slice(2).join(' ')));
+        else if (parts[0] === 'HIDE' && parts.length >= 2) addRuleRow('HIDE', normalizeToDisplay(parts.slice(1).join(' ')), '');
     });
     if (container.children.length === 0) addRuleRow('REDIRECT', '', '');
 };
@@ -344,50 +279,23 @@ const parseConfigToVisual = (text) => {
 const addRuleRow = (type, target, source) => {
     const div = document.createElement('div');
     div.className = 'rule-row card shadow-0 border mb-2 bg-white';
-    div.innerHTML = `
-        <div class="card-body p-2 d-flex align-items-center gap-2">
-            <select class="form-select form-select-sm rule-type" style="width:90px"><option value="REDIRECT">重定向</option><option value="HIDE">隐藏</option></select>
-            <div class="flex-grow-1 d-flex flex-column gap-1">
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text border-0 bg-light text-muted" style="width: 80px;">原始路径</span>
-                    <input type="text" class="form-control font-monospace rule-target" placeholder="App看到的 (如 /Download)" value="${target}">
-                </div>
-                <div class="input-group input-group-sm rule-source-group">
-                    <span class="input-group-text border-0 bg-light text-muted" style="width: 80px;">重定向至</span>
-                    <input type="text" class="form-control font-monospace rule-source" placeholder="实际存储 (如 /MyFolder)" value="${source}">
-                </div>
-            </div>
-            <button class="btn btn-link text-danger px-2 btn-del ms-auto align-self-center">${ICONS.DELETE}</button>
-        </div>`;
-    
+    div.innerHTML = `<div class="card-body p-2 d-flex align-items-center gap-2"><select class="form-select form-select-sm rule-type" style="width:90px"><option value="REDIRECT">重定向</option><option value="HIDE">隐藏</option></select><div class="flex-grow-1 d-flex flex-column gap-1"><div class="input-group input-group-sm"><span class="input-group-text border-0 bg-light text-muted" style="width: 80px;">原始路径</span><input type="text" class="form-control font-monospace rule-target" placeholder="App看到的" value="${target}"></div><div class="input-group input-group-sm rule-source-group"><span class="input-group-text border-0 bg-light text-muted" style="width: 80px;">重定向至</span><input type="text" class="form-control font-monospace rule-source" placeholder="实际存储" value="${source}"></div></div><button class="btn btn-link text-danger px-2 btn-del ms-auto align-self-center">${ICONS.DELETE}</button></div>`;
     div.querySelector('.rule-type').value = type;
-    const sourceGroup = div.querySelector('.rule-source-group');
-    const targetInput = div.querySelector('.rule-target');
-    const sourceInput = div.querySelector('.rule-source');
-    
+    const sourceGroup = div.querySelector('.rule-source-group'), targetInput = div.querySelector('.rule-target'), sourceInput = div.querySelector('.rule-source');
     if(type==='HIDE') sourceGroup.classList.add('d-none');
     div.querySelector('.rule-type').onchange = (e) => sourceGroup.classList.toggle('d-none', e.target.value === 'HIDE');
     div.querySelector('.btn-del').onclick = () => div.remove();
-    
-    setupAutocomplete(targetInput);
-    setupAutocomplete(sourceInput);
+    setupAutocomplete(targetInput); setupAutocomplete(sourceInput);
     document.getElementById('ruleBuilderContainer').appendChild(div);
 };
 
 const generateConfigFromVisual = () => {
     let res = "";
     document.querySelectorAll('.rule-row').forEach(row => {
-        const type = row.querySelector('.rule-type').value;
-        const targetDisplay = row.querySelector('.rule-target').value.trim();
-        const sourceDisplay = row.querySelector('.rule-source').value.trim();
-        if(targetDisplay) {
-            const configTarget = normalizeToConfig(targetDisplay, true);
-            if (type === 'REDIRECT' && sourceDisplay) {
-                const configSource = normalizeToConfig(sourceDisplay, false);
-                res += `REDIRECT ${configTarget} ${configSource}\n`;
-            } else if (type === 'HIDE') {
-                res += `HIDE ${configTarget}\n`;
-            }
+        const type = row.querySelector('.rule-type').value, target = row.querySelector('.rule-target').value.trim(), source = row.querySelector('.rule-source').value.trim();
+        if(target) {
+            if (type === 'REDIRECT' && source) res += `REDIRECT ${normalizeToConfig(target, true)} ${normalizeToConfig(source, false)}\n`;
+            else if (type === 'HIDE') res += `HIDE ${normalizeToConfig(target, true)}\n`;
         }
     });
     return res;
@@ -395,11 +303,9 @@ const generateConfigFromVisual = () => {
 document.getElementById('btnAddRuleRow').onclick = () => addRuleRow('REDIRECT', '', '');
 
 document.getElementById('btnSaveEnv').onclick = async () => {
-    const isVisual = document.getElementById('modeVisual').checked;
-    const content = isVisual ? generateConfigFromVisual() : document.getElementById('envRuleContent').value;
+    const content = document.getElementById('modeVisual').checked ? generateConfigFromVisual() : document.getElementById('envRuleContent').value;
     await exec(`echo '${content}' > ${BASE_DIR}/${currentEditingEnv}.conf`);
-    toast("规则已保存");
-    envEditorModal.hide();
+    toast("规则已保存"); envEditorModal.hide();
 };
 
 document.getElementById('btnDeleteEnv').onclick = async () => {
@@ -408,11 +314,9 @@ document.getElementById('btnDeleteEnv').onclick = async () => {
     let content = "# Generated by WebUI\n";
     registry.forEach((val, key) => { if (val.env !== currentEditingEnv) content += `${key} ${val.env} ${val.param}\n`; });
     await exec(`echo '${content}' > ${INJECTOR_CONF}`);
-    envEditorModal.hide();
-    loadData();
+    envEditorModal.hide(); loadData();
 };
 
-// --- 监控与日志 (保持不变) ---
 const updateIOTable = async () => {
     const tbody = document.getElementById('ioTableBody');
     const raw = await run(`grep -H "\\[IO\\]" ${LOG_DIR}/*.log | grep -v "injector.log" | tail -n 100`);
@@ -421,17 +325,14 @@ const updateIOTable = async () => {
     tbody.innerHTML = raw.split('\n').reverse().map(line => {
         const m = line.match(/\/([^\/]+)\.log:\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
         if (!m) return null;
-        const [_, pkg, time, op, details] = m;
-        const app = appMap.get(pkg);
-        const name = app ? app.appLabel : pkg;
+        const [_, pkg, time, op, details] = m, app = appMap.get(pkg), name = app ? app.appLabel : pkg;
         if (term && !name.toLowerCase().includes(term) && !details.toLowerCase().includes(term)) return null;
         return `<tr><td class="text-muted">${time}</td><td><div class="fw-bold">${name}</div></td><td><span class="badge shadow-0 op-${op}">${op}</span></td><td class="text-wrap-path">${details.replace(' -> ', ' <i class="fas fa-arrow-right opacity-50"></i> ')}</td></tr>`;
     }).filter(r=>r).join('');
 };
 
 const loadLogs = async () => {
-    const select = document.getElementById('logFileSelect');
-    const viewer = document.getElementById('logViewer');
+    const select = document.getElementById('logFileSelect'), viewer = document.getElementById('logViewer');
     const files = (await run(`ls ${LOG_DIR}/*.log 2>/dev/null`)).split('\n').filter(f=>f);
     const cur = select.value;
     select.innerHTML = files.map(f => `<option value="${f.split('/').pop()}" ${f.split('/').pop()===cur?'selected':''}>${f.split('/').pop()}</option>`).join('');
@@ -444,7 +345,6 @@ const loadLogs = async () => {
 };
 document.getElementById('logFileSelect').addEventListener('change', loadLogs);
 
-// --- 初始化 ---
 document.addEventListener('DOMContentLoaded', () => {
     appConfigModal = new mdb.Modal(document.getElementById('appConfigModal'));
     envEditorModal = new mdb.Modal(document.getElementById('envEditorModal'));

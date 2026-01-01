@@ -11,12 +11,22 @@ let ruleModalInstance;
 let appPickerModalInstance;
 let allInstalledApps = [];
 
+// 动态注入安全区域样式 (Parcel 兼容性处理)
+if (!document.getElementById('ksu-insets-style')) {
+    const link = document.createElement('link');
+    link.id = 'ksu-insets-style';
+    link.rel = 'stylesheet';
+    link.href = '/internal/insets.css';
+    document.head.appendChild(link);
+}
+
+// 通用执行函数
 const run = async (cmd) => {
     const res = await exec(cmd);
-    if (res.errno !== 0) console.warn(`[Shell] ${cmd} failed: ${res.stderr}`);
-    return res.stdout.trim() || "";
+    return res.stdout ? res.stdout.trim() : "";
 };
 
+// 刷新 MDB 输入框状态，解决文字重叠
 const refreshMDB = () => {
     document.querySelectorAll('.form-outline').forEach(el => {
         const input = el.querySelector('input, textarea');
@@ -25,8 +35,9 @@ const refreshMDB = () => {
     });
 };
 
+// 语法高亮处理器 (增加类型检查)
 const highlightContent = (text) => {
-    if (!text) return '<span class="text-muted italic">Empty</span>';
+    if (typeof text !== 'string' || !text) return '';
     return text
         .replace(/#(.*)/g, '<span class="log-comment">#$1</span>')
         .replace(/\b(REDIRECT|HIDE)\b/g, '<span class="log-keyword">$1</span>')
@@ -38,27 +49,40 @@ const highlightContent = (text) => {
 const loadConfigs = async () => {
     const ruleList = document.getElementById('ruleList');
     try {
+        // 加载主配置
         const main = await run(`[ -f ${BASE_DIR}/injector.conf ] && cat ${BASE_DIR}/injector.conf`);
-        document.getElementById('mainConfig').value = main;
+        document.getElementById('mainConfig').value = main || "";
 
-        const files = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
-        const pkgNames = files.split('\n')
+        // 获取规则文件列表
+        const filesRaw = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
+        const pkgNames = filesRaw.split('\n')
             .filter(f => f && !f.includes('injector.conf'))
-            .map(f => f.split('/').pop().replace('.conf', ''));
+            .map(f => {
+                const parts = f.split('/');
+                const fileName = parts.pop() || "";
+                return fileName.replace('.conf', '');
+            });
 
         if (pkgNames.length === 0) {
-            ruleList.innerHTML = '<div class="p-5 text-center text-muted small">未找到应用规则</div>';
+            ruleList.innerHTML = '<div class="p-5 text-center text-muted small">暂无应用规则</div>';
         } else {
+            // 批量获取应用信息
             const packagesInfo = await getPackagesInfo(pkgNames);
             const infoMap = new Map();
-            packagesInfo.forEach(info => infoMap.set(info.packageName, info));
+            if (packagesInfo) {
+                packagesInfo.forEach(info => infoMap.set(info.packageName, info));
+            }
 
             ruleList.innerHTML = pkgNames.map(pkg => {
                 const info = infoMap.get(pkg);
-                const label = info ? info.label : pkg;
+                const label = (info && info.label) ? info.label : pkg;
+                // 关键修复：安全处理 replace 调用
+                const safeLabel = label.toString().replace(/'/g, "\\'");
                 const iconSrc = info ? `ksu://icon/${pkg}` : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+                
                 return `
-                <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-3 border-0 border-bottom app-item-row" onclick="openRuleEditor('${pkg}', '${label.replace(/'/g, "\\'")}')">
+                <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-3 border-0 border-bottom app-item-row" 
+                     onclick="openRuleEditor('${pkg}', '${safeLabel}')">
                     <div class="d-flex align-items-center overflow-hidden">
                         <img src="${iconSrc}" class="app-icon rounded-circle me-3">
                         <div class="text-truncate">
@@ -71,19 +95,22 @@ const loadConfigs = async () => {
             }).join('');
         }
     } catch (e) {
-        ruleList.innerHTML = `<div class="alert alert-danger m-3 small">加载失败: ${e.message}</div>`;
+        ruleList.innerHTML = `<div class="alert alert-danger m-3 small">加载配置异常: ${e.message}</div>`;
     }
     refreshMDB();
 };
 
 window.openRuleEditor = async (pkgName, appLabel) => {
+    if (!pkgName) return;
     const content = await run(`cat ${BASE_DIR}/${pkgName}.conf`);
     document.getElementById('modalAppName').textContent = appLabel || pkgName;
     document.getElementById('modalAppPkg').textContent = pkgName;
     document.getElementById('modalAppIcon').src = `ksu://icon/${pkgName}`;
-    document.getElementById('modalRuleContent').value = content;
+    document.getElementById('modalRuleContent').value = content || "";
+    
     document.getElementById('btnDeleteRule').onclick = () => deleteRule(pkgName);
     document.getElementById('btnModalSave').onclick = () => saveRule(pkgName);
+    
     ruleModalInstance.show();
     setTimeout(refreshMDB, 200);
 };
@@ -112,25 +139,38 @@ document.getElementById('btnOpenAppPicker').onclick = async () => {
     appPickerModalInstance.show();
     try {
         const packages = await listPackages('user');
-        allInstalledApps = await getPackagesInfo(packages);
-        allInstalledApps.sort((a, b) => a.label.localeCompare(b.label, 'zh'));
-        renderAppPickerList(allInstalledApps);
+        if (packages && packages.length > 0) {
+            allInstalledApps = await getPackagesInfo(packages);
+            allInstalledApps.sort((a, b) => (a.label || "").localeCompare(b.label || "", 'zh'));
+            renderAppPickerList(allInstalledApps);
+        } else {
+            throw new Error("未获取到应用列表");
+        }
     } catch (e) {
-        listContainer.innerHTML = `<div class="text-danger p-3 small">加载失败: ${e.message}</div>`;
+        listContainer.innerHTML = `<div class="text-danger p-3 small">应用拉取失败: ${e.message}</div>`;
     }
 };
 
 const renderAppPickerList = (apps) => {
-    document.getElementById('appPickerList').innerHTML = apps.map(app => `
+    const listContainer = document.getElementById('appPickerList');
+    if (!apps || apps.length === 0) {
+        listContainer.innerHTML = '<div class="p-4 text-center text-muted">没有匹配的应用</div>';
+        return;
+    }
+    listContainer.innerHTML = apps.map(app => {
+        const pkg = app.packageName || "unknown";
+        const label = app.label || pkg;
+        const safeLabel = label.toString().replace(/'/g, "\\'");
+        return `
         <div class="list-group-item list-group-item-action d-flex align-items-center px-3 py-2 border-0" 
-             onclick="selectAppToConfig('${app.packageName}', '${app.label.replace(/'/g, "\\'")}')">
-            <img src="ksu://icon/${app.packageName}" class="app-icon-sm rounded-circle me-3">
+             onclick="selectAppToConfig('${pkg}', '${safeLabel}')">
+            <img src="ksu://icon/${pkg}" class="app-icon-sm rounded-circle me-3">
             <div class="text-truncate">
-                <div class="fw-bold text-dark small">${app.label}</div>
-                <small class="text-muted font-monospace" style="font-size: 10px;">${app.packageName}</small>
+                <div class="fw-bold text-dark small">${label}</div>
+                <small class="text-muted font-monospace" style="font-size: 10px;">${pkg}</small>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 };
 
 window.selectAppToConfig = async (pkgName, label) => {
@@ -143,9 +183,10 @@ window.selectAppToConfig = async (pkgName, label) => {
 };
 
 document.getElementById('appPickerSearch').oninput = (e) => {
-    const term = e.target.value.toLowerCase();
+    const term = (e.target.value || "").toLowerCase();
     const filtered = allInstalledApps.filter(app => 
-        app.label.toLowerCase().includes(term) || app.packageName.toLowerCase().includes(term)
+        (app.label || "").toLowerCase().includes(term) || 
+        (app.packageName || "").toLowerCase().includes(term)
     );
     renderAppPickerList(filtered);
 };
@@ -153,35 +194,47 @@ document.getElementById('appPickerSearch').oninput = (e) => {
 // --- 日志与监控 ---
 const loadLogs = async () => {
     const select = document.getElementById('logFileSelect');
-    const files = await run(`ls ${LOG_DIR}/*.log 2>/dev/null`);
-    const fileList = files.split('\n').filter(f => f);
+    const viewer = document.getElementById('logViewer');
+    const filesRaw = await run(`ls ${LOG_DIR}/*.log 2>/dev/null`);
+    const fileList = filesRaw.split('\n').filter(f => f);
+    
     if (fileList.length === 0) {
         select.innerHTML = '<option value="">无日志</option>';
+        viewer.textContent = "日志目录为空";
         return;
     }
     const current = select.value;
     select.innerHTML = fileList.map(f => {
-        const name = f.split('/').pop();
-        return `<option value="${name}" ${name === current ? 'selected' : ''}>${name === 'injector.log' ? '系统日志' : name}</option>`;
+        const name = f.split('/').pop() || "";
+        return `<option value="${name}" ${name === current ? 'selected' : ''}>${name === 'injector.log' ? '系统服务日志' : name}</option>`;
     }).join('');
-    const target = select.value || fileList[0].split('/').pop();
-    const content = await run(`tail -c 50000 ${LOG_DIR}/${target} 2>/dev/null`);
-    document.getElementById('logViewer').innerHTML = highlightContent(content);
+
+    const target = select.value || (fileList[0] ? fileList[0].split('/').pop() : "");
+    if (target) {
+        const content = await run(`tail -c 50000 ${LOG_DIR}/${target} 2>/dev/null`);
+        viewer.innerHTML = highlightContent(content);
+        viewer.scrollTop = viewer.scrollHeight;
+    }
 };
 
 const updateIOTable = async () => {
     const tbody = document.getElementById('ioTableBody');
     const raw = await run(`grep -H "\\[IO\\]" ${LOG_DIR}/*.log | grep -v "injector.log" | tail -n 150`);
+    
     if (!raw) {
         tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted small">暂无监控数据</td></tr>';
         return;
     }
-    const searchTerm = document.getElementById('ioSearch').value.toLowerCase();
+
+    const searchTerm = (document.getElementById('ioSearch').value || "").toLowerCase();
     tbody.innerHTML = raw.split('\n').reverse().map(line => {
+        // 匹配 1.包名 2.时间 3.操作 4.详情
         const m = line.match(/\/([^\/]+)\.log:\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
         if (!m) return null;
+        
         const [_, pkg, time, op, details] = m;
         if (searchTerm && !details.toLowerCase().includes(searchTerm) && !pkg.toLowerCase().includes(searchTerm)) return null;
+        
         const displayDetails = details.replace(' -> ', ' <i class="fas fa-arrow-right mx-1 opacity-50"></i> ');
         return `<tr>
             <td class="text-muted small">${time}</td>
@@ -196,41 +249,68 @@ const updateIOTable = async () => {
 const switchTab = (tabId) => {
     document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('show', 'active'));
-    document.querySelector(`[href="#${tabId}"]`).classList.add('active');
-    document.getElementById(tabId).classList.add('show', 'active');
+    
+    const targetLink = document.querySelector(`[href="#${tabId}"]`);
+    const targetPane = document.getElementById(tabId);
+    
+    if (targetLink) targetLink.classList.add('active');
+    if (targetPane) targetPane.classList.add('show', 'active');
+    
     if (tabId === 'content-log') loadLogs();
     if (tabId === 'content-io') updateIOTable();
 };
 
 document.getElementById('btnSaveMain').onclick = async () => {
-    await run(`echo '${document.getElementById('mainConfig').value}' > ${BASE_DIR}/injector.conf`);
-    toast("主配置已保存");
+    const val = document.getElementById('mainConfig').value;
+    const res = await exec(`echo '${val}' > ${BASE_DIR}/injector.conf`);
+    if (res.errno === 0) toast("主配置已保存");
+    else toast("保存失败: " + res.stderr);
 };
 
 document.getElementById('btnReload').onclick = async () => {
     toast("正在重启服务...");
-    await run(`sh ${SERVICE_SH}`);
-    setTimeout(checkStatus, 1500);
+    const res = await exec(`sh ${SERVICE_SH}`);
+    if (res.errno === 0) {
+        toast("重启指令已发送");
+        setTimeout(checkStatus, 2000);
+    } else {
+        toast("重启失败: " + res.stderr);
+    }
 };
 
 document.querySelectorAll('.nav-link').forEach(el => {
-    el.onclick = (e) => { e.preventDefault(); switchTab(el.getAttribute('href').substring(1)); };
+    el.onclick = (e) => {
+        e.preventDefault();
+        const id = el.getAttribute('href').replace('#', '');
+        switchTab(id);
+    };
 });
 
 const checkStatus = () => {
     run("pgrep -f 'injector$'").then(pid => {
         const badge = document.getElementById('statusBadge');
         const info = document.getElementById('statusInfo');
-        badge.className = pid ? "badge badge-success me-2" : "badge badge-danger me-2";
-        badge.textContent = pid ? "RUNNING" : "STOPPED";
-        info.textContent = pid ? `PID: ${pid.trim()}` : "OFFLINE";
+        if (pid) {
+            badge.className = "badge badge-success me-2";
+            badge.textContent = "RUNNING";
+            info.textContent = `PID: ${pid}`;
+        } else {
+            badge.className = "badge badge-danger me-2";
+            badge.textContent = "STOPPED";
+            info.textContent = "服务未运行";
+        }
     });
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 实例化 MDB 组件
     ruleModalInstance = new mdb.Modal(document.getElementById('ruleModal'));
     appPickerModalInstance = new mdb.Modal(document.getElementById('appPickerModal'));
-    document.querySelectorAll('[data-mdb-collapse-init]').forEach(el => new mdb.Collapse(el));
+    
+    document.querySelectorAll('[data-mdb-collapse-init]').forEach(el => {
+        new mdb.Collapse(el);
+    });
+
     loadConfigs();
     checkStatus();
 });

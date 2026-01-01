@@ -17,8 +17,9 @@ body {
     padding: 12px; height: 500px; overflow-y: auto; border: none;
 }
 
-.app-icon { width: 40px; height: 40px; object-fit: cover; }
-.app-icon-sm { width: 32px; height: 32px; object-fit: cover; }
+.app-icon-container { width: 40px; height: 40px; display: inline-block; }
+.app-icon-sm-container { width: 32px; height: 32px; display: inline-block; }
+
 .app-item-row { cursor: pointer; transition: background 0.2s; &:active { background: #eee; } }
 
 .op-OPEN   { background-color: #00bcd4 !important; }

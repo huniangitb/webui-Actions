@@ -157,7 +157,7 @@ document.getElementById('btnCreateEnv').onclick = async () => {
     loadData();
 };
 
-// --- 自动补全核心逻辑 (RAF + 焦点保护) ---
+// --- 自动补全核心逻辑 (修复滑动与选中) ---
 const updateBoxPosition = (input) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none' || !input) return;
@@ -169,12 +169,10 @@ const updateBoxPosition = (input) => {
     
     box.style.width = maxWidth + 'px';
     
-    // X轴定位
     let leftPos = rect.left;
     if (leftPos + maxWidth > window.innerWidth) leftPos = window.innerWidth - maxWidth - 10;
     box.style.left = leftPos + 'px';
 
-    // Y轴定位 (紧贴)
     const spaceBelow = viewportHeight - rect.bottom;
     if (spaceBelow < boxHeight && rect.top > boxHeight) {
         box.style.top = (rect.top - boxHeight - 2) + 'px';
@@ -194,7 +192,6 @@ const startAutoUpdate = (input) => {
     requestAnimationFrame(loop);
 };
 
-// 全局点击监听：只有点击非输入框且非建议框区域时才隐藏
 document.addEventListener('click', (e) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none') return;
@@ -205,20 +202,18 @@ document.addEventListener('click', (e) => {
 
 const setupAutocomplete = (input) => {
     const box = document.getElementById('suggestionBox');
-    const scrollContainer = document.getElementById('editorVisual');
-
-    input.addEventListener('focus', () => {
+    
+    // 聚焦时自动上滑，防止被遮挡
+    const autoScroll = () => {
         window._currentInput = input;
         setTimeout(() => {
-            const row = input.closest('.rule-row');
-            if (row && scrollContainer) {
-                const rowRect = row.getBoundingClientRect();
-                const containerRect = scrollContainer.getBoundingClientRect();
-                scrollContainer.scrollBy({ top: (rowRect.top - containerRect.top) - containerRect.height * 0.2, behavior: 'smooth' });
-            }
-        }, 300);
+            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300); // 延时等待键盘弹出
         if(input.value) input.dispatchEvent(new Event('input'));
-    });
+    };
+
+    input.addEventListener('focus', autoScroll);
+    input.addEventListener('click', autoScroll);
 
     const performSearch = debounce(async (val) => {
         let parentDir = PATH_PREFIX_REAL, searchPrefix = "", displayBase = "/";
@@ -238,20 +233,19 @@ const setupAutocomplete = (input) => {
         parentDir = parentDir.replace(/\/+/g, '/');
         try {
             const res = await exec(`ls -F -1 "${parentDir}" 2>/dev/null | head -n 30`);
-            if (!res?.stdout) { 
-                box.style.display = 'none'; return; 
-            }
+            if (!res?.stdout) { box.style.display = 'none'; return; }
+            
             const suggestions = res.stdout.split('\n').filter(l => l.startsWith(searchPrefix)).map(line => {
                 const isDir = line.endsWith('/'), name = isDir ? line.slice(0, -1) : line;
                 return { text: displayBase + name + (isDir ? '/' : ''), icon: isDir ? ICONS.FOLDER : ICONS.FILE };
             });
             if (suggestions.length === 0) { box.style.display = 'none'; return; }
             
-            // 关键修复：ontouchstart + onmousedown 且 preventDefault，防止输入框失焦导致键盘重载
+            // 修复：移除 ontouchstart 允许滑动，保留 mousedown 防止失焦，使用 onclick 触发选中
             box.innerHTML = suggestions.map(s => `
                 <div class="list-group-item list-group-item-action py-2 px-3 border-0 d-flex align-items-center suggestion-item" 
-                     onmousedown="event.preventDefault(); applySuggestion('${s.text}')"
-                     ontouchstart="event.preventDefault(); applySuggestion('${s.text}')">
+                     onmousedown="event.preventDefault()"
+                     onclick="applySuggestion('${s.text}')">
                     <div class="me-3" style="width:16px">${s.icon}</div>
                     <div class="fw-bold font-monospace small text-truncate">${s.text}</div>
                 </div>
@@ -268,7 +262,6 @@ const setupAutocomplete = (input) => {
 window.applySuggestion = (text) => {
     if (window._currentInput) {
         window._currentInput.value = text;
-        // 立即触发 input 事件以加载下一级目录，无需等待
         window._currentInput.dispatchEvent(new Event('input'));
     }
 };

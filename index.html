@@ -7,7 +7,8 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
 </head>
 <body class="bg-light">
-    <div class="container-fluid px-0 px-md-3 py-3" style="max-width: 800px; margin: 0 auto;">
+    <!-- 修改：添加 padding-top 适配状态栏 -->
+    <div class="container-fluid px-0 px-md-3 py-3" style="max-width: 800px; margin: 0 auto; padding-top: max(12px, env(safe-area-inset-top));">
         <!-- 头部 -->
         <div class="d-flex justify-content-between align-items-center mb-3 px-3">
             <div>
@@ -172,7 +173,8 @@
                             所有路径输入均自动映射至 <b>/data/media/0/</b> 进行搜索补全。
                         </div>
                         <div id="ruleBuilderContainer"></div>
-                        <div style="height: 60px;"></div>
+                        <!-- 底部留白，方便滚动 -->
+                        <div style="height: 100px;"></div>
                     </div>
                     
                     <!-- 悬浮添加按钮容器 -->

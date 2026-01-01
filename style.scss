@@ -25,6 +25,9 @@ body { background-color: #f8f9fa !important; font-size: 14px; }
     border: 1px solid #616161;
     position: fixed !important;
     z-index: 9999;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* iOS平滑滚动 */
+    overscroll-behavior: contain;
 }
 #suggestionBox .suggestion-item {
     background-color: transparent;

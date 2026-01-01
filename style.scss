@@ -1,57 +1,99 @@
-:root { --code-font: "JetBrains Mono", monospace; }
-body { background-color: #f8f9fa !important; font-size: 14px; }
+:root {
+    --code-font: "JetBrains Mono", monospace;
+    --bg-body: #f8f9fa;
+    --bg-card: #ffffff;
+    --text-main: #212529;
+    --text-muted: #757575;
+    --border-color: #dee2e6;
+    --input-bg: #ffffff;
+    --suggestion-bg: #424242;
+}
 
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-body: #121212;
+        --bg-card: #1e1e1e;
+        --text-main: #e0e0e0;
+        --text-muted: #a0a0a0;
+        --border-color: #333333;
+        --input-bg: #2d2d2d;
+        --suggestion-bg: #252525;
+    }
+    
+    /* 强制覆盖 MDB 的一些浅色背景 */
+    .bg-light { background-color: var(--bg-body) !important; }
+    .bg-white { background-color: var(--bg-card) !important; }
+    .card { background-color: var(--bg-card); border-color: var(--border-color); }
+    .modal-content { background-color: var(--bg-card); color: var(--text-main); }
+    .modal-header, .modal-footer { border-color: var(--border-color); background-color: var(--bg-card); }
+    .form-control, .form-select { background-color: var(--input-bg); border-color: var(--border-color); color: var(--text-main); }
+    .form-control:focus, .form-select:focus { background-color: var(--input-bg); color: var(--text-main); }
+    .list-group-item { background-color: var(--bg-card); border-color: var(--border-color); color: var(--text-main); }
+    .table { color: var(--text-main); }
+    .table-light { background-color: #2d2d2d; color: var(--text-main); }
+    .nav-pills { background-color: #2d2d2d !important; }
+    .text-dark { color: var(--text-main) !important; }
+    .text-muted { color: var(--text-muted) !important; }
+    input::placeholder { color: #666 !important; }
+}
+
+body { background-color: var(--bg-body) !important; color: var(--text-main); font-size: 14px; transition: background 0.3s, color 0.3s; }
 .font-monospace { font-family: var(--code-font) !important; }
+
+/* 隐藏滚动条 */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-.hover-shadow:hover { box-shadow: 0 4px 18px 0 rgba(0,0,0,0.12), 0 7px 10px -5px rgba(0,0,0,0.15) !important; transition: box-shadow 0.2s; }
+/* 悬浮阴影 */
+.hover-shadow:hover { box-shadow: 0 4px 18px 0 rgba(0,0,0,0.25) !important; }
 
+/* 源码编辑器 */
 .raw-editor-padding { padding: 1rem !important; line-height: 1.5; }
 
-.mode-selector .btn-check:not(:checked) + .btn { border-color: #e0e0e0; color: #999; opacity: 0.8; }
+/* 运行模式选择器 */
+.mode-selector .btn-check:not(:checked) + .btn { border-color: var(--border-color); color: var(--text-muted); opacity: 0.6; }
 .mode-selector .btn-check:checked + .btn-outline-warning { background-color: #ffa900; color: white; border-color: #ffa900; }
 .mode-selector .btn-check:checked + .btn-outline-success { background-color: #00b74a; color: white; border-color: #00b74a; }
 .mode-selector .btn-check:checked + .btn-outline-secondary { background-color: #757575; color: white; border-color: #757575; }
 
+/* 监控操作颜色 */
 .op-OPEN { background-color: #00bcd4 !important; }
 .op-READ { background-color: #4caf50 !important; }
 .op-WRITE { background-color: #ff9800 !important; }
 .op-CREATE { background-color: #9c27b0 !important; }
 .text-wrap-path { white-space: normal !important; word-break: break-all; line-height: 1.3; font-size: 11px; }
 
+/* 自动补全建议框 */
 #suggestionBox {
-    background-color: #424242;
-    border: 1px solid #616161;
+    background-color: var(--suggestion-bg);
+    border: 1px solid var(--border-color);
     position: fixed !important;
     z-index: 9999;
     overflow-y: auto;
-    -webkit-overflow-scrolling: touch; /* iOS平滑滚动 */
+    -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
 }
 #suggestionBox .suggestion-item {
     background-color: transparent;
-    color: #e0e0e0;
+    color: var(--text-main);
     cursor: pointer;
 }
-#suggestionBox .suggestion-item:hover {
-    background-color: #616161;
-}
+#suggestionBox .suggestion-item:hover { background-color: rgba(255, 255, 255, 0.1); }
 
-/* 悬浮按钮容器：透明、穿透 */
+/* 悬浮按钮：透明容器、穿透点击 */
 .visual-footer-action {
     position: sticky;
     bottom: 0;
     z-index: 10;
     background-color: transparent !important;
     box-shadow: none !important;
-    pointer-events: none; /* 让点击事件穿透容器 */
+    pointer-events: none;
 }
 
-/* 按钮本身：恢复点击和阴影 */
+/* 添加规则按钮：恢复点击与阴影 */
 #btnAddRuleRow {
     pointer-events: auto;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
 }
 
 @media (max-width: 768px) {

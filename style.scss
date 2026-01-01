@@ -1,8 +1,7 @@
 :root { --code-font: "JetBrains Mono", monospace; }
 
 body { 
-    background-color: #f8f9fa !important; 
-    font-size: 14px; 
+    background-color: #f8f9fa !important; font-size: 14px; 
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -16,19 +15,10 @@ body {
     padding: 12px; height: 500px; overflow-y: auto; border: none;
 }
 
-// 应用图标样式
 .app-icon { width: 40px; height: 40px; object-fit: cover; }
 .app-icon-sm { width: 32px; height: 32px; object-fit: cover; }
+.app-item-row { cursor: pointer; transition: background 0.2s; &:active { background: #eee; } }
 
-// 列表项交互
-.app-item-row {
-    cursor: pointer;
-    transition: background-color 0.2s;
-    &:hover { background-color: #f8f9fa; }
-    &:active { background-color: #eee; }
-}
-
-// IO 颜色
 .op-OPEN   { background-color: #00bcd4 !important; }
 .op-READ   { background-color: #4caf50 !important; }
 .op-WRITE  { background-color: #ff9800 !important; }
@@ -36,21 +26,13 @@ body {
 .op-RENAME { background-color: #3f51b5 !important; }
 .op-UNLINK, .op-RMDIR { background-color: #f44336 !important; }
 
-.pkg-badge { 
-    font-family: var(--code-font); font-size: 10px; 
-    max-width: 140px; overflow: hidden; text-overflow: ellipsis; display: inline-block;
-}
-
+.pkg-badge { font-family: var(--code-font); font-size: 10px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
 .log-time { color: #888; }
 .log-io-tag { color: #555; font-weight: bold; }
 .log-keyword { color: #1266f1; font-weight: bold; }
 .log-comment { color: #666; font-style: italic; }
 
-.table-responsive {
-    background: white;
-    thead th { background: #f1f3f5; position: sticky; top: 0; z-index: 5; font-size: 11px; font-weight: bold; }
-}
-
+.table-responsive { background: white; thead th { background: #f1f3f5; position: sticky; top: 0; z-index: 5; font-size: 11px; } }
 .text-wrap-path { white-space: normal !important; word-break: break-all; line-height: 1.3; }
 .btn-floating { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
 .nav-tabs .nav-link.active { font-weight: bold; border-bottom: 3px solid #1266f1; color: #1266f1; }

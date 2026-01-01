@@ -2,7 +2,7 @@ import 'mdb-ui-kit/css/mdb.min.css';
 import './style.scss';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import * as mdb from 'mdb-ui-kit';
-import { mdiAndroid, mdiFileDocumentOutline } from '@mdi/js';
+import { mdiAndroid } from '@mdi/js';
 
 const BASE_DIR = "/data/Namespace-Proxy";
 const LOG_DIR = `${BASE_DIR}/log`;
@@ -11,19 +11,14 @@ const SERVICE_SH = "/data/adb/modules/Namespace-Proxy/service.sh";
 let ruleModalInstance, appPickerModalInstance;
 let allInstalledApps = [];
 
-// 生成 SVG 图标
-const getSvgIcon = (path, color = 'currentColor') => 
-    `<svg viewBox="0 0 24 24" fill="${color}" style="width:100%;height:100%"><path d="${path}"/></svg>`;
-
-const ICON_APP_SVG = getSvgIcon(mdiAndroid, '#757575');
+// 默认图标 (Base64 SVG)
+const DEFAULT_ICON = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJMMiA3djlsMTAgNSA0LjMtMi4xIDEuNyAxIDQuMy0yLjF2LTlsLTEwLTV6bTAgMTguNWwtOC00VjguMmw4IDQgOC00djYuM2wtOCA0eiIgZmlsbD0iI2FhYSIvPjwvc3ZnPg==`;
 
 const run = async (cmd) => {
     try {
         const res = await exec(cmd);
         return res && res.stdout ? res.stdout.trim() : "";
-    } catch (e) { 
-        return ""; 
-    }
+    } catch (e) { return ""; }
 };
 
 const refreshMDB = () => {
@@ -46,8 +41,8 @@ const highlightContent = (text) => {
 const loadConfigs = async () => {
     const ruleList = document.getElementById('ruleList');
     try {
-        // 增加 2>/dev/null 避免文件不存在导致 exec 抛错
-        const main = await run(`cat ${BASE_DIR}/injector.conf 2>/dev/null`);
+        // 使用 cat ... || true 确保文件不存在时不抛出异常
+        const main = await run(`cat ${BASE_DIR}/injector.conf 2>/dev/null || true`);
         document.getElementById('mainConfig').value = main || "";
 
         const filesRaw = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
@@ -77,7 +72,7 @@ const loadConfigs = async () => {
             <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-3 border-0 border-bottom app-item-row" 
                  onclick="openRuleEditor('${pkg}', '${label.toString().replace(/'/g, "\\'")}')">
                 <div class="d-flex align-items-center overflow-hidden">
-                    <div class="app-icon-container me-3">${ICON_APP_SVG}</div>
+                    <img src="ksu://icon/${pkg}" class="app-icon rounded-circle me-3" onerror="this.src='${DEFAULT_ICON}'">
                     <div class="text-truncate">
                         <div class="fw-bold ${statusClass}">${label}</div>
                         <small class="text-muted font-monospace" style="font-size: 10px;">${pkg}</small>
@@ -92,10 +87,14 @@ const loadConfigs = async () => {
 
 window.openRuleEditor = async (pkgName, appLabel) => {
     if (!pkgName) return;
-    const content = await run(`cat ${BASE_DIR}/${pkgName}.conf 2>/dev/null`);
+    const content = await run(`cat ${BASE_DIR}/${pkgName}.conf 2>/dev/null || true`);
     document.getElementById('modalAppName').textContent = appLabel || pkgName;
     document.getElementById('modalAppPkg').textContent = pkgName;
-    document.getElementById('modalAppIconContainer').innerHTML = ICON_APP_SVG;
+    
+    const img = document.getElementById('modalAppIcon');
+    img.src = "ksu://icon/" + pkgName;
+    img.onerror = () => { img.src = DEFAULT_ICON; };
+
     document.getElementById('modalRuleContent').value = content || "";
     document.getElementById('btnDeleteRule').onclick = () => deleteRule(pkgName);
     document.getElementById('btnModalSave').onclick = () => saveRule(pkgName);
@@ -125,7 +124,7 @@ const renderAppPickerList = (apps) => {
         return `
         <div class="list-group-item list-group-item-action d-flex align-items-center px-3 py-2 border-0" 
              onclick="selectAppToConfig('${pkg}', '${label.toString().replace(/'/g, "\\'")}')">
-            <div class="app-icon-sm-container me-3">${ICON_APP_SVG}</div>
+            <img src="ksu://icon/${pkg}" class="app-icon-sm rounded-circle me-3" onerror="this.src='${DEFAULT_ICON}'">
             <div class="text-truncate">
                 <div class="fw-bold text-dark small">${label}</div>
                 <small class="text-muted font-monospace" style="font-size: 10px;">${pkg}</small>

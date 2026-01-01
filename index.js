@@ -157,29 +157,59 @@ document.getElementById('btnCreateEnv').onclick = async () => {
     loadData();
 };
 
+// --- 自动补全核心逻辑 (RAF 实时定位版) ---
+const updateBoxPosition = (input) => {
+    const box = document.getElementById('suggestionBox');
+    if (box.style.display === 'none' || !input) return;
+
+    const rect = input.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const boxHeight = box.offsetHeight || 200;
+    const maxWidth = Math.min(300, window.innerWidth - 20);
+    
+    box.style.width = maxWidth + 'px';
+    
+    // X轴定位
+    let leftPos = rect.left;
+    if (leftPos + maxWidth > window.innerWidth) leftPos = window.innerWidth - maxWidth - 10;
+    box.style.left = leftPos + 'px';
+
+    // Y轴定位 (智能上下翻转)
+    const spaceBelow = viewportHeight - rect.bottom;
+    // 强制紧贴：+2 或 -2 像素微调
+    if (spaceBelow < boxHeight && rect.top > boxHeight) {
+        box.style.top = (rect.top - boxHeight - 2) + 'px';
+    } else {
+        box.style.top = (rect.bottom + 2) + 'px';
+    }
+};
+
+const startAutoUpdate = (input) => {
+    const box = document.getElementById('suggestionBox');
+    const loop = () => {
+        if (box.style.display !== 'none' && window._currentInput === input) {
+            updateBoxPosition(input);
+            requestAnimationFrame(loop);
+        }
+    };
+    requestAnimationFrame(loop);
+};
+
+// 全局点击监听：只有点击非输入框且非建议框区域时才隐藏
+document.addEventListener('click', (e) => {
+    const box = document.getElementById('suggestionBox');
+    if (box.style.display === 'none') return;
+    if (e.target === window._currentInput) return;
+    if (box.contains(e.target)) return;
+    box.style.display = 'none';
+}, true);
+
 const setupAutocomplete = (input) => {
     const box = document.getElementById('suggestionBox');
     const scrollContainer = document.getElementById('editorVisual');
 
-    const updateBoxPosition = () => {
-        if (box.style.display === 'none') return;
-        const rect = input.getBoundingClientRect();
-        const viewportHeight = window.innerHeight;
-        const boxHeight = box.offsetHeight || 200;
-        const maxWidth = Math.min(300, window.innerWidth - 20);
-        box.style.width = maxWidth + 'px';
-        let leftPos = rect.left;
-        if (leftPos + maxWidth > window.innerWidth) leftPos = window.innerWidth - maxWidth - 10;
-        box.style.left = leftPos + 'px';
-        const spaceBelow = viewportHeight - rect.bottom;
-        if (spaceBelow < boxHeight && rect.top > boxHeight) {
-            box.style.top = (rect.top - boxHeight - 5) + 'px';
-        } else {
-            box.style.top = (rect.bottom + 5) + 'px';
-        }
-    };
-
     input.addEventListener('focus', () => {
+        window._currentInput = input;
         setTimeout(() => {
             const row = input.closest('.rule-row');
             if (row && scrollContainer) {
@@ -188,18 +218,11 @@ const setupAutocomplete = (input) => {
                 scrollContainer.scrollBy({ top: (rowRect.top - containerRect.top) - containerRect.height * 0.2, behavior: 'smooth' });
             }
         }, 300);
-        scrollContainer.addEventListener('scroll', updateBoxPosition);
-        window.addEventListener('resize', updateBoxPosition);
+        // 聚焦时如果已有内容，触发一次搜索以显示建议
         if(input.value) input.dispatchEvent(new Event('input'));
     });
 
-    input.addEventListener('blur', () => {
-        setTimeout(() => {
-            box.style.display = 'none';
-            scrollContainer.removeEventListener('scroll', updateBoxPosition);
-            window.removeEventListener('resize', updateBoxPosition);
-        }, 200);
-    });
+    // 移除 blur 事件监听，防止误隐藏
 
     const performSearch = debounce(async (val) => {
         let parentDir = PATH_PREFIX_REAL, searchPrefix = "", displayBase = "/";
@@ -227,8 +250,7 @@ const setupAutocomplete = (input) => {
             if (suggestions.length === 0) { box.style.display = 'none'; return; }
             box.innerHTML = suggestions.map(s => `<div class="list-group-item list-group-item-action py-2 px-3 border-0 d-flex align-items-center suggestion-item" onmousedown="applySuggestion('${s.text}')"><div class="me-3" style="width:16px">${s.icon}</div><div class="fw-bold font-monospace small text-truncate">${s.text}</div></div>`).join('');
             box.style.display = 'block';
-            updateBoxPosition();
-            window._currentInput = input;
+            startAutoUpdate(input); // 启动实时定位循环
         } catch (e) { box.style.display = 'none'; }
     }, 100);
 

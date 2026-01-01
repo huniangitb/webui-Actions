@@ -1,12 +1,12 @@
+import 'mdb-ui-kit/css/mdb.min.css'; // 由 JS 引入 CSS 确保 Parcel 正确解析
+import './style.scss';
 import { exec, toast } from 'kernelsu';
 import * as mdb from 'mdb-ui-kit';
-import './style.scss'; // 导入 SCSS
 
 const BASE_DIR = "/data/Namespace-Proxy";
 const LOG_DIR = `${BASE_DIR}/log`;
 let ruleModal;
 
-// 初始化 MDB 输入框
 const initInputs = () => {
     document.querySelectorAll('.form-outline').forEach((el) => {
         new mdb.Input(el).init();
@@ -31,7 +31,7 @@ const loadConfigs = async () => {
             const name = f.split('/').pop();
             return `
             <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
-                <div class="fw-bold text-dark">${name}</div>
+                <div class="fw-bold text-dark text-truncate" style="max-width: 70%">${name}</div>
                 <div class="btn-group shadow-0">
                     <button class="btn btn-light btn-sm" onclick="editRuleFile('${name}')"><i class="fas fa-edit"></i></button>
                     <button class="btn btn-light btn-sm text-danger" onclick="deleteRuleFile('${name}')"><i class="fas fa-trash"></i></button>

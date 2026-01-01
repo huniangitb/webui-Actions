@@ -3,11 +3,8 @@
 body { 
     background-color: #f8f9fa !important; 
     font-size: 14px; 
-    // 使用 Web 标准的安全区域适配方法，替代 insets.css
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    padding-left: env(safe-area-inset-left, 0px);
-    padding-right: env(safe-area-inset-right, 0px);
 }
 
 .font-monospace { font-family: var(--code-font) !important; font-size: 12px !important; }
@@ -17,6 +14,18 @@ body {
     white-space: pre-wrap; word-break: break-all;
     background: #1e1e1e !important; color: #d4d4d4 !important;
     padding: 12px; height: 500px; overflow-y: auto; border: none;
+}
+
+// 应用图标样式
+.app-icon { width: 40px; height: 40px; object-fit: cover; }
+.app-icon-sm { width: 32px; height: 32px; object-fit: cover; }
+
+// 列表项交互
+.app-item-row {
+    cursor: pointer;
+    transition: background-color 0.2s;
+    &:hover { background-color: #f8f9fa; }
+    &:active { background-color: #eee; }
 }
 
 // IO 颜色
@@ -32,8 +41,8 @@ body {
     max-width: 140px; overflow: hidden; text-overflow: ellipsis; display: inline-block;
 }
 
-.log-time    { color: #888; }
-.log-io-tag  { color: #555; font-weight: bold; }
+.log-time { color: #888; }
+.log-io-tag { color: #555; font-weight: bold; }
 .log-keyword { color: #1266f1; font-weight: bold; }
 .log-comment { color: #666; font-style: italic; }
 

@@ -8,7 +8,7 @@
 </head>
 <body class="bg-light">
     <div class="container py-3">
-        <!-- 状态头部 -->
+        <!-- 头部 -->
         <div class="d-flex justify-content-between align-items-center mb-4 px-2">
             <div>
                 <h4 class="mb-0 text-primary fw-bold">NAMESPACE PROXY</h4>
@@ -20,32 +20,44 @@
             <button id="btnReload" class="btn btn-warning btn-floating shadow-0"><i class="fas fa-sync"></i></button>
         </div>
 
-        <!-- 导航标签 -->
-        <ul class="nav nav-tabs mb-3 shadow-sm bg-white rounded px-2" role="tablist">
-            <li class="nav-item"><a class="nav-link active" href="#content-config">配置</a></li>
+        <ul class="nav nav-tabs mb-3 shadow-0 bg-white rounded px-2" role="tablist">
+            <li class="nav-item"><a class="nav-link active" href="#content-config">应用管理</a></li>
             <li class="nav-item"><a class="nav-link" href="#content-log">日志</a></li>
             <li class="nav-item"><a class="nav-link" href="#content-io">监控</a></li>
         </ul>
 
         <div class="tab-content">
-            <!-- 配置页 -->
+            <!-- 图形化配置页 -->
             <div class="tab-pane fade show active" id="content-config">
+                <!-- 全局配置卡片 -->
                 <div class="card shadow-0 border mb-3">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                        <h6 class="mb-0 fw-bold"><i class="fas fa-cog me-2 text-primary"></i>injector.conf</h6>
-                        <button id="btnSaveMain" class="btn btn-primary btn-sm shadow-0">保存修改</button>
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-2" data-mdb-collapse-init href="#collapseGlobal" role="button">
+                        <h6 class="mb-0 fw-bold"><i class="fas fa-sliders-h me-2 text-primary"></i>全局配置 (injector.conf)</h6>
+                        <i class="fas fa-chevron-down text-muted"></i>
                     </div>
-                    <div class="card-body p-0">
-                        <textarea class="form-control font-monospace border-0 p-3" id="mainConfig" rows="10" style="resize: none;"></textarea>
+                    <div class="collapse" id="collapseGlobal">
+                        <div class="card-body p-0 border-top">
+                            <textarea class="form-control font-monospace border-0 p-3" id="mainConfig" rows="6" style="resize: none;"></textarea>
+                            <div class="p-2 text-end bg-light">
+                                <button id="btnSaveMain" class="btn btn-primary btn-sm shadow-0">保存全局配置</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
+                <!-- 应用规则列表 -->
                 <div class="card shadow-0 border">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0 fw-bold">应用规则文件</h6>
-                            <button id="btnAddRule" class="btn btn-success btn-sm shadow-0"><i class="fas fa-plus"></i></button>
+                            <h6 class="mb-0 fw-bold">已配置应用</h6>
+                            <button id="btnOpenAppPicker" class="btn btn-success btn-sm shadow-0 btn-rounded">
+                                <i class="fas fa-plus me-1"></i>添加应用
+                            </button>
                         </div>
-                        <div id="ruleList" class="list-group list-group-light border-0"></div>
+                        <!-- 这里将由 JS 渲染图形化列表 -->
+                        <div id="ruleList" class="list-group list-group-light border-0">
+                            <div class="text-center p-4 text-muted"><i class="fas fa-spinner fa-spin me-2"></i>加载中...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -83,28 +95,56 @@
         </div>
     </div>
 
-    <!-- 编辑 Modal -->
+    <!-- 规则编辑 Modal -->
     <div class="modal fade" id="ruleModal" tabindex="-1">
-        <div class="modal-dialog modal-lg"><div class="modal-content border-0">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title fw-bold">编辑规则</h5>
-                <button type="button" class="btn-close btn-close-white" data-mdb-dismiss="modal"></button>
+        <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content border-0">
+            <div class="modal-header bg-light border-bottom-0">
+                <div class="d-flex align-items-center">
+                    <img id="modalAppIcon" src="" class="rounded-circle me-3" style="width: 40px; height: 40px;">
+                    <div>
+                        <h5 class="modal-title fw-bold" id="modalAppName">应用名称</h5>
+                        <small class="text-muted font-monospace" id="modalAppPkg">com.example.pkg</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-mdb-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="form-outline mb-4 border rounded">
-                    <input type="text" id="modalRuleName" class="form-control" />
-                    <label class="form-label">包名 (Pkg Name)</label>
-                </div>
                 <div class="form-outline border rounded">
-                    <textarea class="form-control font-monospace" id="modalRuleContent" rows="10"></textarea>
-                    <label class="form-label">规则内容</label>
+                    <textarea class="form-control font-monospace" id="modalRuleContent" rows="12"></textarea>
+                    <label class="form-label">重定向规则 (REDIRECT src target)</label>
+                </div>
+                <div class="form-text mt-2 text-muted small">
+                    示例: <code>REDIRECT /storage/emulated/0/DCIM /data/media/0/Pictures</code>
                 </div>
             </div>
             <div class="modal-footer border-0">
-                <button id="btnModalSave" class="btn btn-primary w-100 shadow-0">保存并应用</button>
+                <button id="btnDeleteRule" class="btn btn-outline-danger shadow-0 me-auto">删除规则</button>
+                <button id="btnModalSave" class="btn btn-primary shadow-0 px-4">保存</button>
             </div>
         </div></div>
     </div>
+
+    <!-- 应用选择器 Modal -->
+    <div class="modal fade" id="appPickerModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content border-0" style="height: 80vh;">
+                <div class="modal-header border-bottom-0">
+                    <h5 class="modal-title fw-bold">选择应用</h5>
+                    <button type="button" class="btn-close" data-mdb-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-0">
+                    <div class="form-outline mb-3 border rounded sticky-top bg-white">
+                        <input type="text" id="appPickerSearch" class="form-control" />
+                        <label class="form-label">搜索应用名称或包名</label>
+                    </div>
+                    <div id="appPickerList" class="list-group list-group-light">
+                        <!-- JS 填充应用列表 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="index.js" type="module"></script>
 </body>
 </html>

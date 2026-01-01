@@ -8,6 +8,28 @@ body { background-color: #f8f9fa !important; font-size: 14px; }
 .hover-shadow:hover { box-shadow: 0 4px 18px 0 rgba(0,0,0,0.12), 0 7px 10px -5px rgba(0,0,0,0.15) !important; transition: box-shadow 0.2s; }
 .border-dashed { border-style: dashed !important; }
 
+/* 运行模式选择器样式 */
+.mode-selector .btn-check:not(:checked) + .btn {
+    border-color: #e0e0e0;
+    color: #999;
+    opacity: 0.8;
+}
+.mode-selector .btn-check:checked + .btn-outline-warning {
+    background-color: #ffa900;
+    color: white;
+    border-color: #ffa900;
+}
+.mode-selector .btn-check:checked + .btn-outline-danger {
+    background-color: #f93154;
+    color: white;
+    border-color: #f93154;
+}
+.mode-selector .btn-check:checked + .btn-outline-secondary {
+    background-color: #757575;
+    color: white;
+    border-color: #757575;
+}
+
 /* 监控颜色 */
 .op-OPEN { background-color: #00bcd4 !important; }
 .op-READ { background-color: #4caf50 !important; }
@@ -15,8 +37,13 @@ body { background-color: #f8f9fa !important; font-size: 14px; }
 .op-CREATE { background-color: #9c27b0 !important; }
 .text-wrap-path { white-space: normal !important; word-break: break-all; line-height: 1.3; font-size: 11px; }
 
-/* 移动端适配 */
+/* 建议框样式 */
+#suggestionBox .list-group-item:hover {
+    background-color: #f0f2f5;
+    cursor: pointer;
+}
+
 @media (max-width: 768px) {
-    .container-fluid { padding-bottom: 80px; } /* 防止底部被遮挡 */
+    .container-fluid { padding-bottom: 80px; }
     .nav-pills .nav-link { padding: 8px 10px; font-size: 13px; }
 }

@@ -23,8 +23,8 @@
         </ul>
 
         <div class="tab-content">
+            <!-- 配置页 -->
             <div class="tab-pane fade show active" id="content-config">
-                <!-- 取消主配置区的浮动标签，改为卡片头部 -->
                 <div class="card shadow-0 border mb-3">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
                         <h6 class="mb-0 fw-bold"><i class="fas fa-cog me-2 text-primary"></i>injector.conf</h6>
@@ -34,7 +34,6 @@
                         <textarea class="form-control font-monospace border-0 p-3" id="mainConfig" rows="10" style="resize: none;"></textarea>
                     </div>
                 </div>
-                
                 <div class="card shadow-0 border">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -46,6 +45,7 @@
                 </div>
             </div>
 
+            <!-- 日志页 -->
             <div class="tab-pane fade" id="content-log">
                 <div class="card shadow-0 bg-white border"><div class="card-body">
                     <select id="logFileSelect" class="form-select mb-3 border bg-light shadow-none font-monospace"></select>
@@ -53,16 +53,26 @@
                 </div></div>
             </div>
 
+            <!-- IO 监控页 -->
             <div class="tab-pane fade" id="content-io">
                 <div class="card shadow-0 bg-white border"><div class="card-body">
                     <div class="form-outline mb-3 border rounded">
                         <input type="text" id="ioSearch" class="form-control" />
-                        <label class="form-label">搜索路径、操作、详情...</label>
+                        <label class="form-label">搜索包名、路径、操作...</label>
                     </div>
-                    <div class="table-responsive border" style="height: 450px;"><table class="table table-sm table-hover">
-                        <thead class="table-light sticky-top"><tr><th>时间</th><th class="text-center">操作</th><th>详情</th></tr></thead>
-                        <tbody id="ioTableBody" class="font-monospace"></tbody>
-                    </table></div>
+                    <div class="table-responsive border" style="height: 450px;">
+                        <table class="table table-sm table-hover text-nowrap">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th style="width: 70px">时间</th>
+                                    <th style="width: 100px">应用</th>
+                                    <th style="width: 80px" class="text-center">操作</th>
+                                    <th>详情</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ioTableBody" class="font-monospace"></tbody>
+                        </table>
+                    </div>
                 </div></div>
             </div>
         </div>

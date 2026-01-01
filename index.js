@@ -15,13 +15,10 @@ const run = async (cmd) => {
     } catch (e) { return ""; }
 };
 
-// 强制更新 MDB 输入框状态，防止文字重叠
 const refreshMDB = () => {
     document.querySelectorAll('.form-outline').forEach(el => {
         const input = el.querySelector('input, textarea');
-        if (input && input.value) {
-            el.classList.add('active'); // 强制激活标签，防止重叠
-        }
+        if (input && input.value) el.classList.add('active');
         new mdb.Input(el).init();
     });
 };
@@ -37,7 +34,6 @@ const highlightContent = (text) => {
 const loadConfigs = async () => {
     const main = await run(`[ -f ${BASE_DIR}/injector.conf ] && cat ${BASE_DIR}/injector.conf`);
     document.getElementById('mainConfig').value = main;
-    
     const files = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
     const ruleList = document.getElementById('ruleList');
     const ruleFiles = files.split('\n').filter(f => f && !f.includes('injector.conf'));
@@ -48,7 +44,7 @@ const loadConfigs = async () => {
             const name = f.split('/').pop();
             return `<div class="list-group-item d-flex justify-content-between align-items-center px-3 py-3 border-0 border-bottom">
                 <div class="text-truncate me-2">
-                    <i class="fas fa-file-code text-indigo me-2"></i>
+                    <i class="fas fa-cube text-primary me-2"></i>
                     <span class="fw-bold text-dark">${name.replace('.conf', '')}</span>
                 </div>
                 <div class="btn-group shadow-0">
@@ -97,29 +93,37 @@ const loadLogs = async () => {
     logViewer.scrollTop = logViewer.scrollHeight;
 };
 
+// --- IO 监控 (新增包名识别) ---
 const updateIOTable = async () => {
     const tbody = document.getElementById('ioTableBody');
+    // grep 会输出文件名，例如: /data/.../log/com.pkg.log:[时间] [IO] ...
     const raw = await run(`find ${LOG_DIR} -name "*.log" ! -name "injector.log" -exec grep "\\[IO\\]" {} + | tail -n 150`);
     
     if (!raw) {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4 text-muted small">暂无监控数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted small">暂无应用监控数据</td></tr>';
         return;
     }
 
     const searchTerm = document.getElementById('ioSearch').value.toLowerCase();
     const rows = raw.split('\n').reverse().map(line => {
-        const m = line.match(/\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
+        // 正则提取：1.包名(文件名) 2.时间 3.操作 4.详情
+        const m = line.match(/([\w\.]+)\.log:\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
         if (!m) return null;
-        const [_, time, op, details] = m;
-        if (searchTerm && !details.toLowerCase().includes(searchTerm)) return null;
+        
+        const [_, pkg, time, op, details] = m;
+        if (searchTerm && !details.toLowerCase().includes(searchTerm) && !pkg.toLowerCase().includes(searchTerm)) return null;
+        
         const displayDetails = details.replace(' -> ', ' <i class="fas fa-arrow-right mx-1 opacity-50"></i> ');
+
         return `<tr>
-            <td class="text-muted small" style="width: 80px">${time}</td>
-            <td class="text-center" style="width: 80px"><span class="badge shadow-0 op-${op}">${op}</span></td>
+            <td class="text-muted small">${time}</td>
+            <td><span class="badge badge-light text-dark border shadow-0 pkg-badge">${pkg}</span></td>
+            <td class="text-center"><span class="badge shadow-0 op-${op}">${op}</span></td>
             <td class="text-wrap-path small">${displayDetails}</td>
         </tr>`;
     }).filter(r => r).join('');
-    tbody.innerHTML = rows;
+
+    tbody.innerHTML = rows || '<tr><td colspan="4" class="text-center p-4 small">无匹配结果</td></tr>';
 };
 
 const switchTab = (tabId) => {
@@ -167,6 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
     ruleModal = new mdb.Modal(document.getElementById('ruleModal'));
     loadConfigs();
     run("pgrep injector").then(pid => {
-        document.getElementById('statusInfo').textContent = pid ? `PID: ${pid.trim()}` : "未启动";
+        document.getElementById('statusInfo').textContent = pid ? `运行中 (PID: ${pid.trim()})` : "未启动";
     });
 });

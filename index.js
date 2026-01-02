@@ -3,12 +3,14 @@ import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { 
     mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
     mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight,
-    mdiFilterVariant, mdiViewGrid, mdiViewList, mdiStop, mdiPlay
+    mdiFilterVariant, mdiViewGrid, mdiViewList, mdiStop, mdiPlay,
+    mdiEyeOff
 } from '@mdi/js';
 
 const BASE_DIR = "/data/Namespace-Proxy";
 const LOG_DIR = `${BASE_DIR}/log`;
 const INJECTOR_CONF = `${BASE_DIR}/injector.conf`;
+const MONITOR_IGNORE_CONF = `${BASE_DIR}/monitor_ignore.conf`;
 const SERVICE_SH = "/data/adb/modules/Namespace-Proxy/service.sh";
 const PATH_PREFIX_STORAGE = '/storage/emulated/0';
 const PATH_PREFIX_REAL = '/data/media/0';
@@ -47,7 +49,8 @@ const ICONS = {
     GRID: getSvg(mdiViewGrid, 24, '#fff'),
     LIST: getSvg(mdiViewList, 24, '#fff'),
     STOP: getSvg(mdiStop, 20, '#dc3545'),
-    PLAY: getSvg(mdiPlay, 20, '#36a420')
+    PLAY: getSvg(mdiPlay, 20, '#36a420'),
+    EYE_OFF: getSvg(mdiEyeOff, 20, 'currentColor')
 };
 
 const checkStatus = async () => {
@@ -85,12 +88,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('iconIoSearch').innerHTML = ICONS.SEARCH;
     document.getElementById('iconFilter').innerHTML = ICONS.FILTER;
     document.getElementById('iconEnvView').innerHTML = ICONS.LIST;
+    document.getElementById('btnMonitorIgnore').innerHTML = ICONS.EYE_OFF;
     document.querySelectorAll('.btn-close').forEach(el => el.innerHTML = ICONS.CLOSE);
     document.getElementById('btnNewEnv').innerHTML = `<span style="display:flex;align-items:center;gap:4px">${getSvg(mdiPlus,14,'#fff')} 新建</span>`;
     document.getElementById('btnAddRuleRow').innerHTML = `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`;
+    document.getElementById('btnAddIgnoreRow').innerHTML = `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加路径</span>`;
 
     loadData();
-    pollLogs(true); // Initial load
+    pollLogs(true);
     checkStatus();
     
     if (statusPolling) clearInterval(statusPolling);
@@ -119,23 +124,28 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     });
 
-    const visualPane = document.getElementById('editorVisual');
-    const alertBox = document.getElementById('editorAlert');
-    let lastScrollY = 0;
-    visualPane.addEventListener('scroll', () => {
-        const currentY = visualPane.scrollTop;
-        if (currentY > lastScrollY && currentY > 20) {
-            alertBox.classList.add('collapsed');
-        } else if (currentY < lastScrollY) {
-            alertBox.classList.remove('collapsed');
-        }
-        lastScrollY = currentY;
-    }, { passive: true });
+    const setupScrollAlert = (visualId, alertId) => {
+        const visualPane = document.getElementById(visualId);
+        const alertBox = document.getElementById(alertId);
+        let lastScrollY = 0;
+        visualPane.addEventListener('scroll', () => {
+            const currentY = visualPane.scrollTop;
+            if (currentY > lastScrollY && currentY > 20) {
+                alertBox.classList.add('collapsed');
+            } else if (currentY < lastScrollY) {
+                alertBox.classList.remove('collapsed');
+            }
+            lastScrollY = currentY;
+        }, { passive: true });
+    };
+    setupScrollAlert('editorVisual', 'editorAlert');
+    setupScrollAlert('ignoreVisual', 'alertIgnore');
     
-    // 日志切换：直接更新内容，不刷新列表
     document.getElementById('logFileSelect').addEventListener('change', () => {
         updateLogContent();
     });
+    
+    document.getElementById('btnMonitorIgnore').onclick = openMonitorIgnoreEditor;
 });
 
 const run = async (cmd) => {
@@ -200,7 +210,7 @@ const loadData = async () => {
         }
 
         const files = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
-        envList = files ? files.split('\n').map(f => f.split('/').pop().replace('.conf', '')).filter(n => n && n !== 'injector') : [];
+        envList = files ? files.split('\n').map(f => f.split('/').pop().replace('.conf', '')).filter(n => n && n !== 'injector' && n !== 'monitor_ignore') : [];
 
         envStats.clear();
         if (envList.length > 0) {
@@ -354,40 +364,104 @@ window.openEnvEditor = async (envName) => {
     openModal('envEditorModal');
 };
 
-document.querySelectorAll('input[name="editorMode"]').forEach(el => {
-    el.onchange = (e) => {
-        const isVisual = e.target.value === 'visual';
-        const alertBox = document.getElementById('editorAlert');
-        const visualEl = document.getElementById('editorVisual');
-        const rawEl = document.getElementById('editorRaw');
-        const fab = document.querySelector('.fab-container');
-        const modalContent = document.querySelector('#envEditorModal .modal-content');
+const handleModeChange = (isVisual, modalId, visualId, rawId, alertId, fabId, contentId, parseFunc, genFunc) => {
+    const alertBox = document.getElementById(alertId);
+    const visualEl = document.getElementById(visualId);
+    const rawEl = document.getElementById(rawId);
+    const fab = document.getElementById(fabId) || document.querySelector(`#${modalId} .fab-container`);
+    const modalContent = document.querySelector(`#${modalId} .modal-content`);
 
-        if (isVisual) {
-            modalContent.classList.remove('dark-theme');
-            rawEl.classList.remove('active');
-            setTimeout(() => {
-                rawEl.classList.add('hidden');
-                visualEl.classList.remove('hidden');
-                alertBox.classList.remove('collapsed');
-                fab.classList.remove('hidden');
-                parseConfigToVisual(document.getElementById('envRuleContent').value);
-                requestAnimationFrame(() => { visualEl.classList.add('active'); });
-            }, 250);
-        } else {
-            modalContent.classList.add('dark-theme');
-            visualEl.classList.remove('active');
-            alertBox.classList.add('collapsed');
-            fab.classList.add('hidden');
-            setTimeout(() => {
-                visualEl.classList.add('hidden');
-                rawEl.classList.remove('hidden');
-                document.getElementById('envRuleContent').value = generateConfigFromVisual();
-                requestAnimationFrame(() => { rawEl.classList.add('active'); });
-            }, 250);
-        }
-    };
+    if (isVisual) {
+        modalContent.classList.remove('dark-theme');
+        rawEl.classList.remove('active');
+        setTimeout(() => {
+            rawEl.classList.add('hidden');
+            visualEl.classList.remove('hidden');
+            alertBox.classList.remove('collapsed');
+            fab.classList.remove('hidden');
+            parseFunc(document.getElementById(contentId).value);
+            requestAnimationFrame(() => { visualEl.classList.add('active'); });
+        }, 250);
+    } else {
+        modalContent.classList.add('dark-theme');
+        visualEl.classList.remove('active');
+        alertBox.classList.add('collapsed');
+        fab.classList.add('hidden');
+        setTimeout(() => {
+            visualEl.classList.add('hidden');
+            rawEl.classList.remove('hidden');
+            document.getElementById(contentId).value = genFunc();
+            requestAnimationFrame(() => { rawEl.classList.add('active'); });
+        }, 250);
+    }
+};
+
+document.querySelectorAll('input[name="editorMode"]').forEach(el => {
+    el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'envEditorModal', 'editorVisual', 'editorRaw', 'editorAlert', null, 'envRuleContent', parseConfigToVisual, generateConfigFromVisual);
 });
+
+// Ignore Editor Logic
+const openMonitorIgnoreEditor = async () => {
+    const content = await run(`cat ${MONITOR_IGNORE_CONF} 2>/dev/null`);
+    document.getElementById('monitorIgnoreContent').value = content;
+    parseIgnoreToVisual(content);
+    
+    document.getElementById('alertIgnore').classList.remove('collapsed');
+    const modalContent = document.querySelector('#monitorIgnoreModal .modal-content');
+    modalContent.classList.remove('dark-theme');
+    
+    const visualRadio = document.querySelector('input[name="ignoreMode"][value="visual"]');
+    if (visualRadio) { visualRadio.checked = true; visualRadio.dispatchEvent(new Event('change')); }
+    
+    openModal('monitorIgnoreModal');
+};
+
+document.querySelectorAll('input[name="ignoreMode"]').forEach(el => {
+    el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'monitorIgnoreModal', 'ignoreVisual', 'ignoreRaw', 'alertIgnore', 'fabIgnore', 'monitorIgnoreContent', parseIgnoreToVisual, generateIgnoreFromVisual);
+});
+
+const parseIgnoreToVisual = (text) => {
+    const container = document.getElementById('ignoreBuilderContainer');
+    container.innerHTML = '';
+    if (text) {
+        text.split('\n').filter(l => l.trim()).forEach(line => {
+            addIgnoreRow(line.trim());
+        });
+    }
+    if (container.children.length === 0) addIgnoreRow('');
+};
+
+const addIgnoreRow = (path) => {
+    const div = document.createElement('div');
+    div.className = 'rule-row';
+    div.innerHTML = `
+        <div class="rule-inputs">
+            <input type="text" class="form-control ignore-path" placeholder="/path/to/ignore" value="${path}">
+        </div>
+        <button class="btn btn-icon-sm btn-del">${ICONS.DELETE}</button>
+    `;
+    div.querySelector('.btn-del').onclick = () => div.remove();
+    setupAutocomplete(div.querySelector('.ignore-path'));
+    document.getElementById('ignoreBuilderContainer').appendChild(div);
+};
+
+const generateIgnoreFromVisual = () => {
+    let res = "";
+    document.querySelectorAll('.ignore-path').forEach(input => {
+        const val = input.value.trim();
+        if (val) res += val + "\n";
+    });
+    return res;
+};
+
+document.getElementById('btnAddIgnoreRow').onclick = () => addIgnoreRow('');
+document.getElementById('btnSaveIgnore').onclick = async () => {
+    const isVisual = document.querySelector('input[name="ignoreMode"][value="visual"]').checked;
+    const content = isVisual ? generateIgnoreFromVisual() : document.getElementById('monitorIgnoreContent').value;
+    await exec(`echo '${content}' > ${MONITOR_IGNORE_CONF}`);
+    toast("配置已保存");
+    closeModal('monitorIgnoreModal');
+};
 
 const parseConfigToVisual = (text) => {
     const container = document.getElementById('ruleBuilderContainer');
@@ -525,43 +599,12 @@ const updateIOTable = async () => {
     }
 };
 
-// 拆分日志加载逻辑
-const updateLogFileList = async () => {
-    const select = document.getElementById('logFileSelect');
-    const filesRaw = await run(`ls ${LOG_DIR}/*.log 2>/dev/null`);
-    
-    requestAnimationFrame(() => {
-        const files = filesRaw ? filesRaw.split('\n').filter(f => f) : [];
-        let optionsHtml = `<option value="ZYGISK">Zygisk (Logcat)</option>`;
-        files.forEach(f => { const name = f.split('/').pop(); optionsHtml += `<option value="${name}">${name}</option>`; });
-        
-        if (select.innerHTML !== optionsHtml) {
-            const oldVal = select.value;
-            select.innerHTML = optionsHtml;
-            const hasInjector = files.find(f => f.includes('injector.log'));
-            // 保持当前选择，除非当前选择无效
-            if (oldVal && (oldVal === 'ZYGISK' || files.find(f => f.endsWith(oldVal)))) {
-                select.value = oldVal;
-            } else if (hasInjector) {
-                select.value = 'injector.log';
-            } else {
-                select.value = 'ZYGISK';
-            }
-        }
-    });
-};
-
 const updateLogContent = async () => {
     const select = document.getElementById('logFileSelect');
     const viewer = document.getElementById('logViewer');
     const target = select.value;
-    
     let content = target === 'ZYGISK' ? await run("logcat -d -s Zygisk_Blocker") : await run(`tail -n 200 ${LOG_DIR}/${target} 2>/dev/null`);
-    
     requestAnimationFrame(() => {
-        // 只有当内容长度变化时才更新DOM，避免闪烁，但如果是切换文件（内容可能变短），也需要更新
-        // 这里的简单判断是：长度变化 OR 目标文件变化(这层逻辑由调用者保证)
-        // 实际上每次都更新 innerHTML 开销也不大，主要是 exec 耗时
         if (viewer.getAttribute('data-len') != content.length || viewer.getAttribute('data-target') !== target) {
             viewer.innerHTML = content || "无日志内容";
             viewer.scrollTop = viewer.scrollHeight;
@@ -575,7 +618,21 @@ const pollLogs = async (isInit = false) => {
     if (isFetchingLogs) return;
     isFetchingLogs = true;
     try {
-        await updateLogFileList();
+        const select = document.getElementById('logFileSelect');
+        const filesRaw = await run(`ls ${LOG_DIR}/*.log 2>/dev/null`);
+        requestAnimationFrame(() => {
+            const files = filesRaw ? filesRaw.split('\n').filter(f => f) : [];
+            let optionsHtml = `<option value="ZYGISK">Zygisk (Logcat)</option>`;
+            files.forEach(f => { const name = f.split('/').pop(); optionsHtml += `<option value="${name}">${name}</option>`; });
+            if (select.innerHTML !== optionsHtml) {
+                const oldVal = select.value;
+                select.innerHTML = optionsHtml;
+                const hasInjector = files.find(f => f.includes('injector.log'));
+                if (oldVal && (oldVal === 'ZYGISK' || files.find(f => f.endsWith(oldVal)))) select.value = oldVal;
+                else if (hasInjector) select.value = 'injector.log';
+                else select.value = 'ZYGISK';
+            }
+        });
         await updateLogContent();
     } finally {
         isFetchingLogs = false;

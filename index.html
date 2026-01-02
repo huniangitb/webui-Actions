@@ -15,7 +15,6 @@
                     <small id="statusInfo">Checking</small>
                 </div>
             </div>
-            <!-- 合并后的开关按钮 -->
             <button id="btnToggleStatus" class="btn btn-icon"></button>
         </div>
 
@@ -69,9 +68,12 @@
             <!-- 3. 监控 -->
             <div id="content-io" class="tab-pane">
                 <div class="card full-height-card">
-                    <div class="search-bar compact">
-                        <span class="icon-placeholder" id="iconIoSearch"></span>
-                        <input type="text" id="ioSearch" placeholder="搜索操作记录..." />
+                    <div style="display:flex; gap:10px; margin-bottom:10px; align-items:center">
+                        <div class="search-bar compact" style="flex:1; margin-bottom:0">
+                            <span class="icon-placeholder" id="iconIoSearch"></span>
+                            <input type="text" id="ioSearch" placeholder="搜索操作记录..." />
+                        </div>
+                        <button id="btnMonitorIgnore" class="btn btn-icon-sm" style="width:36px;height:36px;background:var(--bg-input);color:var(--text-muted)"></button>
                     </div>
                     <div class="table-container">
                         <table class="table">
@@ -183,6 +185,48 @@
             <div class="modal-footer">
                 <button id="btnDeleteEnv" class="btn btn-danger-outline">删除</button>
                 <button id="btnSaveEnv" class="btn btn-primary">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框：监控过滤配置 -->
+    <div id="monitorIgnoreModal" class="modal">
+        <div class="modal-content large flex-column">
+            <div class="modal-header nowrap">
+                <div class="header-title-group">
+                    <h3>监控过滤</h3>
+                    <small class="text-muted">monitor_ignore.conf</small>
+                </div>
+                <div class="header-actions-group">
+                    <div class="toggle-group">
+                        <label><input type="radio" name="ignoreMode" value="visual" checked><span>图形</span></label>
+                        <label><input type="radio" name="ignoreMode" value="raw"><span>源码</span></label>
+                    </div>
+                    <button class="btn-close" onclick="closeModal('monitorIgnoreModal')"></button>
+                </div>
+            </div>
+            
+            <div class="modal-body no-padding relative flex-grow" style="overflow: hidden;">
+                <div id="alertIgnore" class="alert-info sticky-top">
+                    匹配规则：<b>前缀匹配</b> (例如 /A/B 过滤该路径及其子项)
+                </div>
+
+                <div id="ignoreVisual" class="editor-pane scroll-y fade-content active">
+                    <div id="ignoreBuilderContainer"></div>
+                    <div class="spacer"></div>
+                </div>
+                
+                <div id="ignoreRaw" class="editor-pane full-height fade-content hidden">
+                    <textarea id="monitorIgnoreContent" class="code-editor"></textarea>
+                </div>
+                
+                <div class="fab-container" id="fabIgnore">
+                    <button id="btnAddIgnoreRow" class="btn btn-primary rounded shadow">添加路径</button>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button id="btnSaveIgnore" class="btn btn-primary full-width">保存配置</button>
             </div>
         </div>
     </div>

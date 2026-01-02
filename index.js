@@ -20,7 +20,7 @@ let currentEditingEnv = null;
 let currentBindingPkg = null;
 let activeMounts = new Set();
 let logPolling = null;
-let currentAppFilter = 'filterUser'; // 默认过滤状态
+let currentAppFilter = 'filterUser';
 
 const getSvg = (path, size = 24, color = 'currentColor') => 
     `<svg viewBox="0 0 24 24" fill="${color}" width="${size}" height="${size}"><path d="${path}"/></svg>`;
@@ -39,8 +39,28 @@ const ICONS = {
     FILTER: getSvg(mdiFilterVariant, 24, '#fff')
 };
 
+// 状态检查函数 - 优化版
+const checkStatus = async () => {
+    const badge = document.getElementById('statusBadge');
+    const info = document.getElementById('statusInfo');
+    
+    // 优先使用 pidof，更准确
+    let pid = await run("pidof injector");
+    // 备用方案
+    if (!pid) pid = await run("pgrep -x injector");
+
+    if (pid) {
+        badge.className = "badge badge-success";
+        badge.textContent = "RUNNING";
+        info.textContent = `PID: ${pid.split(' ')[0]}`;
+    } else {
+        badge.className = "badge badge-gray";
+        badge.textContent = "STOPPED";
+        info.textContent = "OFFLINE";
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
-    // 初始化图标
     document.getElementById('btnReload').innerHTML = ICONS.REFRESH;
     document.getElementById('iconSearch').innerHTML = ICONS.SEARCH;
     document.getElementById('iconIoSearch').innerHTML = ICONS.SEARCH;
@@ -49,15 +69,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnNewEnv').innerHTML = `<span style="display:flex;align-items:center;gap:4px">${getSvg(mdiPlus,14,'#fff')} 新建</span>`;
     document.getElementById('btnAddRuleRow').innerHTML = `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`;
 
-    // 立即加载数据
     loadData();
-    // 立即异步加载日志
     setTimeout(loadLogs, 100); 
+    checkStatus(); // 启动时检查状态
 
-    // 绑定事件
     document.getElementById('appSearch').oninput = renderAppList;
     
-    // 悬浮过滤按钮逻辑
     const fabBtn = document.getElementById('btnFilterFab');
     const filterOpts = document.getElementById('filterOptions');
     
@@ -227,6 +244,7 @@ const renderAppList = () => {
     }).join('') : '<div class="empty-state">无匹配应用</div>';
 };
 
+// ... renderEnvList, openAppConfig, btnSaveBinding (无变化) ...
 const renderEnvList = () => {
     const listEl = document.getElementById('envList');
     if (envList.length === 0) {
@@ -431,7 +449,7 @@ document.getElementById('btnDeleteEnv').onclick = async () => {
     loadData();
 };
 
-// ... autocomplete logic (无变化) ...
+// ... autocomplete (无变化) ...
 const updateBoxPosition = (input) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none' || !input) return;
@@ -626,14 +644,13 @@ const loadLogs = async () => {
 
 document.getElementById('logFileSelect').addEventListener('change', loadLogs);
 
-// ... reload button logic ...
 document.getElementById('btnReload').onclick = async () => {
     await exec(`sh ${SERVICE_SH}`);
     toast("Reloading...");
     setTimeout(loadData, 1000);
+    setTimeout(checkStatus, 1500); // Reload后检查
 };
 
-// ... tab switching logic ...
 document.querySelectorAll('.nav-item').forEach(btn => {
     btn.onclick = () => {
         document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
@@ -651,7 +668,6 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     };
 });
 
-// ... polling logic ...
 const startPolling = () => {
     if (logPolling) return;
     const activeBtn = document.querySelector('.nav-item.active');

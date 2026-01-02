@@ -81,7 +81,7 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .btn-close { 
     background: transparent; color: var(--text-muted); width: 32px; height: 32px; padding: 0; 
     border-radius: 50%; flex-shrink: 0; transition: all 0.2s; 
-    border: none; outline: none; /* 确保无边框 */
+    border: none; outline: none;
 }
 .btn-close:hover { color: var(--text-main); transform: rotate(90deg); }
 .btn-close:active { transform: scale(0.9); }
@@ -135,8 +135,8 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .app-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-end { flex-shrink: 0; display: flex; align-items: center; }
 
-/* FAB */
-.fab-filter-container { 
+/* FABs */
+.fab-filter-container, .fab-env-container { 
     position: absolute; 
     bottom: 20px; right: 20px; 
     display: flex; flex-direction: column; align-items: flex-end; gap: 10px; 
@@ -149,14 +149,21 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .filter-opt { background: var(--bg-surface); border: 1px solid var(--border); padding: 8px 16px; border-radius: 20px; color: var(--text-main); font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.2s; white-space: nowrap; }
 .filter-opt.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
-/* Environment Grid - 修复行间距 */
+/* Environment Grid/List */
 .grid-list { 
     display: grid; 
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); 
     gap: 8px; 
-    align-content: start; /* 关键：防止行被拉伸 */
+    align-content: start;
 }
+/* 单列列表模式 */
+.grid-list.list-mode {
+    grid-template-columns: 1fr;
+    gap: 4px;
+}
+
 .scroll-y { overflow-y: auto; flex: 1; }
+
 .env-item { 
     background: var(--bg-input); 
     padding: 6px; 
@@ -170,8 +177,20 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
     position: relative; 
     border: 1px solid transparent; 
     transition: all 0.2s; 
-    height: 56px; /* 进一步降低高度 */
+    height: 56px;
 }
+/* 列表模式下的 Item 样式 */
+.list-mode .env-item {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 50px;
+    text-align: left;
+}
+.list-mode .env-info { display: flex; align-items: center; gap: 12px; }
+.list-mode .env-icon { margin-bottom: 0; }
+.list-mode .env-stats { display: flex; gap: 6px; }
+
 .env-item:hover { background: #e4e6eb; transform: translateY(-1px); }
 .env-item:active { transform: scale(0.98); }
 .env-icon { margin-bottom: 2px; transform: scale(0.85); }
@@ -185,14 +204,14 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .badge-success { background: var(--success); }
 .badge-warning { background: var(--warning); color: #000; }
 .badge-primary { background: var(--primary); }
+.badge-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); font-size: 9px; }
 
-/* Modals & Animations */
+/* Modals */
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(3px); opacity: 0; transition: opacity 0.25s ease; }
 .modal.show { display: flex; opacity: 1; }
 .modal.hiding { opacity: 0; }
 .modal.hiding .modal-content { transform: translateY(20px); }
 
-/* 模态框高度修复 */
 .modal-content { 
     background: var(--bg-surface); width: 92%; max-width: 420px; border-radius: 16px; 
     display: flex; flex-direction: column; 
@@ -202,20 +221,12 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
     transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
 }
-/* 关键：给环境编辑模态框一个固定高度，让内部 flex 生效 */
-.modal-content.large { 
-    max-width: 800px; 
-    height: 70vh; /* 固定高度，撑开编辑器 */
-}
+.modal-content.large { max-width: 800px; height: 70vh; }
 .modal-content.small { max-width: 320px; }
 .modal-content.flex-column { display: flex; flex-direction: column; }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-.modal-header { 
-    padding: 10px 16px; 
-    border-bottom: 1px solid var(--border); 
-    display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; 
-}
+.modal-header { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
 .modal-header.nowrap { flex-wrap: nowrap; gap: 10px; }
 .header-title-group { flex: 1; min-width: 0; margin-top: -2px; }
 .header-actions-group { display: flex; align-items: center; gap: 12px; flex-shrink: 0; margin-top: -2px; }
@@ -240,12 +251,7 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 
 .editor-pane { flex: 1; display: flex; flex-direction: column; }
 .editor-pane.scroll-y { overflow-y: auto; }
-/* 源码模式：全填充 */
-.editor-pane.full-height { 
-    flex: 1; 
-    height: 100%; 
-    width: 100%;
-}
+.editor-pane.full-height { flex: 1; height: 100%; width: 100%; }
 
 .rule-row { display: flex; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); align-items: center; background: var(--bg-surface); flex-shrink: 0; }
 .rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 4px; }

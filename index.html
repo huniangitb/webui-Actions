@@ -7,7 +7,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- 头部 (固定高度) -->
         <div class="header">
             <div class="header-left">
                 <h2 class="title">NAMESPACE PROXY</h2>
@@ -19,7 +18,6 @@
             <button id="btnReload" class="btn btn-icon"></button>
         </div>
 
-        <!-- 导航 (固定高度) -->
         <div class="nav-tabs">
             <button class="nav-item active" data-target="content-apps">应用绑定</button>
             <button class="nav-item" data-target="content-envs">环境管理</button>
@@ -27,23 +25,17 @@
             <button class="nav-item" data-target="content-log">日志</button>
         </div>
 
-        <!-- 内容区域 (占据剩余高度) -->
         <div class="tab-content-wrapper">
             <!-- 1. 应用绑定 -->
             <div id="content-apps" class="tab-pane active">
                 <div class="app-layout-container">
-                    <!-- 搜索栏 (固定) -->
                     <div class="app-search-wrapper">
                         <div class="search-bar">
                             <span class="icon-placeholder" id="iconSearch"></span>
                             <input type="text" id="appSearch" placeholder="搜索应用名称或包名..." />
                         </div>
                     </div>
-                    
-                    <!-- 列表 (滚动) -->
                     <div id="appList" class="list-group scrollable-list"></div>
-
-                    <!-- 悬浮过滤按钮 (绝对定位) -->
                     <div class="fab-filter-container">
                         <div class="filter-options" id="filterOptions">
                             <button class="filter-opt active" data-filter="filterUser">用户应用</button>
@@ -59,12 +51,19 @@
 
             <!-- 2. 环境管理 -->
             <div id="content-envs" class="tab-pane">
-                <div class="card full-height-card">
+                <div class="card full-height-card relative">
                     <div class="card-header">
                         <h3>环境列表</h3>
                         <button id="btnNewEnv" class="btn btn-primary btn-sm">新建</button>
                     </div>
                     <div id="envList" class="grid-list scroll-y"></div>
+                    
+                    <!-- 环境视图切换悬浮按钮 -->
+                    <div class="fab-env-container">
+                        <button id="btnEnvViewToggle" class="btn btn-primary fab-main shadow">
+                            <span id="iconEnvView"></span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -163,20 +162,14 @@
             
             <div class="modal-body no-padding relative flex-grow">
                 <div id="suggestionBox" class="suggestion-box"></div>
-                
-                <!-- 图形编辑器 -->
                 <div id="editorVisual" class="editor-pane scroll-y">
                     <div class="alert-info">路径自动映射至 <b>/data/media/0/</b></div>
                     <div id="ruleBuilderContainer"></div>
-                    <div class="spacer"></div> <!-- 底部留白给FAB -->
+                    <div class="spacer"></div>
                 </div>
-                
-                <!-- 源码编辑器 (全高) -->
                 <div id="editorRaw" class="editor-pane hidden full-height">
                     <textarea id="envRuleContent" class="code-editor"></textarea>
                 </div>
-
-                <!-- 添加规则按钮 (仅图形模式) -->
                 <div class="fab-container">
                     <button id="btnAddRuleRow" class="btn btn-primary rounded shadow">添加规则</button>
                 </div>

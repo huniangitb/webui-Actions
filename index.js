@@ -149,7 +149,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.getElementById('btnMonitorIgnore').onclick = openMonitorIgnoreEditor;
     
-    // 日志清空
     document.getElementById('btnClearLog').onclick = async () => {
         const target = document.getElementById('logFileSelect').value;
         if (!target) return;
@@ -162,6 +161,14 @@ document.addEventListener('DOMContentLoaded', () => {
         toast("日志已清空");
         updateLogContent();
     };
+
+    // 监听全局点击关闭建议框
+    document.addEventListener('click', (e) => {
+        const box = document.getElementById('suggestionBox');
+        if (box.style.display !== 'none' && window._currentInput && e.target !== window._currentInput && !box.contains(e.target)) {
+            box.style.display = 'none';
+        }
+    });
 });
 
 const run = async (cmd) => {
@@ -192,6 +199,8 @@ window.closeModal = (id) => {
     if (el && el.classList.contains('show')) {
         el.classList.add('hiding');
         setTimeout(() => { el.classList.remove('show'); el.classList.remove('hiding'); }, 250);
+        // 关闭模态框时隐藏补全框
+        document.getElementById('suggestionBox').style.display = 'none';
     }
 };
 
@@ -549,29 +558,47 @@ document.getElementById('btnDeleteEnv').onclick = async () => {
     loadData();
 };
 
+// 关键修复：位置更新逻辑
 const updateBoxPosition = (input) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none' || !input) return;
 
     const rect = input.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const boxHeight = box.offsetHeight || 200; // 预估高度
+    const threshold = window.innerHeight * 0.5; // 屏幕一半
     
-    // 宽度和水平对齐
+    // 水平对齐
     box.style.width = rect.width + 'px';
     box.style.left = rect.left + 'px';
 
-    const spaceBelow = viewportHeight - rect.bottom;
-    // 如果下方空间不足以显示完整高度，且上方空间比下方大，则向上显示
-    if (spaceBelow < boxHeight && rect.top > spaceBelow) {
-        // 向上显示：top 设为 auto，bottom 设为视口高度 - input.top
+    // 垂直对齐逻辑
+    if (rect.bottom > threshold) {
+        // 在下半屏，向上弹出，紧贴 rect.top
         box.style.top = 'auto';
-        box.style.bottom = (viewportHeight - rect.top) + 'px';
+        box.style.bottom = (window.innerHeight - rect.top) + 'px';
+        box.style.maxHeight = (rect.top - 10) + 'px'; // 防止溢出顶部
+        box.style.borderRadius = '8px 8px 0 0';
+        box.style.borderBottom = 'none';
+        box.style.borderTop = '1px solid var(--border)';
     } else {
-        // 向下显示
+        // 在上半屏，向下弹出，紧贴 rect.bottom
         box.style.top = rect.bottom + 'px';
         box.style.bottom = 'auto';
+        box.style.maxHeight = (window.innerHeight - rect.bottom - 10) + 'px'; // 防止溢出底部
+        box.style.borderRadius = '0 0 8px 8px';
+        box.style.borderTop = 'none';
+        box.style.borderBottom = '1px solid var(--border)';
     }
+};
+
+const startAutoUpdate = (input) => {
+    const box = document.getElementById('suggestionBox');
+    const loop = () => {
+        if (box.style.display !== 'none' && window._currentInput === input) {
+            updateBoxPosition(input);
+            requestAnimationFrame(loop);
+        }
+    };
+    requestAnimationFrame(loop);
 };
 
 const setupAutocomplete = (input) => {
@@ -605,7 +632,8 @@ const setupAutocomplete = (input) => {
             box.innerHTML = suggestions.map(s => `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window.applySuggestion('${s.text}')"><div class="s-icon">${s.icon}</div><div class="s-text">${s.text}</div></div>`).join('');
             
             box.style.display = 'block';
-            updateBoxPosition(input); // 计算位置
+            updateBoxPosition(input);
+            startAutoUpdate(input); // 启动位置跟随
             
         } catch (e) { box.style.display = 'none'; }
     }, 150);

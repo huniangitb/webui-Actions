@@ -89,7 +89,6 @@
                 <div class="card full-height-card relative">
                     <select id="logFileSelect" class="form-select mb-2"></select>
                     <div id="logViewer" class="log-viewer"></div>
-                    <!-- 日志清空悬浮按钮 -->
                     <div class="fab-log-container">
                         <button id="btnClearLog" class="btn btn-primary fab-main shadow" style="background:var(--danger)">
                             <span id="iconClearLog"></span>
@@ -168,9 +167,6 @@
             </div>
             
             <div class="modal-body no-padding relative flex-grow" style="overflow: hidden;">
-                <!-- 自动补全建议框放在这里，确保它能浮在内容之上 -->
-                <div id="suggestionBox" class="suggestion-box"></div>
-                
                 <div id="editorAlert" class="alert-info sticky-top">
                     路径自动映射至 <b>/data/media/0/</b>
                 </div>
@@ -237,6 +233,9 @@
             </div>
         </div>
     </div>
+    
+    <!-- 关键修复：自动补全框移到 Body 根节点下，避免 fixed 定位失效 -->
+    <div id="suggestionBox" class="suggestion-box"></div>
 
     <script src="index.js" type="module"></script>
 </body>

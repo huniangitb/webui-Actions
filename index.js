@@ -1,4 +1,4 @@
-import './style.scss';
+import './style.css';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { 
     mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
@@ -22,9 +22,9 @@ let currentEditingEnv = null;
 let currentBindingPkg = null;
 let activeMounts = new Set();
 let logPolling = null;
+let statusPolling = null; // 状态轮询
 let currentAppFilter = 'filterUser';
 
-// 异步锁
 let isFetchingLogs = false;
 let isFetchingIO = false;
 
@@ -79,6 +79,10 @@ document.addEventListener('DOMContentLoaded', () => {
     loadData();
     loadLogs(); 
     checkStatus();
+    
+    // 启动状态每秒轮询
+    if (statusPolling) clearInterval(statusPolling);
+    statusPolling = setInterval(checkStatus, 1000);
 
     document.getElementById('appSearch').oninput = renderAppList;
     
@@ -103,7 +107,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     });
 
-    // 滚动监听：隐藏/显示 Alert
     const visualPane = document.getElementById('editorVisual');
     const alertBox = document.getElementById('editorAlert');
     let lastScrollY = 0;
@@ -323,12 +326,9 @@ window.openEnvEditor = async (envName) => {
     const content = await run(`cat ${BASE_DIR}/${envName}.conf 2>/dev/null`);
     document.getElementById('envRuleContent').value = content;
     parseConfigToVisual(content);
-    
-    // Reset state
     document.getElementById('editorAlert').classList.remove('collapsed');
     const visualRadio = document.querySelector('input[name="editorMode"][value="visual"]');
     if (visualRadio) { visualRadio.checked = true; visualRadio.dispatchEvent(new Event('change')); }
-    
     openModal('envEditorModal');
 };
 
@@ -339,39 +339,25 @@ document.querySelectorAll('input[name="editorMode"]').forEach(el => {
         const visualEl = document.getElementById('editorVisual');
         const rawEl = document.getElementById('editorRaw');
         const fab = document.querySelector('.fab-container');
-
         if (isVisual) {
-            // Switch to Visual
             rawEl.classList.remove('active');
             setTimeout(() => {
                 rawEl.classList.add('hidden');
                 visualEl.classList.remove('hidden');
-                alertBox.classList.remove('collapsed'); // Show alert
+                alertBox.classList.remove('collapsed');
                 fab.classList.remove('hidden');
-                
-                // Parse content
                 parseConfigToVisual(document.getElementById('envRuleContent').value);
-                
-                requestAnimationFrame(() => {
-                    visualEl.classList.add('active');
-                });
+                requestAnimationFrame(() => { visualEl.classList.add('active'); });
             }, 250);
         } else {
-            // Switch to Raw
             visualEl.classList.remove('active');
-            alertBox.classList.add('collapsed'); // Hide alert
+            alertBox.classList.add('collapsed');
             fab.classList.add('hidden');
-            
             setTimeout(() => {
                 visualEl.classList.add('hidden');
                 rawEl.classList.remove('hidden');
-                
-                // Generate content
                 document.getElementById('envRuleContent').value = generateConfigFromVisual();
-                
-                requestAnimationFrame(() => {
-                    rawEl.classList.add('active');
-                });
+                requestAnimationFrame(() => { rawEl.classList.add('active'); });
             }, 250);
         }
     };
@@ -520,7 +506,6 @@ const loadLogs = async () => {
         const select = document.getElementById('logFileSelect');
         const viewer = document.getElementById('logViewer');
         const filesRaw = await run(`ls ${LOG_DIR}/*.log 2>/dev/null`);
-        
         requestAnimationFrame(() => {
             const files = filesRaw ? filesRaw.split('\n').filter(f => f) : [];
             let optionsHtml = `<option value="ZYGISK">Zygisk (Logcat)</option>`;
@@ -533,10 +518,8 @@ const loadLogs = async () => {
                 else select.value = oldVal || 'ZYGISK';
             }
         });
-
         const target = select.value;
         let content = target === 'ZYGISK' ? await run("logcat -d -s Zygisk_Blocker") : await run(`tail -n 200 ${LOG_DIR}/${target} 2>/dev/null`);
-        
         requestAnimationFrame(() => {
             if (viewer.getAttribute('data-len') != content.length) {
                 viewer.innerHTML = content || "无日志内容";
@@ -556,17 +539,14 @@ document.getElementById('btnReload').onclick = async () => {
     setTimeout(checkStatus, 1500);
 };
 
-// Stop Button Logic
 document.getElementById('btnStop').onclick = async () => {
     let pid = await run("pidof injector");
     if (!pid) pid = await run("pgrep -x injector");
     if (pid) {
-        await exec(`kill -15 ${pid.split(' ')[0]}`); // SIGTERM
+        await exec(`kill -15 ${pid.split(' ')[0]}`);
         toast("发送停止信号...");
         setTimeout(checkStatus, 1000);
-    } else {
-        toast("未运行");
-    }
+    } else toast("未运行");
 };
 
 document.querySelectorAll('.nav-item').forEach(btn => {

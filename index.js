@@ -27,7 +27,7 @@ let currentAppFilter = 'filterUser';
 
 let isFetchingLogs = false;
 let isFetchingIO = false;
-let currentPid = null; // 缓存 PID 状态
+let currentPid = null;
 
 const getSvg = (path, size = 24, color = 'currentColor') => 
     `<svg viewBox="0 0 24 24" fill="${color}" width="${size}" height="${size}"><path d="${path}"/></svg>`;
@@ -63,22 +63,18 @@ const checkStatus = async () => {
         badge.className = "badge badge-success";
         badge.textContent = "RUNNING";
         info.textContent = `PID: ${currentPid}`;
-        
-        // 运行状态：显示停止按钮
         if (toggleBtn.getAttribute('data-status') !== 'running') {
             toggleBtn.innerHTML = ICONS.STOP;
-            toggleBtn.style.background = "rgba(220, 53, 69, 0.1)"; // 浅红色背景
+            toggleBtn.style.background = "rgba(220, 53, 69, 0.1)";
             toggleBtn.setAttribute('data-status', 'running');
         }
     } else {
         badge.className = "badge badge-gray";
         badge.textContent = "STOPPED";
         info.textContent = "OFFLINE";
-        
-        // 停止状态：显示启动按钮
         if (toggleBtn.getAttribute('data-status') !== 'stopped') {
             toggleBtn.innerHTML = ICONS.PLAY;
-            toggleBtn.style.background = "rgba(54, 164, 32, 0.1)"; // 浅绿色背景
+            toggleBtn.style.background = "rgba(54, 164, 32, 0.1)";
             toggleBtn.setAttribute('data-status', 'stopped');
         }
     }
@@ -94,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnAddRuleRow').innerHTML = `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`;
 
     loadData();
-    loadLogs(); 
+    pollLogs(true); // Initial load
     checkStatus();
     
     if (statusPolling) clearInterval(statusPolling);
@@ -135,6 +131,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         lastScrollY = currentY;
     }, { passive: true });
+    
+    // 日志切换：直接更新内容，不刷新列表
+    document.getElementById('logFileSelect').addEventListener('change', () => {
+        updateLogContent();
+    });
 });
 
 const run = async (cmd) => {
@@ -343,10 +344,9 @@ window.openEnvEditor = async (envName) => {
     document.getElementById('envRuleContent').value = content;
     parseConfigToVisual(content);
     
-    // Reset to Visual Mode defaults
     document.getElementById('editorAlert').classList.remove('collapsed');
     const modalContent = document.querySelector('#envEditorModal .modal-content');
-    modalContent.classList.remove('dark-theme'); // Ensure light theme start
+    modalContent.classList.remove('dark-theme');
     
     const visualRadio = document.querySelector('input[name="editorMode"][value="visual"]');
     if (visualRadio) { visualRadio.checked = true; visualRadio.dispatchEvent(new Event('change')); }
@@ -363,17 +363,14 @@ document.querySelectorAll('input[name="editorMode"]').forEach(el => {
         const fab = document.querySelector('.fab-container');
         const modalContent = document.querySelector('#envEditorModal .modal-content');
 
-        // Toggle Dark Theme Class
         if (isVisual) {
             modalContent.classList.remove('dark-theme');
             rawEl.classList.remove('active');
-            
             setTimeout(() => {
                 rawEl.classList.add('hidden');
                 visualEl.classList.remove('hidden');
                 alertBox.classList.remove('collapsed');
                 fab.classList.remove('hidden');
-                
                 parseConfigToVisual(document.getElementById('envRuleContent').value);
                 requestAnimationFrame(() => { visualEl.classList.add('active'); });
             }, 250);
@@ -382,11 +379,9 @@ document.querySelectorAll('input[name="editorMode"]').forEach(el => {
             visualEl.classList.remove('active');
             alertBox.classList.add('collapsed');
             fab.classList.add('hidden');
-            
             setTimeout(() => {
                 visualEl.classList.add('hidden');
                 rawEl.classList.remove('hidden');
-                
                 document.getElementById('envRuleContent').value = generateConfigFromVisual();
                 requestAnimationFrame(() => { rawEl.classList.add('active'); });
             }, 250);
@@ -530,40 +525,63 @@ const updateIOTable = async () => {
     }
 };
 
-const loadLogs = async () => {
+// 拆分日志加载逻辑
+const updateLogFileList = async () => {
+    const select = document.getElementById('logFileSelect');
+    const filesRaw = await run(`ls ${LOG_DIR}/*.log 2>/dev/null`);
+    
+    requestAnimationFrame(() => {
+        const files = filesRaw ? filesRaw.split('\n').filter(f => f) : [];
+        let optionsHtml = `<option value="ZYGISK">Zygisk (Logcat)</option>`;
+        files.forEach(f => { const name = f.split('/').pop(); optionsHtml += `<option value="${name}">${name}</option>`; });
+        
+        if (select.innerHTML !== optionsHtml) {
+            const oldVal = select.value;
+            select.innerHTML = optionsHtml;
+            const hasInjector = files.find(f => f.includes('injector.log'));
+            // 保持当前选择，除非当前选择无效
+            if (oldVal && (oldVal === 'ZYGISK' || files.find(f => f.endsWith(oldVal)))) {
+                select.value = oldVal;
+            } else if (hasInjector) {
+                select.value = 'injector.log';
+            } else {
+                select.value = 'ZYGISK';
+            }
+        }
+    });
+};
+
+const updateLogContent = async () => {
+    const select = document.getElementById('logFileSelect');
+    const viewer = document.getElementById('logViewer');
+    const target = select.value;
+    
+    let content = target === 'ZYGISK' ? await run("logcat -d -s Zygisk_Blocker") : await run(`tail -n 200 ${LOG_DIR}/${target} 2>/dev/null`);
+    
+    requestAnimationFrame(() => {
+        // 只有当内容长度变化时才更新DOM，避免闪烁，但如果是切换文件（内容可能变短），也需要更新
+        // 这里的简单判断是：长度变化 OR 目标文件变化(这层逻辑由调用者保证)
+        // 实际上每次都更新 innerHTML 开销也不大，主要是 exec 耗时
+        if (viewer.getAttribute('data-len') != content.length || viewer.getAttribute('data-target') !== target) {
+            viewer.innerHTML = content || "无日志内容";
+            viewer.scrollTop = viewer.scrollHeight;
+            viewer.setAttribute('data-len', content.length);
+            viewer.setAttribute('data-target', target);
+        }
+    });
+};
+
+const pollLogs = async (isInit = false) => {
     if (isFetchingLogs) return;
     isFetchingLogs = true;
     try {
-        const select = document.getElementById('logFileSelect');
-        const viewer = document.getElementById('logViewer');
-        const filesRaw = await run(`ls ${LOG_DIR}/*.log 2>/dev/null`);
-        requestAnimationFrame(() => {
-            const files = filesRaw ? filesRaw.split('\n').filter(f => f) : [];
-            let optionsHtml = `<option value="ZYGISK">Zygisk (Logcat)</option>`;
-            files.forEach(f => { const name = f.split('/').pop(); optionsHtml += `<option value="${name}">${name}</option>`; });
-            if (select.innerHTML !== optionsHtml) {
-                const oldVal = select.value;
-                select.innerHTML = optionsHtml;
-                const hasInjector = files.find(f => f.includes('injector.log'));
-                if (hasInjector && (!oldVal || oldVal === "")) select.value = 'injector.log';
-                else select.value = oldVal || 'ZYGISK';
-            }
-        });
-        const target = select.value;
-        let content = target === 'ZYGISK' ? await run("logcat -d -s Zygisk_Blocker") : await run(`tail -n 200 ${LOG_DIR}/${target} 2>/dev/null`);
-        requestAnimationFrame(() => {
-            if (viewer.getAttribute('data-len') != content.length) {
-                viewer.innerHTML = content || "无日志内容";
-                viewer.scrollTop = viewer.scrollHeight;
-                viewer.setAttribute('data-len', content.length);
-            }
-        });
+        await updateLogFileList();
+        await updateLogContent();
     } finally {
         isFetchingLogs = false;
     }
 };
 
-// Toggle Button Logic
 document.getElementById('btnToggleStatus').onclick = async () => {
     const btn = document.getElementById('btnToggleStatus');
     const isRunning = btn.getAttribute('data-status') === 'running';
@@ -578,10 +596,8 @@ document.getElementById('btnToggleStatus').onclick = async () => {
     } else {
         await exec(`sh ${SERVICE_SH}`);
         toast("启动服务...");
-        setTimeout(loadData, 1000); // Reload data after start
+        setTimeout(loadData, 1000); 
     }
-    
-    // Immediate check to update UI feel
     setTimeout(checkStatus, 500);
     setTimeout(checkStatus, 1500);
 };
@@ -595,7 +611,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
         document.getElementById(targetId).classList.add('active');
         if (targetId === 'content-io' || targetId === 'content-log') {
             if (targetId === 'content-io') updateIOTable();
-            if (targetId === 'content-log') loadLogs();
+            if (targetId === 'content-log') pollLogs(true);
             startPolling();
         } else stopPolling();
     };
@@ -608,7 +624,7 @@ const startPolling = () => {
         if (btn) {
             const t = btn.dataset.target;
             if (t === 'content-io') updateIOTable();
-            if (t === 'content-log') loadLogs();
+            if (t === 'content-log') pollLogs();
         }
     }, 1500);
 };

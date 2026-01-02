@@ -206,12 +206,12 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
     max-height: 85vh; height: auto; 
     box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
     transform: translateY(0);
-    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s ease, color 0.3s ease; /* 增加背景颜色过渡 */
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s ease, color 0.3s ease;
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
 }
-/* 暗色模式下的模态框样式 */
+/* 源码模式：容器深灰色 (#252526) */
 .modal-content.dark-theme { 
-    background-color: #1e1e1e; 
+    background-color: #252526; 
     color: #e4e6eb; 
 }
 .modal-content.dark-theme .modal-header, 
@@ -308,7 +308,21 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .table th { text-align: left; padding: 10px 8px; background: var(--bg-input); position: sticky; top: 0; font-weight: 600; z-index: 10; border-bottom: 1px solid var(--border); }
 .table td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .log-viewer { flex: 1; background: #1e1e1e; color: #d4d4d4; padding: 12px; font-family: var(--code-font); font-size: 11px; overflow: auto; border-radius: 8px; white-space: pre-wrap; line-height: 1.4; min-height: 0; }
-.code-editor { width: 100%; height: 100%; background: #1e1e1e; color: #d4d4d4; border: none; padding: 15px; font-family: var(--code-font); resize: none; font-size: 12px; line-height: 1.5; outline: none; }
+
+/* 源码编辑器：更深的黑色 (#1e1e1e) + 微弱边框，与容器 (#252526) 区分 */
+.code-editor { 
+    width: 100%; height: 100%; 
+    background: #1e1e1e; 
+    color: #d4d4d4; 
+    border: 1px solid #3e3e42; 
+    padding: 15px; 
+    font-family: var(--code-font); 
+    resize: none; 
+    font-size: 12px; 
+    line-height: 1.5; 
+    outline: none; 
+    border-radius: 4px;
+}
 
 /* Utilities */
 .hidden { display: none !important; }

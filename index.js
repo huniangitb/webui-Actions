@@ -2,7 +2,8 @@ import './style.scss';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { 
     mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
-    mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight 
+    mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight,
+    mdiFilterVariant 
 } from '@mdi/js';
 
 const BASE_DIR = "/data/Namespace-Proxy";
@@ -19,8 +20,8 @@ let currentEditingEnv = null;
 let currentBindingPkg = null;
 let activeMounts = new Set();
 let logPolling = null;
+let currentAppFilter = 'filterUser'; // 默认过滤状态
 
-// 图标辅助
 const getSvg = (path, size = 24, color = 'currentColor') => 
     `<svg viewBox="0 0 24 24" fill="${color}" width="${size}" height="${size}"><path d="${path}"/></svg>`;
 
@@ -34,17 +35,52 @@ const ICONS = {
     SEARCH: getSvg(mdiMagnify, 18, '#868e96'),
     PLUS: getSvg(mdiPlus, 16, '#fff'),
     CLOSE: getSvg(mdiClose, 20, 'currentColor'),
-    CHEVRON: getSvg(mdiChevronRight, 20, '#adb5bd')
+    CHEVRON: getSvg(mdiChevronRight, 20, '#adb5bd'),
+    FILTER: getSvg(mdiFilterVariant, 24, '#fff')
 };
 
-// 初始化静态图标
 document.addEventListener('DOMContentLoaded', () => {
+    // 初始化图标
     document.getElementById('btnReload').innerHTML = ICONS.REFRESH;
     document.getElementById('iconSearch').innerHTML = ICONS.SEARCH;
     document.getElementById('iconIoSearch').innerHTML = ICONS.SEARCH;
+    document.getElementById('iconFilter').innerHTML = ICONS.FILTER;
     document.querySelectorAll('.btn-close').forEach(el => el.innerHTML = ICONS.CLOSE);
     document.getElementById('btnNewEnv').innerHTML = `<span style="display:flex;align-items:center;gap:4px">${getSvg(mdiPlus,14,'#fff')} 新建</span>`;
     document.getElementById('btnAddRuleRow').innerHTML = `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`;
+
+    // 立即加载数据
+    loadData();
+    // 立即异步加载日志
+    setTimeout(loadLogs, 100); 
+
+    // 绑定事件
+    document.getElementById('appSearch').oninput = renderAppList;
+    
+    // 悬浮过滤按钮逻辑
+    const fabBtn = document.getElementById('btnFilterFab');
+    const filterOpts = document.getElementById('filterOptions');
+    
+    fabBtn.onclick = (e) => {
+        e.stopPropagation();
+        filterOpts.classList.toggle('show');
+    };
+    
+    document.addEventListener('click', (e) => {
+        if (!filterOpts.contains(e.target) && !fabBtn.contains(e.target)) {
+            filterOpts.classList.remove('show');
+        }
+    });
+
+    document.querySelectorAll('.filter-opt').forEach(btn => {
+        btn.onclick = () => {
+            currentAppFilter = btn.dataset.filter;
+            document.querySelectorAll('.filter-opt').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            filterOpts.classList.remove('show');
+            renderAppList();
+        };
+    });
 });
 
 const run = async (cmd) => {
@@ -142,14 +178,12 @@ const loadData = async () => {
 const renderAppList = () => {
     const listEl = document.getElementById('appList');
     const searchVal = document.getElementById('appSearch').value.toLowerCase();
-    const filterEl = document.querySelector('input[name="appFilter"]:checked');
-    const filter = filterEl ? filterEl.id : 'filterUser';
-
+    
     const items = [];
     appMap.forEach(app => {
-        if (filter === 'filterUser' && app.isSystem) return;
-        if (filter === 'filterSystem' && !app.isSystem) return;
-        if (filter === 'filterBound' && !app.boundEnv) return;
+        if (currentAppFilter === 'filterUser' && app.isSystem) return;
+        if (currentAppFilter === 'filterSystem' && !app.isSystem) return;
+        if (currentAppFilter === 'filterBound' && !app.boundEnv) return;
 
         const label = app.appLabel || app.packageName;
         if (searchVal && !label.toLowerCase().includes(searchVal) && !app.packageName.toLowerCase().includes(searchVal)) return;
@@ -397,21 +431,18 @@ document.getElementById('btnDeleteEnv').onclick = async () => {
     loadData();
 };
 
+// ... autocomplete logic (无变化) ...
 const updateBoxPosition = (input) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none' || !input) return;
-
     const rect = input.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const boxHeight = box.offsetHeight || 200;
     const maxWidth = Math.min(300, window.innerWidth - 20);
-    
     box.style.width = maxWidth + 'px';
-    
     let leftPos = rect.left;
     if (leftPos + maxWidth > window.innerWidth) leftPos = window.innerWidth - maxWidth - 10;
     box.style.left = leftPos + 'px';
-
     const spaceBelow = viewportHeight - rect.bottom;
     if (spaceBelow < boxHeight && rect.top > boxHeight) {
         box.style.top = (rect.top - boxHeight - 2) + 'px';
@@ -441,7 +472,6 @@ document.addEventListener('click', (e) => {
 
 const setupAutocomplete = (input) => {
     const box = document.getElementById('suggestionBox');
-    
     const autoScroll = () => {
         window._currentInput = input;
         setTimeout(() => {
@@ -449,15 +479,12 @@ const setupAutocomplete = (input) => {
         }, 300);
         if (input.value) input.dispatchEvent(new Event('input'));
     };
-
     input.addEventListener('focus', autoScroll);
     input.addEventListener('click', autoScroll);
-
     const performSearch = debounce(async (val) => {
         let parentDir = PATH_PREFIX_REAL;
         let searchPrefix = "";
         let displayBase = "/";
-        
         const cleanVal = val ? val.replace(/^\/+/, '') : "";
         if (!cleanVal) {
             parentDir = PATH_PREFIX_REAL + '/';
@@ -475,16 +502,13 @@ const setupAutocomplete = (input) => {
                 displayBase = "/" + dirPart;
             }
         }
-        
         parentDir = parentDir.replace(/\/+/g, '/');
-
         try {
             const res = await exec(`ls -F -1 "${parentDir}" 2>/dev/null | head -n 30`);
             if (!res || !res.stdout) {
                 box.style.display = 'none';
                 return;
             }
-            
             const suggestions = res.stdout.split('\n')
                 .filter(l => l.startsWith(searchPrefix))
                 .map(line => {
@@ -495,12 +519,10 @@ const setupAutocomplete = (input) => {
                         icon: isDir ? ICONS.FOLDER : ICONS.FILE 
                     };
                 });
-
             if (suggestions.length === 0) {
                 box.style.display = 'none';
                 return;
             }
-
             box.innerHTML = suggestions.map(s => `
                 <div class="suggestion-item" 
                      onmousedown="event.preventDefault()" 
@@ -509,14 +531,12 @@ const setupAutocomplete = (input) => {
                     <div class="s-text">${s.text}</div>
                 </div>
             `).join('');
-
             box.style.display = 'block';
             startAutoUpdate(input);
         } catch (e) {
             box.style.display = 'none';
         }
     }, 150);
-
     input.addEventListener('input', (e) => performSearch(e.target.value));
 };
 
@@ -529,7 +549,6 @@ window.applySuggestion = (text) => {
 
 const updateIOTable = async () => {
     const tbody = document.getElementById('ioTableBody');
-    // 移除 tail 限制，加载所有
     const raw = await run(`grep -H "\\[IO\\]" ${LOG_DIR}/*.log | grep -v "injector.log"`);
     
     if (!raw) {
@@ -592,7 +611,6 @@ const loadLogs = async () => {
     let content = "";
     
     if (target === 'ZYGISK') {
-        // 修正 Logcat 命令
         content = await run("logcat -d -s Zygisk_Blocker");
     } else if (target) {
         content = await run(`tail -n 200 ${LOG_DIR}/${target} 2>/dev/null`);
@@ -608,16 +626,40 @@ const loadLogs = async () => {
 
 document.getElementById('logFileSelect').addEventListener('change', loadLogs);
 
+// ... reload button logic ...
+document.getElementById('btnReload').onclick = async () => {
+    await exec(`sh ${SERVICE_SH}`);
+    toast("Reloading...");
+    setTimeout(loadData, 1000);
+};
+
+// ... tab switching logic ...
+document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.onclick = () => {
+        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        
+        btn.classList.add('active');
+        const targetId = btn.dataset.target;
+        document.getElementById(targetId).classList.add('active');
+
+        if (targetId === 'content-io' || targetId === 'content-log') {
+            startPolling();
+        } else {
+            stopPolling();
+        }
+    };
+});
+
+// ... polling logic ...
 const startPolling = () => {
     if (logPolling) return;
-    
     const activeBtn = document.querySelector('.nav-item.active');
     if (activeBtn) {
         const target = activeBtn.dataset.target;
         if (target === 'content-io') updateIOTable();
         if (target === 'content-log') loadLogs();
     }
-
     logPolling = setInterval(() => {
         const btn = document.querySelector('.nav-item.active');
         if (btn) {
@@ -634,48 +676,3 @@ const stopPolling = () => {
         logPolling = null;
     }
 };
-
-document.addEventListener('DOMContentLoaded', () => {
-    loadData();
-
-    document.getElementById('appSearch').oninput = renderAppList;
-    document.querySelectorAll('input[name="appFilter"]').forEach(el => el.onchange = renderAppList);
-    
-    document.getElementById('btnReload').onclick = async () => {
-        await exec(`sh ${SERVICE_SH}`);
-        toast("Reloading...");
-        setTimeout(loadData, 1000);
-    };
-
-    document.querySelectorAll('.nav-item').forEach(btn => {
-        btn.onclick = () => {
-            document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-            
-            btn.classList.add('active');
-            const targetId = btn.dataset.target;
-            document.getElementById(targetId).classList.add('active');
-
-            if (targetId === 'content-io' || targetId === 'content-log') {
-                startPolling();
-            } else {
-                stopPolling();
-            }
-        };
-    });
-
-    run("pgrep -f 'injector$'").then(pid => {
-        const badge = document.getElementById('statusBadge');
-        const info = document.getElementById('statusInfo');
-        
-        if (pid) {
-            badge.className = "badge badge-success";
-            badge.textContent = "RUNNING";
-            info.textContent = `PID: ${pid}`;
-        } else {
-            badge.className = "badge badge-gray";
-            badge.textContent = "STOPPED";
-            info.textContent = "OFFLINE";
-        }
-    });
-});

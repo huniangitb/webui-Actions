@@ -28,19 +28,31 @@
         </div>
 
         <div class="tab-content">
-            <!-- 1. 应用绑定 -->
-            <div id="content-apps" class="tab-pane active">
-                <div class="card no-padding-mobile">
-                    <div class="search-bar">
-                        <span class="icon-placeholder" id="iconSearch"></span>
-                        <input type="text" id="appSearch" placeholder="搜索应用名称或包名..." />
+            <!-- 1. 应用绑定 (全屏布局) -->
+            <div id="content-apps" class="tab-pane active full-height-pane">
+                <div class="app-layout-container">
+                    <!-- 搜索栏固定 -->
+                    <div class="app-search-wrapper">
+                        <div class="search-bar">
+                            <span class="icon-placeholder" id="iconSearch"></span>
+                            <input type="text" id="appSearch" placeholder="搜索应用名称或包名..." />
+                        </div>
                     </div>
-                    <div class="filter-group no-scrollbar">
-                        <label class="radio-btn"><input type="radio" name="appFilter" id="filterUser" checked><span>用户应用</span></label>
-                        <label class="radio-btn"><input type="radio" name="appFilter" id="filterSystem"><span>系统应用</span></label>
-                        <label class="radio-btn"><input type="radio" name="appFilter" id="filterBound"><span>已绑定</span></label>
+                    
+                    <!-- 列表滚动区域 -->
+                    <div id="appList" class="list-group scrollable-list"></div>
+
+                    <!-- 悬浮过滤按钮 -->
+                    <div class="fab-filter-container">
+                        <div class="filter-options" id="filterOptions">
+                            <button class="filter-opt active" data-filter="filterUser">用户应用</button>
+                            <button class="filter-opt" data-filter="filterSystem">系统应用</button>
+                            <button class="filter-opt" data-filter="filterBound">已绑定</button>
+                        </div>
+                        <button id="btnFilterFab" class="btn btn-primary fab-main">
+                            <span id="iconFilter"></span>
+                        </button>
                     </div>
-                    <div id="appList" class="list-group"></div>
                 </div>
             </div>
 
@@ -73,8 +85,8 @@
 
             <!-- 4. 日志 -->
             <div id="content-log" class="tab-pane">
-                <div class="card">
-                    <select id="logFileSelect" class="form-select"></select>
+                <div class="card full-height-card">
+                    <select id="logFileSelect" class="form-select mb-2"></select>
                     <div id="logViewer" class="log-viewer"></div>
                 </div>
             </div>
@@ -133,13 +145,13 @@
 
     <!-- 模态框：环境编辑 -->
     <div id="envEditorModal" class="modal">
-        <div class="modal-content large">
-            <div class="modal-header">
-                <div>
-                    <h3 id="editorEnvName">Env</h3>
+        <div class="modal-content large flex-column">
+            <div class="modal-header nowrap">
+                <div class="header-title-group">
+                    <h3 id="editorEnvName" class="text-truncate">Env</h3>
                     <small class="text-muted">规则配置</small>
                 </div>
-                <div class="header-actions">
+                <div class="header-actions-group">
                     <div class="toggle-group">
                         <label><input type="radio" name="editorMode" value="visual" checked><span>图形</span></label>
                         <label><input type="radio" name="editorMode" value="raw"><span>源码</span></label>
@@ -147,23 +159,28 @@
                     <button class="btn-close" onclick="closeModal('envEditorModal')"></button>
                 </div>
             </div>
-            <div class="modal-body no-padding relative">
+            
+            <div class="modal-body no-padding relative flex-grow">
                 <div id="suggestionBox" class="suggestion-box"></div>
                 
-                <div id="editorVisual" class="editor-pane">
+                <!-- 图形编辑器 -->
+                <div id="editorVisual" class="editor-pane scroll-y">
                     <div class="alert-info">路径自动映射至 <b>/data/media/0/</b></div>
                     <div id="ruleBuilderContainer"></div>
-                    <div class="spacer"></div>
+                    <div class="spacer"></div> <!-- 底部留白给FAB -->
                 </div>
                 
-                <div class="fab-container">
-                    <button id="btnAddRuleRow" class="btn btn-primary rounded">添加规则</button>
-                </div>
-
-                <div id="editorRaw" class="editor-pane hidden">
+                <!-- 源码编辑器 (全高) -->
+                <div id="editorRaw" class="editor-pane hidden full-height">
                     <textarea id="envRuleContent" class="code-editor"></textarea>
                 </div>
+
+                <!-- 添加规则按钮 (仅图形模式) -->
+                <div class="fab-container">
+                    <button id="btnAddRuleRow" class="btn btn-primary rounded shadow">添加规则</button>
+                </div>
             </div>
+            
             <div class="modal-footer">
                 <button id="btnDeleteEnv" class="btn btn-danger-outline">删除</button>
                 <button id="btnSaveEnv" class="btn btn-primary">保存</button>

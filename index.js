@@ -2,7 +2,7 @@ import './style.scss';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { 
     mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
-    mdiRefresh, mdiMagnify, mdiPlus, mdiCloseCircle, mdiChevronRight, // 替换为 mdiCloseCircle
+    mdiRefresh, mdiMagnify, mdiPlus, mdiCloseCircle, mdiChevronRight,
     mdiFilterVariant 
 } from '@mdi/js';
 
@@ -34,7 +34,7 @@ const ICONS = {
     REFRESH: getSvg(mdiRefresh, 20, '#000'),
     SEARCH: getSvg(mdiMagnify, 18, '#868e96'),
     PLUS: getSvg(mdiPlus, 16, '#fff'),
-    CLOSE: getSvg(mdiCloseCircle, 26, '#868e96'), // 使用更美观的关闭图标，稍微调大一点
+    CLOSE: getSvg(mdiCloseCircle, 26, '#868e96'),
     CHEVRON: getSvg(mdiChevronRight, 20, '#adb5bd'),
     FILTER: getSvg(mdiFilterVariant, 24, '#fff')
 };
@@ -66,7 +66,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnAddRuleRow').innerHTML = `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`;
 
     loadData();
-    setTimeout(loadLogs, 100); 
+    // 立即加载日志，无延迟
+    loadLogs(); 
     checkStatus();
 
     document.getElementById('appSearch').oninput = renderAppList;
@@ -114,8 +115,26 @@ const debounce = (func, wait) => {
     };
 };
 
-window.openModal = (id) => document.getElementById(id)?.classList.add('show');
-window.closeModal = (id) => document.getElementById(id)?.classList.remove('show');
+// 优化 Modal 动画逻辑
+window.openModal = (id) => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.remove('hiding');
+        el.classList.add('show');
+    }
+};
+
+window.closeModal = (id) => {
+    const el = document.getElementById(id);
+    if (el && el.classList.contains('show')) {
+        el.classList.add('hiding'); // 添加退出动画类
+        // 等待动画结束后移除 show
+        setTimeout(() => {
+            el.classList.remove('show');
+            el.classList.remove('hiding');
+        }, 250); // 对应 CSS transition 时间
+    }
+};
 
 const normalizeToDisplay = (path) => {
     if (!path) return "";
@@ -444,6 +463,7 @@ document.getElementById('btnDeleteEnv').onclick = async () => {
     loadData();
 };
 
+// ... autocomplete (无变化) ...
 const updateBoxPosition = (input) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none' || !input) return;
@@ -639,6 +659,7 @@ const loadLogs = async () => {
     }
 };
 
+// 立即响应下拉框变化
 document.getElementById('logFileSelect').addEventListener('change', loadLogs);
 
 document.getElementById('btnReload').onclick = async () => {
@@ -658,6 +679,9 @@ document.querySelectorAll('.nav-item').forEach(btn => {
         document.getElementById(targetId).classList.add('active');
 
         if (targetId === 'content-io' || targetId === 'content-log') {
+            // 切换 Tab 时立即刷新一次，减少等待
+            if (targetId === 'content-io') updateIOTable();
+            if (targetId === 'content-log') loadLogs();
             startPolling();
         } else {
             stopPolling();
@@ -667,6 +691,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 
 const startPolling = () => {
     if (logPolling) return;
+    // 立即执行一次
     const activeBtn = document.querySelector('.nav-item.active');
     if (activeBtn) {
         const target = activeBtn.dataset.target;

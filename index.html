@@ -7,8 +7,8 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
 </head>
 <body class="bg-light">
-    <!-- 修改：margin-top: 4vh 整体下移 4% 规避状态栏 -->
-    <div class="container-fluid px-0 px-md-3 py-3" style="max-width: 800px; margin: 4vh auto 0 auto;">
+    <!-- 整体下移规避状态栏 -->
+    <div class="container-fluid px-0 px-md-3 py-3" style="max-width: 800px; margin: 3vh auto 0 auto;">
         <!-- 头部 -->
         <div class="d-flex justify-content-between align-items-center mb-3 px-3">
             <div>
@@ -30,6 +30,7 @@
         </ul>
 
         <div class="tab-content px-3">
+            <!-- 1. 应用绑定列表 -->
             <div class="tab-pane fade show active" id="content-apps">
                 <div class="card shadow-0 border">
                     <div class="card-body p-2">
@@ -50,6 +51,7 @@
                 </div>
             </div>
 
+            <!-- 2. 环境管理 -->
             <div class="tab-pane fade" id="content-envs">
                 <div class="card shadow-0 border">
                     <div class="card-body p-3">
@@ -62,11 +64,15 @@
                 </div>
             </div>
 
+            <!-- 3. 监控 -->
             <div class="tab-pane fade" id="content-io">
                 <div class="card shadow-0 bg-white border"><div class="card-body p-2">
-                    <div class="input-group mb-2 border rounded">
-                         <span class="input-group-text border-0 bg-transparent py-1"><i class="fas fa-search text-muted small"></i></span>
-                        <input type="text" id="ioSearch" class="form-control form-control-sm border-0 shadow-none" placeholder="搜索操作记录..." />
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="input-group border rounded me-2">
+                             <span class="input-group-text border-0 bg-transparent py-1"><i class="fas fa-search text-muted small"></i></span>
+                            <input type="text" id="ioSearch" class="form-control form-control-sm border-0 shadow-none" placeholder="搜索操作记录..." />
+                        </div>
+                        <div class="spinner-border spinner-border-sm text-primary" role="status" id="ioSpinner" style="display:none;"></div>
                     </div>
                     <div class="table-responsive border rounded" style="height: 500px;">
                         <table class="table table-sm table-hover text-nowrap align-middle mb-0">
@@ -77,6 +83,7 @@
                 </div></div>
             </div>
 
+            <!-- 4. 日志 -->
             <div class="tab-pane fade" id="content-log">
                 <div class="card shadow-0 bg-white border"><div class="card-body p-2">
                     <select id="logFileSelect" class="form-select form-select-sm mb-2 font-monospace bg-light"></select>

@@ -23,12 +23,12 @@ body {
     background: var(--bg-body); color: var(--text-main); font-size: 14px; 
     padding-top: max(15px, env(safe-area-inset-top));
     user-select: none; -webkit-user-select: none;
-    height: 100vh; overflow: hidden; /* 核心：禁止body滚动 */
+    height: 100vh; overflow: hidden;
 }
 img, a { -webkit-user-drag: none; }
 input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -webkit-user-select: text; }
 
-/* Layout - 核心 Flex 结构 */
+/* Layout */
 .container { 
     max-width: 800px; margin: 0 auto; padding: 10px; 
     height: 100%; width: 100%;
@@ -49,9 +49,9 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .nav-item { flex: 0 0 auto; padding: 8px 16px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 20px; color: var(--text-muted); font-size: 13px; font-weight: 600; }
 .nav-item.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 2px 4px rgba(24, 119, 242, 0.3); }
 
-/* Tab Content Wrapper - 占据剩余空间 */
+/* Tab Content */
 .tab-content-wrapper {
-    flex: 1; min-height: 0; /* 允许收缩 */
+    flex: 1; min-height: 0;
     display: flex; flex-direction: column;
     position: relative;
 }
@@ -76,7 +76,6 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .full-width { width: 100%; padding: 12px; font-size: 15px; }
 .shadow { box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
 
-/* Select with Arrow */
 .form-control, .form-select { width: 100%; padding: 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg-input); color: var(--text-main); font-size: 14px; appearance: none; }
 .form-select {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2365676b'%3E%3Cpath d='M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z'/%3E%3C/svg%3E");
@@ -92,15 +91,15 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .icon-placeholder { display: flex; align-items: center; margin-right: 8px; }
 .search-bar input { border: none; background: transparent; width: 100%; height: 100%; color: var(--text-main); padding: 0; }
 
-/* App List Layout (Fixed Height, Internal Scroll) */
+/* App List Layout */
 .app-layout-container { 
-    flex: 1; min-height: 0; /* 关键 */
+    flex: 1; min-height: 0; 
     display: flex; flex-direction: column; 
     position: relative; 
     background: var(--bg-surface); 
     border-radius: var(--radius); 
     border: 1px solid var(--border); 
-    overflow: hidden; /* 防止溢出 */
+    overflow: hidden; 
 }
 .app-search-wrapper { padding: 12px; background: var(--bg-surface); border-bottom: 1px solid var(--border); z-index: 10; flex-shrink: 0; }
 .app-search-wrapper .search-bar { margin-bottom: 0; }
@@ -108,7 +107,7 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
     flex: 1; 
     overflow-y: auto; 
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 80px; /* Space for FAB */ 
+    padding-bottom: 80px; 
 }
 
 .list-group { display: flex; flex-direction: column; }
@@ -121,12 +120,12 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .app-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-end { flex-shrink: 0; display: flex; align-items: center; }
 
-/* Floating Action Button (FAB) */
+/* FAB */
 .fab-filter-container { 
     position: absolute; 
     bottom: 20px; right: 20px; 
     display: flex; flex-direction: column; align-items: flex-end; gap: 10px; 
-    z-index: 100; /* 确保在最上层 */
+    z-index: 100; 
 }
 .fab-main { width: 56px; height: 56px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; padding: 0; }
 .filter-options { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; opacity: 0; transform: translateY(20px); pointer-events: none; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -154,8 +153,9 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 /* Modals */
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(3px); opacity: 0; transition: opacity 0.2s; }
 .modal.show { display: flex; opacity: 1; }
-.modal-content { background: var(--bg-surface); width: 92%; max-width: 420px; border-radius: 16px; display: flex; flex-direction: column; max-height: 85vh; box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-.modal-content.large { max-width: 800px; height: 85vh; }
+/* 关键修改：height: auto, max-height: 85vh 实现高度自适应 */
+.modal-content { background: var(--bg-surface); width: 92%; max-width: 420px; border-radius: 16px; display: flex; flex-direction: column; max-height: 85vh; height: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.modal-content.large { max-width: 800px; }
 .modal-content.small { max-width: 320px; }
 .modal-content.flex-column { display: flex; flex-direction: column; }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -165,13 +165,13 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .header-title-group { flex: 1; min-width: 0; }
 .header-actions-group { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 
-.modal-body { padding: 16px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; }
+.modal-body { padding: 16px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .modal-footer { padding: 16px; border-top: 1px solid var(--border); display: flex; gap: 10px; flex-shrink: 0; }
 .no-padding { padding: 0; }
 .relative { position: relative; }
 .flex-grow { flex: 1; min-height: 0; }
 
-/* Editor */
+/* Editor - 紧凑化 */
 .app-info-header { display: flex; align-items: center; margin-bottom: 20px; background: var(--bg-input); padding: 12px; border-radius: 12px; }
 .app-icon { width: 48px; height: 48px; margin-right: 12px; display: flex; align-items: center; justify-content: center; }
 .mode-selector { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); margin-top: 8px; }
@@ -185,13 +185,15 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 
 .editor-pane { flex: 1; display: flex; flex-direction: column; }
 .editor-pane.scroll-y { overflow-y: auto; }
-.editor-pane.full-height { height: 100%; }
+/* 源码模式固定高度，保证编辑体验 */
+.editor-pane.full-height { height: 500px; max-height: 60vh; }
 
-.rule-row { display: flex; gap: 8px; padding: 10px; border-bottom: 1px solid var(--border); align-items: center; background: var(--bg-surface); flex-shrink: 0; }
-.rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+/* 紧凑化调整 */
+.rule-row { display: flex; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); align-items: center; background: var(--bg-surface); flex-shrink: 0; }
+.rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .rule-type { width: 90px; font-size: 12px; padding: 6px 20px 6px 6px; }
 .fab-container { position: absolute; bottom: 20px; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; }
-.fab-container button { pointer-events: auto; width: auto; padding: 10px 24px; border-radius: 24px; }
+.fab-container button { pointer-events: auto; width: auto; padding: 8px 20px; border-radius: 20px; font-size: 13px; }
 
 /* Autocomplete */
 .suggestion-box { position: fixed; background: var(--bg-surface); border: 1px solid var(--border); z-index: 3000; max-height: 200px; overflow-y: auto; display: none; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
@@ -216,10 +218,11 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .fw-bold { font-weight: 600; }
 .text-truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .d-block { display: block; }
-.spacer { height: 80px; flex-shrink: 0; }
+.spacer { height: 60px; flex-shrink: 0; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .break-all { word-break: break-all; }
-.alert-info { background: rgba(24, 119, 242, 0.1); color: var(--primary); padding: 10px; font-size: 12px; text-align: center; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+/* 紧凑化调整 */
+.alert-info { background: rgba(24, 119, 242, 0.1); color: var(--primary); padding: 8px 10px; font-size: 11px; text-align: center; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px; }
 .full-col { grid-column: 1 / -1; }
 

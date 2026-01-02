@@ -22,6 +22,7 @@ let activeMounts = new Set();
 let logPolling = null;
 let currentAppFilter = 'filterUser';
 
+// ... getSvg, ICONS, checkStatus (无变化) ...
 const getSvg = (path, size = 24, color = 'currentColor') => 
     `<svg viewBox="0 0 24 24" fill="${color}" width="${size}" height="${size}"><path d="${path}"/></svg>`;
 
@@ -39,14 +40,10 @@ const ICONS = {
     FILTER: getSvg(mdiFilterVariant, 24, '#fff')
 };
 
-// 状态检查函数 - 优化版
 const checkStatus = async () => {
     const badge = document.getElementById('statusBadge');
     const info = document.getElementById('statusInfo');
-    
-    // 优先使用 pidof，更准确
     let pid = await run("pidof injector");
-    // 备用方案
     if (!pid) pid = await run("pgrep -x injector");
 
     if (pid) {
@@ -71,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadData();
     setTimeout(loadLogs, 100); 
-    checkStatus(); // 启动时检查状态
+    checkStatus();
 
     document.getElementById('appSearch').oninput = renderAppList;
     
@@ -121,6 +118,7 @@ const debounce = (func, wait) => {
 window.openModal = (id) => document.getElementById(id)?.classList.add('show');
 window.closeModal = (id) => document.getElementById(id)?.classList.remove('show');
 
+// ... normalize functions (无变化) ...
 const normalizeToDisplay = (path) => {
     if (!path) return "";
     if (path.startsWith(PATH_PREFIX_REAL)) return path.substring(PATH_PREFIX_REAL.length) || "/";
@@ -140,6 +138,7 @@ const normalizeToConfig = (path, isTarget) => {
     }
 };
 
+// ... loadData, renderAppList, renderEnvList (无变化) ...
 const loadData = async () => {
     try {
         const fuseArgs = await run("ps -A -o args | grep fuse_daemon | grep -v grep");
@@ -244,7 +243,6 @@ const renderAppList = () => {
     }).join('') : '<div class="empty-state">无匹配应用</div>';
 };
 
-// ... renderEnvList, openAppConfig, btnSaveBinding (无变化) ...
 const renderEnvList = () => {
     const listEl = document.getElementById('envList');
     if (envList.length === 0) {
@@ -318,6 +316,7 @@ document.getElementById('btnCreateEnv').onclick = async () => {
     loadData();
 };
 
+// ... openEnvEditor, editor logic (无变化) ...
 window.openEnvEditor = async (envName) => {
     currentEditingEnv = envName;
     document.getElementById('editorEnvName').textContent = envName;
@@ -608,21 +607,30 @@ const loadLogs = async () => {
         optionsHtml += `<option value="${name}">${name}</option>`;
     });
 
+    // 更新下拉列表
     if (select.innerHTML !== optionsHtml) {
         const oldVal = select.value;
         select.innerHTML = optionsHtml;
-        if (oldVal) select.value = oldVal;
-    }
+        
+        // 强制选中逻辑：只要有 injector.log，且当前选中的无效或为空，就切过去
+        const hasInjector = files.find(f => f.includes('injector.log'));
+        
+        // 检查当前 oldVal 是否还在新列表中
+        const isValid = oldVal && (oldVal === 'ZYGISK' || files.find(f => f.endsWith(oldVal)));
 
-    // 默认选中 injector.log
-    if (!select.value || select.value === "") {
-        if (files.find(f => f.includes('injector.log'))) {
+        if (hasInjector && (!isValid || oldVal === "")) {
             select.value = 'injector.log';
-        } else if (files.length > 0) {
-            select.value = files[0].split('/').pop();
+        } else if (isValid) {
+            select.value = oldVal;
         } else {
-            select.value = 'ZYGISK';
+            // 如果原来的无效了，且没有 injector.log，默认选第一个
+            select.value = files.length > 0 ? files[0].split('/').pop() : 'ZYGISK';
         }
+    }
+    
+    // 初始化时的强制兜底
+    if (!select.value && files.find(f => f.includes('injector.log'))) {
+        select.value = 'injector.log';
     }
 
     const target = select.value;
@@ -648,7 +656,7 @@ document.getElementById('btnReload').onclick = async () => {
     await exec(`sh ${SERVICE_SH}`);
     toast("Reloading...");
     setTimeout(loadData, 1000);
-    setTimeout(checkStatus, 1500); // Reload后检查
+    setTimeout(checkStatus, 1500);
 };
 
 document.querySelectorAll('.nav-item').forEach(btn => {

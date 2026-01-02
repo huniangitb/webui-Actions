@@ -1,4 +1,4 @@
-import './style.css';
+import './style.scss';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile } from '@mdi/js';
 

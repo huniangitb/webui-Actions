@@ -1,4 +1,4 @@
-import './style.css'; // 引用新的纯 CSS
+import './style.scss'; // 引用新的纯 CSS
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile } from '@mdi/js';
 

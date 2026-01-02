@@ -143,4 +143,58 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .mode-selector { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); margin-top: 8px; }
 .mode-selector label { flex: 1; text-align: center; cursor: pointer; }
 .mode-selector input { display: none; }
-.mode-selector span { display: block; padding: 10px; background: var(--bg-input); font-size: 13px; border-right: 1px solid var(--border); transition:
+.mode-selector span { display: block; padding: 10px; background: var(--bg-input); font-size: 13px; border-right: 1px solid var(--border); transition: background 0.2s; }
+.mode-selector label:last-child span { border-right: none; }
+.mode-selector input:checked + span { background: var(--text-main); color: var(--bg-surface); font-weight: 600; }
+.mode-selector input[value="MONITOR"]:checked + span { background: var(--warning); color: #000; }
+.mode-selector input[value="PASSTHROUGH"]:checked + span { background: var(--success); color: #fff; }
+
+.editor-pane { flex: 1; display: flex; flex-direction: column; }
+.editor-pane.scroll-y { overflow-y: auto; }
+.editor-pane.full-height { height: 100%; }
+
+.rule-row { display: flex; gap: 8px; padding: 10px; border-bottom: 1px solid var(--border); align-items: center; background: var(--bg-surface); flex-shrink: 0; }
+.rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.rule-type { width: 90px; font-size: 12px; padding: 6px 20px 6px 6px; }
+.fab-container { position: absolute; bottom: 20px; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; }
+.fab-container button { pointer-events: auto; width: auto; padding: 10px 24px; border-radius: 24px; }
+
+/* Autocomplete */
+.suggestion-box { position: fixed; background: var(--bg-surface); border: 1px solid var(--border); z-index: 3000; max-height: 200px; overflow-y: auto; display: none; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+.suggestion-item { padding: 10px 12px; display: flex; align-items: center; cursor: pointer; border-bottom: 1px solid var(--border); color: var(--text-main); font-size: 13px; }
+.suggestion-item:active { background: var(--bg-input); }
+.s-icon { margin-right: 10px; width: 16px; display: flex; }
+.s-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Logs & IO */
+.table-container { flex: 1; overflow: auto; border: 1px solid var(--border); border-radius: 8px; min-height: 0; }
+.table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.table th { text-align: left; padding: 10px 8px; background: var(--bg-input); position: sticky; top: 0; font-weight: 600; z-index: 10; border-bottom: 1px solid var(--border); }
+.table td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.log-viewer { flex: 1; background: #1e1e1e; color: #d4d4d4; padding: 12px; font-family: var(--code-font); font-size: 11px; overflow: auto; border-radius: 8px; white-space: pre-wrap; line-height: 1.4; min-height: 0; }
+.code-editor { width: 100%; height: 100%; background: #1e1e1e; color: #d4d4d4; border: none; padding: 15px; font-family: var(--code-font); resize: none; font-size: 12px; line-height: 1.5; outline: none; }
+
+/* Utilities */
+.hidden { display: none !important; }
+.text-muted { color: var(--text-muted); }
+.text-center { text-align: center; }
+.font-monospace { font-family: var(--code-font); }
+.fw-bold { font-weight: 600; }
+.text-truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.d-block { display: block; }
+.spacer { height: 80px; flex-shrink: 0; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.break-all { word-break: break-all; }
+.alert-info { background: rgba(24, 119, 242, 0.1); color: var(--primary); padding: 10px; font-size: 12px; text-align: center; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px; }
+.full-col { grid-column: 1 / -1; }
+
+/* IO Colors */
+.op-tag { padding: 2px 5px; border-radius: 3px; color: #fff; font-size: 9px; font-weight: bold; font-family: var(--code-font); }
+.op-OPEN { background: #17a2b8; }
+.op-READ { background: #28a745; }
+.op-WRITE { background: #fd7e14; }
+.op-CREATE { background: #6f42c1; }
+.op-MKDIR { background: #6610f2; }
+.op-RMDIR { background: #dc3545; }
+.op-UNLINK { background: #e83e8c; }

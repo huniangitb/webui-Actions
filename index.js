@@ -1,6 +1,9 @@
-import './style.scss';
+import './style.css';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
-import { mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile } from '@mdi/js';
+import { 
+    mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
+    mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight 
+} from '@mdi/js';
 
 const BASE_DIR = "/data/Namespace-Proxy";
 const LOG_DIR = `${BASE_DIR}/log`;
@@ -17,19 +20,33 @@ let currentBindingPkg = null;
 let activeMounts = new Set();
 let logPolling = null;
 
-// 图标生成辅助函数
+// 图标辅助
 const getSvg = (path, size = 24, color = 'currentColor') => 
     `<svg viewBox="0 0 24 24" fill="${color}" width="${size}" height="${size}"><path d="${path}"/></svg>`;
 
 const ICONS = {
     ANDROID: getSvg(mdiAndroid, 32, '#757575'),
     ENV: getSvg(mdiLayers, 24, '#1266f1'),
-    DELETE: getSvg(mdiDelete, 16, 'currentColor'),
+    DELETE: getSvg(mdiDelete, 18, 'currentColor'),
     FOLDER: getSvg(mdiFolder, 16, '#ffca28'),
-    FILE: getSvg(mdiFile, 16, '#9e9e9e')
+    FILE: getSvg(mdiFile, 16, '#9e9e9e'),
+    REFRESH: getSvg(mdiRefresh, 20, '#000'),
+    SEARCH: getSvg(mdiMagnify, 18, '#868e96'),
+    PLUS: getSvg(mdiPlus, 16, '#fff'),
+    CLOSE: getSvg(mdiClose, 20, 'currentColor'),
+    CHEVRON: getSvg(mdiChevronRight, 20, '#adb5bd')
 };
 
-// KSU Exec 封装
+// 初始化静态图标
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('btnReload').innerHTML = ICONS.REFRESH;
+    document.getElementById('iconSearch').innerHTML = ICONS.SEARCH;
+    document.getElementById('iconIoSearch').innerHTML = ICONS.SEARCH;
+    document.querySelectorAll('.btn-close').forEach(el => el.innerHTML = ICONS.CLOSE);
+    document.getElementById('btnNewEnv').innerHTML = `<span style="display:flex;align-items:center;gap:4px">${getSvg(mdiPlus,14,'#fff')} 新建</span>`;
+    document.getElementById('btnAddRuleRow').innerHTML = `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`;
+});
+
 const run = async (cmd) => {
     try {
         const res = await exec(cmd);
@@ -40,7 +57,6 @@ const run = async (cmd) => {
     }
 };
 
-// 防抖函数
 const debounce = (func, wait) => {
     let timeout;
     return function(...args) {
@@ -49,17 +65,9 @@ const debounce = (func, wait) => {
     };
 };
 
-// 模态框控制
-window.openModal = (id) => {
-    const el = document.getElementById(id);
-    if (el) el.classList.add('show');
-};
-window.closeModal = (id) => {
-    const el = document.getElementById(id);
-    if (el) el.classList.remove('show');
-};
+window.openModal = (id) => document.getElementById(id)?.classList.add('show');
+window.closeModal = (id) => document.getElementById(id)?.classList.remove('show');
 
-// 路径处理
 const normalizeToDisplay = (path) => {
     if (!path) return "";
     if (path.startsWith(PATH_PREFIX_REAL)) return path.substring(PATH_PREFIX_REAL.length) || "/";
@@ -79,10 +87,8 @@ const normalizeToConfig = (path, isTarget) => {
     }
 };
 
-// 数据加载核心逻辑
 const loadData = async () => {
     try {
-        // 1. 获取挂载状态 (解析 fuse_daemon 参数)
         const fuseArgs = await run("ps -A -o args | grep fuse_daemon | grep -v grep");
         activeMounts.clear();
         if (fuseArgs) {
@@ -92,11 +98,9 @@ const loadData = async () => {
             });
         }
 
-        // 2. 获取环境列表
         const files = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
         envList = files ? files.split('\n').map(f => f.split('/').pop().replace('.conf', '')).filter(n => n && n !== 'injector') : [];
 
-        // 3. 获取绑定配置
         const regContent = await run(`cat ${INJECTOR_CONF} 2>/dev/null`);
         registry.clear();
         if (regContent) {
@@ -108,10 +112,8 @@ const loadData = async () => {
             });
         }
 
-        // 4. 获取应用列表 (KSU API)
         const userPkgs = await listPackages('user') || [];
         const systemPkgs = await listPackages('system') || [];
-        // 去重合并
         const allPkgs = [...new Set([...userPkgs, ...systemPkgs])];
         const infos = await getPackagesInfo(allPkgs);
 
@@ -137,7 +139,6 @@ const loadData = async () => {
     }
 };
 
-// 渲染应用列表
 const renderAppList = () => {
     const listEl = document.getElementById('appList');
     const searchVal = document.getElementById('appSearch').value.toLowerCase();
@@ -146,64 +147,66 @@ const renderAppList = () => {
 
     const items = [];
     appMap.forEach(app => {
-        // 过滤逻辑
         if (filter === 'filterUser' && app.isSystem) return;
         if (filter === 'filterSystem' && !app.isSystem) return;
         if (filter === 'filterBound' && !app.boundEnv) return;
 
-        // 搜索逻辑
         const label = app.appLabel || app.packageName;
         if (searchVal && !label.toLowerCase().includes(searchVal) && !app.packageName.toLowerCase().includes(searchVal)) return;
 
         items.push(app);
     });
 
-    // 排序：已绑定 > 字母顺序
     items.sort((a, b) => (!!b.boundEnv - !!a.boundEnv) || (a.appLabel || "").localeCompare(b.appLabel || ""));
 
     listEl.innerHTML = items.length ? items.map(app => {
-        let badges = "";
-        // 挂载状态
+        let mountedBadge = "";
+        let envBadge = "";
+        
         if (activeMounts.has(app.packageName)) {
-            badges += `<span class="badge badge-success" style="margin-left:6px">MOUNTED</span>`;
+            mountedBadge = `<span class="badge badge-success">MOUNTED</span>`;
         }
-        // 绑定环境
+
         if (app.boundEnv) {
             let colorClass = "badge-primary";
             if (app.boundParam === 'MONITOR') colorClass = "badge-warning";
             else if (app.boundParam === 'PASSTHROUGH') colorClass = "badge-success";
-            badges += `<span class="badge ${colorClass}" style="margin-left:6px">${app.boundEnv}</span>`;
+            envBadge = `<span class="badge ${colorClass} badge-pill">${app.boundEnv}</span>`;
         }
 
         return `
         <div class="list-item" onclick="openAppConfig('${app.packageName}')">
-            <div class="me-3">${ICONS.ANDROID}</div>
-            <div class="app-content">
-                <div class="app-header">
-                    <span class="app-name">${app.appLabel}</span>
-                    ${badges}
+            <div class="app-main">
+                <div class="app-icon-wrapper">${ICONS.ANDROID}</div>
+                <div class="app-content">
+                    <div class="app-header">
+                        <span class="app-name">${app.appLabel}</span>
+                        ${mountedBadge}
+                    </div>
+                    <small class="text-muted font-monospace text-truncate d-block">${app.packageName}</small>
                 </div>
-                <small class="text-muted font-monospace">${app.packageName}</small>
+            </div>
+            <div class="app-end">
+                ${envBadge}
             </div>
         </div>`;
-    }).join('') : '<div style="text-align:center;padding:20px;color:var(--text-muted)">无匹配应用</div>';
+    }).join('') : '<div class="empty-state">无匹配应用</div>';
 };
 
-// 渲染环境列表
 const renderEnvList = () => {
     const listEl = document.getElementById('envList');
     if (envList.length === 0) {
-        listEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted)">暂无环境，请新建</div>';
+        listEl.innerHTML = '<div class="empty-state full-col">暂无环境，请新建</div>';
         return;
     }
     listEl.innerHTML = envList.map(env => `
         <div class="env-item" onclick="openEnvEditor('${env}')">
-            <div style="flex:1"><h4 style="margin:0;font-size:15px;">${env}</h4></div>
-            <i class="fas fa-chevron-right text-muted"></i>
+            <div class="env-icon">${ICONS.ENV}</div>
+            <div class="env-name">${env}</div>
+            <div class="env-arrow">${ICONS.CHEVRON}</div>
         </div>`).join('');
 };
 
-// 打开应用配置模态框
 window.openAppConfig = (pkg) => {
     currentBindingPkg = pkg;
     const app = appMap.get(pkg);
@@ -227,7 +230,6 @@ window.openAppConfig = (pkg) => {
     openModal('appConfigModal');
 };
 
-// 保存应用绑定
 document.getElementById('btnSaveBinding').onclick = async () => {
     const env = document.getElementById('bindEnvSelect').value;
     const modeEl = document.querySelector('input[name="bindMode"]:checked');
@@ -250,7 +252,6 @@ document.getElementById('btnSaveBinding').onclick = async () => {
     loadData();
 };
 
-// 新建环境
 document.getElementById('btnNewEnv').onclick = () => {
     document.getElementById('newEnvName').value = '';
     openModal('newEnvModal');
@@ -265,7 +266,6 @@ document.getElementById('btnCreateEnv').onclick = async () => {
     loadData();
 };
 
-// 打开环境编辑器
 window.openEnvEditor = async (envName) => {
     currentEditingEnv = envName;
     document.getElementById('editorEnvName').textContent = envName;
@@ -275,7 +275,6 @@ window.openEnvEditor = async (envName) => {
     
     parseConfigToVisual(content);
     
-    // 默认切换到图形模式
     const visualRadio = document.querySelector('input[name="editorMode"][value="visual"]');
     if (visualRadio) {
         visualRadio.checked = true;
@@ -285,7 +284,6 @@ window.openEnvEditor = async (envName) => {
     openModal('envEditorModal');
 };
 
-// 切换编辑器模式
 document.querySelectorAll('input[name="editorMode"]').forEach(el => {
     el.onchange = (e) => {
         const isVisual = e.target.value === 'visual';
@@ -294,16 +292,13 @@ document.querySelectorAll('input[name="editorMode"]').forEach(el => {
         document.querySelector('.fab-container').classList.toggle('hidden', !isVisual);
         
         if (!isVisual) {
-            // 切换到源码模式，生成配置
             document.getElementById('envRuleContent').value = generateConfigFromVisual();
         } else {
-            // 切换到图形模式，解析配置
             parseConfigToVisual(document.getElementById('envRuleContent').value);
         }
     };
 });
 
-// 解析配置到图形界面
 const parseConfigToVisual = (text) => {
     const container = document.getElementById('ruleBuilderContainer');
     container.innerHTML = '';
@@ -327,7 +322,6 @@ const parseConfigToVisual = (text) => {
     }
 };
 
-// 添加规则行
 const addRuleRow = (type, target, source) => {
     const div = document.createElement('div');
     div.className = 'rule-row';
@@ -340,7 +334,7 @@ const addRuleRow = (type, target, source) => {
             <input type="text" class="form-control rule-target" placeholder="原始路径" value="${target}">
             <input type="text" class="form-control rule-source ${type==='HIDE'?'hidden':''}" placeholder="重定向至" value="${source}">
         </div>
-        <button class="btn btn-close btn-del">${ICONS.DELETE}</button>
+        <button class="btn btn-icon-sm btn-del">${ICONS.DELETE}</button>
     `;
 
     const select = div.querySelector('.rule-type');
@@ -357,7 +351,6 @@ const addRuleRow = (type, target, source) => {
     document.getElementById('ruleBuilderContainer').appendChild(div);
 };
 
-// 从图形界面生成配置
 const generateConfigFromVisual = () => {
     let res = "";
     document.querySelectorAll('.rule-row').forEach(row => {
@@ -378,7 +371,6 @@ const generateConfigFromVisual = () => {
 
 document.getElementById('btnAddRuleRow').onclick = () => addRuleRow('REDIRECT', '', '');
 
-// 保存环境配置
 document.getElementById('btnSaveEnv').onclick = async () => {
     const isVisual = document.querySelector('input[name="editorMode"][value="visual"]').checked;
     const content = isVisual ? generateConfigFromVisual() : document.getElementById('envRuleContent').value;
@@ -388,13 +380,11 @@ document.getElementById('btnSaveEnv').onclick = async () => {
     closeModal('envEditorModal');
 };
 
-// 删除环境
 document.getElementById('btnDeleteEnv').onclick = async () => {
     if (!confirm(`确定删除环境 ${currentEditingEnv} 吗?`)) return;
     
     await run(`rm ${BASE_DIR}/${currentEditingEnv}.conf`);
     
-    // 清理引用该环境的绑定
     let content = "# Generated by WebUI\n";
     registry.forEach((val, key) => {
         if (val.env !== currentEditingEnv) {
@@ -407,7 +397,6 @@ document.getElementById('btnDeleteEnv').onclick = async () => {
     loadData();
 };
 
-// --- 自动补全逻辑 ---
 const updateBoxPosition = (input) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none' || !input) return;
@@ -424,7 +413,6 @@ const updateBoxPosition = (input) => {
     box.style.left = leftPos + 'px';
 
     const spaceBelow = viewportHeight - rect.bottom;
-    // 智能上下翻转
     if (spaceBelow < boxHeight && rect.top > boxHeight) {
         box.style.top = (rect.top - boxHeight - 2) + 'px';
     } else {
@@ -443,7 +431,6 @@ const startAutoUpdate = (input) => {
     requestAnimationFrame(loop);
 };
 
-// 全局点击监听，隐藏补全框
 document.addEventListener('click', (e) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none') return;
@@ -455,7 +442,6 @@ document.addEventListener('click', (e) => {
 const setupAutocomplete = (input) => {
     const box = document.getElementById('suggestionBox');
     
-    // 聚焦时自动上滑
     const autoScroll = () => {
         window._currentInput = input;
         setTimeout(() => {
@@ -519,8 +505,8 @@ const setupAutocomplete = (input) => {
                 <div class="suggestion-item" 
                      onmousedown="event.preventDefault()" 
                      onclick="window.applySuggestion('${s.text}')">
-                    <div style="margin-right:8px;width:16px">${s.icon}</div>
-                    <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.text}</div>
+                    <div class="s-icon">${s.icon}</div>
+                    <div class="s-text">${s.text}</div>
                 </div>
             `).join('');
 
@@ -541,13 +527,13 @@ window.applySuggestion = (text) => {
     }
 };
 
-// --- 监控与日志 ---
 const updateIOTable = async () => {
     const tbody = document.getElementById('ioTableBody');
-    const raw = await run(`grep -H "\\[IO\\]" ${LOG_DIR}/*.log | grep -v "injector.log" | tail -n 50`);
+    // 移除 tail 限制，加载所有
+    const raw = await run(`grep -H "\\[IO\\]" ${LOG_DIR}/*.log | grep -v "injector.log"`);
     
     if (!raw) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">无活动</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">无活动</td></tr>';
         return;
     }
 
@@ -564,10 +550,10 @@ const updateIOTable = async () => {
         if (term && !name.toLowerCase().includes(term) && !details.toLowerCase().includes(term)) return null;
         
         return `<tr>
-            <td class="text-muted">${time}</td>
-            <td><b>${name}</b></td>
+            <td class="text-muted small">${time}</td>
+            <td><div class="text-truncate" style="max-width:100px">${name}</div></td>
             <td><span class="op-tag op-${op}">${op}</span></td>
-            <td style="word-break:break-all">${details.replace(' -> ', ' &rarr; ')}</td>
+            <td class="break-all">${details.replace(' -> ', ' &rarr; ')}</td>
         </tr>`;
     }).filter(r => r).join('');
 };
@@ -576,25 +562,22 @@ const loadLogs = async () => {
     const select = document.getElementById('logFileSelect');
     const viewer = document.getElementById('logViewer');
     
-    // 获取日志文件列表
     const filesRaw = await run(`ls ${LOG_DIR}/*.log 2>/dev/null`);
     const files = filesRaw ? filesRaw.split('\n').filter(f => f) : [];
     
-    // 构造选项，包含 Zygisk
     let optionsHtml = `<option value="ZYGISK">Zygisk (Logcat)</option>`;
     files.forEach(f => {
         const name = f.split('/').pop();
         optionsHtml += `<option value="${name}">${name}</option>`;
     });
 
-    // 仅当内容变化时更新 DOM，避免重置选中状态
     if (select.innerHTML !== optionsHtml) {
         const oldVal = select.value;
         select.innerHTML = optionsHtml;
         if (oldVal) select.value = oldVal;
     }
 
-    // 默认选中策略: injector.log > 第一个文件 > Zygisk
+    // 默认选中 injector.log
     if (!select.value || select.value === "") {
         if (files.find(f => f.includes('injector.log'))) {
             select.value = 'injector.log';
@@ -609,12 +592,12 @@ const loadLogs = async () => {
     let content = "";
     
     if (target === 'ZYGISK') {
-        content = await run("logcat -d -s Zygisk_Blocker -t 100");
+        // 修正 Logcat 命令
+        content = await run("logcat -d -s Zygisk_Blocker");
     } else if (target) {
-        content = await run(`tail -n 100 ${LOG_DIR}/${target} 2>/dev/null`);
+        content = await run(`tail -n 200 ${LOG_DIR}/${target} 2>/dev/null`);
     }
 
-    // 更新视图 (简单 Diff 防止闪烁)
     const currentLen = viewer.getAttribute('data-len');
     if (currentLen != content.length) {
         viewer.innerHTML = content ? content : "无日志内容";
@@ -625,11 +608,9 @@ const loadLogs = async () => {
 
 document.getElementById('logFileSelect').addEventListener('change', loadLogs);
 
-// 轮询控制
 const startPolling = () => {
     if (logPolling) return;
     
-    // 立即执行一次，消除延迟
     const activeBtn = document.querySelector('.nav-item.active');
     if (activeBtn) {
         const target = activeBtn.dataset.target;
@@ -654,11 +635,9 @@ const stopPolling = () => {
     }
 };
 
-// 初始化
 document.addEventListener('DOMContentLoaded', () => {
     loadData();
 
-    // 绑定事件
     document.getElementById('appSearch').oninput = renderAppList;
     document.querySelectorAll('input[name="appFilter"]').forEach(el => el.onchange = renderAppList);
     
@@ -668,10 +647,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(loadData, 1000);
     };
 
-    // Tab 切换逻辑
     document.querySelectorAll('.nav-item').forEach(btn => {
         btn.onclick = () => {
-            // UI 切换
             document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
             
@@ -679,7 +656,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const targetId = btn.dataset.target;
             document.getElementById(targetId).classList.add('active');
 
-            // 轮询控制
             if (targetId === 'content-io' || targetId === 'content-log') {
                 startPolling();
             } else {
@@ -688,7 +664,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     });
 
-    // 状态检查
     run("pgrep -f 'injector$'").then(pid => {
         const badge = document.getElementById('statusBadge');
         const info = document.getElementById('statusInfo');

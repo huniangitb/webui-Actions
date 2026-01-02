@@ -2,23 +2,21 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Namespace Proxy</title>
-    <!-- 仅保留 FontAwesome 图标 -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
 </head>
 <body>
     <div class="container">
         <!-- 头部 -->
         <div class="header">
-            <div>
+            <div class="header-left">
                 <h2 class="title">NAMESPACE PROXY</h2>
                 <div class="status-bar">
                     <span class="badge badge-gray" id="statusBadge">...</span>
                     <small id="statusInfo">Checking</small>
                 </div>
             </div>
-            <button id="btnReload" class="btn btn-icon"><i class="fas fa-sync"></i></button>
+            <button id="btnReload" class="btn btn-icon"></button>
         </div>
 
         <!-- 导航 -->
@@ -32,9 +30,9 @@
         <div class="tab-content">
             <!-- 1. 应用绑定 -->
             <div id="content-apps" class="tab-pane active">
-                <div class="card">
+                <div class="card no-padding-mobile">
                     <div class="search-bar">
-                        <i class="fas fa-search"></i>
+                        <span class="icon-placeholder" id="iconSearch"></span>
                         <input type="text" id="appSearch" placeholder="搜索应用名称或包名..." />
                     </div>
                     <div class="filter-group no-scrollbar">
@@ -51,7 +49,7 @@
                 <div class="card">
                     <div class="card-header">
                         <h3>环境列表</h3>
-                        <button id="btnNewEnv" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> 新建</button>
+                        <button id="btnNewEnv" class="btn btn-primary btn-sm">新建</button>
                     </div>
                     <div id="envList" class="grid-list"></div>
                 </div>
@@ -61,12 +59,12 @@
             <div id="content-io" class="tab-pane">
                 <div class="card">
                     <div class="search-bar compact">
-                        <i class="fas fa-search"></i>
+                        <span class="icon-placeholder" id="iconIoSearch"></span>
                         <input type="text" id="ioSearch" placeholder="搜索操作记录..." />
                     </div>
                     <div class="table-container">
                         <table class="table">
-                            <thead><tr><th>时间</th><th>应用</th><th>操作</th><th>详情</th></tr></thead>
+                            <thead><tr><th style="width:60px">时间</th><th>应用</th><th style="width:50px">操作</th><th>详情</th></tr></thead>
                             <tbody id="ioTableBody"></tbody>
                         </table>
                     </div>
@@ -88,14 +86,14 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>应用绑定</h3>
-                <button class="btn-close" onclick="closeModal('appConfigModal')"><i class="fas fa-times"></i></button>
+                <button class="btn-close" onclick="closeModal('appConfigModal')"></button>
             </div>
             <div class="modal-body">
                 <div class="app-info-header">
                     <div id="bindAppIcon" class="app-icon"></div>
-                    <div>
-                        <div id="bindAppName" class="fw-bold">App Name</div>
-                        <small id="bindAppPkg" class="text-muted font-monospace">com.pkg</small>
+                    <div style="overflow:hidden">
+                        <div id="bindAppName" class="fw-bold text-truncate">App Name</div>
+                        <small id="bindAppPkg" class="text-muted font-monospace text-truncate d-block">com.pkg</small>
                     </div>
                 </div>
                 <div class="form-group">
@@ -122,7 +120,7 @@
         <div class="modal-content small">
             <div class="modal-header">
                 <h3>新建环境</h3>
-                <button class="btn-close" onclick="closeModal('newEnvModal')"><i class="fas fa-times"></i></button>
+                <button class="btn-close" onclick="closeModal('newEnvModal')"></button>
             </div>
             <div class="modal-body">
                 <input type="text" id="newEnvName" class="form-control" placeholder="例如: GameScope" />
@@ -139,14 +137,14 @@
             <div class="modal-header">
                 <div>
                     <h3 id="editorEnvName">Env</h3>
-                    <small>规则配置</small>
+                    <small class="text-muted">规则配置</small>
                 </div>
                 <div class="header-actions">
                     <div class="toggle-group">
                         <label><input type="radio" name="editorMode" value="visual" checked><span>图形</span></label>
                         <label><input type="radio" name="editorMode" value="raw"><span>源码</span></label>
                     </div>
-                    <button class="btn-close" onclick="closeModal('envEditorModal')"><i class="fas fa-times"></i></button>
+                    <button class="btn-close" onclick="closeModal('envEditorModal')"></button>
                 </div>
             </div>
             <div class="modal-body no-padding relative">
@@ -159,7 +157,7 @@
                 </div>
                 
                 <div class="fab-container">
-                    <button id="btnAddRuleRow" class="btn btn-primary rounded"><i class="fas fa-plus"></i> 添加规则</button>
+                    <button id="btnAddRuleRow" class="btn btn-primary rounded">添加规则</button>
                 </div>
 
                 <div id="editorRaw" class="editor-pane hidden">

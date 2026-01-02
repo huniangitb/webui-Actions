@@ -3,7 +3,7 @@ import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { 
     mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
     mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight,
-    mdiFilterVariant, mdiViewGrid, mdiViewList 
+    mdiFilterVariant, mdiViewGrid, mdiViewList, mdiStop
 } from '@mdi/js';
 
 const BASE_DIR = "/data/Namespace-Proxy";
@@ -15,14 +15,18 @@ const PATH_PREFIX_REAL = '/data/media/0';
 
 let appMap = new Map();
 let envList = [];
-let envStats = new Map(); // 存储环境规则计数
-let envViewMode = 'grid'; // 'grid' or 'list'
+let envStats = new Map(); 
+let envViewMode = 'grid';
 let registry = new Map();
 let currentEditingEnv = null;
 let currentBindingPkg = null;
 let activeMounts = new Set();
 let logPolling = null;
 let currentAppFilter = 'filterUser';
+
+// 异步锁
+let isFetchingLogs = false;
+let isFetchingIO = false;
 
 const getSvg = (path, size = 24, color = 'currentColor') => 
     `<svg viewBox="0 0 24 24" fill="${color}" width="${size}" height="${size}"><path d="${path}"/></svg>`;
@@ -40,7 +44,8 @@ const ICONS = {
     CHEVRON: getSvg(mdiChevronRight, 20, '#adb5bd'),
     FILTER: getSvg(mdiFilterVariant, 24, '#fff'),
     GRID: getSvg(mdiViewGrid, 24, '#fff'),
-    LIST: getSvg(mdiViewList, 24, '#fff')
+    LIST: getSvg(mdiViewList, 24, '#fff'),
+    STOP: getSvg(mdiStop, 20, '#dc3545')
 };
 
 const checkStatus = async () => {
@@ -62,6 +67,7 @@ const checkStatus = async () => {
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnReload').innerHTML = ICONS.REFRESH;
+    document.getElementById('btnStop').innerHTML = ICONS.STOP;
     document.getElementById('iconSearch').innerHTML = ICONS.SEARCH;
     document.getElementById('iconIoSearch').innerHTML = ICONS.SEARCH;
     document.getElementById('iconFilter').innerHTML = ICONS.FILTER;
@@ -76,7 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('appSearch').oninput = renderAppList;
     
-    // 环境视图切换
     document.getElementById('btnEnvViewToggle').onclick = () => {
         envViewMode = envViewMode === 'grid' ? 'list' : 'grid';
         document.getElementById('iconEnvView').innerHTML = envViewMode === 'grid' ? ICONS.LIST : ICONS.GRID;
@@ -97,6 +102,20 @@ document.addEventListener('DOMContentLoaded', () => {
             renderAppList();
         };
     });
+
+    // 滚动监听：隐藏/显示 Alert
+    const visualPane = document.getElementById('editorVisual');
+    const alertBox = document.getElementById('editorAlert');
+    let lastScrollY = 0;
+    visualPane.addEventListener('scroll', () => {
+        const currentY = visualPane.scrollTop;
+        if (currentY > lastScrollY && currentY > 20) {
+            alertBox.classList.add('collapsed');
+        } else if (currentY < lastScrollY) {
+            alertBox.classList.remove('collapsed');
+        }
+        lastScrollY = currentY;
+    }, { passive: true });
 });
 
 const run = async (cmd) => {
@@ -163,20 +182,15 @@ const loadData = async () => {
         const files = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
         envList = files ? files.split('\n').map(f => f.split('/').pop().replace('.conf', '')).filter(n => n && n !== 'injector') : [];
 
-        // 统计各环境规则数量
         envStats.clear();
         if (envList.length > 0) {
             const countsR = await run(`grep -c "REDIRECT" ${BASE_DIR}/*.conf 2>/dev/null`);
             const countsH = await run(`grep -c "HIDE" ${BASE_DIR}/*.conf 2>/dev/null`);
-            
             envList.forEach(env => {
                 const regR = new RegExp(`${env}\\.conf:(\\d+)`);
                 const matchR = countsR.match(regR);
                 const matchH = countsH.match(new RegExp(`${env}\\.conf:(\\d+)`));
-                envStats.set(env, { 
-                    r: matchR ? parseInt(matchR[1]) : 0, 
-                    h: matchH ? parseInt(matchH[1]) : 0 
-                });
+                envStats.set(env, { r: matchR ? parseInt(matchR[1]) : 0, h: matchH ? parseInt(matchH[1]) : 0 });
             });
         }
 
@@ -201,11 +215,7 @@ const loadData = async () => {
             infos.forEach(info => {
                 if (info && info.packageName) {
                     const reg = registry.get(info.packageName);
-                    appMap.set(info.packageName, { 
-                        ...info, 
-                        boundEnv: reg?.env, 
-                        boundParam: reg?.param 
-                    });
+                    appMap.set(info.packageName, { ...info, boundEnv: reg?.env, boundParam: reg?.param });
                 }
             });
         }
@@ -253,30 +263,17 @@ const renderEnvList = () => {
         listEl.innerHTML = '<div class="empty-state full-col">暂无环境，请新建</div>';
         return;
     }
-
     listEl.className = `grid-list scroll-y ${envViewMode === 'list' ? 'list-mode' : ''}`;
-
     listEl.innerHTML = envList.map(env => {
         const stats = envStats.get(env) || { r: 0, h: 0 };
-        
         if (envViewMode === 'list') {
             return `
             <div class="env-item" onclick="openEnvEditor('${env}')">
-                <div class="env-info">
-                    <div class="env-icon">${ICONS.ENV}</div>
-                    <div class="env-name">${env}</div>
-                </div>
-                <div class="env-stats">
-                    <span class="badge badge-outline">R: ${stats.r}</span>
-                    <span class="badge badge-outline">H: ${stats.h}</span>
-                </div>
+                <div class="env-info"><div class="env-icon">${ICONS.ENV}</div><div class="env-name">${env}</div></div>
+                <div class="env-stats"><span class="badge badge-outline">R: ${stats.r}</span><span class="badge badge-outline">H: ${stats.h}</span></div>
             </div>`;
         } else {
-            return `
-            <div class="env-item" onclick="openEnvEditor('${env}')">
-                <div class="env-icon">${ICONS.ENV}</div>
-                <div class="env-name">${env}</div>
-            </div>`;
+            return `<div class="env-item" onclick="openEnvEditor('${env}')"><div class="env-icon">${ICONS.ENV}</div><div class="env-name">${env}</div></div>`;
         }
     }).join('');
 };
@@ -326,24 +323,56 @@ window.openEnvEditor = async (envName) => {
     const content = await run(`cat ${BASE_DIR}/${envName}.conf 2>/dev/null`);
     document.getElementById('envRuleContent').value = content;
     parseConfigToVisual(content);
+    
+    // Reset state
+    document.getElementById('editorAlert').classList.remove('collapsed');
     const visualRadio = document.querySelector('input[name="editorMode"][value="visual"]');
     if (visualRadio) { visualRadio.checked = true; visualRadio.dispatchEvent(new Event('change')); }
+    
     openModal('envEditorModal');
 };
 
 document.querySelectorAll('input[name="editorMode"]').forEach(el => {
     el.onchange = (e) => {
         const isVisual = e.target.value === 'visual';
-        const modalBody = document.querySelector('#envEditorModal .modal-body');
-        document.getElementById('editorVisual').classList.toggle('hidden', !isVisual);
-        document.getElementById('editorRaw').classList.toggle('hidden', isVisual);
-        document.querySelector('.fab-container').classList.toggle('hidden', !isVisual);
-        if (!isVisual) {
-            modalBody.style.padding = '0';
-            document.getElementById('envRuleContent').value = generateConfigFromVisual();
+        const alertBox = document.getElementById('editorAlert');
+        const visualEl = document.getElementById('editorVisual');
+        const rawEl = document.getElementById('editorRaw');
+        const fab = document.querySelector('.fab-container');
+
+        if (isVisual) {
+            // Switch to Visual
+            rawEl.classList.remove('active');
+            setTimeout(() => {
+                rawEl.classList.add('hidden');
+                visualEl.classList.remove('hidden');
+                alertBox.classList.remove('collapsed'); // Show alert
+                fab.classList.remove('hidden');
+                
+                // Parse content
+                parseConfigToVisual(document.getElementById('envRuleContent').value);
+                
+                requestAnimationFrame(() => {
+                    visualEl.classList.add('active');
+                });
+            }, 250);
         } else {
-            modalBody.style.padding = '16px';
-            parseConfigToVisual(document.getElementById('envRuleContent').value);
+            // Switch to Raw
+            visualEl.classList.remove('active');
+            alertBox.classList.add('collapsed'); // Hide alert
+            fab.classList.add('hidden');
+            
+            setTimeout(() => {
+                visualEl.classList.add('hidden');
+                rawEl.classList.remove('hidden');
+                
+                // Generate content
+                document.getElementById('envRuleContent').value = generateConfigFromVisual();
+                
+                requestAnimationFrame(() => {
+                    rawEl.classList.add('active');
+                });
+            }, 250);
         }
     };
 });
@@ -405,7 +434,7 @@ document.getElementById('btnSaveEnv').onclick = async () => {
     await exec(`echo '${content}' > ${BASE_DIR}/${currentEditingEnv}.conf`);
     toast("规则已保存");
     closeModal('envEditorModal');
-    loadData(); // 重新加载以更新统计
+    loadData();
 };
 
 document.getElementById('btnDeleteEnv').onclick = async () => {
@@ -461,41 +490,62 @@ const setupAutocomplete = (input) => {
 window.applySuggestion = (text) => { if (window._currentInput) { window._currentInput.value = text; window._currentInput.dispatchEvent(new Event('input')); } };
 
 const updateIOTable = async () => {
-    const tbody = document.getElementById('ioTableBody');
-    const raw = await run(`grep -H "\\[IO\\]" ${LOG_DIR}/*.log | grep -v "injector.log"`);
-    if (!raw) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">无活动</td></tr>'; return; }
-    const term = document.getElementById('ioSearch').value.toLowerCase();
-    tbody.innerHTML = raw.split('\n').reverse().map(line => {
-        const m = line.match(/\/([^\/]+)\.log:\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
-        if (!m) return null;
-        const [_, pkg, time, op, details] = m;
-        const app = appMap.get(pkg);
-        const name = app ? app.appLabel : pkg;
-        if (term && !name.toLowerCase().includes(term) && !details.toLowerCase().includes(term)) return null;
-        return `<tr><td class="text-muted small">${time}</td><td><div class="text-truncate" style="max-width:100px">${name}</div></td><td><span class="op-tag op-${op}">${op}</span></td><td class="break-all">${details.replace(' -> ', ' &rarr; ')}</td></tr>`;
-    }).filter(r => r).join('');
+    if (isFetchingIO) return; 
+    isFetchingIO = true;
+    try {
+        const raw = await run(`grep -H "\\[IO\\]" ${LOG_DIR}/*.log | grep -v "injector.log"`);
+        requestAnimationFrame(() => {
+            const tbody = document.getElementById('ioTableBody');
+            if (!raw) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">无活动</td></tr>'; return; }
+            const term = document.getElementById('ioSearch').value.toLowerCase();
+            tbody.innerHTML = raw.split('\n').reverse().map(line => {
+                const m = line.match(/\/([^\/]+)\.log:\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
+                if (!m) return null;
+                const [_, pkg, time, op, details] = m;
+                const app = appMap.get(pkg);
+                const name = app ? app.appLabel : pkg;
+                if (term && !name.toLowerCase().includes(term) && !details.toLowerCase().includes(term)) return null;
+                return `<tr><td class="text-muted small">${time}</td><td><div class="text-truncate" style="max-width:100px">${name}</div></td><td><span class="op-tag op-${op}">${op}</span></td><td class="break-all">${details.replace(' -> ', ' &rarr; ')}</td></tr>`;
+            }).filter(r => r).join('');
+        });
+    } finally {
+        isFetchingIO = false;
+    }
 };
 
 const loadLogs = async () => {
-    const select = document.getElementById('logFileSelect');
-    const viewer = document.getElementById('logViewer');
-    const filesRaw = await run(`ls ${LOG_DIR}/*.log 2>/dev/null`);
-    const files = filesRaw ? filesRaw.split('\n').filter(f => f) : [];
-    let optionsHtml = `<option value="ZYGISK">Zygisk (Logcat)</option>`;
-    files.forEach(f => { const name = f.split('/').pop(); optionsHtml += `<option value="${name}">${name}</option>`; });
-    if (select.innerHTML !== optionsHtml) {
-        const oldVal = select.value;
-        select.innerHTML = optionsHtml;
-        const hasInjector = files.find(f => f.includes('injector.log'));
-        if (hasInjector && (!oldVal || oldVal === "")) select.value = 'injector.log';
-        else select.value = oldVal || 'ZYGISK';
-    }
-    const target = select.value;
-    let content = target === 'ZYGISK' ? await run("logcat -d -s Zygisk_Blocker") : await run(`tail -n 200 ${LOG_DIR}/${target} 2>/dev/null`);
-    if (viewer.getAttribute('data-len') != content.length) {
-        viewer.innerHTML = content || "无日志内容";
-        viewer.scrollTop = viewer.scrollHeight;
-        viewer.setAttribute('data-len', content.length);
+    if (isFetchingLogs) return;
+    isFetchingLogs = true;
+    try {
+        const select = document.getElementById('logFileSelect');
+        const viewer = document.getElementById('logViewer');
+        const filesRaw = await run(`ls ${LOG_DIR}/*.log 2>/dev/null`);
+        
+        requestAnimationFrame(() => {
+            const files = filesRaw ? filesRaw.split('\n').filter(f => f) : [];
+            let optionsHtml = `<option value="ZYGISK">Zygisk (Logcat)</option>`;
+            files.forEach(f => { const name = f.split('/').pop(); optionsHtml += `<option value="${name}">${name}</option>`; });
+            if (select.innerHTML !== optionsHtml) {
+                const oldVal = select.value;
+                select.innerHTML = optionsHtml;
+                const hasInjector = files.find(f => f.includes('injector.log'));
+                if (hasInjector && (!oldVal || oldVal === "")) select.value = 'injector.log';
+                else select.value = oldVal || 'ZYGISK';
+            }
+        });
+
+        const target = select.value;
+        let content = target === 'ZYGISK' ? await run("logcat -d -s Zygisk_Blocker") : await run(`tail -n 200 ${LOG_DIR}/${target} 2>/dev/null`);
+        
+        requestAnimationFrame(() => {
+            if (viewer.getAttribute('data-len') != content.length) {
+                viewer.innerHTML = content || "无日志内容";
+                viewer.scrollTop = viewer.scrollHeight;
+                viewer.setAttribute('data-len', content.length);
+            }
+        });
+    } finally {
+        isFetchingLogs = false;
     }
 };
 
@@ -504,6 +554,19 @@ document.getElementById('btnReload').onclick = async () => {
     toast("Reloading...");
     setTimeout(loadData, 1000);
     setTimeout(checkStatus, 1500);
+};
+
+// Stop Button Logic
+document.getElementById('btnStop').onclick = async () => {
+    let pid = await run("pidof injector");
+    if (!pid) pid = await run("pgrep -x injector");
+    if (pid) {
+        await exec(`kill -15 ${pid.split(' ')[0]}`); // SIGTERM
+        toast("发送停止信号...");
+        setTimeout(checkStatus, 1000);
+    } else {
+        toast("未运行");
+    }
 };
 
 document.querySelectorAll('.nav-item').forEach(btn => {

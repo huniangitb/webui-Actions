@@ -15,7 +15,10 @@
                     <small id="statusInfo">Checking</small>
                 </div>
             </div>
-            <button id="btnReload" class="btn btn-icon"></button>
+            <div style="display:flex;gap:8px">
+                <button id="btnStop" class="btn btn-icon" style="background:var(--bg-input);color:var(--danger)"></button>
+                <button id="btnReload" class="btn btn-icon"></button>
+            </div>
         </div>
 
         <div class="nav-tabs">
@@ -57,8 +60,6 @@
                         <button id="btnNewEnv" class="btn btn-primary btn-sm">新建</button>
                     </div>
                     <div id="envList" class="grid-list scroll-y"></div>
-                    
-                    <!-- 环境视图切换悬浮按钮 -->
                     <div class="fab-env-container">
                         <button id="btnEnvViewToggle" class="btn btn-primary fab-main shadow">
                             <span id="iconEnvView"></span>
@@ -93,7 +94,7 @@
         </div>
     </div>
 
-    <!-- 模态框：应用绑定 -->
+    <!-- 模态框：应用绑定 (无变化) -->
     <div id="appConfigModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -127,7 +128,7 @@
         </div>
     </div>
 
-    <!-- 模态框：新建环境 -->
+    <!-- 模态框：新建环境 (无变化) -->
     <div id="newEnvModal" class="modal">
         <div class="modal-content small">
             <div class="modal-header">
@@ -160,16 +161,23 @@
                 </div>
             </div>
             
-            <div class="modal-body no-padding relative flex-grow">
+            <div class="modal-body no-padding relative flex-grow" style="overflow: hidden;">
                 <div id="suggestionBox" class="suggestion-box"></div>
-                <div id="editorVisual" class="editor-pane scroll-y">
-                    <div class="alert-info">路径自动映射至 <b>/data/media/0/</b></div>
+                
+                <!-- 顶部提示栏，独立于滚动区域 -->
+                <div id="editorAlert" class="alert-info sticky-top">
+                    路径自动映射至 <b>/data/media/0/</b>
+                </div>
+
+                <div id="editorVisual" class="editor-pane scroll-y fade-content active">
                     <div id="ruleBuilderContainer"></div>
                     <div class="spacer"></div>
                 </div>
-                <div id="editorRaw" class="editor-pane hidden full-height">
+                
+                <div id="editorRaw" class="editor-pane full-height fade-content hidden">
                     <textarea id="envRuleContent" class="code-editor"></textarea>
                 </div>
+                
                 <div class="fab-container">
                     <button id="btnAddRuleRow" class="btn btn-primary rounded shadow">添加规则</button>
                 </div>

@@ -71,8 +71,8 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .btn-danger-outline { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
 .btn-icon { background: var(--warning); color: #000; width: 36px; height: 36px; border-radius: 50%; padding: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.15); }
 .btn-icon-sm { background: transparent; color: var(--text-muted); width: 28px; height: 28px; padding: 0; border-radius: 4px; }
-.btn-close { background: transparent; color: var(--text-muted); width: 32px; height: 32px; padding: 0; border-radius: 50%; flex-shrink: 0; }
-.btn-close:active { background: var(--bg-input); }
+.btn-close { background: transparent; color: var(--text-muted); width: 32px; height: 32px; padding: 0; border-radius: 50%; flex-shrink: 0; transition: color 0.2s; }
+.btn-close:active { color: var(--text-main); }
 .full-width { width: 100%; padding: 12px; font-size: 15px; }
 .shadow { box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
 
@@ -133,14 +133,28 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .filter-opt { background: var(--bg-surface); border: 1px solid var(--border); padding: 8px 16px; border-radius: 20px; color: var(--text-main); font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.2s; white-space: nowrap; }
 .filter-opt.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
-/* Environment Grid */
-.grid-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+/* Environment Grid - 固定高度紧凑化 */
+.grid-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
 .scroll-y { overflow-y: auto; flex: 1; }
-.env-item { background: var(--bg-input); padding: 15px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; text-align: center; cursor: pointer; position: relative; border: 1px solid transparent; transition: all 0.2s; }
+.env-item { 
+    background: var(--bg-input); 
+    padding: 10px; 
+    border-radius: 12px; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; /* 居中 */
+    text-align: center; 
+    cursor: pointer; 
+    position: relative; 
+    border: 1px solid transparent; 
+    transition: all 0.2s; 
+    height: 80px; /* 固定高度 */
+}
 .env-item:active { transform: scale(0.98); }
-.env-icon { margin-bottom: 8px; }
-.env-name { font-weight: 600; font-size: 14px; word-break: break-all; }
-.env-arrow { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); opacity: 0.3; }
+.env-icon { margin-bottom: 4px; }
+.env-name { font-weight: 600; font-size: 13px; word-break: break-all; line-height: 1.2; max-height: 32px; overflow: hidden; }
+.env-arrow { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); opacity: 0.3; display: none; /* 紧凑模式下隐藏箭头更干净 */ }
 
 /* Badges */
 .badge { padding: 3px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; color: #fff; letter-spacing: 0.5px; }
@@ -153,17 +167,22 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 /* Modals */
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(3px); opacity: 0; transition: opacity 0.2s; }
 .modal.show { display: flex; opacity: 1; }
-/* 关键修改：height: auto, max-height: 85vh 实现高度自适应 */
 .modal-content { background: var(--bg-surface); width: 92%; max-width: 420px; border-radius: 16px; display: flex; flex-direction: column; max-height: 85vh; height: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 .modal-content.large { max-width: 800px; }
 .modal-content.small { max-width: 320px; }
 .modal-content.flex-column { display: flex; flex-direction: column; }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-.modal-header { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+/* Modal Header 紧凑化 */
+.modal-header { 
+    padding: 10px 16px; /* 减少 padding */
+    border-bottom: 1px solid var(--border); 
+    display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; 
+}
 .modal-header.nowrap { flex-wrap: nowrap; gap: 10px; }
-.header-title-group { flex: 1; min-width: 0; }
-.header-actions-group { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+/* 向上拉一点 */
+.header-title-group { flex: 1; min-width: 0; margin-top: -2px; }
+.header-actions-group { display: flex; align-items: center; gap: 12px; flex-shrink: 0; margin-top: -2px; }
 
 .modal-body { padding: 16px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .modal-footer { padding: 16px; border-top: 1px solid var(--border); display: flex; gap: 10px; flex-shrink: 0; }
@@ -171,7 +190,7 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .relative { position: relative; }
 .flex-grow { flex: 1; min-height: 0; }
 
-/* Editor - 紧凑化 */
+/* Editor */
 .app-info-header { display: flex; align-items: center; margin-bottom: 20px; background: var(--bg-input); padding: 12px; border-radius: 12px; }
 .app-icon { width: 48px; height: 48px; margin-right: 12px; display: flex; align-items: center; justify-content: center; }
 .mode-selector { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); margin-top: 8px; }
@@ -185,10 +204,9 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 
 .editor-pane { flex: 1; display: flex; flex-direction: column; }
 .editor-pane.scroll-y { overflow-y: auto; }
-/* 源码模式固定高度，保证编辑体验 */
-.editor-pane.full-height { height: 500px; max-height: 60vh; }
+/* 源码模式相对高度：最小高度撑开 Modal，但不固定死 */
+.editor-pane.full-height { min-height: 60vh; }
 
-/* 紧凑化调整 */
 .rule-row { display: flex; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); align-items: center; background: var(--bg-surface); flex-shrink: 0; }
 .rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .rule-type { width: 90px; font-size: 12px; padding: 6px 20px 6px 6px; }
@@ -221,7 +239,6 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .spacer { height: 60px; flex-shrink: 0; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .break-all { word-break: break-all; }
-/* 紧凑化调整 */
 .alert-info { background: rgba(24, 119, 242, 0.1); color: var(--primary); padding: 8px 10px; font-size: 11px; text-align: center; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px; }
 .full-col { grid-column: 1 / -1; }

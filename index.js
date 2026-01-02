@@ -1,8 +1,8 @@
-import './style.scss';
+import './style.css';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { 
     mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
-    mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight,
+    mdiRefresh, mdiMagnify, mdiPlus, mdiCloseCircle, mdiChevronRight, // 替换为 mdiCloseCircle
     mdiFilterVariant 
 } from '@mdi/js';
 
@@ -22,7 +22,6 @@ let activeMounts = new Set();
 let logPolling = null;
 let currentAppFilter = 'filterUser';
 
-// ... getSvg, ICONS, checkStatus (无变化) ...
 const getSvg = (path, size = 24, color = 'currentColor') => 
     `<svg viewBox="0 0 24 24" fill="${color}" width="${size}" height="${size}"><path d="${path}"/></svg>`;
 
@@ -35,7 +34,7 @@ const ICONS = {
     REFRESH: getSvg(mdiRefresh, 20, '#000'),
     SEARCH: getSvg(mdiMagnify, 18, '#868e96'),
     PLUS: getSvg(mdiPlus, 16, '#fff'),
-    CLOSE: getSvg(mdiClose, 20, 'currentColor'),
+    CLOSE: getSvg(mdiCloseCircle, 26, '#868e96'), // 使用更美观的关闭图标，稍微调大一点
     CHEVRON: getSvg(mdiChevronRight, 20, '#adb5bd'),
     FILTER: getSvg(mdiFilterVariant, 24, '#fff')
 };
@@ -118,7 +117,6 @@ const debounce = (func, wait) => {
 window.openModal = (id) => document.getElementById(id)?.classList.add('show');
 window.closeModal = (id) => document.getElementById(id)?.classList.remove('show');
 
-// ... normalize functions (无变化) ...
 const normalizeToDisplay = (path) => {
     if (!path) return "";
     if (path.startsWith(PATH_PREFIX_REAL)) return path.substring(PATH_PREFIX_REAL.length) || "/";
@@ -138,7 +136,6 @@ const normalizeToConfig = (path, isTarget) => {
     }
 };
 
-// ... loadData, renderAppList, renderEnvList (无变化) ...
 const loadData = async () => {
     try {
         const fuseArgs = await run("ps -A -o args | grep fuse_daemon | grep -v grep");
@@ -316,7 +313,6 @@ document.getElementById('btnCreateEnv').onclick = async () => {
     loadData();
 };
 
-// ... openEnvEditor, editor logic (无变化) ...
 window.openEnvEditor = async (envName) => {
     currentEditingEnv = envName;
     document.getElementById('editorEnvName').textContent = envName;
@@ -448,7 +444,6 @@ document.getElementById('btnDeleteEnv').onclick = async () => {
     loadData();
 };
 
-// ... autocomplete (无变化) ...
 const updateBoxPosition = (input) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none' || !input) return;
@@ -607,15 +602,11 @@ const loadLogs = async () => {
         optionsHtml += `<option value="${name}">${name}</option>`;
     });
 
-    // 更新下拉列表
     if (select.innerHTML !== optionsHtml) {
         const oldVal = select.value;
         select.innerHTML = optionsHtml;
         
-        // 强制选中逻辑：只要有 injector.log，且当前选中的无效或为空，就切过去
         const hasInjector = files.find(f => f.includes('injector.log'));
-        
-        // 检查当前 oldVal 是否还在新列表中
         const isValid = oldVal && (oldVal === 'ZYGISK' || files.find(f => f.endsWith(oldVal)));
 
         if (hasInjector && (!isValid || oldVal === "")) {
@@ -623,12 +614,10 @@ const loadLogs = async () => {
         } else if (isValid) {
             select.value = oldVal;
         } else {
-            // 如果原来的无效了，且没有 injector.log，默认选第一个
             select.value = files.length > 0 ? files[0].split('/').pop() : 'ZYGISK';
         }
     }
     
-    // 初始化时的强制兜底
     if (!select.value && files.find(f => f.includes('injector.log'))) {
         select.value = 'injector.log';
     }

@@ -2,7 +2,7 @@ import './style.scss';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { 
     mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
-    mdiRefresh, mdiMagnify, mdiPlus, mdiCloseCircle, mdiChevronRight,
+    mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight, // 换回 mdiClose
     mdiFilterVariant 
 } from '@mdi/js';
 
@@ -34,7 +34,7 @@ const ICONS = {
     REFRESH: getSvg(mdiRefresh, 20, '#000'),
     SEARCH: getSvg(mdiMagnify, 18, '#868e96'),
     PLUS: getSvg(mdiPlus, 16, '#fff'),
-    CLOSE: getSvg(mdiCloseCircle, 26, '#868e96'),
+    CLOSE: getSvg(mdiClose, 28, '#5f6368'), // 使用纯叉号，颜色加深，尺寸加大
     CHEVRON: getSvg(mdiChevronRight, 20, '#adb5bd'),
     FILTER: getSvg(mdiFilterVariant, 24, '#fff')
 };
@@ -66,7 +66,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnAddRuleRow').innerHTML = `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`;
 
     loadData();
-    // 立即加载日志，无延迟
     loadLogs(); 
     checkStatus();
 
@@ -115,7 +114,6 @@ const debounce = (func, wait) => {
     };
 };
 
-// 优化 Modal 动画逻辑
 window.openModal = (id) => {
     const el = document.getElementById(id);
     if (el) {
@@ -127,12 +125,11 @@ window.openModal = (id) => {
 window.closeModal = (id) => {
     const el = document.getElementById(id);
     if (el && el.classList.contains('show')) {
-        el.classList.add('hiding'); // 添加退出动画类
-        // 等待动画结束后移除 show
+        el.classList.add('hiding');
         setTimeout(() => {
             el.classList.remove('show');
             el.classList.remove('hiding');
-        }, 250); // 对应 CSS transition 时间
+        }, 250);
     }
 };
 
@@ -353,13 +350,18 @@ window.openEnvEditor = async (envName) => {
 document.querySelectorAll('input[name="editorMode"]').forEach(el => {
     el.onchange = (e) => {
         const isVisual = e.target.value === 'visual';
+        const modalBody = document.querySelector('#envEditorModal .modal-body');
+        
         document.getElementById('editorVisual').classList.toggle('hidden', !isVisual);
         document.getElementById('editorRaw').classList.toggle('hidden', isVisual);
         document.querySelector('.fab-container').classList.toggle('hidden', !isVisual);
         
+        // 源码模式下去除 padding，让黑色背景填满
         if (!isVisual) {
+            modalBody.style.padding = '0';
             document.getElementById('envRuleContent').value = generateConfigFromVisual();
         } else {
+            modalBody.style.padding = '16px';
             parseConfigToVisual(document.getElementById('envRuleContent').value);
         }
     };
@@ -659,7 +661,6 @@ const loadLogs = async () => {
     }
 };
 
-// 立即响应下拉框变化
 document.getElementById('logFileSelect').addEventListener('change', loadLogs);
 
 document.getElementById('btnReload').onclick = async () => {
@@ -679,7 +680,6 @@ document.querySelectorAll('.nav-item').forEach(btn => {
         document.getElementById(targetId).classList.add('active');
 
         if (targetId === 'content-io' || targetId === 'content-log') {
-            // 切换 Tab 时立即刷新一次，减少等待
             if (targetId === 'content-io') updateIOTable();
             if (targetId === 'content-log') loadLogs();
             startPolling();
@@ -691,7 +691,6 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 
 const startPolling = () => {
     if (logPolling) return;
-    // 立即执行一次
     const activeBtn = document.querySelector('.nav-item.active');
     if (activeBtn) {
         const target = activeBtn.dataset.target;

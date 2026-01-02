@@ -86,9 +86,15 @@
 
             <!-- 4. 日志 -->
             <div id="content-log" class="tab-pane">
-                <div class="card full-height-card">
+                <div class="card full-height-card relative">
                     <select id="logFileSelect" class="form-select mb-2"></select>
                     <div id="logViewer" class="log-viewer"></div>
+                    <!-- 日志清空悬浮按钮 -->
+                    <div class="fab-log-container">
+                        <button id="btnClearLog" class="btn btn-primary fab-main shadow" style="background:var(--danger)">
+                            <span id="iconClearLog"></span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -162,6 +168,7 @@
             </div>
             
             <div class="modal-body no-padding relative flex-grow" style="overflow: hidden;">
+                <!-- 自动补全建议框放在这里，确保它能浮在内容之上 -->
                 <div id="suggestionBox" class="suggestion-box"></div>
                 
                 <div id="editorAlert" class="alert-info sticky-top">

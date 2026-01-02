@@ -4,7 +4,7 @@ import {
     mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
     mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight,
     mdiFilterVariant, mdiViewGrid, mdiViewList, mdiStop, mdiPlay,
-    mdiEyeOff
+    mdiEyeOff, mdiDeleteSweep
 } from '@mdi/js';
 
 const BASE_DIR = "/data/Namespace-Proxy";
@@ -50,7 +50,8 @@ const ICONS = {
     LIST: getSvg(mdiViewList, 24, '#fff'),
     STOP: getSvg(mdiStop, 20, '#dc3545'),
     PLAY: getSvg(mdiPlay, 20, '#36a420'),
-    EYE_OFF: getSvg(mdiEyeOff, 20, 'currentColor')
+    EYE_OFF: getSvg(mdiEyeOff, 20, 'currentColor'),
+    CLEAR: getSvg(mdiDeleteSweep, 20, '#fff')
 };
 
 const checkStatus = async () => {
@@ -89,6 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('iconFilter').innerHTML = ICONS.FILTER;
     document.getElementById('iconEnvView').innerHTML = ICONS.LIST;
     document.getElementById('btnMonitorIgnore').innerHTML = ICONS.EYE_OFF;
+    document.getElementById('iconClearLog').innerHTML = ICONS.CLEAR;
     document.querySelectorAll('.btn-close').forEach(el => el.innerHTML = ICONS.CLOSE);
     document.getElementById('btnNewEnv').innerHTML = `<span style="display:flex;align-items:center;gap:4px">${getSvg(mdiPlus,14,'#fff')} 新建</span>`;
     document.getElementById('btnAddRuleRow').innerHTML = `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`;
@@ -146,6 +148,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     document.getElementById('btnMonitorIgnore').onclick = openMonitorIgnoreEditor;
+    
+    // 日志清空
+    document.getElementById('btnClearLog').onclick = async () => {
+        const target = document.getElementById('logFileSelect').value;
+        if (!target) return;
+        
+        if (target === 'ZYGISK') {
+            await exec("logcat -c");
+        } else {
+            await exec(`echo -n > ${LOG_DIR}/${target}`);
+        }
+        toast("日志已清空");
+        updateLogContent();
+    };
 });
 
 const run = async (cmd) => {
@@ -533,6 +549,31 @@ document.getElementById('btnDeleteEnv').onclick = async () => {
     loadData();
 };
 
+const updateBoxPosition = (input) => {
+    const box = document.getElementById('suggestionBox');
+    if (box.style.display === 'none' || !input) return;
+
+    const rect = input.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const boxHeight = box.offsetHeight || 200; // 预估高度
+    
+    // 宽度和水平对齐
+    box.style.width = rect.width + 'px';
+    box.style.left = rect.left + 'px';
+
+    const spaceBelow = viewportHeight - rect.bottom;
+    // 如果下方空间不足以显示完整高度，且上方空间比下方大，则向上显示
+    if (spaceBelow < boxHeight && rect.top > spaceBelow) {
+        // 向上显示：top 设为 auto，bottom 设为视口高度 - input.top
+        box.style.top = 'auto';
+        box.style.bottom = (viewportHeight - rect.top) + 'px';
+    } else {
+        // 向下显示
+        box.style.top = rect.bottom + 'px';
+        box.style.bottom = 'auto';
+    }
+};
+
 const setupAutocomplete = (input) => {
     const box = document.getElementById('suggestionBox');
     const performSearch = debounce(async (val) => {
@@ -562,11 +603,10 @@ const setupAutocomplete = (input) => {
             });
             if (suggestions.length === 0) { box.style.display = 'none'; return; }
             box.innerHTML = suggestions.map(s => `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window.applySuggestion('${s.text}')"><div class="s-icon">${s.icon}</div><div class="s-text">${s.text}</div></div>`).join('');
+            
             box.style.display = 'block';
-            const rect = input.getBoundingClientRect();
-            box.style.left = rect.left + 'px';
-            box.style.top = rect.bottom + 'px';
-            box.style.width = rect.width + 'px';
+            updateBoxPosition(input); // 计算位置
+            
         } catch (e) { box.style.display = 'none'; }
     }, 150);
     input.addEventListener('input', (e) => performSearch(e.target.value));

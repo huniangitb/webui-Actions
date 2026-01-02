@@ -136,7 +136,7 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .app-end { flex-shrink: 0; display: flex; align-items: center; }
 
 /* FABs */
-.fab-filter-container, .fab-env-container { 
+.fab-filter-container, .fab-env-container, .fab-log-container { 
     position: absolute; 
     bottom: 20px; right: 20px; 
     display: flex; flex-direction: column; align-items: flex-end; gap: 10px; 
@@ -295,7 +295,18 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .fab-container button { pointer-events: auto; width: auto; padding: 8px 20px; border-radius: 20px; font-size: 13px; }
 
 /* Autocomplete */
-.suggestion-box { position: fixed; background: var(--bg-surface); border: 1px solid var(--border); z-index: 3000; max-height: 200px; overflow-y: auto; display: none; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+.suggestion-box { 
+    position: fixed; /* 固定定位，基于视口 */
+    background: var(--bg-surface); 
+    border: 1px solid var(--border); 
+    z-index: 3000; 
+    max-height: 200px; 
+    overflow-y: auto; 
+    display: none; 
+    border-radius: 8px; 
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2); 
+    /* 移除 top, left，由JS动态计算 */
+}
 .suggestion-item { padding: 10px 12px; display: flex; align-items: center; cursor: pointer; border-bottom: 1px solid var(--border); color: var(--text-main); font-size: 13px; }
 .suggestion-item:active { background: var(--bg-input); }
 .s-icon { margin-right: 10px; width: 16px; display: flex; }

@@ -15,10 +15,8 @@
                     <small id="statusInfo">Checking</small>
                 </div>
             </div>
-            <div style="display:flex;gap:8px">
-                <button id="btnStop" class="btn btn-icon" style="background:var(--bg-input);color:var(--danger)"></button>
-                <button id="btnReload" class="btn btn-icon"></button>
-            </div>
+            <!-- 合并后的开关按钮 -->
+            <button id="btnToggleStatus" class="btn btn-icon"></button>
         </div>
 
         <div class="nav-tabs">
@@ -94,7 +92,7 @@
         </div>
     </div>
 
-    <!-- 模态框：应用绑定 (无变化) -->
+    <!-- 模态框：应用绑定 -->
     <div id="appConfigModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -128,7 +126,7 @@
         </div>
     </div>
 
-    <!-- 模态框：新建环境 (无变化) -->
+    <!-- 模态框：新建环境 -->
     <div id="newEnvModal" class="modal">
         <div class="modal-content small">
             <div class="modal-header">
@@ -164,7 +162,6 @@
             <div class="modal-body no-padding relative flex-grow" style="overflow: hidden;">
                 <div id="suggestionBox" class="suggestion-box"></div>
                 
-                <!-- 顶部提示栏，独立于滚动区域 -->
                 <div id="editorAlert" class="alert-info sticky-top">
                     路径自动映射至 <b>/data/media/0/</b>
                 </div>

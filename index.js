@@ -3,7 +3,7 @@ import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { 
     mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
     mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight,
-    mdiFilterVariant, mdiViewGrid, mdiViewList, mdiStop
+    mdiFilterVariant, mdiViewGrid, mdiViewList, mdiStop, mdiPlay
 } from '@mdi/js';
 
 const BASE_DIR = "/data/Namespace-Proxy";
@@ -22,11 +22,12 @@ let currentEditingEnv = null;
 let currentBindingPkg = null;
 let activeMounts = new Set();
 let logPolling = null;
-let statusPolling = null; // 状态轮询
+let statusPolling = null;
 let currentAppFilter = 'filterUser';
 
 let isFetchingLogs = false;
 let isFetchingIO = false;
+let currentPid = null; // 缓存 PID 状态
 
 const getSvg = (path, size = 24, color = 'currentColor') => 
     `<svg viewBox="0 0 24 24" fill="${color}" width="${size}" height="${size}"><path d="${path}"/></svg>`;
@@ -45,29 +46,45 @@ const ICONS = {
     FILTER: getSvg(mdiFilterVariant, 24, '#fff'),
     GRID: getSvg(mdiViewGrid, 24, '#fff'),
     LIST: getSvg(mdiViewList, 24, '#fff'),
-    STOP: getSvg(mdiStop, 20, '#dc3545')
+    STOP: getSvg(mdiStop, 20, '#dc3545'),
+    PLAY: getSvg(mdiPlay, 20, '#36a420')
 };
 
 const checkStatus = async () => {
     const badge = document.getElementById('statusBadge');
     const info = document.getElementById('statusInfo');
+    const toggleBtn = document.getElementById('btnToggleStatus');
+    
     let pid = await run("pidof injector");
     if (!pid) pid = await run("pgrep -x injector");
+    currentPid = pid ? pid.split(' ')[0] : null;
 
-    if (pid) {
+    if (currentPid) {
         badge.className = "badge badge-success";
         badge.textContent = "RUNNING";
-        info.textContent = `PID: ${pid.split(' ')[0]}`;
+        info.textContent = `PID: ${currentPid}`;
+        
+        // 运行状态：显示停止按钮
+        if (toggleBtn.getAttribute('data-status') !== 'running') {
+            toggleBtn.innerHTML = ICONS.STOP;
+            toggleBtn.style.background = "rgba(220, 53, 69, 0.1)"; // 浅红色背景
+            toggleBtn.setAttribute('data-status', 'running');
+        }
     } else {
         badge.className = "badge badge-gray";
         badge.textContent = "STOPPED";
         info.textContent = "OFFLINE";
+        
+        // 停止状态：显示启动按钮
+        if (toggleBtn.getAttribute('data-status') !== 'stopped') {
+            toggleBtn.innerHTML = ICONS.PLAY;
+            toggleBtn.style.background = "rgba(54, 164, 32, 0.1)"; // 浅绿色背景
+            toggleBtn.setAttribute('data-status', 'stopped');
+        }
     }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('btnReload').innerHTML = ICONS.REFRESH;
-    document.getElementById('btnStop').innerHTML = ICONS.STOP;
     document.getElementById('iconSearch').innerHTML = ICONS.SEARCH;
     document.getElementById('iconIoSearch').innerHTML = ICONS.SEARCH;
     document.getElementById('iconFilter').innerHTML = ICONS.FILTER;
@@ -80,7 +97,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadLogs(); 
     checkStatus();
     
-    // 启动状态每秒轮询
     if (statusPolling) clearInterval(statusPolling);
     statusPolling = setInterval(checkStatus, 1000);
 
@@ -326,9 +342,15 @@ window.openEnvEditor = async (envName) => {
     const content = await run(`cat ${BASE_DIR}/${envName}.conf 2>/dev/null`);
     document.getElementById('envRuleContent').value = content;
     parseConfigToVisual(content);
+    
+    // Reset to Visual Mode defaults
     document.getElementById('editorAlert').classList.remove('collapsed');
+    const modalContent = document.querySelector('#envEditorModal .modal-content');
+    modalContent.classList.remove('dark-theme'); // Ensure light theme start
+    
     const visualRadio = document.querySelector('input[name="editorMode"][value="visual"]');
     if (visualRadio) { visualRadio.checked = true; visualRadio.dispatchEvent(new Event('change')); }
+    
     openModal('envEditorModal');
 };
 
@@ -339,23 +361,32 @@ document.querySelectorAll('input[name="editorMode"]').forEach(el => {
         const visualEl = document.getElementById('editorVisual');
         const rawEl = document.getElementById('editorRaw');
         const fab = document.querySelector('.fab-container');
+        const modalContent = document.querySelector('#envEditorModal .modal-content');
+
+        // Toggle Dark Theme Class
         if (isVisual) {
+            modalContent.classList.remove('dark-theme');
             rawEl.classList.remove('active');
+            
             setTimeout(() => {
                 rawEl.classList.add('hidden');
                 visualEl.classList.remove('hidden');
                 alertBox.classList.remove('collapsed');
                 fab.classList.remove('hidden');
+                
                 parseConfigToVisual(document.getElementById('envRuleContent').value);
                 requestAnimationFrame(() => { visualEl.classList.add('active'); });
             }, 250);
         } else {
+            modalContent.classList.add('dark-theme');
             visualEl.classList.remove('active');
             alertBox.classList.add('collapsed');
             fab.classList.add('hidden');
+            
             setTimeout(() => {
                 visualEl.classList.add('hidden');
                 rawEl.classList.remove('hidden');
+                
                 document.getElementById('envRuleContent').value = generateConfigFromVisual();
                 requestAnimationFrame(() => { rawEl.classList.add('active'); });
             }, 250);
@@ -532,21 +563,27 @@ const loadLogs = async () => {
     }
 };
 
-document.getElementById('btnReload').onclick = async () => {
-    await exec(`sh ${SERVICE_SH}`);
-    toast("Reloading...");
-    setTimeout(loadData, 1000);
-    setTimeout(checkStatus, 1500);
-};
+// Toggle Button Logic
+document.getElementById('btnToggleStatus').onclick = async () => {
+    const btn = document.getElementById('btnToggleStatus');
+    const isRunning = btn.getAttribute('data-status') === 'running';
 
-document.getElementById('btnStop').onclick = async () => {
-    let pid = await run("pidof injector");
-    if (!pid) pid = await run("pgrep -x injector");
-    if (pid) {
-        await exec(`kill -15 ${pid.split(' ')[0]}`);
-        toast("发送停止信号...");
-        setTimeout(checkStatus, 1000);
-    } else toast("未运行");
+    if (isRunning) {
+        if (currentPid) {
+            await exec(`kill -15 ${currentPid}`);
+            toast("发送停止信号...");
+        } else {
+            toast("进程不存在");
+        }
+    } else {
+        await exec(`sh ${SERVICE_SH}`);
+        toast("启动服务...");
+        setTimeout(loadData, 1000); // Reload data after start
+    }
+    
+    // Immediate check to update UI feel
+    setTimeout(checkStatus, 500);
+    setTimeout(checkStatus, 1500);
 };
 
 document.querySelectorAll('.nav-item').forEach(btn => {

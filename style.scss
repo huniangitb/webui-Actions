@@ -149,11 +149,12 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .filter-opt { background: var(--bg-surface); border: 1px solid var(--border); padding: 8px 16px; border-radius: 20px; color: var(--text-main); font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.2s; white-space: nowrap; }
 .filter-opt.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
-/* Environment Grid - 极致紧凑修正 */
+/* Environment Grid - 修复行间距 */
 .grid-list { 
     display: grid; 
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); /* 缩小列宽下限，一行能放更多 */
-    gap: 6px; /* 缩小间距 */
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); 
+    gap: 8px; 
+    align-content: start; /* 关键：防止行被拉伸 */
 }
 .scroll-y { overflow-y: auto; flex: 1; }
 .env-item { 
@@ -169,11 +170,11 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
     position: relative; 
     border: 1px solid transparent; 
     transition: all 0.2s; 
-    height: 60px; /* 降低高度 */
+    height: 56px; /* 进一步降低高度 */
 }
 .env-item:hover { background: #e4e6eb; transform: translateY(-1px); }
 .env-item:active { transform: scale(0.98); }
-.env-icon { margin-bottom: 2px; transform: scale(0.9); }
+.env-icon { margin-bottom: 2px; transform: scale(0.85); }
 .env-name { font-weight: 600; font-size: 12px; word-break: break-all; line-height: 1.2; max-height: 28px; overflow: hidden; }
 .env-arrow { display: none; }
 
@@ -191,6 +192,7 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .modal.hiding { opacity: 0; }
 .modal.hiding .modal-content { transform: translateY(20px); }
 
+/* 模态框高度修复 */
 .modal-content { 
     background: var(--bg-surface); width: 92%; max-width: 420px; border-radius: 16px; 
     display: flex; flex-direction: column; 
@@ -200,7 +202,11 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
     transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
 }
-.modal-content.large { max-width: 800px; }
+/* 关键：给环境编辑模态框一个固定高度，让内部 flex 生效 */
+.modal-content.large { 
+    max-width: 800px; 
+    height: 70vh; /* 固定高度，撑开编辑器 */
+}
 .modal-content.small { max-width: 320px; }
 .modal-content.flex-column { display: flex; flex-direction: column; }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -234,10 +240,10 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 
 .editor-pane { flex: 1; display: flex; flex-direction: column; }
 .editor-pane.scroll-y { overflow-y: auto; }
-/* 源码模式：强制高度，填满容器 */
+/* 源码模式：全填充 */
 .editor-pane.full-height { 
     flex: 1; 
-    height: 60vh; /* 强制高度，解决 flex 嵌套传递问题 */
+    height: 100%; 
     width: 100%;
 }
 

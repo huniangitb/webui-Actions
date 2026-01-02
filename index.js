@@ -2,7 +2,7 @@ import './style.scss';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { 
     mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
-    mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight, // 换回 mdiClose
+    mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight,
     mdiFilterVariant 
 } from '@mdi/js';
 
@@ -34,7 +34,7 @@ const ICONS = {
     REFRESH: getSvg(mdiRefresh, 20, '#000'),
     SEARCH: getSvg(mdiMagnify, 18, '#868e96'),
     PLUS: getSvg(mdiPlus, 16, '#fff'),
-    CLOSE: getSvg(mdiClose, 28, '#5f6368'), // 使用纯叉号，颜色加深，尺寸加大
+    CLOSE: getSvg(mdiClose, 28, '#5f6368'),
     CHEVRON: getSvg(mdiChevronRight, 20, '#adb5bd'),
     FILTER: getSvg(mdiFilterVariant, 24, '#fff')
 };
@@ -356,7 +356,6 @@ document.querySelectorAll('input[name="editorMode"]').forEach(el => {
         document.getElementById('editorRaw').classList.toggle('hidden', isVisual);
         document.querySelector('.fab-container').classList.toggle('hidden', !isVisual);
         
-        // 源码模式下去除 padding，让黑色背景填满
         if (!isVisual) {
             modalBody.style.padding = '0';
             document.getElementById('envRuleContent').value = generateConfigFromVisual();

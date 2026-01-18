@@ -54,6 +54,41 @@ const ICONS = {
     CLEAR: getSvg(mdiDeleteSweep, 20, '#fff')
 };
 
+const fetchActiveMounts = async () => {
+    const fuseArgs = await run("ps -A -o args | grep fuse_daemon | grep -v grep");
+    const mounts = new Set();
+    if (fuseArgs) {
+        fuseArgs.split('\n').forEach(line => {
+            const match = line.match(/--pkg=([a-zA-Z0-9._]+)/);
+            if (match) mounts.add(match[1]);
+        });
+    }
+    return mounts;
+};
+
+const updateMountStatus = async () => {
+    const newMounts = await fetchActiveMounts();
+    activeMounts = newMounts;
+    
+    const listItems = document.querySelectorAll('#appList .list-item');
+    listItems.forEach(item => {
+        const pkg = item.dataset.pkg;
+        if (!pkg) return;
+        
+        const header = item.querySelector('.app-header');
+        if (!header) return;
+
+        const badge = header.querySelector('.badge-success');
+        const isMounted = activeMounts.has(pkg);
+
+        if (isMounted && !badge) {
+            header.insertAdjacentHTML('beforeend', `<span class="badge badge-success">MOUNTED</span>`);
+        } else if (!isMounted && badge && badge.textContent === 'MOUNTED') {
+            badge.remove();
+        }
+    });
+};
+
 const checkStatus = async () => {
     const badge = document.getElementById('statusBadge');
     const info = document.getElementById('statusInfo');
@@ -82,6 +117,8 @@ const checkStatus = async () => {
             toggleBtn.setAttribute('data-status', 'stopped');
         }
     }
+    
+    await updateMountStatus();
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -225,14 +262,7 @@ const normalizeToConfig = (path, isTarget) => {
 
 const loadData = async () => {
     try {
-        const fuseArgs = await run("ps -A -o args | grep fuse_daemon | grep -v grep");
-        activeMounts.clear();
-        if (fuseArgs) {
-            fuseArgs.split('\n').forEach(line => {
-                const match = line.match(/--pkg=([a-zA-Z0-9._]+)/);
-                if (match) activeMounts.add(match[1]);
-            });
-        }
+        activeMounts = await fetchActiveMounts();
 
         const files = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
         envList = files ? files.split('\n').map(f => f.split('/').pop().replace('.conf', '')).filter(n => n && n !== 'injector' && n !== 'monitor_ignore') : [];
@@ -299,7 +329,7 @@ const renderAppList = () => {
         let mountedBadge = activeMounts.has(app.packageName) ? `<span class="badge badge-success">MOUNTED</span>` : "";
         let envBadge = app.boundEnv ? `<span class="badge ${app.boundParam==='MONITOR'?'badge-warning':app.boundParam==='PASSTHROUGH'?'badge-success':'badge-primary'} badge-pill">${app.boundEnv}</span>` : "";
         return `
-        <div class="list-item" onclick="openAppConfig('${app.packageName}')">
+        <div class="list-item" data-pkg="${app.packageName}" onclick="openAppConfig('${app.packageName}')">
             <div class="app-main">
                 <div class="app-icon-wrapper">${ICONS.ANDROID}</div>
                 <div class="app-content">

@@ -8,7 +8,6 @@ const MODULE_ID = "miuicx_color_tuner";
 const MODULE_PATH = `/data/adb/modules/${MODULE_ID}`;
 let currentConfigPath = '';
 
-// Kcal节点路径
 const KCAL_RED_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_red";
 const KCAL_GREEN_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_green";
 const KCAL_BLUE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_blue";
@@ -18,15 +17,10 @@ const KCAL_CONT_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_cont";
 const KCAL_VAL_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_val";
 const KCAL_ENABLE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_enable";
 
-// 已弃用旧路径，改用 settings 命令
-// const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
-// const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
-
 const SLOPE_PRECISION = 100;
 const HUE_NODE_MAX = 1536;
 const HUE_UI_MAX = 360;
 
-// 默认配置
 const defaultConfig = {
     red: { intercept: 256.0, slope: 0.0 },
     green: { intercept: 256.0, slope: 0.0 },
@@ -46,9 +40,8 @@ const refreshRateColorStops = [
     { rate: 144, color: [249, 49, 84] }
 ];
 
-// 全局状态变量
 let globalConfig = JSON.parse(JSON.stringify(defaultConfig));
-let maxBrightness = 255; // 更改为 Android 标准最大亮度
+let maxBrightness = 255;
 let currentRefreshRate = 60;
 let colorChart = null;
 let nodeStatusModal = null;
@@ -60,7 +53,13 @@ let originalConfigForWizard = null;
 let brightnessBeforeWizard = -1;
 let isKcalEnabled = true;
 
-// DOM元素引用
+// 异步亮度队列控制
+let isBrightnessApplying = false;
+let pendingBrightnessValue = null;
+
+// 图表状态
+let isLogScale = localStorage.getItem('chartScale') === 'linear' ? false : true;
+
 const brightnessSlider = document.getElementById('brightnessSlider');
 const brightnessValue = document.getElementById('brightnessValue');
 const refreshRateValue = document.getElementById('refreshRateValue');
@@ -68,6 +67,7 @@ const saveButton = document.getElementById('saveButton');
 const resetConfigButton = document.getElementById('resetConfigButton');
 const readNodeButton = document.getElementById('readNodeButton');
 const chartCanvas = document.getElementById('colorCurveChart');
+const chartScaleSwitch = document.getElementById('chartScaleSwitch');
 const advancedConfigEditor = document.getElementById('advanced-config-editor');
 const advancedModeButton = document.getElementById('advancedModeButton');
 const wizardButton = document.getElementById('wizardButton');
@@ -130,13 +130,16 @@ async function pollSystemStatus() {
         }
     } catch (e) {}
     try {
-        if (wizardModal && wizardModal._isShown) return;
-        // 使用 settings 命令获取亮度
+        // 交互时不轮询，防止回跳
+        const isUserInteracting = document.activeElement === brightnessSlider || brightnessSlider === document.querySelector(':active');
+        if ((wizardModal && wizardModal._isShown) || isUserInteracting) return;
+
         const { stdout } = await exec(`settings get system screen_brightness`);
         const newBrightness = parseInt(stdout.trim());
-        if (newBrightness !== lastKnownBrightness) {
+        
+        // 只有当后台无挂起任务时才同步
+        if (newBrightness !== lastKnownBrightness && pendingBrightnessValue === null) {
             lastKnownBrightness = newBrightness;
-            // 计算百分比 (1-255 范围)
             const percentage = Math.round(((newBrightness - 1) / (255 - 1)) * 100);
             brightnessValue.innerText = i18next.t('status.brightnessValue', { value: newBrightness, percent: percentage });
             brightnessSlider.value = percentage;
@@ -185,23 +188,38 @@ function toggleAdvancedMode(enable, showToast = true) {
 
 function updateTheme() {
     const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.documentElement.setAttribute('data-mdb-theme', isDarkMode ? 'dark' : 'light');
+    const theme = isDarkMode ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-mdb-theme', theme);
+    localStorage.setItem('theme', theme); // 保存主题状态
     updateChart();
 }
 
-// 映射 0-100 百分比到 1-255 系统亮度
+// 异步亮度设置任务
+async function runBrightnessTask() {
+    if (isBrightnessApplying) return;
+    isBrightnessApplying = true;
+    while (pendingBrightnessValue !== null) {
+        const valueToApply = pendingBrightnessValue;
+        pendingBrightnessValue = null;
+        try {
+            await exec(`settings put system screen_brightness ${valueToApply}`);
+        } catch (e) { console.error("Brightness apply failed:", e); }
+    }
+    isBrightnessApplying = false;
+}
+
 const scaleToSystemBrightness = (percentage) => Math.max(1, Math.round(1 + (percentage / 100) * (255 - 1)));
 
-async function setSystemBrightness(percentage) {
+function setSystemBrightness(percentage) {
     const systemValue = scaleToSystemBrightness(percentage);
-    try {
-        // 使用 settings 命令设置亮度
-        await exec(`settings put system screen_brightness ${systemValue}`);
-        if (!wizardModal || !wizardModal._isShown) {
-             brightnessValue.innerText = i18next.t('status.brightnessValue', { value: systemValue, percent: percentage });
-             lastKnownBrightness = systemValue;
-        }
-    } catch (e) { toast(i18next.t('toast.saveFailed', { error: `Brightness: ${e.message}` }), 'error'); }
+    // 立即更新UI
+    lastKnownBrightness = systemValue;
+    const percentageClamped = Math.round(((systemValue - 1) / (255 - 1)) * 100);
+    brightnessValue.innerText = i18next.t('status.brightnessValue', { value: systemValue, percent: percentageClamped });
+    
+    // 加入异步队列
+    pendingBrightnessValue = systemValue;
+    runBrightnessTask();
 }
 
 function updateKcalEnableUI(enabled) {
@@ -249,25 +267,54 @@ function calculateChartData(params) {
     return { labels, datasets };
 }
 
+function getChartScales(isDark) {
+    const tickColor = isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+    
+    const xScale = isLogScale ? {
+        type: 'logarithmic',
+        min: 1, max: 100,
+        ticks: {
+            color: tickColor,
+            callback: function (value) { const shown_ticks = [1, 2, 5, 10, 20, 50, 100]; if (shown_ticks.includes(Number(value))) return value + '%'; },
+            generateTicks: function () { return [1, 2, 5, 10, 20, 50, 100].map(v => ({ value: v })); }
+        }
+    } : {
+        type: 'linear',
+        min: 0, max: 100,
+        ticks: {
+            color: tickColor,
+            stepSize: 20,
+            callback: function (value) { return value + '%'; }
+        }
+    };
+
+    // 合并通用属性
+    xScale.title = { display: true, text: i18next.t('status.brightness'), color: tickColor };
+    xScale.grid = { color: gridColor };
+
+    return {
+        x: xScale,
+        y: { title: { display: true, text: i18next.t('chart.yAxisTitle'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } }
+    };
+}
+
 function initChart() {
     if (colorChart) colorChart.destroy();
     const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
-    const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
-    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
     const chartData = calculateChartData(globalConfig);
+    
     colorChart = new Chart(chartCanvas.getContext('2d'), {
-        type: 'line', data: chartData, options: {
-            responsive: true, maintainAspectRatio: false, scales: {
-                x: {
-                    type: 'logarithmic', title: { display: true, text: i18next.t('status.brightness'), color: tickColor }, min: 1, max: 100,
-                    ticks: {
-                        color: tickColor,
-                        callback: function (value) { const shown_ticks = [1, 2, 5, 10, 20, 50, 100]; if (shown_ticks.includes(Number(value))) return value + '%'; },
-                        generateTicks: function () { return [{ value: 1 }, { value: 2 }, { value: 5 }, { value: 10 }, { value: 20 }, { value: 50 }, { value: 100 }]; }
-                    }, grid: { color: gridColor }
-                },
-                y: { title: { display: true, text: i18next.t('chart.yAxisTitle'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } }
-            }, plugins: { legend: { display: true, labels: { color: tickColor } } }
+        type: 'line', 
+        data: chartData, 
+        options: {
+            responsive: true, 
+            maintainAspectRatio: false, 
+            animation: { duration: 400 }, // 优化图表动画
+            scales: getChartScales(isDarkMode), 
+            plugins: { 
+                legend: { display: true, labels: { color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' } } 
+            }
         }
     });
 }
@@ -277,21 +324,25 @@ function updateChart() {
     if (colorChart) {
         const isDarkMode = document.documentElement.dataset.mdbTheme === 'dark';
         const tickColor = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
-        const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+        
         colorChart.data = calculateChartData(globalConfig);
-        colorChart.options.scales.x.title.text = i18next.t('status.brightness');
-        colorChart.options.scales.x.title.color = tickColor;
-        colorChart.options.scales.x.ticks.color = tickColor;
-        colorChart.options.scales.x.grid.color = gridColor;
-        colorChart.options.scales.y.title.text = i18next.t('chart.yAxisTitle');
-        colorChart.options.scales.y.title.color = tickColor;
-        colorChart.options.scales.y.ticks.color = tickColor;
-        colorChart.options.scales.y.grid.color = gridColor;
+        
+        // 动态更新坐标轴配置
+        const newScales = getChartScales(isDarkMode);
+        colorChart.options.scales.x = newScales.x;
+        colorChart.options.scales.y = newScales.y;
+        
         colorChart.options.plugins.legend.labels.color = tickColor;
         colorChart.update();
     } else { 
         initChart();
     }
+}
+
+function toggleChartScale() {
+    isLogScale = chartScaleSwitch.checked;
+    localStorage.setItem('chartScale', isLogScale ? 'log' : 'linear');
+    updateChart();
 }
 
 async function applyAllKcalSettings(config, useRefreshRate = currentRefreshRate) {
@@ -610,12 +661,10 @@ async function fetchInitialSystemState() {
         updateKcalEnableUI(false);
     }
     try {
-        // 使用 settings 命令初始化亮度状态
         const { stdout: cur } = await exec(`settings get system screen_brightness`);
         const currentSystemVal = parseInt(cur.trim()) || 128;
         lastKnownBrightness = currentSystemVal;
         
-        // Android 亮度范围通常为 1-255 (或 0-255，按要求至少为 1)
         const percentage = Math.round(((currentSystemVal - 1) / (255 - 1)) * 100);
         brightnessSlider.value = percentage;
         brightnessValue.innerText = i18next.t('status.brightnessValue', { value: currentSystemVal, percent: percentage });
@@ -634,6 +683,10 @@ async function init() {
     updateTheme();
     nodeStatusModal = new Modal(document.getElementById('nodeStatusModal'));
     wizardModal = new Modal(wizardModalElement);
+    
+    // 初始化图表开关状态
+    chartScaleSwitch.checked = isLogScale;
+    
     await fetchInitialSystemState();
     currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
     await loadConfigAndRender();
@@ -646,6 +699,7 @@ async function init() {
     advancedModeButton.addEventListener('click', () => toggleAdvancedMode(!isAdvancedMode));
     saveAdvColorButton.addEventListener('click', saveConfig);
     resetAdvColorButton.addEventListener('click', resetAdvColor);
+    chartScaleSwitch.addEventListener('change', toggleChartScale);
 
     for (const color of ['red', 'green', 'blue']) {
         const elements = uiElements[color];

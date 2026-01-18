@@ -1,17 +1,25 @@
-@use "mdb-ui-kit/src/scss/mdb.free.scss";
 :root {
   color-scheme: light dark;
 }
+
 @media (prefers-color-scheme: dark) {
   html, body {
     background-color: #121212 !important;
     color: #ffffff;
   }
 }
+
+@use "mdb-ui-kit/src/scss/mdb.free.scss";
+
 body {
   font-size: 16px; 
   padding-bottom: 150px;
-  background-color: var(--mdb-body-bg); 
+  background-color: var(--mdb-body-bg);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.card, .modal-content, .form-control, .btn {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .btn .svg-icon {
@@ -33,17 +41,6 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-}
-
-.status-header .form-check {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding-left: 0;
-}
-
-.status-header .form-check-label {
-    font-size: 0.9em;
 }
 
 .badge {
@@ -102,7 +99,6 @@ body {
   &:hover { background-color: rgba(57, 192, 237, 0.25) !important; }
 }
 
-
 .config-actions-group {
     display: flex;
     flex-wrap: wrap;
@@ -115,9 +111,10 @@ body {
     height: 220px;
     width: 100%;
     padding: 0.5rem;
-    margin-top: 1rem;
+    margin-top: 0.5rem;
     border-radius: 0.25rem;
     border: 1px solid rgba(var(--mdb-body-color-rgb), 0.125);
+    background-color: rgba(var(--mdb-body-color-rgb), 0.01);
 }
 
 input[type="range"] {
@@ -132,7 +129,6 @@ input[type="range"] {
 
 .range-info .form-range::-webkit-slider-thumb,
 .range-info .form-range::-moz-range-thumb { background-color: #39c0ed; }
-
 
 #configContentContainer {
     transition: opacity 0.35s ease, max-height 0.35s ease;

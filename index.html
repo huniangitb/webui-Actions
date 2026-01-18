@@ -6,7 +6,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="title">MiuiCX Color Tuner</title>
     <link rel="stylesheet" href="main.scss">
-</head><body>
+    <!-- 防白屏脚本：在页面渲染前立即设置主题 -->
+    <script>
+        (function() {
+            try {
+                const localTheme = localStorage.getItem('theme');
+                const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (localTheme === 'dark' || (!localTheme && sysDark)) {
+                    document.documentElement.setAttribute('data-mdb-theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-mdb-theme', 'light');
+                }
+            } catch (e) {}
+        })();
+    </script>
+</head>
+<body>
     <div class="container mt-4 mb-5">
         <header class="text-center mb-4">
             <h1 data-i18n="title"></h1>
@@ -102,7 +117,21 @@
                             </div>
                         </div>
                     </div>
-                    <div class="chart-container mt-4"><canvas id="colorCurveChart"></canvas></div>
+                    
+                    <!-- 图表区域 -->
+                    <div class="chart-wrapper mt-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small text-muted" data-i18n="chart.title">Color Curve</span>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="chartScaleSwitch" checked>
+                                <label class="form-check-label small" for="chartScaleSwitch" data-i18n="chart.logScale">Log Scale</label>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="colorCurveChart"></canvas>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>

@@ -33,7 +33,7 @@ const resources = {
       "params.contrast": "Contrast",
       "params.whiteValue": "White Value", // Changed from Value to White Value
       "chart.yAxisTitle": "Calculated Value",
-      "footer.author": "Author: 囫碾 | WebUI by Gemini2.5 Pro",
+      "footer.author": "Author: 囫碾",
       "modals.nodeStatus.title": "Node Status",
       "modals.nodeStatus.close": "Close",
       "modals.wizard.title": "Color Setup Wizard",
@@ -101,7 +101,7 @@ const resources = {
       "params.contrast": "对比度",
       "params.whiteValue": "白值", // Changed from 值 to 白值
       "chart.yAxisTitle": "计算值",
-      "footer.author": "作者: 囫碾 | WebUI by Gemini2.5 Pro",
+      "footer.author": "作者: 囫碾",
       "modals.nodeStatus.title": "节点状态",
       "modals.nodeStatus.close": "关闭",
       "modals.wizard.title": "色彩设置向导",

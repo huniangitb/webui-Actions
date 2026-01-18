@@ -1,16 +1,15 @@
-name: Build WebUI
+name: Build and Maintain yarn.lock & Release
 
 # 触发工作流的事件
 on:
-  # 1. 当代码推送到 main 或 develop 分支时自动触发
+
   push:
     branches:
       - test2
 
-  # 2. 当有 Pull Request 指向 main 分支时自动触发
   pull_request:
     branches:
-      - main
+      - test2
 
   # 3. 保留手动触发功能
   workflow_dispatch:
@@ -18,44 +17,96 @@ on:
       branch:
         description: '要构建的仓库分支 (The branch to build)'
         required: true
-        default: 'test2' # 默认使用 main 分支
+        default: 'test2' # 默认使用 test2 分支
         type: string
 
 jobs:
   build:
     runs-on: ubuntu-24.04
 
-    # 移除 permissions: contents: write，因为不再需要写入权限来提交 yarn.lock
+    # 授权：允许工作流将代码推送回仓库 (用于 yarn.lock 提交)
+    permissions:
+      contents: write
 
     steps:
       # 检出代码
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # 动态决定检出哪个分支：
-          # - 如果是手动触发(workflow_dispatch)，使用用户输入的分支。
-          # - 如果是自动触发(push/pull_request)，使用事件对应的分支 (github.ref)。
+          # 动态决定检出哪个分支
           ref: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.branch) || github.ref }}
 
-      # 设置 Node.js 环境，并启用基于 yarn.lock 的缓存
-      - name: Set up Node.js with cache
+      # 设置 Node.js 环境
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          # 因为仓库中已有 yarn.lock，这是最推荐的缓存方式。
-          # 它会根据 yarn.lock 文件的哈希值来创建和恢复缓存。
-          cache: 'yarn' # 启用 yarn 缓存
 
+      # 安装依赖。这一步会自动创建/更新 yarn.lock 文件
       - name: Install dependencies
-        # 如果缓存命中，这一步会非常快
-        # 由于 yarn.lock 文件现在已存在并被追踪，可以使用 --frozen-lockfile 确保严格安装
-        run: yarn install --frozen-lockfile
+        run: yarn install
+
+      # 检查 yarn.lock 文件是否有变动，如果有则自动提交
+      - name: Commit yarn.lock
+        id: commit_lockfile
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: Add/update yarn.lock"
+          file_pattern: yarn.lock
+          push_options: '--force-with-lease'
+        # 关键：将提交结果保存到输出，以便后续 Job 判断是否需要 Release
 
       - name: Build project
         run: yarn build
 
+      # 将构建产物打包成 zip 文件，方便 Release 附加
+      - name: Archive production artifacts
+        run: zip -r webui-dist.zip dist/
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: webui-dist
-          path: dist/
+          name: webui-dist-archive
+          path: webui-dist.zip
+          retention-days: 1 # 临时保留，主要用于 Release Job 下载
+
+  # 新增 Release Job
+  release:
+    # 仅在 push 事件触发，并且 build 成功时运行
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-24.04
+    
+    # 授权：允许创建 Release
+    permissions:
+      contents: write
+
+    steps:
+      # 1. 下载构建产物
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: webui-dist-archive
+
+      # 2. 获取当前版本号或生成 Tag
+      # 假设您使用 git tag 来管理版本，或者使用日期时间作为版本
+      - name: Get current date for tag
+        id: date
+        run: echo "RELEASE_TAG=v$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
+
+      # 3. 创建 GitHub Release
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.date.outputs.RELEASE_TAG }}
+          name: WebUI Release ${{ steps.date.outputs.RELEASE_TAG }}
+          body: |
+            Automated release of the WebUI build.
+            
+            Changes:
+            - Updated dependencies (yarn.lock)
+            - Latest build artifacts included.
+          draft: false # 立即发布
+          prerelease: false
+          # 附加构建产物 (webui-dist.zip)
+          files: webui-dist.zip

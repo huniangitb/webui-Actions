@@ -12,6 +12,7 @@ const LOG_DIR = `${BASE_DIR}/log`;
 const INJECTOR_CONF = `${BASE_DIR}/injector.conf`;
 const MONITOR_IGNORE_CONF = `${BASE_DIR}/monitor_ignore.conf`;
 const SERVICE_SH = "/data/adb/modules/Namespace-Proxy/service.sh";
+const LOG_CTL = "/data/adb/modules/Namespace-Proxy/log_ctl"; // 新增二进制路径
 const PATH_PREFIX_STORAGE = '/storage/emulated/0';
 const PATH_PREFIX_REAL = '/data/media/0';
 
@@ -192,10 +193,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (target === 'ZYGISK') {
             await exec("logcat -c");
-        } else {
-            await exec(`echo -n > ${LOG_DIR}/${target}`);
+        } else if (target === 'SYS') {
+            // log_ctl 不支持 clear-sys，这里可能仅清除 IO 或显示不支持
+            toast("系统日志暂不支持清除");
         }
-        toast("日志已清空");
         updateLogContent();
     };
 
@@ -216,6 +217,15 @@ const run = async (cmd) => {
         console.error("Exec error:", e);
         return "";
     }
+};
+
+// 封装 log_ctl 调用
+const fetchLogCtl = async (cmd, key = "", limit = 200, offset = 0) => {
+    const k = key ? `"${key}"` : '""';
+    const command = `${LOG_CTL} ${cmd} ${k} ${limit} ${offset} api`;
+    const raw = await run(command);
+    // 移除 log_ctl 返回的 "DONE|total|remain" 或 "OK" 行
+    return raw ? raw.replace(/(?:DONE\|.*|OK)\n?$/, '').trim() : "";
 };
 
 const debounce = (func, wait) => {
@@ -729,23 +739,52 @@ const setupAutocomplete = (input) => {
 
 window.applySuggestion = (text) => { if (window._currentInput) { window._currentInput.value = text; window._currentInput.dispatchEvent(new Event('input')); } };
 
+
 const updateIOTable = async () => {
     if (isFetchingIO) return; 
     isFetchingIO = true;
     try {
-        const raw = await run(`grep -H "\\[IO\\]" ${LOG_DIR}/*.log | grep -v "injector.log"`);
+        const term = document.getElementById('ioSearch').value.toLowerCase();
+        // 调用 log_ctl 获取最近 100 条 IO 记录
+        const raw = await fetchLogCtl('search-io', term, 100);
+        
         requestAnimationFrame(() => {
             const tbody = document.getElementById('ioTableBody');
-            if (!raw) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">无活动</td></tr>'; return; }
-            const term = document.getElementById('ioSearch').value.toLowerCase();
-            tbody.innerHTML = raw.split('\n').reverse().map(line => {
-                const m = line.match(/\/([^\/]+)\.log:\[([\d:]+)\](?:\s+\[[\d:]+\])?\s+\[IO\]\s+(\w+)\s+(.*)/);
-                if (!m) return null;
-                const [_, pkg, time, op, details] = m;
+            if (!raw) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">无活动</td></tr>';
+                return;
+            }
+            
+            // 匹配格式: 1768742124|[com.termux] [OPEN] /ii.html
+            const logRegex = /^(\d+)\|\[(.*?)\]\s+\[(.*?)\]\s+(.*)$/;
+
+            tbody.innerHTML = raw.split('\n').map(line => {
+                if (!line.trim()) return null;
+                
+                const match = line.match(logRegex);
+                if (!match) {
+                    // 无法匹配则原始显示
+                    return `<tr><td colspan="4" class="text-muted small break-all">${line}</td></tr>`;
+                }
+
+                const [_, ts, pkg, op, details] = match;
+                
+                // 转换 Unix 时间戳为 HH:mm:ss
+                const time = new Date(parseInt(ts) * 1000).toTimeString().split(' ')[0];
+                
                 const app = appMap.get(pkg);
                 const name = app ? app.appLabel : pkg;
-                if (term && !name.toLowerCase().includes(term) && !details.toLowerCase().includes(term)) return null;
-                return `<tr><td class="text-muted small">${time}</td><td><div class="text-truncate" style="max-width:100px">${name}</div></td><td><span class="op-tag op-${op}">${op}</span></td><td class="break-all">${details.replace(' -> ', ' &rarr; ')}</td></tr>`;
+
+                // 移除操作两端的括号用于 CSS 类名（如 op-OPEN）
+                const pureOp = op.replace(/[\[\]]/g, '');
+
+                return `
+                <tr>
+                    <td class="text-muted small">${time}</td>
+                    <td><div class="text-truncate" style="max-width:100px" title="${pkg}">${name}</div></td>
+                    <td><span class="op-tag op-${pureOp}">${pureOp}</span></td>
+                    <td class="break-all">${details.replace(' -> ', ' &rarr; ')}</td>
+                </tr>`;
             }).filter(r => r).join('');
         });
     } finally {
@@ -757,7 +796,15 @@ const updateLogContent = async () => {
     const select = document.getElementById('logFileSelect');
     const viewer = document.getElementById('logViewer');
     const target = select.value;
-    let content = target === 'ZYGISK' ? await run("logcat -d -s Zygisk_Blocker") : await run(`tail -n 200 ${LOG_DIR}/${target} 2>/dev/null`);
+    
+    let content = "";
+    if (target === 'ZYGISK') {
+        content = await run("logcat -d -s Zygisk_Blocker");
+    } else {
+        // 使用 log_ctl 查询系统日志
+        content = await fetchLogCtl('search-sys', "", 500);
+    }
+    
     requestAnimationFrame(() => {
         if (viewer.getAttribute('data-len') != content.length || viewer.getAttribute('data-target') !== target) {
             viewer.innerHTML = content || "无日志内容";
@@ -773,18 +820,13 @@ const pollLogs = async (isInit = false) => {
     isFetchingLogs = true;
     try {
         const select = document.getElementById('logFileSelect');
-        const filesRaw = await run(`ls ${LOG_DIR}/*.log 2>/dev/null`);
         requestAnimationFrame(() => {
-            const files = filesRaw ? filesRaw.split('\n').filter(f => f) : [];
-            let optionsHtml = `<option value="ZYGISK">Zygisk (Logcat)</option>`;
-            files.forEach(f => { const name = f.split('/').pop(); optionsHtml += `<option value="${name}">${name}</option>`; });
+            // 固定选项，不再扫描文件
+            const optionsHtml = `<option value="SYS">System Log</option><option value="ZYGISK">Zygisk (Logcat)</option>`;
             if (select.innerHTML !== optionsHtml) {
                 const oldVal = select.value;
                 select.innerHTML = optionsHtml;
-                const hasInjector = files.find(f => f.includes('injector.log'));
-                if (oldVal && (oldVal === 'ZYGISK' || files.find(f => f.endsWith(oldVal)))) select.value = oldVal;
-                else if (hasInjector) select.value = 'injector.log';
-                else select.value = 'ZYGISK';
+                select.value = oldVal && (oldVal === 'ZYGISK' || oldVal === 'SYS') ? oldVal : 'SYS';
             }
         });
         await updateLogContent();

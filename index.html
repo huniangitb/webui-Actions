@@ -32,7 +32,7 @@
                     <div class="app-search-wrapper">
                         <div class="search-bar">
                             <span class="icon-placeholder" id="iconSearch"></span>
-                            <input type="text" id="appSearch" placeholder="搜索应用名称或包名..." />
+                            <input type="text" id="appSearch" placeholder="搜索应用名称..." />
                         </div>
                     </div>
                     <div id="appList" class="list-group scrollable-list"></div>
@@ -42,9 +42,7 @@
                             <button class="filter-opt" data-filter="filterSystem">系统应用</button>
                             <button class="filter-opt" data-filter="filterBound">已绑定</button>
                         </div>
-                        <button id="btnFilterFab" class="btn btn-primary fab-main">
-                            <span id="iconFilter"></span>
-                        </button>
+                        <button id="btnFilterFab" class="btn btn-primary fab-main"><span id="iconFilter"></span></button>
                     </div>
                 </div>
             </div>
@@ -58,28 +56,21 @@
                     </div>
                     <div id="envList" class="grid-list scroll-y"></div>
                     <div class="fab-env-container">
-                        <button id="btnEnvViewToggle" class="btn btn-primary fab-main shadow">
-                            <span id="iconEnvView"></span>
-                        </button>
+                        <button id="btnEnvViewToggle" class="btn btn-primary fab-main shadow"><span id="iconEnvView"></span></button>
                     </div>
                 </div>
             </div>
 
-
-            <!-- 3. 监控 (更新) -->
+            <!-- 3. 监控 -->
             <div id="content-io" class="tab-pane">
-                <div class="card full-height-card">
+                <div class="card full-height-card relative">
                     <div style="display:flex; gap:10px; margin-bottom:10px; align-items:center">
                         <div class="search-bar compact" style="flex:1; margin-bottom:0">
                             <span class="icon-placeholder" id="iconIoSearch"></span>
                             <input type="text" id="ioSearch" placeholder="搜索操作记录..." />
                         </div>
                         <button id="btnMonitorIgnore" class="btn btn-icon-sm" style="width:36px;height:36px;background:var(--bg-input);color:var(--text-muted)"></button>
-                        <button id="btnClearIo" class="btn btn-icon-sm" style="width:36px;height:36px;background:var(--danger);color:#fff">
-                            <span id="iconClearIo"></span>
-                        </button>
                     </div>
-                    <!-- 添加 id="ioTableContainer" 用于滚动监听 -->
                     <div class="table-container" id="ioTableContainer">
                         <table class="table">
                             <thead><tr><th style="width:140px">时间</th><th>应用</th><th style="width:60px">操作</th><th>详情</th></tr></thead>
@@ -87,27 +78,34 @@
                         </table>
                         <div id="ioLoadingIndicator" class="text-center text-muted p-2 hidden">加载中...</div>
                     </div>
+                    <!-- IO 清理悬浮按钮 -->
+                    <div class="fab-io-container" style="position:absolute; bottom:20px; right:20px; z-index:10">
+                        <button id="btnClearIo" class="btn btn-primary fab-main shadow" style="background:var(--danger)">
+                            <span id="iconClearIo"></span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- 4. 日志 (更新) -->
+            <!-- 4. 日志 -->
             <div id="content-log" class="tab-pane">
                 <div class="card full-height-card relative">
-                    <div class="d-flex gap-2 mb-2">
-                        <select id="logSourceSelect" class="form-select" style="flex:1">
+                    <div class="mb-2">
+                        <select id="logSourceSelect" class="form-select">
                             <option value="internal">Framework (Internal)</option>
                             <option value="zygisk">Zygisk (Logcat)</option>
                         </select>
-                        <button id="btnClearLog" class="btn btn-primary shadow" style="background:var(--danger);width:40px">
-                             <span id="iconClearLog"></span>
-                        </button>
                     </div>
-                    <!-- logViewer添加滚动监听 -->
                     <div id="logViewer" class="log-viewer"></div>
                     <div id="sysLoadingIndicator" class="text-center text-muted small hidden" style="position:absolute;bottom:5px;left:0;right:0;background:rgba(0,0,0,0.5);color:#fff;">加载中...</div>
+                    <!-- 日志清理悬浮按钮 -->
+                    <div class="fab-log-container" style="position:absolute; bottom:20px; right:20px; z-index:10">
+                        <button id="btnClearLog" class="btn btn-primary fab-main shadow" style="background:var(--danger)">
+                            <span id="iconClearLog"></span>
+                        </button>
+                    </div>
                 </div>
             </div>
-
         </div>
     </div>
 
@@ -183,26 +181,17 @@
                     <button class="btn-close" onclick="closeModal('envEditorModal')"></button>
                 </div>
             </div>
-            
             <div class="modal-body no-padding relative flex-grow" style="overflow: hidden;">
-                <div id="editorAlert" class="alert-info sticky-top">
-                    路径自动映射至 <b>/data/media/0/</b>
-                </div>
-
+                <div id="editorAlert" class="alert-info sticky-top">映射至 <b>/data/media/0/</b></div>
                 <div id="editorVisual" class="editor-pane scroll-y fade-content active">
                     <div id="ruleBuilderContainer"></div>
                     <div class="spacer"></div>
                 </div>
-                
                 <div id="editorRaw" class="editor-pane full-height fade-content hidden">
                     <textarea id="envRuleContent" class="code-editor"></textarea>
                 </div>
-                
-                <div class="fab-container">
-                    <button id="btnAddRuleRow" class="btn btn-primary rounded shadow">添加规则</button>
-                </div>
+                <div class="fab-container"><button id="btnAddRuleRow" class="btn btn-primary rounded shadow">添加规则</button></div>
             </div>
-            
             <div class="modal-footer">
                 <button id="btnDeleteEnv" class="btn btn-danger-outline">删除</button>
                 <button id="btnSaveEnv" class="btn btn-primary">保存</button>
@@ -226,35 +215,24 @@
                     <button class="btn-close" onclick="closeModal('monitorIgnoreModal')"></button>
                 </div>
             </div>
-            
             <div class="modal-body no-padding relative flex-grow" style="overflow: hidden;">
-                <div id="alertIgnore" class="alert-info sticky-top">
-                    匹配规则：<b>前缀匹配</b> (例如 /A/B 过滤该路径及其子项)
-                </div>
-
+                <div id="alertIgnore" class="alert-info sticky-top">匹配规则：<b>前缀匹配</b></div>
                 <div id="ignoreVisual" class="editor-pane scroll-y fade-content active">
                     <div id="ignoreBuilderContainer"></div>
                     <div class="spacer"></div>
                 </div>
-                
                 <div id="ignoreRaw" class="editor-pane full-height fade-content hidden">
                     <textarea id="monitorIgnoreContent" class="code-editor"></textarea>
                 </div>
-                
-                <div class="fab-container" id="fabIgnore">
-                    <button id="btnAddIgnoreRow" class="btn btn-primary rounded shadow">添加路径</button>
-                </div>
+                <div class="fab-container" id="fabIgnore"><button id="btnAddIgnoreRow" class="btn btn-primary rounded shadow">添加路径</button></div>
             </div>
-            
             <div class="modal-footer">
                 <button id="btnSaveIgnore" class="btn btn-primary full-width">保存配置</button>
             </div>
         </div>
     </div>
     
-    <!-- 关键修复：自动补全框移到 Body 根节点下，避免 fixed 定位失效 -->
     <div id="suggestionBox" class="suggestion-box"></div>
-
     <script src="index.js" type="module"></script>
 </body>
 </html>

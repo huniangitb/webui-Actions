@@ -65,7 +65,8 @@
                 </div>
             </div>
 
-            <!-- 3. 监控 -->
+
+            <!-- 3. 监控 (更新) -->
             <div id="content-io" class="tab-pane">
                 <div class="card full-height-card">
                     <div style="display:flex; gap:10px; margin-bottom:10px; align-items:center">
@@ -74,28 +75,39 @@
                             <input type="text" id="ioSearch" placeholder="搜索操作记录..." />
                         </div>
                         <button id="btnMonitorIgnore" class="btn btn-icon-sm" style="width:36px;height:36px;background:var(--bg-input);color:var(--text-muted)"></button>
+                        <button id="btnClearIo" class="btn btn-icon-sm" style="width:36px;height:36px;background:var(--danger);color:#fff">
+                            <span id="iconClearIo"></span>
+                        </button>
                     </div>
-                    <div class="table-container">
+                    <!-- 添加 id="ioTableContainer" 用于滚动监听 -->
+                    <div class="table-container" id="ioTableContainer">
                         <table class="table">
-                            <thead><tr><th style="width:60px">时间</th><th>应用</th><th style="width:50px">操作</th><th>详情</th></tr></thead>
+                            <thead><tr><th style="width:140px">时间</th><th>应用</th><th style="width:60px">操作</th><th>详情</th></tr></thead>
                             <tbody id="ioTableBody"></tbody>
                         </table>
+                        <div id="ioLoadingIndicator" class="text-center text-muted p-2 hidden">加载中...</div>
                     </div>
                 </div>
             </div>
 
-            <!-- 4. 日志 -->
+            <!-- 4. 日志 (更新) -->
             <div id="content-log" class="tab-pane">
                 <div class="card full-height-card relative">
-                    <select id="logFileSelect" class="form-select mb-2"></select>
-                    <div id="logViewer" class="log-viewer"></div>
-                    <div class="fab-log-container">
-                        <button id="btnClearLog" class="btn btn-primary fab-main shadow" style="background:var(--danger)">
-                            <span id="iconClearLog"></span>
+                    <div class="d-flex gap-2 mb-2">
+                        <select id="logSourceSelect" class="form-select" style="flex:1">
+                            <option value="internal">Framework (Internal)</option>
+                            <option value="zygisk">Zygisk (Logcat)</option>
+                        </select>
+                        <button id="btnClearLog" class="btn btn-primary shadow" style="background:var(--danger);width:40px">
+                             <span id="iconClearLog"></span>
                         </button>
                     </div>
+                    <!-- logViewer添加滚动监听 -->
+                    <div id="logViewer" class="log-viewer"></div>
+                    <div id="sysLoadingIndicator" class="text-center text-muted small hidden" style="position:absolute;bottom:5px;left:0;right:0;background:rgba(0,0,0,0.5);color:#fff;">加载中...</div>
                 </div>
             </div>
+
         </div>
     </div>
 

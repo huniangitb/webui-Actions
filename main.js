@@ -252,19 +252,28 @@ function updateRefreshRateUI(rate) {
 
 function calculateChartData(params) {
     const labels = []; const colorData = { red: [], green: [], blue: [] };
-    for (let p = 1; p <= 100; p++) {
-        labels.push(p); const systemBrightness = scaleToSystemBrightness(p); const log_b = Math.log(systemBrightness);
+    // 对数模式循环 1-100 (百分比)，常规模式循环 0-255 (数值)
+    const maxIter = isLogScale ? 100 : 255;
+    
+    for (let i = (isLogScale ? 1 : 0); i <= maxIter; i++) {
+        labels.push(i);
+        // 对数模式需转换百分比到系统亮度，常规模式直接使用索引(最小为1防止log(0))
+        const systemBrightness = isLogScale ? scaleToSystemBrightness(i) : Math.max(1, i);
+        const log_b = Math.log(systemBrightness);
+        
         for (const color of ['red', 'green', 'blue']) {
             const { intercept, slope } = params[color];
             colorData[color].push(intercept + (slope * log_b));
         }
     }
-    const datasets = [
-        { label: i18next.t('params.red'), data: colorData.red, borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 },
-        { label: i18next.t('params.green'), data: colorData.green, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 },
-        { label: i18next.t('params.blue'), data: colorData.blue, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 }
-    ];
-    return { labels, datasets };
+    return {
+        labels,
+        datasets: [
+            { label: i18next.t('params.red'), data: colorData.red, borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 },
+            { label: i18next.t('params.green'), data: colorData.green, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 },
+            { label: i18next.t('params.blue'), data: colorData.blue, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, borderWidth: 2, pointRadius: 0 }
+        ]
+    };
 }
 
 function getChartScales(isDark) {
@@ -272,27 +281,24 @@ function getChartScales(isDark) {
     const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
     
     const xScale = isLogScale ? {
-        type: 'logarithmic',
-        min: 1, max: 100,
+        type: 'logarithmic', min: 1, max: 100,
         ticks: {
             color: tickColor,
-            callback: function (value) { const shown_ticks = [1, 2, 5, 10, 20, 50, 100]; if (shown_ticks.includes(Number(value))) return value + '%'; },
-            generateTicks: function () { return [1, 2, 5, 10, 20, 50, 100].map(v => ({ value: v })); }
+            callback: (v) => [1, 2, 5, 10, 20, 50, 100].includes(v) ? v + '%' : null,
+            generateTicks: () => [1, 2, 5, 10, 20, 50, 100].map(v => ({ value: v }))
         }
     } : {
-        type: 'linear',
-        min: 0, max: 100,
-        ticks: {
-            color: tickColor,
-            stepSize: 20,
-            callback: function (value) { return value + '%'; }
+        type: 'linear', min: 0, max: 255,
+        ticks: { 
+            color: tickColor, 
+            stepSize: 51, // 均分坐标轴
+            callback: (v) => v 
         }
     };
 
-    // 合并通用属性
     xScale.title = { display: true, text: i18next.t('status.brightness'), color: tickColor };
     xScale.grid = { color: gridColor };
-
+    
     return {
         x: xScale,
         y: { title: { display: true, text: i18next.t('chart.yAxisTitle'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } }

@@ -327,7 +327,15 @@ const renderAppList = () => {
     items.sort((a, b) => (!!b.boundEnv - !!a.boundEnv) || (a.appLabel || "").localeCompare(b.appLabel || ""));
     listEl.innerHTML = items.length ? items.map(app => {
         let mountedBadge = activeMounts.has(app.packageName) ? `<span class="badge badge-success">MOUNTED</span>` : "";
-        let envBadge = app.boundEnv ? `<span class="badge ${app.boundParam==='MONITOR'?'badge-warning':app.boundParam==='PASSTHROUGH'?'badge-success':'badge-primary'} badge-pill">${app.boundEnv}</span>` : "";
+        
+        let badgeClass = 'badge-primary';
+        let badgeStyle = '';
+        if (app.boundParam === 'MONITOR') badgeClass = 'badge-warning';
+        else if (app.boundParam === 'PASSTHROUGH') badgeClass = 'badge-success';
+        else if (app.boundParam === 'MERGE') { badgeClass = 'badge-primary'; badgeStyle = 'style="background:#6f42c1"'; }
+
+        let envBadge = app.boundEnv ? `<span class="badge ${badgeClass} badge-pill" ${badgeStyle}>${app.boundEnv}</span>` : "";
+        
         return `
         <div class="list-item" data-pkg="${app.packageName}" onclick="openAppConfig('${app.packageName}')">
             <div class="app-main">
@@ -376,6 +384,7 @@ window.openAppConfig = (pkg) => {
     const mode = app.boundParam || "";
     if (mode === 'MONITOR') document.getElementById('modeMonitor').checked = true;
     else if (mode === 'PASSTHROUGH') document.getElementById('modePassthrough').checked = true;
+    else if (mode === 'MERGE') document.getElementById('modeMerge').checked = true;
     else document.getElementById('modeDefault').checked = true;
     openModal('appConfigModal');
 };

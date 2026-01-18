@@ -1,5 +1,3 @@
---- START OF FILE Paste January 18, 2026 - 8:42AM ---
-
 import Chart from 'chart.js/auto';
 import { Ripple, Range, Input, Modal, initMDB } from 'mdb-ui-kit';
 import { exec, toast } from 'kernelsu';

@@ -1,3 +1,5 @@
+--- START OF FILE Paste January 18, 2026 - 8:42AM ---
+
 import Chart from 'chart.js/auto';
 import { Ripple, Range, Input, Modal, initMDB } from 'mdb-ui-kit';
 import { exec, toast } from 'kernelsu';
@@ -17,14 +19,16 @@ const KCAL_HUE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_hue";
 const KCAL_CONT_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_cont";
 const KCAL_VAL_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_val";
 const KCAL_ENABLE_PATH = "/sys/devices/platform/kcal_ctrl.0/kcal_enable";
-const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
-const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
+
+// 已弃用旧路径，改用 settings 命令
+// const BACKLIGHT_PATH = "/sys/class/backlight/panel0-backlight/brightness";
+// const MAX_BRIGHTNESS_PATH = "/sys/class/backlight/panel0-backlight/max_brightness";
 
 const SLOPE_PRECISION = 100;
 const HUE_NODE_MAX = 1536;
 const HUE_UI_MAX = 360;
 
-// 默认配置 (现在包含所有参数)
+// 默认配置
 const defaultConfig = {
     red: { intercept: 256.0, slope: 0.0 },
     green: { intercept: 256.0, slope: 0.0 },
@@ -46,7 +50,7 @@ const refreshRateColorStops = [
 
 // 全局状态变量
 let globalConfig = JSON.parse(JSON.stringify(defaultConfig));
-let maxBrightness = 4095;
+let maxBrightness = 255; // 更改为 Android 标准最大亮度
 let currentRefreshRate = 60;
 let colorChart = null;
 let nodeStatusModal = null;
@@ -129,11 +133,13 @@ async function pollSystemStatus() {
     } catch (e) {}
     try {
         if (wizardModal && wizardModal._isShown) return;
-        const { stdout } = await exec(`cat ${BACKLIGHT_PATH}`);
+        // 使用 settings 命令获取亮度
+        const { stdout } = await exec(`settings get system screen_brightness`);
         const newBrightness = parseInt(stdout.trim());
         if (newBrightness !== lastKnownBrightness) {
             lastKnownBrightness = newBrightness;
-            const percentage = Math.round(((newBrightness - 1) / (maxBrightness - 1)) * 100);
+            // 计算百分比 (1-255 范围)
+            const percentage = Math.round(((newBrightness - 1) / (255 - 1)) * 100);
             brightnessValue.innerText = i18next.t('status.brightnessValue', { value: newBrightness, percent: percentage });
             brightnessSlider.value = percentage;
         }
@@ -185,12 +191,14 @@ function updateTheme() {
     updateChart();
 }
 
-const scaleToSystemBrightness = (percentage) => Math.max(1, Math.round(1 + (percentage / 100) * (maxBrightness - 1)));
+// 映射 0-100 百分比到 1-255 系统亮度
+const scaleToSystemBrightness = (percentage) => Math.max(1, Math.round(1 + (percentage / 100) * (255 - 1)));
+
 async function setSystemBrightness(percentage) {
-    if (!BACKLIGHT_PATH) return;
     const systemValue = scaleToSystemBrightness(percentage);
     try {
-        await exec(`echo ${systemValue} > ${BACKLIGHT_PATH}`);
+        // 使用 settings 命令设置亮度
+        await exec(`settings put system screen_brightness ${systemValue}`);
         if (!wizardModal || !wizardModal._isShown) {
              brightnessValue.innerText = i18next.t('status.brightnessValue', { value: systemValue, percent: percentage });
              lastKnownBrightness = systemValue;
@@ -409,7 +417,7 @@ function calculateFit(point1, point2) {
     return { intercept, slope };
 }
 
-// --- WIZARD FUNCTIONS (FIXED) ---
+// --- WIZARD FUNCTIONS ---
 
 function startWizard() {
     originalConfigForWizard = JSON.parse(JSON.stringify(globalConfig));
@@ -437,7 +445,6 @@ function startWizard() {
     wizardFinishButton.style.display = 'none';
     wizardModal.show();
     setSystemBrightness(wizardData.step1.brightnessPercent);
-    // FIX 1: Apply neutral color values at the start of the wizard
     handleWizardColorPreview(1); 
 }
 
@@ -462,19 +469,17 @@ async function handleWizardFinish() {
     const b1 = scaleToSystemBrightness(wizardData.step1.brightnessPercent);
     const b2 = scaleToSystemBrightness(wizardData.step2.brightnessPercent);
     
-    // Update globalConfig's RGB part
     globalConfig.red = calculateFit({ brightness: b1, value: wizardData.step1.red }, { brightness: b2, value: wizardData.step2.red });
     globalConfig.green = calculateFit({ brightness: b1, value: wizardData.step1.green }, { brightness: b2, value: wizardData.step2.green });
     globalConfig.blue = calculateFit({ brightness: b1, value: wizardData.step1.blue }, { brightness: b2, value: wizardData.step2.blue });
     
-    // FIX 2: Reset advanced parameters to default after wizard calibration
     globalConfig.sat = defaultConfig.sat;
     globalConfig.hue = defaultConfig.hue;
     globalConfig.cont = defaultConfig.cont;
     globalConfig.val = defaultConfig.val;
 
     renderUI(globalConfig);
-    renderAdvColorUI(globalConfig); // Update the advanced UI as well
+    renderAdvColorUI(globalConfig);
     await applyAllKcalSettings(globalConfig);
     updateChart();
     await saveConfig();
@@ -496,8 +501,6 @@ function handleWizardColorPreview(stepNum) {
     const g = parseInt(controls.green.input.value);
     const b = parseInt(controls.blue.input.value);
 
-    // FIX 3: Correctly construct the temporary config for preview.
-    // Spread operator should come first to keep advanced settings from original config during preview.
     const tempConfig = {
         ...originalConfigForWizard,
         red: { intercept: r, slope: 0 },
@@ -609,17 +612,20 @@ async function fetchInitialSystemState() {
         updateKcalEnableUI(false);
     }
     try {
-        const { stdout: max } = await exec(`cat ${MAX_BRIGHTNESS_PATH}`); maxBrightness = parseInt(max.trim());
-        const { stdout: cur } = await exec(`cat ${BACKLIGHT_PATH}`); const currentSystemVal = parseInt(cur.trim());
+        // 使用 settings 命令初始化亮度状态
+        const { stdout: cur } = await exec(`settings get system screen_brightness`);
+        const currentSystemVal = parseInt(cur.trim()) || 128;
         lastKnownBrightness = currentSystemVal;
-        const percentage = Math.round(((currentSystemVal - 1) / (maxBrightness - 1)) * 100);
+        
+        // Android 亮度范围通常为 1-255 (或 0-255，按要求至少为 1)
+        const percentage = Math.round(((currentSystemVal - 1) / (255 - 1)) * 100);
         brightnessSlider.value = percentage;
         brightnessValue.innerText = i18next.t('status.brightnessValue', { value: currentSystemVal, percent: percentage });
         brightnessSlider.disabled = false;
     } catch (e) {
         brightnessValue.innerText = i18next.t('status.brightnessReadError');
         brightnessSlider.disabled = true;
-        toast(i18next.t('toast.backlightPathError'), 'error');
+        toast("Failed to read brightness via settings command", 'error');
     }
 }
 
@@ -692,7 +698,7 @@ async function init() {
     wizardCancelButton.addEventListener('click', handleWizardCancel);
     wizardModalElement.addEventListener('hidden.mdb.modal', () => {
         if (brightnessBeforeWizard !== -1) {
-            const originalPercentage = Math.round(((brightnessBeforeWizard - 1) / (maxBrightness - 1)) * 100);
+            const originalPercentage = Math.round(((brightnessBeforeWizard - 1) / (255 - 1)) * 100);
             setSystemBrightness(originalPercentage);
             brightnessBeforeWizard = -1;
         }

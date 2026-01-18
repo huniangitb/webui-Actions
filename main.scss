@@ -1,8 +1,17 @@
 @use "mdb-ui-kit/src/scss/mdb.free.scss";
-
+:root {
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  html, body {
+    background-color: #121212 !important;
+    color: #ffffff;
+  }
+}
 body {
   font-size: 16px; 
   padding-bottom: 150px;
+  background-color: var(--mdb-body-bg); 
 }
 
 .btn .svg-icon {
@@ -16,7 +25,6 @@ body {
   font-weight: 400;
 }
 
-// 新增：为防止 "色彩配置" 标题换行
 .card-body > .d-flex > .card-title {
   white-space: nowrap;
 }
@@ -78,7 +86,6 @@ body {
     flex-shrink: 0;
 }
 
-// 新增：为不同颜色的加减号按钮添加浅色背景和悬停效果
 .btn-minus-plus-danger {
   background-color: rgba(249, 49, 84, 0.15) !important;
   color: #f93154 !important;
@@ -117,7 +124,6 @@ input[type="range"] {
     touch-action: pan-y;
 }
 
-// 修改：为高级模式的截距滑块添加颜色
 .range-danger .form-range::-webkit-slider-thumb,
 .range-danger .form-range::-moz-range-thumb { background-color: #f93154; }
 

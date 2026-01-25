@@ -382,7 +382,7 @@ const fetchSysLogs = async () => {
 
     if (source === 'zygisk') {
         try {
-            const content = await run("logcat -d -s Zygisk_Blocker NamespaceProxy_Injector");
+            const content = await run("logcat -d -s Zygisk_NSProxy NamespaceProxy_Injector");
             viewer.textContent = content || "无 Zygisk 日志";
             viewer.scrollTop = viewer.scrollHeight;
         } catch (e) {

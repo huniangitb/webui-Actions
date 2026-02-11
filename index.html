@@ -4,79 +4,362 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="color-scheme" content="light dark">
-    <title>电池监控 Pro</title>
-    <link rel="stylesheet" href="./style.css">
+    <title>电池状态 · 实时内核</title>
+    <style>
+        :root {
+            --bg-body: #f6f7f9;
+            --bg-card: #ffffff;
+            --text-main: #1a1a1b;
+            --text-sub: #65676b;
+            --accent: #00796b;
+            --accent-light: #e0f2f1;
+            --danger: #d32f2f;
+            --border: #e4e6eb;
+            --safe-top: calc(36px + env(safe-area-inset-top, 0px));
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-body: #121212;
+                --bg-card: #1e1e1e;
+                --text-main: #e4e6eb;
+                --text-sub: #b0b3b8;
+                --accent: #80cbc4;
+                --accent-light: #252d2c;
+                --border: #303030;
+            }
+        }
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: var(--safe-top) 16px 32px 16px;
+        }
+        .app-container { max-width: 500px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .title-group { display: flex; align-items: center; gap: 8px; }
+        h1 { margin: 0; font-size: 1.3rem; }
+        .cycle-selector {
+            display: flex; background: var(--border); padding: 3px; border-radius: 12px; margin-bottom: 16px;
+        }
+        .cycle-btn {
+            flex: 1; border: none; background: transparent; padding: 8px;
+            border-radius: 10px; cursor: pointer; color: var(--text-sub);
+            font-weight: 600; font-size: 0.9rem; transition: 0.2s;
+        }
+        .cycle-btn.active {
+            background: var(--bg-card); color: var(--accent); box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .card {
+            background: var(--bg-card); border-radius: 20px; padding: 18px;
+            margin-bottom: 16px; border: 1px solid var(--border);
+        }
+        .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; color: var(--text-sub); }
+        h2 { margin: 0; font-size: 0.95rem; font-weight: 600; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .stat-item { display: flex; flex-direction: column; }
+        .stat-item.large { grid-column: span 2; padding: 12px; background: var(--accent-light); border-radius: 12px; align-items: center; }
+        .stat-item label { font-size: 0.75rem; color: var(--text-sub); margin-bottom: 4px; }
+        .stat-item span { font-size: 1.1rem; font-weight: 700; font-family: monospace; }
+        .highlight-green { color: #4caf50; font-size: 1.8rem !important; }
+        .time-small { font-size: 0.85rem !important; }
+        .chart-wrapper { position: relative; height: 250px; }
+        .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+        .badge { font-size: 0.7rem; padding: 3px 10px; border-radius: 6px; background: var(--border); color: var(--text-sub); font-weight: bold; }
+        .badge[data-status="Charging"] { background: #4caf50; color: #fff; }
+        .badge[data-status="Discharging"] { background: #ff9800; color: #fff; }
+        .action-bar { display: flex; justify-content: center; margin-top: 8px; }
+        .text-btn { background: transparent; border: none; color: var(--danger); font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        svg { width: 24px; height: 24px; fill: currentColor; }
+    </style>
 </head>
 <body>
     <div class="app-container">
-        <!-- 头部 -->
         <header>
             <div class="title-group">
                 <span class="icon" id="icon-android"></span>
-                <h1>电池状态记录</h1>
+                <h1>电池状态</h1>
             </div>
-            <div class="action-group">
-                <button id="btn-refresh" class="icon-btn" aria-label="刷新"></button>
-            </div>
+            <button id="btn-refresh" class="icon-btn"></button>
         </header>
 
-        <!-- 周期切换器 (新增) -->
         <div class="cycle-selector">
-            <button id="btn-cycle-current" class="cycle-btn active">当前周期</button>
-            <button id="btn-cycle-prev" class="cycle-btn">上一周期</button>
+            <button id="btn-cycle-current" class="cycle-btn active">当前充电周期</button>
+            <button id="btn-cycle-prev" class="cycle-btn">上一周期数据</button>
         </div>
 
-        <!-- 状态卡片 -->
-        <div class="card">
+        <div class="card health-card">
             <div class="card-header">
                 <span class="icon" id="icon-battery"></span>
-                <h2 id="status-title">当前状态: --</h2>
+                <h2>电池健康评估</h2>
             </div>
             <div class="stats-grid">
-                <div class="stat-item">
-                    <label>记录时间</label>
-                    <span id="val-time" class="time-text">--</span>
+                <div class="stat-item large">
+                    <label>当前电池健康度 (SoH)</label>
+                    <span id="val-health" class="highlight-green">--%</span>
                 </div>
                 <div class="stat-item">
-                    <label>电池电量</label>
-                    <span id="val-cap">--%</span>
-                </div>
-                <div class="stat-item">
-                    <label>当前功率</label>
-                    <span id="val-power" class="highlight">-- W</span>
-                </div>
-                <div class="stat-item">
-                    <label>充满容量 (校准)</label>
+                    <label>实际最大容量</label>
                     <span id="val-full-cap">-- mAh</span>
+                </div>
+                <div class="stat-item">
+                    <label>设计额定容量</label>
+                    <span id="val-design-cap">-- mAh</span>
+                </div>
+                <div class="stat-item">
+                    <label>实时记录功率</label>
+                    <span id="val-power">-- W</span>
+                </div>
+                <div class="stat-item">
+                    <label>数据记录时间</label>
+                    <span id="val-time" class="time-small">--</span>
                 </div>
             </div>
         </div>
 
-        <!-- 图表 -->
         <div class="card">
             <div class="card-header">
                 <span class="icon" id="icon-chart"></span>
-                <h2>功率/电量趋势</h2>
+                <h2>充放电趋势 (电量 & 功率)</h2>
             </div>
             <div class="chart-wrapper">
                 <canvas id="batteryChart"></canvas>
             </div>
             <div class="card-footer">
-                <small id="data-source-text">数据源: current.csv</small>
-                <div class="footer-actions">
-                     <span id="status-tag" class="status-tag">未知</span>
-                </div>
+                <small id="source-info">数据源: battery_history.csv</small>
+                <span id="status-badge" class="badge">未知状态</span>
             </div>
         </div>
-        
-        <!-- 底部操作区 -->
-        <div class="danger-zone">
-             <button id="btn-delete" class="text-btn danger">
+
+        <div class="action-bar">
+            <button id="btn-delete" class="text-btn danger">
                 <span class="icon-sm" id="icon-delete"></span> 清空所有记录
             </button>
         </div>
     </div>
+    <script type="module">
+        import { exec, toast } from 'kernelsu';
+        import Chart from 'chart.js/auto';
+        import { 
+            mdiAndroid, mdiRefresh, mdiBatteryCharging100, 
+            mdiChartTimelineVariant, mdiDeleteSweep 
+        } from '@mdi/js';
 
-    <script type="module" src="./index.js"></script>
+        // --- 内核sys节点配置 ---
+        const SYS_DESIGN_CAP = '/sys/class/power_supply/battery/charge_full_design';
+        const SYS_FULL_CAP   = '/sys/class/power_supply/battery/charge_full';  // 当前实际满容量
+
+        const LOG_DIR = '/data/media/0/Android/battery_monitor';
+        const PATHS = {
+            current: `${LOG_DIR}/battery_history.csv`,
+            prev: `${LOG_DIR}/battery_history.prev.csv`
+        };
+
+        let chartInstance = null;
+        let designCapacity = 1;          // 额定容量 (mAh)
+        let appData = { 
+            current: [], 
+            prev: [], 
+            activeCycle: 'current',
+            currentFullCap: null        // 实时从sys读取的当前满容量 (mAh)
+        };
+
+        // --- 初始化 ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            initIcons();
+            await fetchDesignCap();      // 额定容量 (仅需一次)
+            await loadData();           // 加载CSV + 读取实时满容量
+
+            document.getElementById('btn-refresh').addEventListener('click', loadData);
+            document.getElementById('btn-cycle-current').addEventListener('click', () => switchCycle('current'));
+            document.getElementById('btn-cycle-prev').addEventListener('click', () => switchCycle('prev'));
+            document.getElementById('btn-delete').addEventListener('click', clearHistory);
+
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderUI);
+        });
+
+        /** 读取设计容量 (charge_full_design) */
+        async function fetchDesignCap() {
+            const { stdout, errno } = await exec(`cat ${SYS_DESIGN_CAP}`);
+            if (errno === 0) {
+                let val = parseInt(stdout.trim());
+                designCapacity = val > 100000 ? Math.round(val / 1000) : val;
+            }
+        }
+
+        /** 读取当前实际满容量 (charge_full) —— 实时健康度依据 */
+        async function fetchCurrentFullCap() {
+            const { stdout, errno } = await exec(`cat ${SYS_FULL_CAP}`);
+            if (errno === 0) {
+                let val = parseInt(stdout.trim());
+                return val > 100000 ? Math.round(val / 1000) : val;  // µAh → mAh
+            }
+            return null;  // 读取失败
+        }
+
+        /** 加载CSV历史 + 实时满容量 */
+        async function loadData() {
+            const [currRaw, prevRaw] = await Promise.all([
+                exec(`cat "${PATHS.current}"`).catch(() => ({ stdout: '' })),
+                exec(`cat "${PATHS.prev}"`).catch(() => ({ stdout: '' }))
+            ]);
+
+            appData.current = parseCSV(currRaw.stdout);
+            appData.prev = parseCSV(prevRaw.stdout);
+            
+            // 【核心修改】读取当前实际满容量（来自内核），用于健康度计算
+            appData.currentFullCap = await fetchCurrentFullCap();
+
+            renderUI();
+        }
+
+        /** 解析CSV日志 (保持不变) */
+        function parseCSV(csvText) {
+            if (!csvText || csvText.trim() === "") return [];
+            const lines = csvText.trim().split('\n');
+            const records = [];
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',');
+                if (cols.length < 8) continue;
+                const ma = parseInt(cols[5]);
+                const mv = parseInt(cols[6]);
+                const watts = Math.abs((ma * mv) / 1000000);
+                records.push({
+                    timestamp: cols[0],
+                    dateTime: cols[1],
+                    timeOnly: cols[1]?.split(' ')[1] || '',
+                    capacity: parseInt(cols[2]),
+                    status: cols[3],
+                    power: watts.toFixed(2),
+                    calibratedFull: parseInt(cols[7])  // 仍保留，用作降级显示
+                });
+            }
+            return records;
+        }
+
+        /** 刷新UI：健康度、容量、图表、状态 */
+        function renderUI() {
+            const list = appData[appData.activeCycle];
+            const hasData = list.length > 0;
+            const last = hasData ? list[list.length - 1] : null;
+
+            // --- 健康度计算：优先使用 sys 实时满容量，降级使用日志校准容量 ---
+            let fullCapForHealth = appData.currentFullCap;
+            let health = '--';
+            let fullCapDisplay = '--';
+
+            if (fullCapForHealth !== null && designCapacity > 0) {
+                // 1. 有实时sys值，使用它计算SoH
+                health = ((fullCapForHealth / designCapacity) * 100).toFixed(1);
+                fullCapDisplay = `${fullCapForHealth} mAh`;
+            } else if (last && last.calibratedFull > 0) {
+                // 2. 降级：使用CSV记录的最后一次校准容量
+                health = ((last.calibratedFull / designCapacity) * 100).toFixed(1);
+                fullCapDisplay = `${last.calibratedFull} mAh (日志)`;
+            }
+
+            // 更新UI元素
+            document.getElementById('val-health').textContent = health === '--' ? '--%' : `${health}%`;
+            document.getElementById('val-full-cap').textContent = fullCapDisplay;
+            document.getElementById('val-design-cap').textContent = `${designCapacity} mAh`;
+
+            // 功率和时间（仍取自CSV）
+            if (last) {
+                document.getElementById('val-power').textContent = `${last.power} W`;
+                document.getElementById('val-time').textContent = last.dateTime;
+
+                const badge = document.getElementById('status-badge');
+                badge.textContent = translateStatus(last.status);
+                badge.setAttribute('data-status', last.status);
+            }
+
+            // 图表
+            updateChart(list);
+
+            // 数据源说明
+            document.getElementById('source-info').textContent = 
+                `数据源: ${appData.activeCycle === 'current' ? 'battery_history.csv' : 'battery_history.prev.csv'}` +
+                (appData.currentFullCap ? ' · 健康度来自sys' : ' · 健康度来自日志');
+        }
+
+        function switchCycle(type) {
+            appData.activeCycle = type;
+            document.querySelectorAll('.cycle-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-cycle-${type}`).classList.add('active');
+            renderUI();
+        }
+
+        function updateChart(data) {
+            const ctx = document.getElementById('batteryChart').getContext('2d');
+            const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const color = isDark ? '#80cbc4' : '#00796b';
+
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.timeOnly),
+                    datasets: [
+                        {
+                            label: '电量 (%)',
+                            data: data.map(d => d.capacity),
+                            borderColor: color,
+                            backgroundColor: color + '20',
+                            fill: true,
+                            yAxisID: 'y',
+                            tension: 0.3,
+                            pointRadius: 1
+                        },
+                        {
+                            label: '功率 (W)',
+                            data: data.map(d => d.power),
+                            borderColor: '#ff9800',
+                            borderDash: [5, 5],
+                            yAxisID: 'y1',
+                            pointRadius: 0,
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { min: 0, max: 100, ticks: { color: color } },
+                        y1: { position: 'right', grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { labels: { color: isDark ? '#aaa' : '#666' } }
+                    }
+                }
+            });
+        }
+
+        function translateStatus(s) {
+            const m = { 'Charging': '充电中', 'Discharging': '放电中', 'Full': '已充满', 'Not charging': '未充电' };
+            return m[s] || s;
+        }
+
+        async function clearHistory() {
+            if (!confirm("确定要清空所有数据记录吗？")) return;
+            await exec(`rm ${PATHS.current} ${PATHS.prev}`);
+            const header = "timestamp,datetime,capacity,status,charge_counter_mah,current_now_ma,voltage_now_mv,charge_full_mah";
+            await exec(`echo "${header}" > ${PATHS.current}`);
+            loadData();
+        }
+
+        function initIcons() {
+            const set = (id, path) => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = `<svg viewBox="0 0 24 24"><path d="${path}" /></svg>`;
+            };
+            set('icon-android', mdiAndroid);
+            set('btn-refresh', mdiRefresh);
+            set('icon-battery', mdiBatteryCharging100);
+            set('icon-chart', mdiChartTimelineVariant);
+            set('icon-delete', mdiDeleteSweep);
+        }
+    </script>
 </body>
 </html>

@@ -1,106 +1,80 @@
 :root {
-    --bg-body: #f5f5f5;
+    --bg-body: #f6f7f9;
     --bg-card: #ffffff;
-    --text-primary: #212121;
-    --text-secondary: #757575;
-    --border-color: #e0e0e0;
-    --accent-color: #00796b;
-    --active-bg: #e0f2f1;
-    --danger-color: #d32f2f;
-    --status-charging: #4caf50;
-    --status-discharging: #ff9800;
-    --status-full: #2196f3;
-    --status-bar-height: calc(32px + env(safe-area-inset-top, 0px));
+    --text-main: #1a1a1b;
+    --text-sub: #65676b;
+    --accent: #00796b;
+    --accent-light: #e0f2f1;
+    --danger: #d32f2f;
+    --border: #e4e6eb;
+    /* 顶部安全区域补偿 */
+    --safe-top: calc(36px + env(safe-area-inset-top, 0px));
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
         --bg-body: #121212;
         --bg-card: #1e1e1e;
-        --text-primary: #e0e0e0;
-        --text-secondary: #a0a0a0;
-        --border-color: #333333;
-        --accent-color: #80cbc4;
-        --active-bg: #2d3534;
-        --danger-color: #ef5350;
+        --text-main: #e4e6eb;
+        --text-sub: #b0b3b8;
+        --accent: #80cbc4;
+        --accent-light: #252d2c;
+        --border: #303030;
     }
 }
 
 body {
     background-color: var(--bg-body);
-    color: var(--text-primary);
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text-main);
+    font-family: system-ui, -apple-system, sans-serif;
     margin: 0;
-    padding: var(--status-bar-height) 16px 32px 16px;
-    line-height: 1.5;
+    padding: var(--safe-top) 16px 32px 16px;
 }
 
-.app-container { max-width: 600px; margin: 0 auto; }
+.app-container { max-width: 500px; margin: 0 auto; }
 
-/* 头部 */
-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.title-group { display: flex; align-items: center; gap: 10px; }
-h1 { margin: 0; font-size: 1.4rem; font-weight: 700; }
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.title-group { display: flex; align-items: center; gap: 8px; }
+h1 { margin: 0; font-size: 1.3rem; }
 
-/* 周期切换器 */
+/* 周期切换 */
 .cycle-selector {
-    display: flex; gap: 10px; margin-bottom: 16px;
-    background: var(--bg-card); padding: 4px; border-radius: 12px;
-    border: 1px solid var(--border-color);
+    display: flex; background: var(--border); padding: 3px; border-radius: 12px; margin-bottom: 16px;
 }
 .cycle-btn {
-    flex: 1; border: none; background: transparent;
-    padding: 8px; border-radius: 8px; color: var(--text-secondary);
-    font-weight: 600; cursor: pointer; transition: all 0.2s;
+    flex: 1; border: none; background: transparent; padding: 8px;
+    border-radius: 10px; cursor: pointer; color: var(--text-sub);
+    font-weight: 600; font-size: 0.9rem; transition: 0.2s;
 }
 .cycle-btn.active {
-    background: var(--active-bg); color: var(--accent-color);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    background: var(--bg-card); color: var(--accent); box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
 /* 卡片 */
 .card {
-    background-color: var(--bg-card);
-    border-radius: 16px;
-    padding: 16px;
-    margin-bottom: 16px;
-    border: 1px solid var(--border-color);
+    background: var(--bg-card); border-radius: 20px; padding: 18px;
+    margin-bottom: 16px; border: 1px solid var(--border);
 }
-.card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; opacity: 0.9; }
-h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+.card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; color: var(--text-sub); }
+h2 { margin: 0; font-size: 0.95rem; font-weight: 600; }
 
-/* 数据网格 */
+/* 网格 */
 .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .stat-item { display: flex; flex-direction: column; }
-.stat-item label { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; }
-.stat-item span { font-size: 1.1rem; font-weight: bold; font-family: monospace; }
-.time-text { font-size: 0.9rem !important; } /* 时间字体稍微小点 */
-.highlight { color: var(--accent-color); }
+.stat-item.large { grid-column: span 2; padding: 12px; background: var(--accent-light); border-radius: 12px; align-items: center; }
+.stat-item label { font-size: 0.75rem; color: var(--text-sub); margin-bottom: 4px; }
+.stat-item span { font-size: 1.1rem; font-weight: 700; font-family: monospace; }
+.highlight-green { color: #4caf50; font-size: 1.8rem !important; }
+.time-small { font-size: 0.85rem !important; }
 
-/* 图表 */
-.chart-wrapper { position: relative; height: 260px; width: 100%; }
-.card-footer {
-    margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color);
-    display: flex; justify-content: space-between; align-items: center;
-}
-.card-footer small { color: var(--text-secondary); font-size: 0.75rem; }
+/* 图表与底部 */
+.chart-wrapper { position: relative; height: 250px; }
+.card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+.badge { font-size: 0.7rem; padding: 3px 10px; border-radius: 6px; background: var(--border); color: var(--text-sub); font-weight: bold; }
+.badge[data-status="Charging"] { background: #4caf50; color: #fff; }
+.badge[data-status="Discharging"] { background: #ff9800; color: #fff; }
 
-/* 状态标签 */
-.status-tag {
-    font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;
-    font-weight: bold; color: #fff; background: var(--text-secondary);
-}
-.status-tag[data-status="Charging"] { background: var(--status-charging); }
-.status-tag[data-status="Discharging"] { background: var(--status-discharging); }
-.status-tag[data-status="Full"] { background: var(--status-full); }
+.action-bar { display: flex; justify-content: center; margin-top: 8px; }
+.text-btn { background: transparent; border: none; color: var(--danger); font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; }
 
-/* 按钮与图标 */
-.icon-btn { background: transparent; border: none; color: var(--text-primary); padding: 8px; cursor: pointer; }
-.text-btn { 
-    background: rgba(255, 0, 0, 0.08); border: none; cursor: pointer;
-    display: flex; align-items: center; gap: 6px; padding: 8px 16px; 
-    border-radius: 8px; color: var(--danger-color); font-weight: 600;
-}
-.danger-zone { display: flex; justify-content: flex-end; }
 svg { width: 24px; height: 24px; fill: currentColor; }
-.icon-sm svg { width: 18px; height: 18px; }

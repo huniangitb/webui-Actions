@@ -95,7 +95,7 @@ async function fetchSysfsData() {
     healthEl.style.color = health >= 80 ? 'var(--accent-color)' : 'var(--danger-color)';
 }
 
-// 2. 读取 CSV 并绘制图表
+// 2. 读取 CSV 并计算功率
 async function fetchCsvAndDrawChart() {
     // 尝试读取文件
     const { stdout, errno } = await exec(`cat "${CSV_PATH}"`);
@@ -111,22 +111,30 @@ async function fetchCsvAndDrawChart() {
     // 解析 CSV (从第1行开始，跳过Header)
     for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(',');
-        // 确保数据列足够 (根据CSV结构)
-        if (cols.length < 6) continue;
+        // 确保数据列足够: timestamp,datetime,capacity,status,charge_counter,current,voltage,charge_full
+        if (cols.length < 7) continue;
+
+        // 获取基础数值
+        const current_ma = parseInt(cols[5]); // 电流 mA
+        const voltage_mv = parseInt(cols[6]); // 电压 mV
+        
+        // 计算功率 (W) = (电压mV * 电流mA) / 1,000,000
+        // 使用 Math.abs 取绝对值，只关注“速率”大小，不关注方向
+        const power_w = Math.abs((current_ma * voltage_mv) / 1000000);
 
         dataPoints.push({
-            time: cols[1].split(' ')[1], // 取 datetime 的时间部分
-            capacity: parseInt(cols[2]), // 电量
-            current: parseInt(cols[5])   // 电流
+            time: cols[1].split(' ')[1], // 取时间 HH:mm:ss
+            capacity: parseInt(cols[2]), // 电量 %
+            power: parseFloat(power_w.toFixed(2)) // 功率 W (保留2位小数)
         });
     }
 
     // 仅保留最后 60 条以优化性能
-    cachedData = dataPoints.slice(-60);
+    cachedData = dataPoints.slice(-150);
     renderLineChart(cachedData);
 }
 
-// --- Chart.js 绘图配置 ---
+// --- Chart.js 绘图配置 (功率版) ---
 function renderLineChart(data) {
     const ctx = document.getElementById('batteryChart').getContext('2d');
     const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -135,8 +143,8 @@ function renderLineChart(data) {
     const colors = {
         grid: isDark ? '#333333' : '#eeeeee',
         text: isDark ? '#aaaaaa' : '#666666',
-        lineCap: isDark ? '#80cbc4' : '#00897b',
-        lineCurr: isDark ? '#64b5f6' : '#1e88e5'
+        lineCap: isDark ? '#80cbc4' : '#00897b',  // 电量线 (青色)
+        linePower: isDark ? '#ffb74d' : '#f57c00' // 功率线 (橙色)
     };
 
     if (chartInstance) {
@@ -152,20 +160,20 @@ function renderLineChart(data) {
                     label: '电量 (%)',
                     data: data.map(d => d.capacity),
                     borderColor: colors.lineCap,
-                    backgroundColor: colors.lineCap + '1A', // 添加透明度
+                    backgroundColor: colors.lineCap + '1A', // 10% 透明度填充
                     yAxisID: 'y',
                     tension: 0.3,
                     pointRadius: 1,
                     fill: true
                 },
                 {
-                    label: '电流 (mA)',
-                    data: data.map(d => d.current),
-                    borderColor: colors.lineCurr,
-                    borderDash: [5, 5],
-                    yAxisID: 'y1',
+                    label: '功率 (W)',
+                    data: data.map(d => d.power),
+                    borderColor: colors.linePower,
+                    borderDash: [5, 5], // 虚线显示
+                    yAxisID: 'y1', // 绑定到右侧 Y 轴
                     tension: 0.3,
-                    pointRadius: 0,
+                    pointRadius: 2, // 稍微大一点的点以便观察
                     fill: false
                 }
             ]
@@ -184,7 +192,19 @@ function renderLineChart(data) {
                     titleColor: isDark ? '#fff' : '#000',
                     bodyColor: isDark ? '#ccc' : '#333',
                     borderColor: colors.grid,
-                    borderWidth: 1
+                    borderWidth: 1,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += context.parsed.y + (context.datasetIndex === 1 ? ' W' : '%');
+                            }
+                            return label;
+                        }
+                    }
                 }
             },
             scales: {
@@ -204,8 +224,14 @@ function renderLineChart(data) {
                     type: 'linear',
                     display: true,
                     position: 'right',
-                    grid: { display: false },
-                    ticks: { color: colors.lineCurr }
+                    grid: { display: false }, // 右侧不显示网格线
+                    ticks: { color: colors.linePower },
+                    title: {
+                        display: true,
+                        text: '瓦特 (W)',
+                        color: colors.linePower,
+                        font: { size: 10 }
+                    }
                 }
             }
         }

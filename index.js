@@ -1,4 +1,4 @@
-import { exec, toast, enableEdgeToEdge, exit } from 'kernelsu';
+import { exec, toast, exit } from 'kernelsu';
 import Chart from 'chart.js/auto';
 import { 
     mdiAndroid, mdiRefresh, mdiClose, mdiBatteryCharging100, 
@@ -6,7 +6,6 @@ import {
 } from '@mdi/js';
 
 // --- 配置 ---
-enableEdgeToEdge(true);
 const CSV_PATH = '/data/media/0/Android/battery_monitor/battery_history.csv';
 const BATTERY_SYS_PATH = '/sys/class/power_supply/battery';
 

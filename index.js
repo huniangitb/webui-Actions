@@ -6,254 +6,273 @@ import {
 } from '@mdi/js';
 
 // --- 配置常量 ---
-const CSV_PATH = '/data/media/0/Android/battery_monitor/battery_history.csv';
-const BATTERY_SYS_PATH = '/sys/class/power_supply/battery';
+const LOG_DIR = '/data/media/0/Android/battery_monitor';
+const PATHS = {
+    current: `${LOG_DIR}/battery_history.csv`,
+    prev: `${LOG_DIR}/battery_history.prev.csv`
+};
 
-// --- 全局变量 ---
+// --- 全局状态 ---
 let chartInstance = null;
-let cachedData = []; // 缓存数据用于主题切换
+let appState = {
+    activeCycle: 'current', // 'current' or 'prev'
+    data: {
+        current: [],
+        prev: []
+    }
+};
 
-// --- 初始化入口 ---
+// --- 初始化 ---
 document.addEventListener('DOMContentLoaded', () => {
     initIcons();
-    refreshData();
+    loadAllData();
     
-    // 绑定按钮事件
-    document.getElementById('btn-refresh').addEventListener('click', refreshData);
+    // 绑定事件
+    document.getElementById('btn-refresh').addEventListener('click', loadAllData);
     document.getElementById('btn-delete').addEventListener('click', clearHistory);
+    
+    // 周期切换事件
+    document.getElementById('btn-cycle-current').addEventListener('click', () => switchCycle('current'));
+    document.getElementById('btn-cycle-prev').addEventListener('click', () => switchCycle('prev'));
 
-    // 监听深色模式切换
+    // 监听深色模式
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-        if (cachedData.length > 0) renderLineChart(cachedData);
+        renderUI(); // 重绘
     });
 });
 
-// --- 图标渲染逻辑 ---
-function renderIcon(targetId, path) {
-    const el = document.getElementById(targetId);
-    if (el) el.innerHTML = `<svg viewBox="0 0 24 24"><path d="${path}" /></svg>`;
-}
-
 function initIcons() {
-    renderIcon('icon-android', mdiAndroid);
-    renderIcon('btn-refresh', mdiRefresh);
-    renderIcon('icon-battery', mdiBatteryCharging100);
-    renderIcon('icon-chart', mdiChartTimelineVariant);
-    renderIcon('icon-delete', mdiDeleteSweep);
+    const render = (id, path) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = `<svg viewBox="0 0 24 24"><path d="${path}" /></svg>`;
+    };
+    render('icon-android', mdiAndroid);
+    render('btn-refresh', mdiRefresh);
+    render('icon-battery', mdiBatteryCharging100);
+    render('icon-chart', mdiChartTimelineVariant);
+    render('icon-delete', mdiDeleteSweep);
 }
 
-// --- 数据刷新逻辑 ---
-async function refreshData() {
+// --- 数据加载 ---
+async function loadAllData() {
     const btn = document.getElementById('btn-refresh');
     btn.style.transform = 'rotate(360deg)';
     btn.style.transition = 'transform 0.5s ease';
 
     try {
-        await Promise.all([
-            fetchSysfsData(),
-            fetchCsvAndDrawChart()
+        // 并行加载两个文件
+        const [currRaw, prevRaw] = await Promise.all([
+            readFile(PATHS.current),
+            readFile(PATHS.prev)
         ]);
-        toast('数据已更新');
-    } catch (error) {
-        console.error(error);
-        toast('错误: ' + error.message);
+
+        appState.data.current = parseCSV(currRaw);
+        appState.data.prev = parseCSV(prevRaw);
+
+        renderUI();
+        toast('数据已同步');
+    } catch (e) {
+        console.error(e);
+        toast('部分数据加载失败');
     } finally {
         setTimeout(() => { btn.style.transform = 'none'; }, 500);
     }
 }
 
-// 1. 读取 Sysfs 节点 (健康度等)
-async function fetchSysfsData() {
-    const cmd = `
-        cat ${BATTERY_SYS_PATH}/charge_full_design 2>/dev/null || cat ${BATTERY_SYS_PATH}/energy_full_design;
-        echo "|";
-        cat ${BATTERY_SYS_PATH}/charge_full 2>/dev/null || cat ${BATTERY_SYS_PATH}/energy_full;
-        echo "|";
-        cat ${BATTERY_SYS_PATH}/cycle_count 2>/dev/null
-    `;
-    
-    const { stdout, errno } = await exec(cmd);
-    if (errno !== 0) return;
-
-    const parts = stdout.split('|').map(s => parseInt(s.trim()) || 0);
-    let [design, full, cycles] = parts;
-
-    // 单位修正 (uAh -> mAh)
-    if (design > 100000) design = Math.round(design / 1000);
-    if (full > 100000) full = Math.round(full / 1000);
-
-    // 计算健康度
-    const health = design > 0 ? ((full / design) * 100).toFixed(1) : 0;
-
-    // 更新 DOM
-    document.getElementById('val-design').innerText = `${design} mAh`;
-    document.getElementById('val-full').innerText = `${full} mAh`;
-    document.getElementById('val-cycle').innerText = cycles;
-    
-    const healthEl = document.getElementById('val-health');
-    healthEl.innerText = `${health}%`;
-    healthEl.style.color = health >= 80 ? 'var(--accent-color)' : 'var(--danger-color)';
+// 通用读取函数
+async function readFile(path) {
+    const { stdout, errno } = await exec(`cat "${path}"`);
+    return errno === 0 ? stdout : null;
 }
 
-// 2. 读取 CSV 并计算功率
-async function fetchCsvAndDrawChart() {
-    // 尝试读取文件
-    const { stdout, errno } = await exec(`cat "${CSV_PATH}"`);
+// --- CSV 解析核心 ---
+// Header: timestamp,datetime,capacity,status,charge_counter_mah,current_now_ma,voltage_now_mv,charge_full_mah
+function parseCSV(rawContent) {
+    if (!rawContent) return [];
     
-    if (errno !== 0) {
-        renderLineChart([]); // 文件不存在则清空图表
-        return;
-    }
+    const lines = rawContent.trim().split('\n');
+    const points = [];
 
-    const lines = stdout.trim().split('\n');
-    const dataPoints = [];
-    
-    // 解析 CSV (从第1行开始，跳过Header)
+    // 从第1行开始跳过表头
     for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(',');
-        // 确保数据列足够: timestamp,datetime,capacity,status,charge_counter,current,voltage,charge_full
-        if (cols.length < 7) continue;
+        if (cols.length < 8) continue;
 
-        // 获取基础数值
-        const current_ma = parseInt(cols[5]); // 电流 mA
-        const voltage_mv = parseInt(cols[6]); // 电压 mV
+        const ts = parseInt(cols[0]); // Unix Timestamp (Seconds)
+        const current_ma = parseInt(cols[5]);
+        const voltage_mv = parseInt(cols[6]);
         
-        // 计算功率 (W) = (电压mV * 电流mA) / 1,000,000
-        // 使用 Math.abs 取绝对值，只关注“速率”大小，不关注方向
+        // 计算功率 (W)
         const power_w = Math.abs((current_ma * voltage_mv) / 1000000);
 
-        dataPoints.push({
-            time: cols[1].split(' ')[1], // 取时间 HH:mm:ss
-            capacity: parseInt(cols[2]), // 电量 %
-            power: parseFloat(power_w.toFixed(2)) // 功率 W (保留2位小数)
+        points.push({
+            timestamp: ts * 1000, // 转换为毫秒供 Date 使用
+            timeLabel: cols[1].split(' ')[1], // 取 "HH:mm:ss"
+            fullDateTime: cols[1], // 完整日期供详情使用
+            capacity: parseInt(cols[2]),
+            status: cols[3], // Charging, Discharging, Full
+            power: parseFloat(power_w.toFixed(2)),
+            fullCap: parseInt(cols[7])
         });
     }
-
-    // 仅保留最后 60 条以优化性能
-    cachedData = dataPoints.slice(-150);
-    renderLineChart(cachedData);
+    return points;
 }
 
-// --- Chart.js 绘图配置 (功率版) ---
-function renderLineChart(data) {
+// --- UI 渲染逻辑 ---
+
+function switchCycle(cycle) {
+    if (appState.activeCycle === cycle) return;
+    appState.activeCycle = cycle;
+    
+    // 更新按钮样式
+    document.querySelectorAll('.cycle-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`btn-cycle-${cycle}`).classList.add('active');
+    
+    renderUI();
+}
+
+function renderUI() {
+    const dataset = appState.data[appState.activeCycle];
+    const hasData = dataset && dataset.length > 0;
+
+    // 1. 更新卡片统计信息 (取最后一条记录)
+    if (hasData) {
+        const last = dataset[dataset.length - 1];
+        document.getElementById('status-title').textContent = `状态: ${translateStatus(last.status)}`;
+        document.getElementById('val-time').textContent = last.fullDateTime; // 使用日志时间
+        document.getElementById('val-cap').textContent = `${last.capacity}%`;
+        document.getElementById('val-power').textContent = `${last.power} W`;
+        document.getElementById('val-full-cap').textContent = `${last.fullCap} mAh`;
+        
+        // 更新底部状态标签
+        const tag = document.getElementById('status-tag');
+        tag.textContent = last.status;
+        tag.setAttribute('data-status', last.status);
+    } else {
+        document.getElementById('status-title').textContent = "无数据";
+        document.getElementById('val-time').textContent = "--";
+        document.getElementById('val-cap').textContent = "--";
+        document.getElementById('val-power').textContent = "--";
+        document.getElementById('val-full-cap').textContent = "--";
+        document.getElementById('status-tag').textContent = "Empty";
+        document.getElementById('status-tag').removeAttribute('data-status');
+    }
+
+    document.getElementById('data-source-text').textContent = 
+        `来源: ${appState.activeCycle === 'current' ? 'battery_history.csv' : 'battery_history.prev.csv'}`;
+
+    // 2. 绘制图表
+    renderChart(hasData ? dataset : []);
+}
+
+function translateStatus(status) {
+    const map = {
+        'Charging': '充电中',
+        'Discharging': '放电中',
+        'Full': '已充满',
+        'Not charging': '未充电'
+    };
+    return map[status] || status;
+}
+
+// --- Chart.js 渲染 ---
+function renderChart(data) {
     const ctx = document.getElementById('batteryChart').getContext('2d');
     const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-    // 根据深色模式定义颜色
+    // 颜色配置
     const colors = {
-        grid: isDark ? '#333333' : '#eeeeee',
-        text: isDark ? '#aaaaaa' : '#666666',
-        lineCap: isDark ? '#80cbc4' : '#00897b',  // 电量线 (青色)
-        linePower: isDark ? '#ffb74d' : '#f57c00' // 功率线 (橙色)
+        text: isDark ? '#aaa' : '#666',
+        grid: isDark ? '#333' : '#eee',
+        capLine: isDark ? '#80cbc4' : '#00796b',
+        pwrLine: isDark ? '#ffcc80' : '#f57c00'
     };
 
-    if (chartInstance) {
-        chartInstance.destroy();
-    }
+    if (chartInstance) chartInstance.destroy();
 
     chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: data.map(d => d.time),
+            labels: data.map(d => d.timeLabel), // 使用日志中的 HH:mm:ss
             datasets: [
                 {
                     label: '电量 (%)',
                     data: data.map(d => d.capacity),
-                    borderColor: colors.lineCap,
-                    backgroundColor: colors.lineCap + '1A', // 10% 透明度填充
+                    borderColor: colors.capLine,
+                    backgroundColor: colors.capLine + '20',
                     yAxisID: 'y',
+                    fill: true,
                     tension: 0.3,
-                    pointRadius: 1,
-                    fill: true
+                    pointRadius: 1
                 },
                 {
                     label: '功率 (W)',
                     data: data.map(d => d.power),
-                    borderColor: colors.linePower,
-                    borderDash: [5, 5], // 虚线显示
-                    yAxisID: 'y1', // 绑定到右侧 Y 轴
+                    borderColor: colors.pwrLine,
+                    borderDash: [5, 5],
+                    yAxisID: 'y1',
+                    fill: false,
                     tension: 0.3,
-                    pointRadius: 2, // 稍微大一点的点以便观察
-                    fill: false
+                    pointRadius: 0
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: {
-                mode: 'index',
-                intersect: false,
-            },
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { labels: { color: colors.text } },
                 tooltip: {
-                    backgroundColor: isDark ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.95)',
-                    titleColor: isDark ? '#fff' : '#000',
-                    bodyColor: isDark ? '#ccc' : '#333',
-                    borderColor: colors.grid,
-                    borderWidth: 1,
                     callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed.y !== null) {
-                                label += context.parsed.y + (context.datasetIndex === 1 ? ' W' : '%');
-                            }
-                            return label;
+                        // 在 Tooltip 中显示完整日期时间
+                        title: (items) => {
+                            const idx = items[0].dataIndex;
+                            return data[idx].fullDateTime + " (" + data[idx].status + ")";
                         }
                     }
                 }
             },
             scales: {
                 x: {
-                    grid: { display: false },
-                    ticks: { color: colors.text, maxTicksLimit: 6 }
+                    ticks: { color: colors.text, maxTicksLimit: 6 },
+                    grid: { display: false }
                 },
                 y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
                     min: 0, max: 100,
-                    grid: { color: colors.grid },
-                    ticks: { color: colors.lineCap }
+                    position: 'left',
+                    ticks: { color: colors.capLine },
+                    grid: { color: colors.grid }
                 },
                 y1: {
-                    type: 'linear',
-                    display: true,
                     position: 'right',
-                    grid: { display: false }, // 右侧不显示网格线
-                    ticks: { color: colors.linePower },
-                    title: {
-                        display: true,
-                        text: '瓦特 (W)',
-                        color: colors.linePower,
-                        font: { size: 10 }
-                    }
+                    ticks: { color: colors.pwrLine },
+                    grid: { display: false },
+                    title: { display: true, text: '瓦特 (W)', color: colors.pwrLine }
                 }
             }
         }
     });
 }
 
-// --- 清除历史记录 ---
+// --- 清空历史 ---
 async function clearHistory() {
-    const confirmClear = confirm("确定要删除所有历史记录吗？");
-    if (!confirmClear) return;
+    if (!confirm("确定要删除所有 CSV 记录吗？\n(包含当前和上一周期的记录)")) return;
 
-    // 删除原文件
-    const { errno } = await exec(`rm "${CSV_PATH}"`);
+    // 清空两个文件
+    const header = "timestamp,datetime,capacity,status,charge_counter_mah,current_now_ma,voltage_now_mv,charge_full_mah";
+    
+    // 执行 Shell 命令链
+    const cmd = `
+        rm "${PATHS.current}" "${PATHS.prev}"; 
+        echo "${header}" > "${PATHS.current}";
+    `;
+    
+    const { errno } = await exec(cmd);
     
     if (errno === 0) {
-        // 重新写入 CSV 表头
-        const header = "timestamp,datetime,capacity,status,charge_counter_mah,current_now_ma,voltage_now_mv,charge_full_mah";
-        await exec(`echo "${header}" > "${CSV_PATH}"`);
-        
-        toast('历史记录已清空');
-        // 刷新图表（清空显示）
-        refreshData();
+        toast('历史记录已彻底清空');
+        loadAllData(); // 重新加载
     } else {
         toast('操作失败');
     }

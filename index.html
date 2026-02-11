@@ -9,58 +9,71 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- 顶部导航：移除了退出按钮 -->
+        <!-- 头部 -->
         <header>
             <div class="title-group">
                 <span class="icon" id="icon-android"></span>
                 <h1>电池状态记录</h1>
             </div>
             <div class="action-group">
-                <button id="btn-refresh" class="icon-btn" aria-label="刷新数据"></button>
+                <button id="btn-refresh" class="icon-btn" aria-label="刷新"></button>
             </div>
         </header>
 
-        <!-- 实时状态卡片 -->
+        <!-- 周期切换器 (新增) -->
+        <div class="cycle-selector">
+            <button id="btn-cycle-current" class="cycle-btn active">当前周期</button>
+            <button id="btn-cycle-prev" class="cycle-btn">上一周期</button>
+        </div>
+
+        <!-- 状态卡片 -->
         <div class="card">
             <div class="card-header">
                 <span class="icon" id="icon-battery"></span>
-                <h2>电池健康 (Sysfs)</h2>
+                <h2 id="status-title">当前状态: --</h2>
             </div>
             <div class="stats-grid">
                 <div class="stat-item">
-                    <label>设计容量</label>
-                    <span id="val-design">Loading...</span>
+                    <label>记录时间</label>
+                    <span id="val-time" class="time-text">--</span>
                 </div>
                 <div class="stat-item">
-                    <label>当前全容量</label>
-                    <span id="val-full">Loading...</span>
+                    <label>电池电量</label>
+                    <span id="val-cap">--%</span>
                 </div>
                 <div class="stat-item">
-                    <label>循环次数</label>
-                    <span id="val-cycle">Loading...</span>
+                    <label>当前功率</label>
+                    <span id="val-power" class="highlight">-- W</span>
                 </div>
                 <div class="stat-item">
-                    <label>健康度 (SoH)</label>
-                    <span id="val-health" class="highlight">--%</span>
+                    <label>充满容量 (校准)</label>
+                    <span id="val-full-cap">-- mAh</span>
                 </div>
             </div>
         </div>
 
-        <!-- 折线统计图卡片 -->
+        <!-- 图表 -->
         <div class="card">
             <div class="card-header">
                 <span class="icon" id="icon-chart"></span>
-                <h2>充电电流/电量趋势</h2>
+                <h2>功率/电量趋势</h2>
             </div>
             <div class="chart-wrapper">
                 <canvas id="batteryChart"></canvas>
             </div>
             <div class="card-footer">
-                <small>CSV记录: /data/media/0/.../battery_history.csv</small>
-                <button id="btn-delete" class="text-btn danger">
-                    <span class="icon-sm" id="icon-delete"></span> 清空记录
-                </button>
+                <small id="data-source-text">数据源: current.csv</small>
+                <div class="footer-actions">
+                     <span id="status-tag" class="status-tag">未知</span>
+                </div>
             </div>
+        </div>
+        
+        <!-- 底部操作区 -->
+        <div class="danger-zone">
+             <button id="btn-delete" class="text-btn danger">
+                <span class="icon-sm" id="icon-delete"></span> 清空所有记录
+            </button>
         </div>
     </div>
 

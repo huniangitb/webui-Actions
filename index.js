@@ -1,4 +1,3 @@
-// 1. 导入必要的 API (移除了 exit)
 import { exec, toast } from 'kernelsu';
 import Chart from 'chart.js/auto';
 import { 
@@ -6,32 +5,30 @@ import {
     mdiChartTimelineVariant, mdiDeleteSweep 
 } from '@mdi/js';
 
-// --- 配置 ---
+// --- 配置常量 ---
 const CSV_PATH = '/data/media/0/Android/battery_monitor/battery_history.csv';
 const BATTERY_SYS_PATH = '/sys/class/power_supply/battery';
 
-// --- 全局状态 ---
+// --- 全局变量 ---
 let chartInstance = null;
-let cachedData = []; // 缓存数据用于主题切换重绘
+let cachedData = []; // 缓存数据用于主题切换
 
-// --- 初始化 ---
+// --- 初始化入口 ---
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. 渲染图标
     initIcons();
-    // 2. 加载数据
     refreshData();
     
-    // 3. 绑定事件
+    // 绑定按钮事件
     document.getElementById('btn-refresh').addEventListener('click', refreshData);
     document.getElementById('btn-delete').addEventListener('click', clearHistory);
 
-    // 4. 监听深色模式切换，自动重绘图表
+    // 监听深色模式切换
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
         if (cachedData.length > 0) renderLineChart(cachedData);
     });
 });
 
-// --- 图标注入 ---
+// --- 图标渲染逻辑 ---
 function renderIcon(targetId, path) {
     const el = document.getElementById(targetId);
     if (el) el.innerHTML = `<svg viewBox="0 0 24 24"><path d="${path}" /></svg>`;
@@ -45,10 +42,9 @@ function initIcons() {
     renderIcon('icon-delete', mdiDeleteSweep);
 }
 
-// --- 数据处理主流程 ---
+// --- 数据刷新逻辑 ---
 async function refreshData() {
     const btn = document.getElementById('btn-refresh');
-    // 简单的旋转动画
     btn.style.transform = 'rotate(360deg)';
     btn.style.transition = 'transform 0.5s ease';
 
@@ -60,15 +56,14 @@ async function refreshData() {
         toast('数据已更新');
     } catch (error) {
         console.error(error);
-        toast('数据加载错误: ' + error.message);
+        toast('错误: ' + error.message);
     } finally {
         setTimeout(() => { btn.style.transform = 'none'; }, 500);
     }
 }
 
-// 1. 读取 Sysfs 电池健康信息
+// 1. 读取 Sysfs 节点 (健康度等)
 async function fetchSysfsData() {
-    // 组合命令：设计容量 | 当前容量 | 循环次数
     const cmd = `
         cat ${BATTERY_SYS_PATH}/charge_full_design 2>/dev/null || cat ${BATTERY_SYS_PATH}/energy_full_design;
         echo "|";
@@ -78,7 +73,7 @@ async function fetchSysfsData() {
     `;
     
     const { stdout, errno } = await exec(cmd);
-    if (errno !== 0) return; // 失败忽略
+    if (errno !== 0) return;
 
     const parts = stdout.split('|').map(s => parseInt(s.trim()) || 0);
     let [design, full, cycles] = parts;
@@ -100,49 +95,48 @@ async function fetchSysfsData() {
     healthEl.style.color = health >= 80 ? 'var(--accent-color)' : 'var(--danger-color)';
 }
 
-// 2. 读取 CSV 并绘制折线图
+// 2. 读取 CSV 并绘制图表
 async function fetchCsvAndDrawChart() {
+    // 尝试读取文件
     const { stdout, errno } = await exec(`cat "${CSV_PATH}"`);
     
     if (errno !== 0) {
-        // 文件不存在，清空图表
-        renderLineChart([]);
+        renderLineChart([]); // 文件不存在则清空图表
         return;
     }
 
     const lines = stdout.trim().split('\n');
     const dataPoints = [];
-
-    // CSV Header: timestamp,datetime,capacity,status,charge_counter_mah,current_now_ma,voltage_now_mv,charge_full_mah
-    // Index:      0         1        2        3      4                   5               6               7
     
+    // 解析 CSV (从第1行开始，跳过Header)
     for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(',');
-        if (cols.length < 6) continue; // 数据不完整跳过
+        // 确保数据列足够 (根据CSV结构)
+        if (cols.length < 6) continue;
 
         dataPoints.push({
-            time: cols[1].split(' ')[1], // 取 HH:mm:ss
-            capacity: parseInt(cols[2]), // 电量 %
-            current: parseInt(cols[5])   // 电流 mA (通常正数为充电/负数为放电，或反之，视内核而定)
+            time: cols[1].split(' ')[1], // 取 datetime 的时间部分
+            capacity: parseInt(cols[2]), // 电量
+            current: parseInt(cols[5])   // 电流
         });
     }
 
-    // 截取最后 150 条数据，保证渲染性能
-    cachedData = dataPoints.slice(-150);
+    // 仅保留最后 60 条以优化性能
+    cachedData = dataPoints.slice(-60);
     renderLineChart(cachedData);
 }
 
-// --- Chart.js 折线图配置 ---
+// --- Chart.js 绘图配置 ---
 function renderLineChart(data) {
     const ctx = document.getElementById('batteryChart').getContext('2d');
     const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-    // 样式适配
-    const styles = {
-        grid: isDark ? '#333' : '#eee',
-        text: isDark ? '#aaa' : '#666',
-        colorCap: isDark ? '#80cbc4' : '#00897b', // 电量线颜色
-        colorCurr: isDark ? '#64b5f6' : '#1e88e5' // 电流线颜色
+    // 根据深色模式定义颜色
+    const colors = {
+        grid: isDark ? '#333333' : '#eeeeee',
+        text: isDark ? '#aaaaaa' : '#666666',
+        lineCap: isDark ? '#80cbc4' : '#00897b',
+        lineCurr: isDark ? '#64b5f6' : '#1e88e5'
     };
 
     if (chartInstance) {
@@ -150,25 +144,25 @@ function renderLineChart(data) {
     }
 
     chartInstance = new Chart(ctx, {
-        type: 'line', // 折线统计图
+        type: 'line',
         data: {
             labels: data.map(d => d.time),
             datasets: [
                 {
                     label: '电量 (%)',
                     data: data.map(d => d.capacity),
-                    borderColor: styles.colorCap,
-                    backgroundColor: styles.colorCap + '1A', // 10% 透明度
+                    borderColor: colors.lineCap,
+                    backgroundColor: colors.lineCap + '1A', // 添加透明度
                     yAxisID: 'y',
-                    tension: 0.3, // 曲线平滑度
-                    pointRadius: 1, // 数据点大小
+                    tension: 0.3,
+                    pointRadius: 1,
                     fill: true
                 },
                 {
                     label: '电流 (mA)',
                     data: data.map(d => d.current),
-                    borderColor: styles.colorCurr,
-                    borderDash: [5, 5], // 虚线
+                    borderColor: colors.lineCurr,
+                    borderDash: [5, 5],
                     yAxisID: 'y1',
                     tension: 0.3,
                     pointRadius: 0,
@@ -184,47 +178,57 @@ function renderLineChart(data) {
                 intersect: false,
             },
             plugins: {
-                legend: {
-                    labels: { color: styles.text }
-                },
+                legend: { labels: { color: colors.text } },
                 tooltip: {
-                    backgroundColor: isDark ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)',
+                    backgroundColor: isDark ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.95)',
                     titleColor: isDark ? '#fff' : '#000',
-                    bodyColor: isDark ? '#ddd' : '#333',
-                    borderColor: styles.grid,
+                    bodyColor: isDark ? '#ccc' : '#333',
+                    borderColor: colors.grid,
                     borderWidth: 1
                 }
             },
             scales: {
                 x: {
                     grid: { display: false },
-                    ticks: { color: styles.text, maxTicksLimit: 5 }
+                    ticks: { color: colors.text, maxTicksLimit: 6 }
                 },
                 y: {
                     type: 'linear',
                     display: true,
                     position: 'left',
-                    min: 0,
-                    max: 100,
-                    grid: { color: styles.grid },
-                    ticks: { color: styles.colorCap }
+                    min: 0, max: 100,
+                    grid: { color: colors.grid },
+                    ticks: { color: colors.lineCap }
                 },
                 y1: {
                     type: 'linear',
                     display: true,
                     position: 'right',
                     grid: { display: false },
-                    ticks: { color: styles.colorCurr }
+                    ticks: { color: colors.lineCurr }
                 }
             }
         }
     });
 }
 
-// --- 清空历史记录 ---
+// --- 清除历史记录 ---
 async function clearHistory() {
+    const confirmClear = confirm("确定要删除所有历史记录吗？");
+    if (!confirmClear) return;
+
+    // 删除原文件
     const { errno } = await exec(`rm "${CSV_PATH}"`);
     
     if (errno === 0) {
-        // 重写 CSV 表头
-        const header = "timestamp,dat
+        // 重新写入 CSV 表头
+        const header = "timestamp,datetime,capacity,status,charge_counter_mah,current_now_ma,voltage_now_mv,charge_full_mah";
+        await exec(`echo "${header}" > "${CSV_PATH}"`);
+        
+        toast('历史记录已清空');
+        // 刷新图表（清空显示）
+        refreshData();
+    } else {
+        toast('操作失败');
+    }
+}

@@ -1,106 +1,117 @@
-/* --- 1. 默认 (浅色模式) --- */
+/* --- 1. 颜色变量定义 --- */
 :root {
     --bg-body: #f5f5f5;
     --bg-card: #ffffff;
     --text-primary: #212121;
     --text-secondary: #757575;
-    --border-color: #e0e0e0;
-    --accent-color: #00695c; /* 蓝绿色 */
-    --chart-grid: #e0e0e0;
-    --chart-text: #666666;
-    --btn-hover: rgba(0, 0, 0, 0.05);
+    --border-color: #e2e2e2;
+    --accent-color: #00796b;
     --danger-color: #d32f2f;
+    /* 状态栏高度补偿：基础 32px + 系统安全区域 */
+    --status-bar-padding: calc(32px + env(safe-area-inset-top, 0px));
 }
 
-/* --- 2. 深色模式 (自动覆盖) --- */
 @media (prefers-color-scheme: dark) {
     :root {
         --bg-body: #121212;
         --bg-card: #1e1e1e;
         --text-primary: #e0e0e0;
-        --text-secondary: #a0a0a0;
+        --text-secondary: #9e9e9e;
         --border-color: #333333;
-        --accent-color: #80cbc4; /* 浅青色 */
-        --chart-grid: #333333;
-        --chart-text: #9e9e9e;
-        --btn-hover: rgba(255, 255, 255, 0.1);
-        --danger-color: #ef5350;
+        --accent-color: #80cbc4;
+        --danger-color: #ff5252;
     }
 }
 
-/* --- 3. 全局样式 --- */
+/* --- 2. 布局逻辑 --- */
 body {
     background-color: var(--bg-body);
     color: var(--text-primary);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: -apple-system, sans-serif;
     margin: 0;
-    padding: 16px;
-    padding-top: env(safe-area-inset-top); /* 适配状态栏 */
-    transition: background-color 0.3s, color 0.3s;
+    /* 核心修改：增加顶部边距，防止与状态栏重合 */
+    padding: var(--status-bar-padding) 16px 32px 16px;
+    line-height: 1.5;
+    transition: background-color 0.3s;
 }
 
-.app-container { max-width: 600px; margin: 0 auto; }
+.app-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
 
 /* 头部 */
 header {
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 24px;
 }
-.title-group { display: flex; align-items: center; gap: 12px; }
-h1 { margin: 0; font-size: 1.5rem; }
-h2 { margin: 0; font-size: 1.1rem; font-weight: 500; }
+.title-group { display: flex; align-items: center; gap: 10px; }
+h1 { margin: 0; font-size: 1.4rem; font-weight: 700; }
+h2 { margin: 0; font-size: 1.05rem; font-weight: 600; }
 
-/* 卡片 */
+/* 卡片设计 */
 .card {
     background-color: var(--bg-card);
-    border-radius: 16px;
-    padding: 20px;
+    border-radius: 18px;
+    padding: 18px;
     margin-bottom: 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
 }
 
 .card-header {
-    display: flex; align-items: center; gap: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 16px;
-    color: var(--text-primary);
-    opacity: 0.9;
+    opacity: 0.85;
 }
 
-/* 数据网格 */
+/* 数据展示 */
 .stats-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
 }
 .stat-item { display: flex; flex-direction: column; }
-.stat-item label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; }
-.stat-item span { font-size: 1.25rem; font-weight: 600; font-family: monospace; }
+.stat-item label { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 2px; }
+.stat-item span { font-size: 1.15rem; font-weight: 700; font-family: 'Roboto Mono', monospace; }
 .highlight { color: var(--accent-color); }
 
-/* 图表容器 */
-.chart-wrapper { position: relative; height: 280px; width: 100%; }
+/* 图表 */
+.chart-wrapper {
+    position: relative;
+    height: 240px;
+    width: 100%;
+}
 
 .card-footer {
-    margin-top: 16px; padding-top: 12px;
+    margin-top: 16px;
+    padding-top: 12px;
     border-top: 1px solid var(--border-color);
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
-.card-footer small { color: var(--text-secondary); font-size: 0.75rem; }
+.card-footer small { color: var(--text-secondary); font-size: 0.7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%; }
 
-/* 按钮与图标 */
+/* 交互元素 */
 .icon-btn {
     background: transparent; border: none; cursor: pointer;
-    color: var(--text-primary); padding: 8px; border-radius: 50%;
+    color: var(--text-primary); padding: 10px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
 }
-.icon-btn:hover { background-color: var(--btn-hover); }
+.icon-btn:active { background-color: rgba(150, 150, 150, 0.2); }
 
 .text-btn {
-    background: transparent; border: none; cursor: pointer;
-    display: flex; align-items: center; gap: 6px; font-size: 0.9rem;
-    padding: 6px 12px; border-radius: 8px;
+    background: rgba(255, 0, 0, 0.05); border: none; cursor: pointer;
+    display: flex; align-items: center; gap: 4px; font-size: 0.85rem;
+    padding: 6px 12px; border-radius: 8px; font-weight: 600;
 }
 .text-btn.danger { color: var(--danger-color); }
-.text-btn:hover { background-color: var(--btn-hover); }
 
-/* SVG 处理 */
-svg { width: 24px; height: 24px; fill: currentColor; display: block; }
-.icon-sm svg { width: 18px; height: 18px; }
+/* SVG */
+svg { width: 24px; height: 24px; fill: currentColor; }
+.icon-sm svg { width: 16px; height: 16px; }

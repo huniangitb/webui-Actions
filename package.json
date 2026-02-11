@@ -10,7 +10,7 @@
   "dependencies": {
     "chart.js": "^4.4.3",
     "@popperjs/core": "^2.11.8",
-    "kernelsu": "^3.0.2",
+    "kernelsu": "^3.0.2"
   },
   "devDependencies": {
     "@mdi/js": "^7.4.47",

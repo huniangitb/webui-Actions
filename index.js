@@ -127,8 +127,8 @@ async function fetchCsvAndDrawChart() {
         });
     }
 
-    // 截取最后 60 条数据，保证渲染性能
-    cachedData = dataPoints.slice(-60);
+    // 截取最后 150 条数据，保证渲染性能
+    cachedData = dataPoints.slice(-150);
     renderLineChart(cachedData);
 }
 

@@ -2,10 +2,9 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- 告知浏览器页面支持浅色和深色模式 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="color-scheme" content="light dark">
-    <title>电池监控 WebUI</title>
+    <title>电池状态记录 WebUI</title>
     <link rel="stylesheet" href="./style.css">
 </head>
 <body>
@@ -17,8 +16,8 @@
                 <h1>电池管家</h1>
             </div>
             <div class="action-group">
+                <!-- 仅保留刷新按钮 -->
                 <button id="btn-refresh" class="icon-btn" aria-label="刷新"></button>
-                <button id="btn-exit" class="icon-btn" aria-label="退出"></button>
             </div>
         </header>
 
@@ -52,15 +51,15 @@
         <div class="card">
             <div class="card-header">
                 <span class="icon" id="icon-chart"></span>
-                <h2>充电/放电趋势</h2>
+                <h2>数据趋势</h2>
             </div>
             <div class="chart-wrapper">
                 <canvas id="batteryChart"></canvas>
             </div>
             <div class="card-footer">
-                <small>数据源: /data/media/0/.../battery_history.csv</small>
+                <small>数据源: battery_history.csv</small>
                 <button id="btn-delete" class="text-btn danger">
-                    <span class="icon-sm" id="icon-delete"></span> 清除记录
+                    <span class="icon-sm" id="icon-delete"></span> 清理
                 </button>
             </div>
         </div>

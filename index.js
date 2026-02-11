@@ -1,4 +1,4 @@
-import { exec, toast, exit } from 'kernelsu';
+import { exec, toast } from 'kernelsu';
 import Chart from 'chart.js/auto';
 import { 
     mdiAndroid, mdiRefresh, mdiClose, mdiBatteryCharging100, 
@@ -12,16 +12,14 @@ const BATTERY_SYS_PATH = '/sys/class/power_supply/battery';
 // --- 初始化 ---
 document.addEventListener('DOMContentLoaded', () => {
     initIcons();
-    refreshData();
-    
-    // 绑定按钮事件
-    document.getElementById('btn-refresh').addEventListener('click', refreshData);
-    document.getElementById('btn-exit').addEventListener('click', () => exit());
-    document.getElementById('btn-delete').addEventListener('click', deleteHistory);
+    refreshAll();
 
-    // 核心：监听系统主题变化，重绘图表以适配颜色
+    // 绑定事件 (已移除 exit 绑定)
+    document.getElementById('btn-refresh').addEventListener('click', refreshAll);
+    document.getElementById('btn-delete').addEventListener('click', clearHistory);
+
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-        if (lastChartData) renderChart(lastChartData); // 如果有数据，重绘
+        if (lastData.length > 0) renderChart(lastData);
     });
 });
 
@@ -33,7 +31,6 @@ function renderIcon(path) {
 function initIcons() {
     document.getElementById('icon-android').innerHTML = renderIcon(mdiAndroid);
     document.getElementById('btn-refresh').innerHTML = renderIcon(mdiRefresh);
-    document.getElementById('btn-exit').innerHTML = renderIcon(mdiClose);
     document.getElementById('icon-battery').innerHTML = renderIcon(mdiBatteryCharging100);
     document.getElementById('icon-chart').innerHTML = renderIcon(mdiChartTimelineVariant);
     document.getElementById('icon-delete').innerHTML = renderIcon(mdiDeleteSweep);

@@ -4,24 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="color-scheme" content="light dark">
-    <title>电池状态记录 WebUI</title>
+    <title>电池监控 Pro</title>
     <link rel="stylesheet" href="./style.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- 顶部导航 -->
+        <!-- 顶部导航：移除了退出按钮 -->
         <header>
             <div class="title-group">
                 <span class="icon" id="icon-android"></span>
-                <h1>电池管家</h1>
+                <h1>电池状态记录</h1>
             </div>
             <div class="action-group">
-                <!-- 仅保留刷新按钮 -->
-                <button id="btn-refresh" class="icon-btn" aria-label="刷新"></button>
+                <button id="btn-refresh" class="icon-btn" aria-label="刷新数据"></button>
             </div>
         </header>
 
-        <!-- 电池状态卡片 -->
+        <!-- 实时状态卡片 -->
         <div class="card">
             <div class="card-header">
                 <span class="icon" id="icon-battery"></span>
@@ -30,15 +29,15 @@
             <div class="stats-grid">
                 <div class="stat-item">
                     <label>设计容量</label>
-                    <span id="val-design">--</span>
+                    <span id="val-design">Loading...</span>
                 </div>
                 <div class="stat-item">
                     <label>当前全容量</label>
-                    <span id="val-full">--</span>
+                    <span id="val-full">Loading...</span>
                 </div>
                 <div class="stat-item">
                     <label>循环次数</label>
-                    <span id="val-cycle">--</span>
+                    <span id="val-cycle">Loading...</span>
                 </div>
                 <div class="stat-item">
                     <label>健康度 (SoH)</label>
@@ -47,19 +46,19 @@
             </div>
         </div>
 
-        <!-- 历史图表卡片 -->
+        <!-- 折线统计图卡片 -->
         <div class="card">
             <div class="card-header">
                 <span class="icon" id="icon-chart"></span>
-                <h2>数据趋势</h2>
+                <h2>充电电流/电量趋势</h2>
             </div>
             <div class="chart-wrapper">
                 <canvas id="batteryChart"></canvas>
             </div>
             <div class="card-footer">
-                <small>数据源: battery_history.csv</small>
+                <small>CSV记录: /data/media/0/.../battery_history.csv</small>
                 <button id="btn-delete" class="text-btn danger">
-                    <span class="icon-sm" id="icon-delete"></span> 清理
+                    <span class="icon-sm" id="icon-delete"></span> 清空记录
                 </button>
             </div>
         </div>

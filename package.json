@@ -8,9 +8,9 @@
     "build": "parcel build index.html --no-source-maps --public-url ./ --no-cache"
   },
   "dependencies": {
+    "chart.js": "^4.4.3",
     "@popperjs/core": "^2.11.8",
     "kernelsu": "^3.0.2",
-    "mdb-ui-kit": "^7.3.0"
   },
   "devDependencies": {
     "@mdi/js": "^7.4.47",

@@ -893,3 +893,6 @@ document.getElementById('btnSaveEnv').onclick = async () => {
 };
 
 document.getElementById('btnAddRuleRow').onclick = () => addRuleRow('REDIRECT', '', '');
+document.getElementById('btnNewEnv').onclick = () => {
+    openModal('newEnvModal');
+};

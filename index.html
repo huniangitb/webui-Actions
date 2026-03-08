@@ -60,13 +60,22 @@
                     <div class="flex-grow relative" style="overflow: hidden; display:flex; flex-direction:column;">
                         <div id="globalAlert" class="alert-info sticky-top">该区块下规则对所有应用默认生效</div>
                         <div id="globalVisual" class="editor-pane scroll-y fade-content active" style="padding:12px;">
+                            <div class="form-group mb-3">
+                                <label style="font-size:13px; font-weight:600; margin-bottom:6px; display:block;">全局文件操作监控</label>
+                                <select id="globalMonitorSelect" class="form-select">
+                                    <option value="">默认 (不配置)</option>
+                                    <option value="ON">全局开启 (MONITOR ON)</option>
+                                    <option value="OFF">全局关闭 (MONITOR OFF)</option>
+                                </select>
+                            </div>
+                            <h4 style="margin:5px 0 10px 0; font-size:14px;">全局路径规则</h4>
                             <div id="globalRuleBuilderContainer"></div>
                             <div class="spacer"></div>
                         </div>
                         <div id="globalRaw" class="editor-pane full-height fade-content hidden">
                             <textarea id="globalRuleContent" class="code-editor" style="border:none; border-radius:0;"></textarea>
                         </div>
-                        <div class="fab-container" id="fabGlobal"><button id="btnGlobalAddRule" class="btn btn-primary rounded shadow">添加全局规则</button></div>
+                        <div class="fab-container" id="fabGlobal"><button id="btnGlobalAddRule" class="btn btn-primary rounded shadow">添加规则</button></div>
                     </div>
                     <div class="card-footer" style="padding:12px; border-top:1px solid var(--border);">
                         <button id="btnSaveGlobal" class="btn btn-primary full-width">保存全局规则</button>
@@ -91,7 +100,6 @@
                         </table>
                         <div id="ioLoadingIndicator" class="text-center text-muted p-2 hidden">加载中...</div>
                     </div>
-                    <!-- IO 清理悬浮按钮 -->
                     <div class="fab-io-container" style="position:absolute; bottom:20px; right:20px; z-index:10">
                         <button id="btnClearIo" class="btn btn-primary fab-main shadow" style="background:var(--danger)">
                             <span id="iconClearIo"></span>
@@ -111,7 +119,6 @@
                     </div>
                     <div id="logViewer" class="log-viewer"></div>
                     <div id="sysLoadingIndicator" class="text-center text-muted small hidden" style="position:absolute;bottom:5px;left:0;right:0;background:rgba(0,0,0,0.5);color:#fff;">加载中...</div>
-                    <!-- 日志清理悬浮按钮 -->
                     <div class="fab-log-container" style="position:absolute; bottom:20px; right:20px; z-index:10">
                         <button id="btnClearLog" class="btn btn-primary fab-main shadow" style="background:var(--danger)">
                             <span id="iconClearLog"></span>

@@ -16,7 +16,7 @@ const PATH_PREFIX_STORAGE = '/storage/emulated/0';
 const PATH_PREFIX_REAL = '/data/media/0';
 
 let appMap = new Map();
-let confSections = new Map(); // key: "[GLOBAL]" or "[pkg]", value: text content
+let confSections = new Map(); 
 let activeMounts = new Set();
 let statusPolling = null;
 let currentAppFilter = 'filterUser';
@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const setHtml = (id, html) => { const el = document.getElementById(id); if(el) el.innerHTML = html; };
     setHtml('btnAppAddRule', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`);
-    setHtml('btnGlobalAddRule', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加全局规则</span>`);
+    setHtml('btnGlobalAddRule', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`);
     setHtml('btnAddIgnoreRow', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加路径</span>`);
 
     loadData();
@@ -533,14 +533,14 @@ const renderAppList = () => {
 const renderGlobalRules = () => {
     const text = confSections.has('[GLOBAL]') ? confSections.get('[GLOBAL]') : "";
     document.getElementById('globalRuleContent').value = text;
-    parseConfigTextToVisual(text, 'globalRuleBuilderContainer', null);
+    parseConfigTextToVisual(text, 'globalRuleBuilderContainer', 'globalMonitorSelect');
     
     const visualRadio = document.querySelector('input[name="globalEditorMode"][value="visual"]');
     if (visualRadio && !visualRadio.checked) { 
         visualRadio.checked = true; 
         handleModeChange(true, 'content-global', 'globalVisual', 'globalRaw', 'globalAlert', 'fabGlobal', 'globalRuleContent', 
-            (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', null),
-            () => generateConfigTextFromVisual('globalRuleBuilderContainer', null));
+            (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect'),
+            () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect'));
     }
 };
 
@@ -672,7 +672,7 @@ document.getElementById('btnDeleteAppConfig').onclick = async () => {
 document.getElementById('btnSaveGlobal').onclick = async () => {
     try {
         const isVisual = document.querySelector('input[name="globalEditorMode"][value="visual"]').checked;
-        const text = isVisual ? generateConfigTextFromVisual('globalRuleBuilderContainer', null) : document.getElementById('globalRuleContent').value;
+        const text = isVisual ? generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect') : document.getElementById('globalRuleContent').value;
         
         confSections.set('[GLOBAL]', text);
         await flushConfig();
@@ -818,8 +818,8 @@ const handleModeChange = (isVisual, containerId, visualId, rawId, alertId, fabId
 
 document.querySelectorAll('input[name="globalEditorMode"]').forEach(el => {
     el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'content-global', 'globalVisual', 'globalRaw', 'globalAlert', 'fabGlobal', 'globalRuleContent', 
-        (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', null),
-        () => generateConfigTextFromVisual('globalRuleBuilderContainer', null));
+        (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect'),
+        () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect'));
 });
 
 document.querySelectorAll('input[name="appEditorMode"]').forEach(el => {

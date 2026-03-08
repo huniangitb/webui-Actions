@@ -16,16 +16,12 @@ const PATH_PREFIX_STORAGE = '/storage/emulated/0';
 const PATH_PREFIX_REAL = '/data/media/0';
 
 let appMap = new Map();
-let envList = [];
-let envStats = new Map(); 
-let envViewMode = 'grid';
-let registry = new Map();
-let currentEditingEnv = null;
-let currentBindingPkg = null;
+let confSections = new Map(); // key: "[GLOBAL]" or "[pkg]", value: text content
 let activeMounts = new Set();
 let statusPolling = null;
 let currentAppFilter = 'filterUser';
 let currentPid = null;
+let currentBindingPkg = null;
 
 const PAGE_LIMIT = 50;
 let ioState = { offset: 0, loading: false, hasMore: true, term: '' };
@@ -54,11 +50,9 @@ const ICONS = {
     CLEAR: getSvg(mdiDeleteSweep, 20, '#fff')
 };
 
-// 核心执行函数：增加错误捕获，防止白屏
 const run = async (cmd) => {
     try {
         const res = await exec(cmd);
-        // 部分命令可能只有 stderr 没有 stdout，视情况处理
         if (res.errno && res.errno !== 0) {
             console.warn(`Cmd failed: ${cmd}`, res.stderr);
             return ""; 
@@ -66,7 +60,7 @@ const run = async (cmd) => {
         return res.stdout ? res.stdout.trim() : "";
     } catch (e) {
         console.error("Exec exception:", e);
-        toast(`执行错误: ${e.message || e}`); // 关键：提示错误
+        toast(`执行错误: ${e.message || e}`); 
         return "";
     }
 };
@@ -139,41 +133,32 @@ const checkStatus = async () => {
         await updateMountStatus();
     } catch (e) {
         console.error("Check status error", e);
-        // 不弹窗，避免定时器频繁骚扰
     }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 初始化图标
     const setIcon = (id, icon) => { const el = document.getElementById(id); if(el) el.innerHTML = icon; };
     setIcon('iconSearch', ICONS.SEARCH);
     setIcon('iconIoSearch', ICONS.SEARCH);
     setIcon('iconFilter', ICONS.FILTER);
-    setIcon('iconEnvView', ICONS.LIST);
     setIcon('btnMonitorIgnore', ICONS.EYE_OFF);
     setIcon('iconClearIo', ICONS.CLEAR);
     setIcon('iconClearLog', ICONS.CLEAR);
     document.querySelectorAll('.btn-close').forEach(el => el.innerHTML = ICONS.CLOSE);
     
     const setHtml = (id, html) => { const el = document.getElementById(id); if(el) el.innerHTML = html; };
-    setHtml('btnNewEnv', `<span style="display:flex;align-items:center;gap:4px">${getSvg(mdiPlus,14,'#fff')} 新建</span>`);
-    setHtml('btnAddRuleRow', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`);
+    setHtml('btnAppAddRule', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`);
+    setHtml('btnGlobalAddRule', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加全局规则</span>`);
     setHtml('btnAddIgnoreRow', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加路径</span>`);
 
     loadData();
     checkStatus();
     
     if (statusPolling) clearInterval(statusPolling);
-    statusPolling = setInterval(checkStatus, 2000); // 放宽检查间隔
+    statusPolling = setInterval(checkStatus, 2000);
 
     document.getElementById('appSearch').oninput = renderAppList;
     
-    document.getElementById('btnEnvViewToggle').onclick = () => {
-        envViewMode = envViewMode === 'grid' ? 'list' : 'grid';
-        document.getElementById('iconEnvView').innerHTML = envViewMode === 'grid' ? ICONS.LIST : ICONS.GRID;
-        renderEnvList();
-    };
-
     const fabBtn = document.getElementById('btnFilterFab');
     const filterOpts = document.getElementById('filterOptions');
     if (fabBtn) {
@@ -191,7 +176,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     });
 
-    // 滚动监听与 IO 逻辑
     const ioContainer = document.getElementById('ioTableContainer');
     const debouncedIoSearch = debounce(() => {
         ioState.offset = 0;
@@ -222,7 +206,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // 日志逻辑
     const logSelect = document.getElementById('logSourceSelect');
     const logViewer = document.getElementById('logViewer');
     
@@ -273,9 +256,6 @@ const debounce = (func, wait) => {
     };
 };
 
-// ---------------------------------------------------------
-// IO 日志获取 (增强错误处理)
-// ---------------------------------------------------------
 const fetchIoLogs = async () => {
     if (ioState.loading || !ioState.hasMore) return;
     ioState.loading = true;
@@ -284,7 +264,6 @@ const fetchIoLogs = async () => {
 
     try {
         const res = await run(`${LOG_CTL} search-io "${ioState.term}" ${PAGE_LIMIT} ${ioState.offset} api`);
-        
         if (!res) {
             ioState.hasMore = false;
         } else {
@@ -292,7 +271,6 @@ const fetchIoLogs = async () => {
             let dataLines = lines;
             const lastLine = lines[lines.length - 1];
 
-            // 解析结束标记 DONE|total|remain
             if (lastLine.startsWith('DONE|')) {
                 const parts = lastLine.split('|');
                 if (parts.length >= 3) {
@@ -328,22 +306,18 @@ const fetchIoLogs = async () => {
 
 const renderIoRows = (lines) => {
     const tbody = document.getElementById('ioTableBody');
-    // 如果之前显示暂无数据，先清空
     if (tbody.innerHTML.includes('暂无数据')) tbody.innerHTML = '';
 
     const html = lines.map(line => {
         if (!line.trim()) return '';
-        // 格式: 1768742124|[com.termux] [OPEN] /ii.html
         const parts = line.split('|');
         if (parts.length < 2) return '';
         
         const ts = parseInt(parts[0]);
-        // 剩余部分重新组合，防止内容里有 |
         const content = parts.slice(1).join('|');
         
         let pkg = "未知", op = "INFO", details = content;
         
-        // 解析 [PKG] [OP] Details
         const match = content.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
         if (match) {
             pkg = match[1];
@@ -372,9 +346,6 @@ const renderIoRows = (lines) => {
     tbody.insertAdjacentHTML('beforeend', html);
 };
 
-// ---------------------------------------------------------
-// 系统日志获取
-// ---------------------------------------------------------
 const fetchSysLogs = async () => {
     const source = document.getElementById('logSourceSelect').value;
     const viewer = document.getElementById('logViewer');
@@ -434,9 +405,6 @@ const fetchSysLogs = async () => {
     }
 };
 
-// ---------------------------------------------------------
-// Tab 切换逻辑
-// ---------------------------------------------------------
 document.querySelectorAll('.nav-item').forEach(btn => {
     btn.onclick = () => {
         document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
@@ -460,37 +428,31 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     };
 });
 
-// ---------------------------------------------------------
-// 数据加载与初始化
-// ---------------------------------------------------------
 const loadData = async () => {
     try {
         activeMounts = await fetchActiveMounts();
-        const files = await run(`ls ${BASE_DIR}/*.conf 2>/dev/null`);
-        envList = files ? files.split('\n').map(f => f.split('/').pop().replace('.conf', '')).filter(n => n && n !== 'injector' && n !== 'monitor_ignore') : [];
         
-        envStats.clear();
-        if (envList.length > 0) {
-            const countsR = await run(`grep -c "REDIRECT" ${BASE_DIR}/*.conf 2>/dev/null`);
-            const countsH = await run(`grep -c "HIDE" ${BASE_DIR}/*.conf 2>/dev/null`);
-            envList.forEach(env => {
-                const regR = new RegExp(`${env}\\.conf:(\\d+)`);
-                const matchR = countsR.match(regR);
-                const matchH = countsH.match(new RegExp(`${env}\\.conf:(\\d+)`));
-                envStats.set(env, { r: matchR ? parseInt(matchR[1]) : 0, h: matchH ? parseInt(matchH[1]) : 0 });
-            });
-        }
-
-        const regContent = await run(`cat ${INJECTOR_CONF} 2>/dev/null`);
-        registry.clear();
-        if (regContent) {
-            regContent.split('\n').forEach(line => {
-                const parts = line.trim().split(/\s+/);
-                if (parts.length >= 2 && !line.trim().startsWith('#')) {
-                    const paramStr = parts.slice(2).join(' ') || "";
-                    registry.set(parts[0], { env: parts[1], param: paramStr });
+        const content = await run(`cat ${INJECTOR_CONF} 2>/dev/null`);
+        confSections.clear();
+        let currentSection = "[GLOBAL]";
+        let currentLines = [];
+        
+        if (content) {
+            content.split('\n').forEach(line => {
+                let trimLine = line.trim();
+                if (trimLine.startsWith('[') && trimLine.endsWith(']')) {
+                    if (currentLines.length > 0 || currentSection === '[GLOBAL]') {
+                        confSections.set(currentSection, currentLines.join('\n'));
+                    }
+                    currentSection = trimLine;
+                    currentLines = [];
+                } else {
+                    currentLines.push(line);
                 }
             });
+            confSections.set(currentSection, currentLines.join('\n'));
+        } else {
+            confSections.set("[GLOBAL]", "");
         }
 
         const userPkgs = await listPackages('user') || [];
@@ -502,14 +464,22 @@ const loadData = async () => {
         if (Array.isArray(infos)) {
             infos.forEach(info => {
                 if (info && info.packageName) {
-                    const reg = registry.get(info.packageName);
-                    appMap.set(info.packageName, { ...info, boundEnv: reg?.env, boundParam: reg?.param });
+                    const sectionKey = `[${info.packageName}]`;
+                    const isConfigured = confSections.has(sectionKey);
+                    let hasMonitor = false;
+                    let hasRules = false;
+                    if (isConfigured) {
+                        const text = confSections.get(sectionKey);
+                        if (text.includes('MONITOR ON')) hasMonitor = true;
+                        if (text.includes('REDIRECT') || text.includes('HIDE')) hasRules = true;
+                    }
+                    appMap.set(info.packageName, { ...info, isConfigured, hasMonitor, hasRules });
                 }
             });
         }
 
         renderAppList();
-        renderEnvList();
+        renderGlobalRules();
     } catch (e) {
         console.error("Load data error", e);
         toast("数据加载异常: " + e.message);
@@ -524,31 +494,24 @@ const renderAppList = () => {
         appMap.forEach(app => {
             if (currentAppFilter === 'filterUser' && app.isSystem) return;
             if (currentAppFilter === 'filterSystem' && !app.isSystem) return;
-            if (currentAppFilter === 'filterBound' && !app.boundEnv) return;
+            if (currentAppFilter === 'filterBound' && !app.isConfigured) return;
             const label = app.appLabel || app.packageName;
             if (searchVal && !label.toLowerCase().includes(searchVal) && !app.packageName.toLowerCase().includes(searchVal)) return;
             items.push(app);
         });
-        items.sort((a, b) => (!!b.boundEnv - !!a.boundEnv) || (a.appLabel || "").localeCompare(b.appLabel || ""));
+        
+        items.sort((a, b) => (!!b.isConfigured - !!a.isConfigured) || (a.appLabel || "").localeCompare(b.appLabel || ""));
+        
         listEl.innerHTML = items.length ? items.map(app => {
             let mountedBadge = activeMounts.has(app.packageName) ? `<span class="badge badge-success">MOUNTED</span>` : "";
             
-            let badgeClass = 'badge-primary';
-            let badgeStyle = '';
-            let badgeText = app.boundEnv;
-            const param = app.boundParam || "";
-
-            if (param.includes('MONITOR')) badgeClass = 'badge-warning';
-            else if (param.includes('PASSTHROUGH')) badgeClass = 'badge-success';
-            
-            if (param.includes('MERGE')) {
-                badgeText += ' (M)';
-                if (!param.includes('MONITOR') && !param.includes('PASSTHROUGH')) {
-                    badgeStyle = 'style="background:#6f42c1"';
-                }
+            let badges = [];
+            if (app.hasMonitor) {
+                badges.push(`<span class="badge badge-warning badge-pill">MONITOR</span>`);
             }
-
-            let envBadge = app.boundEnv ? `<span class="badge ${badgeClass} badge-pill" ${badgeStyle}>${badgeText}</span>` : "";
+            if (app.hasRules) {
+                badges.push(`<span class="badge badge-primary badge-pill">RULES</span>`);
+            }
             
             return `
             <div class="list-item" data-pkg="${app.packageName}" onclick="openAppConfig('${app.packageName}')">
@@ -559,7 +522,7 @@ const renderAppList = () => {
                         <small class="text-muted font-monospace text-truncate d-block">${app.packageName}</small>
                     </div>
                 </div>
-                <div class="app-end">${envBadge}</div>
+                <div class="app-end">${badges.join(' ')}</div>
             </div>`;
         }).join('') : '<div class="empty-state">无匹配应用</div>';
     } catch (e) {
@@ -567,78 +530,153 @@ const renderAppList = () => {
     }
 };
 
-const renderEnvList = () => {
-    try {
-        const listEl = document.getElementById('envList');
-        if (envList.length === 0) {
-            listEl.innerHTML = '<div class="empty-state full-col">暂无环境</div>';
-            return;
-        }
-        listEl.className = `grid-list scroll-y ${envViewMode === 'list' ? 'list-mode' : ''}`;
-        listEl.innerHTML = envList.map(env => {
-            const stats = envStats.get(env) || { r: 0, h: 0 };
-            if (envViewMode === 'list') {
-                return `
-                <div class="env-item" onclick="openEnvEditor('${env}')">
-                    <div class="env-info"><div class="env-icon">${ICONS.ENV}</div><div class="env-name">${env}</div></div>
-                    <div class="env-stats"><span class="badge badge-outline">R: ${stats.r}</span><span class="badge badge-outline">H: ${stats.h}</span></div>
-                </div>`;
-            } else {
-                return `<div class="env-item" onclick="openEnvEditor('${env}')"><div class="env-icon">${ICONS.ENV}</div><div class="env-name">${env}</div></div>`;
-            }
-        }).join('');
-    } catch (e) {
-        console.error("Render env list error", e);
+const renderGlobalRules = () => {
+    const text = confSections.has('[GLOBAL]') ? confSections.get('[GLOBAL]') : "";
+    document.getElementById('globalRuleContent').value = text;
+    parseConfigTextToVisual(text, 'globalRuleBuilderContainer', null);
+    
+    const visualRadio = document.querySelector('input[name="globalEditorMode"][value="visual"]');
+    if (visualRadio && !visualRadio.checked) { 
+        visualRadio.checked = true; 
+        handleModeChange(true, 'content-global', 'globalVisual', 'globalRaw', 'globalAlert', 'fabGlobal', 'globalRuleContent', 
+            (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', null),
+            () => generateConfigTextFromVisual('globalRuleBuilderContainer', null));
     }
+};
+
+const parseConfigTextToVisual = (text, containerId, monitorSelectId) => {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    const selMonitor = monitorSelectId ? document.getElementById(monitorSelectId) : null;
+    if (selMonitor) selMonitor.value = "";
+
+    if (text) {
+        text.split('\n').forEach(line => {
+            const parts = line.trim().split(/\s+/);
+            if (parts[0] === 'REDIRECT' && parts.length >= 3) {
+                addRuleRow('REDIRECT', normalizeToDisplay(parts[1]), normalizeToDisplay(parts.slice(2).join(' ')), containerId);
+            } else if (parts[0] === 'HIDE' && parts.length >= 2) {
+                addRuleRow('HIDE', normalizeToDisplay(parts[1]), '', containerId);
+            } else if (parts[0] === 'MONITOR' && parts.length >= 2 && selMonitor) {
+                if (parts[1] === 'ON') selMonitor.value = 'ON';
+                else if (parts[1] === 'OFF') selMonitor.value = 'OFF';
+            }
+        });
+    }
+    if (container.children.length === 0) addRuleRow('REDIRECT', '', '', containerId);
+};
+
+const generateConfigTextFromVisual = (containerId, monitorSelectId) => {
+    let res = "";
+    const selMonitor = monitorSelectId ? document.getElementById(monitorSelectId) : null;
+    if (selMonitor && selMonitor.value) {
+        res += `MONITOR ${selMonitor.value}\n`;
+    }
+
+    document.querySelectorAll(`#${containerId} .rule-row`).forEach(row => {
+        const type = row.querySelector('.rule-type').value;
+        const target = row.querySelector('.rule-target').value.trim();
+        const source = row.querySelector('.rule-source').value.trim();
+        if (target) {
+            if (type === 'REDIRECT' && source) res += `REDIRECT ${normalizeToConfig(target, true)} ${normalizeToConfig(source, false)}\n`;
+            else if (type === 'HIDE') res += `HIDE ${normalizeToConfig(target, true)}\n`;
+        }
+    });
+    return res;
+};
+
+const addRuleRow = (type, target, source, containerId) => {
+    const div = document.createElement('div');
+    div.className = 'rule-row';
+    div.innerHTML = `<select class="form-select rule-type"><option value="REDIRECT">重定向</option><option value="HIDE">隐藏</option></select><div class="rule-inputs"><input type="text" class="form-control rule-target" placeholder="原始路径" value="${target}"><input type="text" class="form-control rule-source ${type==='HIDE'?'hidden':''}" placeholder="重定向至" value="${source}"></div><button class="btn btn-icon-sm btn-del">${ICONS.DELETE}</button>`;
+    const select = div.querySelector('.rule-type');
+    select.value = type;
+    select.onchange = (e) => div.querySelector('.rule-source').classList.toggle('hidden', e.target.value === 'HIDE');
+    div.querySelector('.btn-del').onclick = () => div.remove();
+    setupAutocomplete(div.querySelector('.rule-target'));
+    setupAutocomplete(div.querySelector('.rule-source'));
+    document.getElementById(containerId).appendChild(div);
+};
+
+const flushConfig = async () => {
+    let result = "";
+    if (confSections.has('[GLOBAL]')) {
+        result += `[GLOBAL]\n${confSections.get('[GLOBAL]').trim()}\n\n`;
+    } else {
+        result += `[GLOBAL]\n\n`;
+    }
+    
+    confSections.forEach((text, section) => {
+        if (section !== '[GLOBAL]' && text.trim()) {
+            result += `${section}\n${text.trim()}\n\n`;
+        }
+    });
+    
+    const safeResult = result.replace(/'/g, "'\\''");
+    await exec(`echo '${safeResult}' > ${INJECTOR_CONF}`);
 };
 
 window.openAppConfig = (pkg) => {
     currentBindingPkg = pkg;
     const app = appMap.get(pkg);
     if (!app) return;
+    
     document.getElementById('bindAppName').textContent = app.appLabel;
     document.getElementById('bindAppPkg').textContent = pkg;
-    document.getElementById('bindAppIcon').innerHTML = ICONS.ANDROID;
-    const select = document.getElementById('bindEnvSelect');
-    select.innerHTML = '<option value="">未绑定 (清除)</option>' + envList.map(e => `<option value="${e}">${e}</option>`).join('');
-    select.value = app.boundEnv || "";
     
-    const mode = app.boundParam || "";
-    const checkMerge = document.getElementById('checkMerge');
-    checkMerge.checked = mode.includes('MERGE');
+    const sectionKey = `[${pkg}]`;
+    const text = confSections.has(sectionKey) ? confSections.get(sectionKey) : "";
+    document.getElementById('appRuleContent').value = text;
+    parseConfigTextToVisual(text, 'appRuleBuilderContainer', 'appMonitorSelect');
     
-    if (mode.includes('MONITOR')) document.getElementById('modeMonitor').checked = true;
-    else if (mode.includes('PASSTHROUGH')) document.getElementById('modePassthrough').checked = true;
-    else document.getElementById('modeDefault').checked = true;
-
-    const updateMergeState = () => {
-        const isPassthrough = document.getElementById('modePassthrough').checked;
-        checkMerge.disabled = isPassthrough;
-        if (isPassthrough) checkMerge.checked = false;
-    };
-    updateMergeState();
-    document.querySelectorAll('input[name="bindMode"]').forEach(el => el.onchange = updateMergeState);
+    const visualRadio = document.querySelector('input[name="appEditorMode"][value="visual"]');
+    if (visualRadio) { visualRadio.checked = true; visualRadio.dispatchEvent(new Event('change')); }
+    
     openModal('appConfigModal');
 };
 
-document.getElementById('btnSaveBinding').onclick = async () => {
+document.getElementById('btnSaveAppConfig').onclick = async () => {
     try {
-        const env = document.getElementById('bindEnvSelect').value;
-        const modeRadio = document.querySelector('input[name="bindMode"]:checked')?.value || "";
-        const isMerge = document.getElementById('checkMerge').checked;
-        let params = [];
-        if (modeRadio) params.push(modeRadio);
-        if (isMerge && modeRadio !== 'PASSTHROUGH') params.push('MERGE');
-        const finalParam = params.join(' ');
+        const isVisual = document.querySelector('input[name="appEditorMode"][value="visual"]').checked;
+        const text = isVisual ? generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect') : document.getElementById('appRuleContent').value;
         
-        if (env) registry.set(currentBindingPkg, { env, param: finalParam });
-        else registry.delete(currentBindingPkg);
+        const sectionKey = `[${currentBindingPkg}]`;
+        if (text.trim()) {
+            confSections.set(sectionKey, text);
+        } else {
+            confSections.delete(sectionKey);
+        }
         
-        let content = "# Generated by WebUI\n";
-        registry.forEach((val, key) => { content += `${key} ${val.env} ${val.param}\n`; });
-        await exec(`echo '${content}' > ${INJECTOR_CONF}`);
-        toast("绑定已更新");
+        await flushConfig();
+        toast("应用配置已保存");
         closeModal('appConfigModal');
+        loadData();
+    } catch (e) {
+        toast("保存失败: " + e.message);
+    }
+};
+
+document.getElementById('btnDeleteAppConfig').onclick = async () => {
+    try {
+        if (!confirm(`确定清除该应用的配置吗?`)) return;
+        confSections.delete(`[${currentBindingPkg}]`);
+        await flushConfig();
+        toast("配置已清除");
+        closeModal('appConfigModal');
+        loadData();
+    } catch (e) {
+        toast("清除失败: " + e.message);
+    }
+};
+
+document.getElementById('btnSaveGlobal').onclick = async () => {
+    try {
+        const isVisual = document.querySelector('input[name="globalEditorMode"][value="visual"]').checked;
+        const text = isVisual ? generateConfigTextFromVisual('globalRuleBuilderContainer', null) : document.getElementById('globalRuleContent').value;
+        
+        confSections.set('[GLOBAL]', text);
+        await flushConfig();
+        toast("全局规则已保存");
         loadData();
     } catch (e) {
         toast("保存失败: " + e.message);
@@ -669,48 +707,6 @@ document.getElementById('btnToggleStatus').onclick = async () => {
     }
 };
 
-window.openEnvEditor = async (envName) => {
-    currentEditingEnv = envName;
-    document.getElementById('editorEnvName').textContent = envName;
-    const content = await run(`cat ${BASE_DIR}/${envName}.conf 2>/dev/null`);
-    document.getElementById('envRuleContent').value = content;
-    parseConfigToVisual(content);
-    document.getElementById('editorAlert').classList.remove('collapsed');
-    const modalContent = document.querySelector('#envEditorModal .modal-content');
-    modalContent.classList.remove('dark-theme');
-    const visualRadio = document.querySelector('input[name="editorMode"][value="visual"]');
-    if (visualRadio) { visualRadio.checked = true; visualRadio.dispatchEvent(new Event('change')); }
-    openModal('envEditorModal');
-};
-
-const parseConfigToVisual = (text) => {
-    const container = document.getElementById('ruleBuilderContainer');
-    container.innerHTML = '';
-    if (text) text.split('\n').forEach(line => {
-        const parts = line.trim().split(/\s+/);
-        if (parts[0] === 'REDIRECT' && parts.length >= 3) addRuleRow('REDIRECT', normalizeToDisplay(parts[1]), normalizeToDisplay(parts.slice(2).join(' ')));
-        else if (parts[0] === 'HIDE' && parts.length >= 2) addRuleRow('HIDE', normalizeToDisplay(parts[1]), '');
-    });
-    if (container.children.length === 0) addRuleRow('REDIRECT', '', '');
-};
-
-const addRuleRow = (type, target, source) => {
-    const div = document.createElement('div');
-    div.className = 'rule-row';
-    div.innerHTML = `<select class="form-select rule-type"><option value="REDIRECT">重定向</option><option value="HIDE">隐藏</option></select><div class="rule-inputs"><input type="text" class="form-control rule-target" placeholder="原始路径" value="${target}"><input type="text" class="form-control rule-source ${type==='HIDE'?'hidden':''}" placeholder="重定向至" value="${source}"></div><button class="btn btn-icon-sm btn-del">${ICONS.DELETE}</button>`;
-    const select = div.querySelector('.rule-type');
-    select.value = type;
-    select.onchange = (e) => div.querySelector('.rule-source').classList.toggle('hidden', e.target.value === 'HIDE');
-    div.querySelector('.btn-del').onclick = () => div.remove();
-    setupAutocomplete(div.querySelector('.rule-target'));
-    setupAutocomplete(div.querySelector('.rule-source'));
-    document.getElementById('ruleBuilderContainer').appendChild(div);
-};
-
-// ... 其他辅助函数如 handleModeChange, Autocomplete 等保持不变 ...
-// (为节省篇幅，此处省略 Autocomplete 及 monitorIgnore 等未变更的辅助逻辑，请确保这些函数在文件中存在)
-
-// [补全 Autocomplete 与 建议框逻辑]
 const updateBoxPosition = (input) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none' || !input) return;
@@ -786,29 +782,31 @@ const setupAutocomplete = (input) => {
 
 window.applySuggestion = (text) => { if (window._currentInput) { window._currentInput.value = text; window._currentInput.dispatchEvent(new Event('input')); } };
 
-// Env Editor & Ignore Editor Toggle Logic
-const handleModeChange = (isVisual, modalId, visualId, rawId, alertId, fabId, contentId, parseFunc, genFunc) => {
+const handleModeChange = (isVisual, containerId, visualId, rawId, alertId, fabId, contentId, parseFunc, genFunc) => {
     const alertBox = document.getElementById(alertId);
     const visualEl = document.getElementById(visualId);
     const rawEl = document.getElementById(rawId);
-    const fab = document.getElementById(fabId) || document.querySelector(`#${modalId} .fab-container`);
-    const modalContent = document.querySelector(`#${modalId} .modal-content`);
+    const containerEl = document.getElementById(containerId);
+    const fab = document.getElementById(fabId) || (containerEl ? containerEl.querySelector('.fab-container') : null);
+    
+    const themeTarget = containerEl.classList.contains('modal') ? containerEl.querySelector('.modal-content') : containerEl.querySelector('.card') || containerEl;
+
     if (isVisual) {
-        modalContent.classList.remove('dark-theme');
+        if (themeTarget) themeTarget.classList.remove('dark-theme');
         rawEl.classList.remove('active');
         setTimeout(() => {
             rawEl.classList.add('hidden');
             visualEl.classList.remove('hidden');
-            alertBox.classList.remove('collapsed');
-            fab.classList.remove('hidden');
+            if (alertBox) alertBox.classList.remove('collapsed');
+            if (fab) fab.classList.remove('hidden');
             parseFunc(document.getElementById(contentId).value);
             requestAnimationFrame(() => { visualEl.classList.add('active'); });
         }, 250);
     } else {
-        modalContent.classList.add('dark-theme');
+        if (themeTarget) themeTarget.classList.add('dark-theme');
         visualEl.classList.remove('active');
-        alertBox.classList.add('collapsed');
-        fab.classList.add('hidden');
+        if (alertBox) alertBox.classList.add('collapsed');
+        if (fab) fab.classList.add('hidden');
         setTimeout(() => {
             visualEl.classList.add('hidden');
             rawEl.classList.remove('hidden');
@@ -818,11 +816,51 @@ const handleModeChange = (isVisual, modalId, visualId, rawId, alertId, fabId, co
     }
 };
 
-document.querySelectorAll('input[name="editorMode"]').forEach(el => {
-    el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'envEditorModal', 'editorVisual', 'editorRaw', 'editorAlert', null, 'envRuleContent', parseConfigToVisual, generateConfigFromVisual);
+document.querySelectorAll('input[name="globalEditorMode"]').forEach(el => {
+    el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'content-global', 'globalVisual', 'globalRaw', 'globalAlert', 'fabGlobal', 'globalRuleContent', 
+        (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', null),
+        () => generateConfigTextFromVisual('globalRuleBuilderContainer', null));
 });
 
-// Ignore Editor
+document.querySelectorAll('input[name="appEditorMode"]').forEach(el => {
+    el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'appConfigModal', 'appVisual', 'appRaw', null, 'fabApp', 'appRuleContent', 
+        (val) => parseConfigTextToVisual(val, 'appRuleBuilderContainer', 'appMonitorSelect'),
+        () => generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect'));
+});
+
+document.getElementById('btnGlobalAddRule').onclick = () => addRuleRow('REDIRECT', '', '', 'globalRuleBuilderContainer');
+document.getElementById('btnAppAddRule').onclick = () => addRuleRow('REDIRECT', '', '', 'appRuleBuilderContainer');
+
+const parseIgnoreToVisual = (text) => {
+    const container = document.getElementById('ignoreBuilderContainer');
+    container.innerHTML = '';
+    if (text) {
+        text.split('\n').forEach(line => {
+            const val = line.trim();
+            if (val && !val.startsWith('#')) addIgnoreRow(val);
+        });
+    }
+    if (container.children.length === 0) addIgnoreRow('');
+};
+
+const generateIgnoreFromVisual = () => {
+    let res = "";
+    document.querySelectorAll('#ignoreBuilderContainer .ignore-row input').forEach(input => {
+        const val = input.value.trim();
+        if (val) res += `${val}\n`;
+    });
+    return res;
+};
+
+const addIgnoreRow = (path) => {
+    const div = document.createElement('div');
+    div.className = 'rule-row ignore-row';
+    div.innerHTML = `<input type="text" class="form-control" placeholder="输入要忽略的路径前缀" value="${path}"><button class="btn btn-icon-sm btn-del">${ICONS.DELETE}</button>`;
+    div.querySelector('.btn-del').onclick = () => div.remove();
+    setupAutocomplete(div.querySelector('input'));
+    document.getElementById('ignoreBuilderContainer').appendChild(div);
+};
+
 const openMonitorIgnoreEditor = async () => {
     const content = await run(`cat ${MONITOR_IGNORE_CONF} 2>/dev/null`);
     document.getElementById('monitorIgnoreContent').value = content;
@@ -839,60 +877,16 @@ document.querySelectorAll('input[name="ignoreMode"]').forEach(el => {
     el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'monitorIgnoreModal', 'ignoreVisual', 'ignoreRaw', 'alertIgnore', 'fabIgnore', 'monitorIgnoreContent', parseIgnoreToVisual, generateIgnoreFromVisual);
 });
 
-const generateConfigFromVisual = () => {
-    let res = "";
-    document.querySelectorAll('#ruleBuilderContainer .rule-row').forEach(row => {
-        const type = row.querySelector('.rule-type').value;
-        const target = row.querySelector('.rule-target').value.trim();
-        const source = row.querySelector('.rule-source').value.trim();
-        if (target) {
-            if (type === 'REDIRECT' && source) res += `REDIRECT ${normalizeToConfig(target, true)} ${normalizeToConfig(source, false)}\n`;
-            else if (type === 'HIDE') res += `HIDE ${normalizeToConfig(target, true)}\n`;
-        }
-    });
-    return res;
-};
+document.getElementById('btnAddIgnoreRow').onclick = () => addIgnoreRow('');
 
-document.getElementById('btnCreateEnv').onclick = async () => {
+document.getElementById('btnSaveIgnore').onclick = async () => {
     try {
-        const name = document.getElementById('newEnvName').value.trim();
-        if (!name) return toast("名称不能为空");
-        await exec(`touch ${BASE_DIR}/${name}.conf`);
-        closeModal('newEnvModal');
-        loadData();
-    } catch (e) {
-        toast("创建失败: " + e.message);
-    }
-};
-
-document.getElementById('btnDeleteEnv').onclick = async () => {
-    try {
-        if (!confirm(`确定删除环境 ${currentEditingEnv} 吗?`)) return;
-        await run(`rm ${BASE_DIR}/${currentEditingEnv}.conf`);
-        let content = "# Generated by WebUI\n";
-        registry.forEach((val, key) => { if (val.env !== currentEditingEnv) content += `${key} ${val.env} ${val.param}\n`; });
-        await exec(`echo '${content}' > ${INJECTOR_CONF}`);
-        closeModal('envEditorModal');
-        loadData();
-    } catch (e) {
-        toast("删除失败: " + e.message);
-    }
-};
-
-document.getElementById('btnSaveEnv').onclick = async () => {
-    try {
-        const isVisual = document.querySelector('input[name="editorMode"][value="visual"]').checked;
-        const content = isVisual ? generateConfigFromVisual() : document.getElementById('envRuleContent').value;
-        await exec(`echo '${content}' > ${BASE_DIR}/${currentEditingEnv}.conf`);
-        toast("规则已保存");
-        closeModal('envEditorModal');
-        loadData();
+        const isVisual = document.querySelector('input[name="ignoreMode"][value="visual"]').checked;
+        const content = isVisual ? generateIgnoreFromVisual() : document.getElementById('monitorIgnoreContent').value;
+        await exec(`echo '${content}' > ${MONITOR_IGNORE_CONF}`);
+        toast("忽略配置已保存");
+        closeModal('monitorIgnoreModal');
     } catch (e) {
         toast("保存失败: " + e.message);
     }
-};
-
-document.getElementById('btnAddRuleRow').onclick = () => addRuleRow('REDIRECT', '', '');
-document.getElementById('btnNewEnv').onclick = () => {
-    openModal('newEnvModal');
 };

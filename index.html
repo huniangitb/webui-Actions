@@ -19,14 +19,14 @@
         </div>
 
         <div class="nav-tabs">
-            <button class="nav-item active" data-target="content-apps">应用绑定</button>
-            <button class="nav-item" data-target="content-envs">环境管理</button>
+            <button class="nav-item active" data-target="content-apps">应用配置</button>
+            <button class="nav-item" data-target="content-global">全局规则</button>
             <button class="nav-item" data-target="content-io">监控</button>
             <button class="nav-item" data-target="content-log">日志</button>
         </div>
 
         <div class="tab-content-wrapper">
-            <!-- 1. 应用绑定 -->
+            <!-- 1. 应用配置 -->
             <div id="content-apps" class="tab-pane active">
                 <div class="app-layout-container">
                     <div class="app-search-wrapper">
@@ -40,23 +40,36 @@
                         <div class="filter-options" id="filterOptions">
                             <button class="filter-opt active" data-filter="filterUser">用户应用</button>
                             <button class="filter-opt" data-filter="filterSystem">系统应用</button>
-                            <button class="filter-opt" data-filter="filterBound">已绑定</button>
+                            <button class="filter-opt" data-filter="filterBound">已配置</button>
                         </div>
                         <button id="btnFilterFab" class="btn btn-primary fab-main"><span id="iconFilter"></span></button>
                     </div>
                 </div>
             </div>
 
-            <!-- 2. 环境管理 -->
-            <div id="content-envs" class="tab-pane">
-                <div class="card full-height-card relative">
-                    <div class="card-header">
-                        <h3>环境列表</h3>
-                        <button id="btnNewEnv" class="btn btn-primary btn-sm">新建</button>
+            <!-- 2. 全局规则 -->
+            <div id="content-global" class="tab-pane">
+                <div class="card full-height-card relative flex-column" id="globalCardContainer" style="padding:0; overflow:hidden;">
+                    <div class="card-header" style="padding: 12px 16px; border-bottom: 1px solid var(--border); margin-bottom: 0;">
+                        <h3>[GLOBAL] 全局规则</h3>
+                        <div class="toggle-group">
+                            <label><input type="radio" name="globalEditorMode" value="visual" checked><span>图形</span></label>
+                            <label><input type="radio" name="globalEditorMode" value="raw"><span>源码</span></label>
+                        </div>
                     </div>
-                    <div id="envList" class="grid-list scroll-y"></div>
-                    <div class="fab-env-container">
-                        <button id="btnEnvViewToggle" class="btn btn-primary fab-main shadow"><span id="iconEnvView"></span></button>
+                    <div class="flex-grow relative" style="overflow: hidden; display:flex; flex-direction:column;">
+                        <div id="globalAlert" class="alert-info sticky-top">该区块下规则对所有应用默认生效</div>
+                        <div id="globalVisual" class="editor-pane scroll-y fade-content active" style="padding:12px;">
+                            <div id="globalRuleBuilderContainer"></div>
+                            <div class="spacer"></div>
+                        </div>
+                        <div id="globalRaw" class="editor-pane full-height fade-content hidden">
+                            <textarea id="globalRuleContent" class="code-editor" style="border:none; border-radius:0;"></textarea>
+                        </div>
+                        <div class="fab-container" id="fabGlobal"><button id="btnGlobalAddRule" class="btn btn-primary rounded shadow">添加全局规则</button></div>
+                    </div>
+                    <div class="card-footer" style="padding:12px; border-top:1px solid var(--border);">
+                        <button id="btnSaveGlobal" class="btn btn-primary full-width">保存全局规则</button>
                     </div>
                 </div>
             </div>
@@ -109,92 +122,44 @@
         </div>
     </div>
 
-    <!-- 模态框：应用绑定 -->
+    <!-- 模态框：应用配置 -->
     <div id="appConfigModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>应用绑定</h3>
-                <button class="btn-close" onclick="closeModal('appConfigModal')"></button>
-            </div>
-            <div class="modal-body">
-                <div class="app-info-header">
-                    <div id="bindAppIcon" class="app-icon"></div>
-                    <div style="overflow:hidden">
-                        <div id="bindAppName" class="fw-bold text-truncate">App Name</div>
-                        <small id="bindAppPkg" class="text-muted font-monospace text-truncate d-block">com.pkg</small>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>选择环境</label>
-                    <select id="bindEnvSelect" class="form-select"><option value="">未绑定 (清除)</option></select>
-                </div>
-                <div class="form-group">
-                    <label>运行模式</label>
-                    <div class="mode-selector">
-                        <label><input type="radio" name="bindMode" id="modeDefault" value="" checked><span>默认</span></label>
-                        <label><input type="radio" name="bindMode" id="modeMonitor" value="MONITOR"><span>监控</span></label>
-                        <label><input type="radio" name="bindMode" id="modePassthrough" value="PASSTHROUGH"><span>直通</span></label>
-                    </div>
-                    <div class="mt-2" style="padding-left: 4px;">
-                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-                            <input type="checkbox" id="checkMerge"> 
-                            <span>启用合并 (MERGE) <small class="text-muted" style="font-weight:normal">- 防止挂载侧漏</small></span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="btnSaveBinding" class="btn btn-primary full-width">保存绑定</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 模态框：新建环境 -->
-    <div id="newEnvModal" class="modal">
-        <div class="modal-content small">
-            <div class="modal-header">
-                <h3>新建环境</h3>
-                <button class="btn-close" onclick="closeModal('newEnvModal')"></button>
-            </div>
-            <div class="modal-body">
-                <input type="text" id="newEnvName" class="form-control" placeholder="例如: GameScope" />
-            </div>
-            <div class="modal-footer">
-                <button id="btnCreateEnv" class="btn btn-primary full-width">创建</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 模态框：环境编辑 -->
-    <div id="envEditorModal" class="modal">
         <div class="modal-content large flex-column">
             <div class="modal-header nowrap">
                 <div class="header-title-group">
-                    <h3 id="editorEnvName" class="text-truncate">Env</h3>
-                    <small class="text-muted">规则配置</small>
+                    <h3 id="bindAppName" class="text-truncate">App Name</h3>
+                    <small id="bindAppPkg" class="text-muted font-monospace">com.pkg</small>
                 </div>
                 <div class="header-actions-group">
                     <div class="toggle-group">
-                        <label><input type="radio" name="editorMode" value="visual" checked><span>图形</span></label>
-                        <label><input type="radio" name="editorMode" value="raw"><span>源码</span></label>
+                        <label><input type="radio" name="appEditorMode" value="visual" checked><span>图形</span></label>
+                        <label><input type="radio" name="appEditorMode" value="raw"><span>源码</span></label>
                     </div>
-                    <button class="btn-close" onclick="closeModal('envEditorModal')"></button>
+                    <button class="btn-close" onclick="closeModal('appConfigModal')"></button>
                 </div>
             </div>
-            <div class="modal-body no-padding relative flex-grow" style="overflow: hidden;">
-                <div id="editorAlert" class="alert-info sticky-top">映射至 <b>/data/media/0/</b></div>
-                <div id="editorVisual" class="editor-pane scroll-y fade-content active">
-                    <div id="ruleBuilderContainer"></div>
+            <div class="modal-body no-padding relative flex-grow" style="overflow: hidden; display:flex; flex-direction:column;">
+                <div id="appVisual" class="editor-pane scroll-y fade-content active" style="padding:12px;">
+                    <div class="form-group mb-3">
+                        <label style="font-size:13px; font-weight:600; margin-bottom:6px; display:block;">文件操作监控</label>
+                        <select id="appMonitorSelect" class="form-select">
+                            <option value="">默认 (不配置)</option>
+                            <option value="ON">强制开启 (MONITOR ON)</option>
+                            <option value="OFF">强制关闭 (MONITOR OFF)</option>
+                        </select>
+                    </div>
+                    <h4 style="margin:5px 0 10px 0; font-size:14px;">应用特有规则配置</h4>
+                    <div id="appRuleBuilderContainer"></div>
                     <div class="spacer"></div>
                 </div>
-                <div id="editorRaw" class="editor-pane full-height fade-content hidden">
-                    <textarea id="envRuleContent" class="code-editor"></textarea>
+                <div id="appRaw" class="editor-pane full-height fade-content hidden">
+                    <textarea id="appRuleContent" class="code-editor" style="border:none; border-radius:0;"></textarea>
                 </div>
-                <div class="fab-container"><button id="btnAddRuleRow" class="btn btn-primary rounded shadow">添加规则</button></div>
+                <div class="fab-container" id="fabApp"><button id="btnAppAddRule" class="btn btn-primary rounded shadow">添加规则</button></div>
             </div>
             <div class="modal-footer">
-                <button id="btnDeleteEnv" class="btn btn-danger-outline">删除</button>
-                <button id="btnSaveEnv" class="btn btn-primary">保存</button>
+                <button id="btnDeleteAppConfig" class="btn btn-danger-outline">清除配置</button>
+                <button id="btnSaveAppConfig" class="btn btn-primary" style="flex:1">保存应用配置</button>
             </div>
         </div>
     </div>
@@ -218,7 +183,7 @@
             <div class="modal-body no-padding relative flex-grow" style="overflow: hidden;">
                 <div id="alertIgnore" class="alert-info sticky-top">匹配规则：<b>前缀匹配</b></div>
                 <div id="ignoreVisual" class="editor-pane scroll-y fade-content active">
-                    <div id="ignoreBuilderContainer"></div>
+                    <div id="ignoreBuilderContainer" style="padding:12px;"></div>
                     <div class="spacer"></div>
                 </div>
                 <div id="ignoreRaw" class="editor-pane full-height fade-content hidden">

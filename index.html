@@ -18,7 +18,7 @@
             <button id="btnToggleStatus" class="btn btn-icon"></button>
         </div>
 
-        <div class="nav-tabs">
+        <div class="nav-tabs main-tabs">
             <button class="nav-item active" data-target="content-apps">应用配置</button>
             <button class="nav-item" data-target="content-global">全局规则</button>
             <button class="nav-item" data-target="content-io">监控</button>
@@ -51,34 +51,34 @@
             <div id="content-global" class="tab-pane">
                 <div class="card full-height-card relative flex-column" id="globalCardContainer" style="padding:0; overflow:hidden;">
                     <div class="card-header" style="padding: 12px 16px; border-bottom: 1px solid var(--border); margin-bottom: 0;">
-                        <h3>[GLOBAL] 全局规则</h3>
+                        <h3>[GLOBAL] 全局配置</h3>
                         <div class="toggle-group">
                             <label><input type="radio" name="globalEditorMode" value="visual" checked><span>图形</span></label>
                             <label><input type="radio" name="globalEditorMode" value="raw"><span>源码</span></label>
                         </div>
                     </div>
                     <div class="flex-grow relative" style="overflow: hidden; display:flex; flex-direction:column;">
-                        <div id="globalAlert" class="alert-info sticky-top">该区块下规则对所有应用默认生效</div>
+                        <div id="globalAlert" class="alert-info sticky-top">配置将写入 injector.conf，对所有应用默认生效</div>
                         <div id="globalVisual" class="editor-pane scroll-y fade-content active" style="padding:12px;">
                             <div class="grid-2-col mb-3">
                                 <div class="form-group">
                                     <label class="control-label">全局监控 (MONITOR)</label>
                                     <select id="globalMonitorSelect" class="form-select">
-                                        <option value="">默认 (不配置)</option>
-                                        <option value="ON">强制开启 (ON)</option>
-                                        <option value="OFF">强制关闭 (OFF)</option>
+                                        <option value="">默认 (OFF)</option>
+                                        <option value="ON">全局开启 (ON)</option>
+                                        <option value="OFF">全局关闭 (OFF)</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
                                     <label class="control-label">全局沙盒 (SANDBOX)</label>
                                     <select id="globalSandboxSelect" class="form-select">
-                                        <option value="">默认 (不配置)</option>
-                                        <option value="ON">强制开启 (ON)</option>
-                                        <option value="OFF">强制关闭 (OFF)</option>
+                                        <option value="">默认 (OFF)</option>
+                                        <option value="ON">全局开启 (ON)</option>
+                                        <option value="OFF">全局关闭 (OFF)</option>
                                     </select>
                                 </div>
                             </div>
-                            <h4 style="margin:5px 0 10px 0; font-size:14px;">全局路径规则</h4>
+                            <h4 style="margin:5px 0 10px 0; font-size:14px;">全局路径映射</h4>
                             <div id="globalRuleBuilderContainer"></div>
                             <div class="spacer"></div>
                         </div>
@@ -120,7 +120,7 @@
                 <div class="card full-height-card relative">
                     <div class="mb-2">
                         <select id="logSourceSelect" class="form-select">
-                            <option value="internal">注入日志</option>
+                            <option value="internal">注入器日志</option>
                             <option value="zygisk">Zygisk (Logcat)</option>
                         </select>
                     </div>
@@ -139,17 +139,24 @@
     <!-- 模态框：应用配置 -->
     <div id="appConfigModal" class="modal">
         <div class="modal-content large flex-column">
-            <div class="modal-header nowrap" style="padding-bottom: 8px;">
-                <div class="header-title-group">
-                    <h3 id="bindAppName" class="text-truncate">App Name</h3>
-                    <small id="bindAppPkg" class="text-muted font-monospace">com.pkg</small>
-                </div>
-                <div class="header-actions-group">
-                    <div class="toggle-group">
-                        <label><input type="radio" name="appEditorMode" value="visual" checked><span>图形</span></label>
-                        <label><input type="radio" name="appEditorMode" value="raw"><span>源码</span></label>
+            <div class="modal-header flex-column" style="align-items: stretch; padding-bottom: 8px;">
+                <div class="nowrap" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div class="header-title-group">
+                        <h3 id="bindAppName" class="text-truncate">App Name</h3>
+                        <small id="bindAppPkg" class="text-muted font-monospace">com.pkg</small>
                     </div>
-                    <button class="btn-close" onclick="closeModal('appConfigModal')"></button>
+                    <div class="header-actions-group">
+                        <div class="toggle-group">
+                            <label><input type="radio" name="appEditorMode" value="visual" checked><span>图形</span></label>
+                            <label><input type="radio" name="appEditorMode" value="raw"><span>源码</span></label>
+                        </div>
+                        <button class="btn-close" onclick="closeModal('appConfigModal')"></button>
+                    </div>
+                </div>
+                <!-- 多用户选择器 -->
+                <div class="user-selector-container">
+                    <span class="control-label" style="margin-bottom:0; font-size:11px;">用户空间:</span>
+                    <div class="nav-tabs user-tabs" id="appUserTabs" style="margin-bottom:0; padding-bottom:0;"></div>
                 </div>
             </div>
             <div class="modal-body no-padding relative flex-grow" style="overflow: hidden; display:flex; flex-direction:column;">
@@ -157,19 +164,20 @@
                     
                     <div class="app-state-toggle-wrapper mb-3">
                         <label class="switch-row">
-                            <span class="fw-bold">启用应用注入</span>
+                            <span class="fw-bold">允许注入 (当前用户)</span>
                             <div class="switch">
                                 <input type="checkbox" id="appEnableToggle" checked>
                                 <span class="slider"></span>
                             </div>
                         </label>
+                        <small class="text-muted d-block mt-1" style="font-size:11px; margin-top:4px;">关闭将强制屏蔽注入，配置不生效。</small>
                     </div>
 
                     <div class="grid-2-col mb-3">
                         <div class="form-group">
                             <label class="control-label">监控 (MONITOR)</label>
                             <select id="appMonitorSelect" class="form-select">
-                                <option value="">默认 (不配置)</option>
+                                <option value="">跟随全局</option>
                                 <option value="ON">强制开启 (ON)</option>
                                 <option value="OFF">强制关闭 (OFF)</option>
                             </select>
@@ -177,14 +185,14 @@
                         <div class="form-group">
                             <label class="control-label">沙盒 (SANDBOX)</label>
                             <select id="appSandboxSelect" class="form-select">
-                                <option value="">默认 (不配置)</option>
+                                <option value="">跟随全局</option>
                                 <option value="ON">强制开启 (ON)</option>
                                 <option value="OFF">强制关闭 (OFF)</option>
                             </select>
                         </div>
                     </div>
                     
-                    <h4 style="margin:5px 0 10px 0; font-size:14px;">应用特有规则配置</h4>
+                    <h4 style="margin:5px 0 10px 0; font-size:14px;">专属路径映射</h4>
                     <div id="appRuleBuilderContainer"></div>
                     <div class="spacer"></div>
                 </div>
@@ -194,7 +202,7 @@
                 <div class="fab-container" id="fabApp"><button id="btnAppAddRule" class="btn btn-primary rounded shadow">添加规则</button></div>
             </div>
             <div class="modal-footer">
-                <button id="btnDeleteAppConfig" class="btn btn-danger-outline">清除配置</button>
+                <button id="btnDeleteAppConfig" class="btn btn-danger-outline">清除当前配置</button>
                 <button id="btnSaveAppConfig" class="btn btn-primary" style="flex:1">保存应用配置</button>
             </div>
         </div>

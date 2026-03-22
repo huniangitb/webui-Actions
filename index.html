@@ -60,13 +60,23 @@
                     <div class="flex-grow relative" style="overflow: hidden; display:flex; flex-direction:column;">
                         <div id="globalAlert" class="alert-info sticky-top">该区块下规则对所有应用默认生效</div>
                         <div id="globalVisual" class="editor-pane scroll-y fade-content active" style="padding:12px;">
-                            <div class="form-group mb-3">
-                                <label style="font-size:13px; font-weight:600; margin-bottom:6px; display:block;">全局文件操作监控</label>
-                                <select id="globalMonitorSelect" class="form-select">
-                                    <option value="">默认 (不配置)</option>
-                                    <option value="ON">全局开启 (MONITOR ON)</option>
-                                    <option value="OFF">全局关闭 (MONITOR OFF)</option>
-                                </select>
+                            <div class="grid-2-col mb-3">
+                                <div class="form-group">
+                                    <label class="control-label">全局监控 (MONITOR)</label>
+                                    <select id="globalMonitorSelect" class="form-select">
+                                        <option value="">默认 (不配置)</option>
+                                        <option value="ON">强制开启 (ON)</option>
+                                        <option value="OFF">强制关闭 (OFF)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="control-label">全局沙盒 (SANDBOX)</label>
+                                    <select id="globalSandboxSelect" class="form-select">
+                                        <option value="">默认 (不配置)</option>
+                                        <option value="ON">强制开启 (ON)</option>
+                                        <option value="OFF">强制关闭 (OFF)</option>
+                                    </select>
+                                </div>
                             </div>
                             <h4 style="margin:5px 0 10px 0; font-size:14px;">全局路径规则</h4>
                             <div id="globalRuleBuilderContainer"></div>
@@ -83,21 +93,18 @@
                 </div>
             </div>
 
-            <!-- 3. 监控 -->
+            <!-- 3. 监控 (矩形通知风格) -->
             <div id="content-io" class="tab-pane">
-                <div class="card full-height-card relative">
+                <div class="card full-height-card relative" style="padding: 10px 10px 0 10px;">
                     <div style="display:flex; gap:10px; margin-bottom:10px; align-items:center">
                         <div class="search-bar compact" style="flex:1; margin-bottom:0">
                             <span class="icon-placeholder" id="iconIoSearch"></span>
-                            <input type="text" id="ioSearch" placeholder="搜索操作记录..." />
+                            <input type="text" id="ioSearch" placeholder="搜索操作记录或路径..." />
                         </div>
                         <button id="btnMonitorIgnore" class="btn btn-icon-sm" style="width:36px;height:36px;background:var(--bg-input);color:var(--text-muted)"></button>
                     </div>
-                    <div class="table-container" id="ioTableContainer">
-                        <table class="table">
-                            <thead><tr><th style="width:140px">时间</th><th>应用</th><th style="width:60px">操作</th><th>详情</th></tr></thead>
-                            <tbody id="ioTableBody"></tbody>
-                        </table>
+                    <div class="list-container scroll-y" id="ioLogContainer" style="flex:1;">
+                        <div id="ioLogList" class="io-log-list"></div>
                         <div id="ioLoadingIndicator" class="text-center text-muted p-2 hidden">加载中...</div>
                     </div>
                     <div class="fab-io-container" style="position:absolute; bottom:20px; right:20px; z-index:10">
@@ -132,7 +139,7 @@
     <!-- 模态框：应用配置 -->
     <div id="appConfigModal" class="modal">
         <div class="modal-content large flex-column">
-            <div class="modal-header nowrap">
+            <div class="modal-header nowrap" style="padding-bottom: 8px;">
                 <div class="header-title-group">
                     <h3 id="bindAppName" class="text-truncate">App Name</h3>
                     <small id="bindAppPkg" class="text-muted font-monospace">com.pkg</small>
@@ -147,14 +154,36 @@
             </div>
             <div class="modal-body no-padding relative flex-grow" style="overflow: hidden; display:flex; flex-direction:column;">
                 <div id="appVisual" class="editor-pane scroll-y fade-content active" style="padding:12px;">
-                    <div class="form-group mb-3">
-                        <label style="font-size:13px; font-weight:600; margin-bottom:6px; display:block;">文件操作监控</label>
-                        <select id="appMonitorSelect" class="form-select">
-                            <option value="">默认 (不配置)</option>
-                            <option value="ON">强制开启 (MONITOR ON)</option>
-                            <option value="OFF">强制关闭 (MONITOR OFF)</option>
-                        </select>
+                    
+                    <div class="app-state-toggle-wrapper mb-3">
+                        <label class="switch-row">
+                            <span class="fw-bold">启用应用注入</span>
+                            <div class="switch">
+                                <input type="checkbox" id="appEnableToggle" checked>
+                                <span class="slider"></span>
+                            </div>
+                        </label>
                     </div>
+
+                    <div class="grid-2-col mb-3">
+                        <div class="form-group">
+                            <label class="control-label">监控 (MONITOR)</label>
+                            <select id="appMonitorSelect" class="form-select">
+                                <option value="">默认 (不配置)</option>
+                                <option value="ON">强制开启 (ON)</option>
+                                <option value="OFF">强制关闭 (OFF)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="control-label">沙盒 (SANDBOX)</label>
+                            <select id="appSandboxSelect" class="form-select">
+                                <option value="">默认 (不配置)</option>
+                                <option value="ON">强制开启 (ON)</option>
+                                <option value="OFF">强制关闭 (OFF)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
                     <h4 style="margin:5px 0 10px 0; font-size:14px;">应用特有规则配置</h4>
                     <div id="appRuleBuilderContainer"></div>
                     <div class="spacer"></div>

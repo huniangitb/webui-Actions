@@ -4,7 +4,7 @@ import {
     mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
     mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight,
     mdiFilterVariant, mdiViewGrid, mdiViewList, mdiStop, mdiPlay,
-    mdiEyeOff, mdiDeleteSweep
+    mdiEyeOff, mdiDeleteSweep, mdiClockOutline, mdiShieldAccount
 } from '@mdi/js';
 
 const BASE_DIR = "/data/Namespace-Proxy";
@@ -16,6 +16,8 @@ const PATH_PREFIX_STORAGE = '/storage/emulated/0';
 const PATH_PREFIX_REAL = '/data/media/0';
 
 let appMap = new Map();
+// confSections format: Map<string, { state: string, text: string }>
+// where key is [pkg] or [GLOBAL], state is 'ON' or 'OFF'
 let confSections = new Map(); 
 let activeMounts = new Set();
 let statusPolling = null;
@@ -36,18 +38,16 @@ const ICONS = {
     DELETE: getSvg(mdiDelete, 18, 'currentColor'),
     FOLDER: getSvg(mdiFolder, 16, '#ffca28'),
     FILE: getSvg(mdiFile, 16, '#9e9e9e'),
-    REFRESH: getSvg(mdiRefresh, 20, '#000'),
     SEARCH: getSvg(mdiMagnify, 18, '#868e96'),
     PLUS: getSvg(mdiPlus, 16, '#fff'),
     CLOSE: getSvg(mdiClose, 28, '#5f6368'),
-    CHEVRON: getSvg(mdiChevronRight, 20, '#adb5bd'),
     FILTER: getSvg(mdiFilterVariant, 24, '#fff'),
-    GRID: getSvg(mdiViewGrid, 24, '#fff'),
-    LIST: getSvg(mdiViewList, 24, '#fff'),
     STOP: getSvg(mdiStop, 20, '#dc3545'),
     PLAY: getSvg(mdiPlay, 20, '#36a420'),
     EYE_OFF: getSvg(mdiEyeOff, 20, 'currentColor'),
-    CLEAR: getSvg(mdiDeleteSweep, 20, '#fff')
+    CLEAR: getSvg(mdiDeleteSweep, 20, '#fff'),
+    CLOCK: getSvg(mdiClockOutline, 14, 'currentColor'),
+    SHIELD: getSvg(mdiShieldAccount, 16, 'currentColor')
 };
 
 const run = async (cmd) => {
@@ -93,8 +93,8 @@ const updateMountStatus = async () => {
             if (!header) return;
             const badge = header.querySelector('.badge-success');
             const isMounted = activeMounts.has(pkg);
-            if (isMounted && !badge) header.insertAdjacentHTML('beforeend', `<span class="badge badge-success">MOUNTED</span>`);
-            else if (!isMounted && badge && badge.textContent === 'MOUNTED') badge.remove();
+            if (isMounted && !badge) header.insertAdjacentHTML('beforeend', `<span class="badge badge-success badge-mount">MOUNTED</span>`);
+            else if (!isMounted && badge && badge.classList.contains('badge-mount')) badge.remove();
         });
     } catch (e) {
         console.error("Update mount status error", e);
@@ -147,9 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.btn-close').forEach(el => el.innerHTML = ICONS.CLOSE);
     
     const setHtml = (id, html) => { const el = document.getElementById(id); if(el) el.innerHTML = html; };
-    setHtml('btnAppAddRule', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`);
-    setHtml('btnGlobalAddRule', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加规则</span>`);
-    setHtml('btnAddIgnoreRow', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${getSvg(mdiPlus,16,'#fff')} 添加路径</span>`);
+    setHtml('btnAppAddRule', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${ICONS.PLUS} 添加规则</span>`);
+    setHtml('btnGlobalAddRule', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${ICONS.PLUS} 添加规则</span>`);
+    setHtml('btnAddIgnoreRow', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${ICONS.PLUS} 添加路径</span>`);
 
     loadData();
     checkStatus();
@@ -176,12 +176,12 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     });
 
-    const ioContainer = document.getElementById('ioTableContainer');
+    const ioContainer = document.getElementById('ioLogContainer');
     const debouncedIoSearch = debounce(() => {
         ioState.offset = 0;
         ioState.hasMore = true;
         ioState.term = document.getElementById('ioSearch').value.trim();
-        document.getElementById('ioTableBody').innerHTML = '';
+        document.getElementById('ioLogList').innerHTML = '';
         fetchIoLogs();
     }, 500);
     
@@ -201,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
             toast("IO 日志已清理");
             ioState.offset = 0;
             ioState.hasMore = true;
-            document.getElementById('ioTableBody').innerHTML = '';
+            document.getElementById('ioLogList').innerHTML = '';
             fetchIoLogs();
         };
     }
@@ -290,7 +290,7 @@ const fetchIoLogs = async () => {
                 renderIoRows(dataLines);
             } else {
                 if (!ioState.hasMore && ioState.offset === 0) {
-                    document.getElementById('ioTableBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无数据</td></tr>';
+                    document.getElementById('ioLogList').innerHTML = '<div class="empty-state">暂无监控数据</div>';
                 }
             }
         }
@@ -305,8 +305,8 @@ const fetchIoLogs = async () => {
 };
 
 const renderIoRows = (lines) => {
-    const tbody = document.getElementById('ioTableBody');
-    if (tbody.innerHTML.includes('暂无数据')) tbody.innerHTML = '';
+    const listEl = document.getElementById('ioLogList');
+    if (listEl.innerHTML.includes('暂无监控数据')) listEl.innerHTML = '';
 
     const html = lines.map(line => {
         if (!line.trim()) return '';
@@ -326,24 +326,28 @@ const renderIoRows = (lines) => {
         }
 
         const date = new Date(ts * 1000);
-        const timeStr = isNaN(date.getTime()) ? "无效时间" : date.toLocaleString('zh-CN', { 
-            month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
+        const timeStr = isNaN(date.getTime()) ? "--:--:--" : date.toLocaleString('zh-CN', { 
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
         });
 
         const app = appMap.get(pkg);
         const appName = app ? app.appLabel : pkg;
 
         return `
-            <tr>
-                <td class="text-muted small font-monospace">${timeStr}</td>
-                <td><div class="text-truncate" style="max-width:100px" title="${pkg}">${appName}</div></td>
-                <td><span class="op-tag op-${op}">${op}</span></td>
-                <td class="break-all font-monospace small">${details}</td>
-            </tr>
+            <div class="io-card">
+                <div class="io-card-header">
+                    <div class="io-time">${ICONS.CLOCK} <span>${timeStr}</span></div>
+                    <div class="io-app text-truncate" title="${pkg}">${appName}</div>
+                    <div class="io-op op-${op}">${op}</div>
+                </div>
+                <div class="io-card-body break-all font-monospace text-muted">
+                    ${details}
+                </div>
+            </div>
         `;
     }).join('');
     
-    tbody.insertAdjacentHTML('beforeend', html);
+    listEl.insertAdjacentHTML('beforeend', html);
 };
 
 const fetchSysLogs = async () => {
@@ -415,7 +419,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
         
         if (targetId === 'content-io') {
              ioState = { offset: 0, loading: false, hasMore: true, term: document.getElementById('ioSearch').value.trim() };
-             document.getElementById('ioTableBody').innerHTML = '';
+             document.getElementById('ioLogList').innerHTML = '';
              fetchIoLogs();
         } else if (targetId === 'content-log') {
              const isInternal = document.getElementById('logSourceSelect').value === 'internal';
@@ -435,24 +439,29 @@ const loadData = async () => {
         const content = await run(`cat ${INJECTOR_CONF} 2>/dev/null`);
         confSections.clear();
         let currentSection = "[GLOBAL]";
+        let currentSectionState = ""; // ON/OFF
         let currentLines = [];
         
         if (content) {
             content.split('\n').forEach(line => {
                 let trimLine = line.trim();
-                if (trimLine.startsWith('[') && trimLine.endsWith(']')) {
+                // 匹配段头 [pkg] 或 [pkg:user] 及后面的 ON/OFF 状态
+                const secMatch = trimLine.match(/^\[(.*?)\](?:\s+(ON|OFF))?/);
+                
+                if (secMatch) {
                     if (currentLines.length > 0 || currentSection === '[GLOBAL]') {
-                        confSections.set(currentSection, currentLines.join('\n'));
+                        confSections.set(currentSection, { state: currentSectionState, text: currentLines.join('\n') });
                     }
-                    currentSection = trimLine;
+                    currentSection = `[${secMatch[1]}]`;
+                    currentSectionState = secMatch[2] || "ON"; // 缺省为 ON
                     currentLines = [];
                 } else {
                     currentLines.push(line);
                 }
             });
-            confSections.set(currentSection, currentLines.join('\n'));
+            confSections.set(currentSection, { state: currentSectionState, text: currentLines.join('\n') });
         } else {
-            confSections.set("[GLOBAL]", "");
+            confSections.set("[GLOBAL]", { state: "", text: "" });
         }
 
         const userPkgs = await listPackages('user') || [];
@@ -465,15 +474,21 @@ const loadData = async () => {
             infos.forEach(info => {
                 if (info && info.packageName) {
                     const sectionKey = `[${info.packageName}]`;
-                    const isConfigured = confSections.has(sectionKey);
+                    const conf = confSections.get(sectionKey);
+                    const isConfigured = !!conf;
                     let hasMonitor = false;
+                    let hasSandbox = false;
                     let hasRules = false;
+                    let isEnabled = true;
+
                     if (isConfigured) {
-                        const text = confSections.get(sectionKey);
+                        isEnabled = conf.state !== 'OFF';
+                        const text = conf.text || "";
                         if (text.includes('MONITOR ON')) hasMonitor = true;
+                        if (text.includes('SANDBOX ON')) hasSandbox = true;
                         if (text.includes('REDIRECT') || text.includes('HIDE')) hasRules = true;
                     }
-                    appMap.set(info.packageName, { ...info, isConfigured, hasMonitor, hasRules });
+                    appMap.set(info.packageName, { ...info, isConfigured, isEnabled, hasMonitor, hasSandbox, hasRules });
                 }
             });
         }
@@ -503,14 +518,15 @@ const renderAppList = () => {
         items.sort((a, b) => (!!b.isConfigured - !!a.isConfigured) || (a.appLabel || "").localeCompare(b.appLabel || ""));
         
         listEl.innerHTML = items.length ? items.map(app => {
-            let mountedBadge = activeMounts.has(app.packageName) ? `<span class="badge badge-success">MOUNTED</span>` : "";
+            let mountedBadge = activeMounts.has(app.packageName) ? `<span class="badge badge-success badge-mount">MOUNTED</span>` : "";
             
             let badges = [];
-            if (app.hasMonitor) {
-                badges.push(`<span class="badge badge-warning badge-pill">MONITOR</span>`);
-            }
-            if (app.hasRules) {
-                badges.push(`<span class="badge badge-primary badge-pill">RULES</span>`);
+            if (app.isConfigured && !app.isEnabled) {
+                badges.push(`<span class="badge badge-gray badge-pill">DISABLED</span>`);
+            } else {
+                if (app.hasSandbox) badges.push(`<span class="badge badge-success badge-pill" style="display:flex;align-items:center;gap:2px">${ICONS.SHIELD} SANDBOX</span>`);
+                if (app.hasMonitor) badges.push(`<span class="badge badge-warning badge-pill">MONITOR</span>`);
+                if (app.hasRules) badges.push(`<span class="badge badge-primary badge-pill">RULES</span>`);
             }
             
             return `
@@ -518,7 +534,7 @@ const renderAppList = () => {
                 <div class="app-main">
                     <div class="app-icon-wrapper">${ICONS.ANDROID}</div>
                     <div class="app-content">
-                        <div class="app-header"><span class="app-name">${app.appLabel}</span>${mountedBadge}</div>
+                        <div class="app-header"><span class="app-name ${!app.isEnabled && app.isConfigured ? 'text-muted' : ''}">${app.appLabel}</span>${mountedBadge}</div>
                         <small class="text-muted font-monospace text-truncate d-block">${app.packageName}</small>
                     </div>
                 </div>
@@ -531,24 +547,29 @@ const renderAppList = () => {
 };
 
 const renderGlobalRules = () => {
-    const text = confSections.has('[GLOBAL]') ? confSections.get('[GLOBAL]') : "";
+    const conf = confSections.get('[GLOBAL]') || { text: "" };
+    const text = conf.text;
     document.getElementById('globalRuleContent').value = text;
-    parseConfigTextToVisual(text, 'globalRuleBuilderContainer', 'globalMonitorSelect');
+    parseConfigTextToVisual(text, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect');
     
     const visualRadio = document.querySelector('input[name="globalEditorMode"][value="visual"]');
     if (visualRadio && !visualRadio.checked) { 
         visualRadio.checked = true; 
         handleModeChange(true, 'content-global', 'globalVisual', 'globalRaw', 'globalAlert', 'fabGlobal', 'globalRuleContent', 
-            (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect'),
-            () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect'));
+            (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'),
+            () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'));
     }
 };
 
-const parseConfigTextToVisual = (text, containerId, monitorSelectId) => {
+const parseConfigTextToVisual = (text, containerId, monitorSelectId, sandboxSelectId) => {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
+    
     const selMonitor = monitorSelectId ? document.getElementById(monitorSelectId) : null;
     if (selMonitor) selMonitor.value = "";
+    
+    const selSandbox = sandboxSelectId ? document.getElementById(sandboxSelectId) : null;
+    if (selSandbox) selSandbox.value = "";
 
     if (text) {
         text.split('\n').forEach(line => {
@@ -560,17 +581,25 @@ const parseConfigTextToVisual = (text, containerId, monitorSelectId) => {
             } else if (parts[0] === 'MONITOR' && parts.length >= 2 && selMonitor) {
                 if (parts[1] === 'ON') selMonitor.value = 'ON';
                 else if (parts[1] === 'OFF') selMonitor.value = 'OFF';
+            } else if (parts[0] === 'SANDBOX' && parts.length >= 2 && selSandbox) {
+                if (parts[1] === 'ON') selSandbox.value = 'ON';
+                else if (parts[1] === 'OFF') selSandbox.value = 'OFF';
             }
         });
     }
     if (container.children.length === 0) addRuleRow('REDIRECT', '', '', containerId);
 };
 
-const generateConfigTextFromVisual = (containerId, monitorSelectId) => {
+const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelectId) => {
     let res = "";
     const selMonitor = monitorSelectId ? document.getElementById(monitorSelectId) : null;
     if (selMonitor && selMonitor.value) {
         res += `MONITOR ${selMonitor.value}\n`;
+    }
+    
+    const selSandbox = sandboxSelectId ? document.getElementById(sandboxSelectId) : null;
+    if (selSandbox && selSandbox.value) {
+        res += `SANDBOX ${selSandbox.value}\n`;
     }
 
     document.querySelectorAll(`#${containerId} .rule-row`).forEach(row => {
@@ -600,15 +629,15 @@ const addRuleRow = (type, target, source, containerId) => {
 
 const flushConfig = async () => {
     let result = "";
-    if (confSections.has('[GLOBAL]')) {
-        result += `[GLOBAL]\n${confSections.get('[GLOBAL]').trim()}\n\n`;
-    } else {
-        result += `[GLOBAL]\n\n`;
-    }
+    const globalConf = confSections.get('[GLOBAL]') || { text: "" };
+    result += `[GLOBAL]\n${globalConf.text.trim()}\n\n`;
     
-    confSections.forEach((text, section) => {
-        if (section !== '[GLOBAL]' && text.trim()) {
-            result += `${section}\n${text.trim()}\n\n`;
+    confSections.forEach((conf, section) => {
+        if (section !== '[GLOBAL]') {
+            // Write if text exists OR state is OFF
+            if (conf.text.trim() || conf.state === 'OFF') {
+                result += `${section} ${conf.state || 'ON'}\n${conf.text.trim()}\n\n`;
+            }
         }
     });
     
@@ -625,9 +654,11 @@ window.openAppConfig = (pkg) => {
     document.getElementById('bindAppPkg').textContent = pkg;
     
     const sectionKey = `[${pkg}]`;
-    const text = confSections.has(sectionKey) ? confSections.get(sectionKey) : "";
-    document.getElementById('appRuleContent').value = text;
-    parseConfigTextToVisual(text, 'appRuleBuilderContainer', 'appMonitorSelect');
+    const conf = confSections.get(sectionKey) || { state: 'ON', text: '' };
+    
+    document.getElementById('appEnableToggle').checked = conf.state !== 'OFF';
+    document.getElementById('appRuleContent').value = conf.text;
+    parseConfigTextToVisual(conf.text, 'appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect');
     
     const visualRadio = document.querySelector('input[name="appEditorMode"][value="visual"]');
     if (visualRadio) { visualRadio.checked = true; visualRadio.dispatchEvent(new Event('change')); }
@@ -638,11 +669,12 @@ window.openAppConfig = (pkg) => {
 document.getElementById('btnSaveAppConfig').onclick = async () => {
     try {
         const isVisual = document.querySelector('input[name="appEditorMode"][value="visual"]').checked;
-        const text = isVisual ? generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect') : document.getElementById('appRuleContent').value;
-        
+        const text = isVisual ? generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect') : document.getElementById('appRuleContent').value;
+        const state = document.getElementById('appEnableToggle').checked ? 'ON' : 'OFF';
+
         const sectionKey = `[${currentBindingPkg}]`;
-        if (text.trim()) {
-            confSections.set(sectionKey, text);
+        if (text.trim() || state === 'OFF') {
+            confSections.set(sectionKey, { state, text });
         } else {
             confSections.delete(sectionKey);
         }
@@ -672,9 +704,9 @@ document.getElementById('btnDeleteAppConfig').onclick = async () => {
 document.getElementById('btnSaveGlobal').onclick = async () => {
     try {
         const isVisual = document.querySelector('input[name="globalEditorMode"][value="visual"]').checked;
-        const text = isVisual ? generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect') : document.getElementById('globalRuleContent').value;
+        const text = isVisual ? generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect') : document.getElementById('globalRuleContent').value;
         
-        confSections.set('[GLOBAL]', text);
+        confSections.set('[GLOBAL]', { state: '', text });
         await flushConfig();
         toast("全局规则已保存");
         loadData();
@@ -818,14 +850,14 @@ const handleModeChange = (isVisual, containerId, visualId, rawId, alertId, fabId
 
 document.querySelectorAll('input[name="globalEditorMode"]').forEach(el => {
     el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'content-global', 'globalVisual', 'globalRaw', 'globalAlert', 'fabGlobal', 'globalRuleContent', 
-        (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect'),
-        () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect'));
+        (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'),
+        () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'));
 });
 
 document.querySelectorAll('input[name="appEditorMode"]').forEach(el => {
     el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'appConfigModal', 'appVisual', 'appRaw', null, 'fabApp', 'appRuleContent', 
-        (val) => parseConfigTextToVisual(val, 'appRuleBuilderContainer', 'appMonitorSelect'),
-        () => generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect'));
+        (val) => parseConfigTextToVisual(val, 'appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect'),
+        () => generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect'));
 });
 
 document.getElementById('btnGlobalAddRule').onclick = () => addRuleRow('REDIRECT', '', '', 'globalRuleBuilderContainer');

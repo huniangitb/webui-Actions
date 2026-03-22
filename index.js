@@ -406,6 +406,7 @@ const loadData = async () => {
         if (injectorConf) {
             injectorConf.split('\n').forEach(line => {
                 const tLine = line.trim();
+                if (!tLine) return; // Ignore empty lines during parsing
                 const secMatch = tLine.match(/^\[(.*?)\](?:\s+(ON|OFF))?/);
                 if (secMatch) {
                     if (currentSection === '[GLOBAL]') globalConfText = globalLines.join('\n');
@@ -413,7 +414,7 @@ const loadData = async () => {
                     if (secMatch[1] !== 'GLOBAL') injectorStates.set(secMatch[1], secMatch[2] || "ON");
                     globalLines = [];
                 } else if (currentSection === '[GLOBAL]') {
-                    globalLines.push(line);
+                    globalLines.push(tLine);
                 }
             });
             if (currentSection === '[GLOBAL]') globalConfText = globalLines.join('\n');
@@ -621,7 +622,7 @@ const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelec
             else if (type === 'HIDE') res += `HIDE ${normalizeToConfig(target, true)}\n`;
         }
     });
-    return res;
+    return res.trim();
 };
 
 const addRuleRow = (type, target, source, containerId) => {
@@ -638,11 +639,15 @@ const addRuleRow = (type, target, source, containerId) => {
 };
 
 const flushInjectorConf = async () => {
-    let res = `[GLOBAL]\n${globalConfText.trim()}\n\n`;
+    let res = `[GLOBAL]\n`;
+    const gt = globalConfText.trim();
+    if (gt) {
+        res += `${gt}\n`;
+    }
     injectorStates.forEach((state, key) => {
-        res += `[${key}] ${state}\n\n`;
+        res += `[${key}] ${state}\n`;
     });
-    const safeResult = res.replace(/'/g, "'\\''");
+    const safeResult = res.trim().replace(/'/g, "'\\''");
     await exec(`echo '${safeResult}' > ${INJECTOR_CONF}`);
 };
 
@@ -684,6 +689,7 @@ document.getElementById('btnSaveAppConfig').onclick = async () => {
     try {
         const isVisual = document.querySelector('input[name="appEditorMode"][value="visual"]').checked;
         const text = isVisual ? generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect') : document.getElementById('appRuleContent').value;
+        const cleanText = text.trim();
         const isEnabled = document.getElementById('appEnableToggle').checked;
 
         const exactKey = `${currentBindingPkg}:${currentBindingUser}`;
@@ -702,11 +708,11 @@ document.getElementById('btnSaveAppConfig').onclick = async () => {
         
         // 无论规则内容是否为空都生成文件，实现“将应用添加到列表中”的逻辑
         if (isEnabled) {
-            await exec(`echo '${text.replace(/'/g, "'\\''")}' > ${file}`);
+            await exec(`echo '${cleanText.replace(/'/g, "'\\''")}' > ${file}`);
             await run(`rm -f ${disabledFile}`);
         } else {
             // 通过后缀名禁用
-            await exec(`echo '${text.replace(/'/g, "'\\''")}' > ${disabledFile}`);
+            await exec(`echo '${cleanText.replace(/'/g, "'\\''")}' > ${disabledFile}`);
             await run(`rm -f ${file}`);
         }
         
@@ -866,7 +872,7 @@ const parseIgnoreToVisual = (text) => {
     if (container.children.length === 0) addIgnoreRow('');
 };
 const generateIgnoreFromVisual = () => {
-    let res = ""; document.querySelectorAll('#ignoreBuilderContainer .ignore-row input').forEach(input => { const val = input.value.trim(); if (val) res += `${val}\n`; }); return res;
+    let res = ""; document.querySelectorAll('#ignoreBuilderContainer .ignore-row input').forEach(input => { const val = input.value.trim(); if (val) res += `${val}\n`; }); return res.trim();
 };
 const addIgnoreRow = (path) => {
     const div = document.createElement('div'); div.className = 'rule-row ignore-row';
@@ -889,7 +895,7 @@ document.getElementById('btnSaveIgnore').onclick = async () => {
     try {
         const isVisual = document.querySelector('input[name="ignoreMode"][value="visual"]').checked;
         const content = isVisual ? generateIgnoreFromVisual() : document.getElementById('monitorIgnoreContent').value;
-        await exec(`echo '${content}' > ${MONITOR_IGNORE_CONF}`);
+        await exec(`echo '${content.trim()}' > ${MONITOR_IGNORE_CONF}`);
         toast("忽略配置已保存"); closeModal('monitorIgnoreModal');
     } catch (e) { toast("保存失败: " + e.message); }
 };

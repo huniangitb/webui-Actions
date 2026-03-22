@@ -10,6 +10,7 @@ import {
 const BASE_DIR = "/data/Namespace-Proxy";
 const INJECTOR_CONF = `${BASE_DIR}/injector.conf`;
 const MONITOR_IGNORE_CONF = `${BASE_DIR}/monitor_ignore.conf`;
+const LIST_CONFIG = `${BASE_DIR}/list.config`;
 const LOG_CTL = "/data/adb/modules/Namespace-Proxy/bin/log_ctl";
 const SERVICE_SH = "/data/adb/modules/Namespace-Proxy/service.sh";
 const PATH_PREFIX_STORAGE = '/storage/emulated/0';
@@ -17,7 +18,7 @@ const PATH_PREFIX_REAL = '/data/media/0';
 
 let appMap = new Map();
 let globalConfText = "";
-let injectorStates = new Map(); // "pkg:uid" -> "ON" or "OFF" (or just "pkg")
+let injectorStates = new Map();
 
 let activeUsers = [0];
 let activeMounts = new Set();
@@ -167,7 +168,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     });
 
-    // 搜索与滚动防抖
     const ioContainer = document.getElementById('ioLogContainer');
     const debouncedIoSearch = debounce(() => {
         ioState.offset = 0; ioState.hasMore = true;
@@ -388,7 +388,6 @@ const loadData = async () => {
     try {
         activeMounts = await fetchActiveMounts();
         
-        // 1. 获取多用户列表
         const userRes = await run("pm list users");
         activeUsers = [];
         if (userRes) {
@@ -397,7 +396,6 @@ const loadData = async () => {
         }
         if (activeUsers.length === 0) activeUsers.push(0);
 
-        // 2. 解析主配置文件 (获取 GLOBAL 和 开关状态)
         const injectorConf = await run(`cat ${INJECTOR_CONF} 2>/dev/null`);
         globalConfText = "";
         injectorStates.clear();
@@ -421,8 +419,7 @@ const loadData = async () => {
             if (currentSection === '[GLOBAL]') globalConfText = globalLines.join('\n');
         }
 
-        // 3. 读取各用户的应用配置目录
-        let ruleFilesMap = new Map(); // "pkg:userid" -> text
+        let ruleFilesMap = new Map();
         for (const uid of activeUsers) {
             const dir = uid === 0 ? `${BASE_DIR}/App-rules` : `${BASE_DIR}/App-rules-${uid}`;
             const lsRes = await run(`ls -1 ${dir} 2>/dev/null`);
@@ -436,10 +433,43 @@ const loadData = async () => {
             }
         }
 
-        const userPkgs = await listPackages('user') || [];
-        const systemPkgs = await listPackages('system') || [];
-        const allPkgs = [...new Set([...userPkgs, ...systemPkgs])];
-        const infos = await getPackagesInfo(allPkgs);
+        let infos = [];
+        try {
+            const userPkgs = await listPackages('user') || [];
+            const systemPkgs = await listPackages('system') || [];
+            const allPkgs = [...new Set([...userPkgs, ...systemPkgs])];
+            if (allPkgs.length > 0) {
+                infos = await getPackagesInfo(allPkgs);
+            }
+        } catch (e) {
+            console.warn("API获取应用列表失败, 尝试使用 fallback", e);
+        }
+
+        // Fallback: 如果系统 API 没获取到任何应用，读取 list.config 作为兼容补救
+        if (!Array.isArray(infos) || infos.length === 0) {
+            const fallbackList = await run(`cat ${LIST_CONFIG} 2>/dev/null`);
+            infos = [];
+            if (fallbackList) {
+                fallbackList.split('\n').forEach(line => {
+                    const trimLine = line.trim();
+                    if (trimLine && !trimLine.startsWith('#') && trimLine.includes('=')) {
+                        const firstEq = trimLine.indexOf('=');
+                        const pkg = trimLine.substring(0, firstEq).trim();
+                        const name = trimLine.substring(firstEq + 1).trim();
+                        if (pkg) {
+                            infos.push({
+                                packageName: pkg,
+                                appLabel: name || pkg,
+                                isSystem: false,
+                                versionName: "",
+                                versionCode: 0,
+                                uid: 0
+                            });
+                        }
+                    }
+                });
+            }
+        }
 
         appMap.clear();
         if (Array.isArray(infos)) {
@@ -658,14 +688,12 @@ document.getElementById('btnSaveAppConfig').onclick = async () => {
 
         const exactKey = `${currentBindingPkg}:${currentBindingUser}`;
         
-        // 1. 更新 injectorStates
         if (!isEnabled) {
             injectorStates.set(exactKey, 'OFF');
         } else {
             injectorStates.set(exactKey, 'ON');
         }
 
-        // 2. 写入单独规则文件
         const dir = currentBindingUser === 0 ? `${BASE_DIR}/App-rules` : `${BASE_DIR}/App-rules-${currentBindingUser}`;
         const file = `${dir}/${currentBindingPkg}.conf`;
         
@@ -739,7 +767,6 @@ document.getElementById('btnToggleStatus').onclick = async () => {
     }
 };
 
-// Autocomplete and mode toggle logic... (保持与以前类似，仅省略冗长重复代码部分)
 const updateBoxPosition = (input) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none' || !input) return;

@@ -15,8 +15,8 @@
                     <small id="statusInfo">Checking</small>
                 </div>
             </div>
-            <div style="display: flex; gap: 8px;">
-                <button id="btnSettings" class="btn btn-icon-sm" style="background:var(--bg-input); color:var(--text-muted)"></button>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button id="btnSettings" class="btn btn-icon" style="background:var(--bg-input); color:var(--text-muted); box-shadow:none;"></button>
                 <button id="btnToggleStatus" class="btn btn-icon"></button>
             </div>
         </div>
@@ -270,7 +270,7 @@
                     </label>
                 </div>
                 <p class="text-muted" style="font-size: 12px; line-height: 1.5;">
-                    开启后，当检测到插件存在时，会自动将图形界面中的隐藏与重定向规则转换为插件支持的 JSON 格式并写入其配置目录。
+                    开启后，会自动合并模块内与应用配置目录的规则，转换为插件支持的 JSON 格式并写入其配置目录。
                 </p>
                 <div id="pluginStatusLabel" class="text-muted font-monospace mt-1" style="font-size: 11px;"></div>
             </div>

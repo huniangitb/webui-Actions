@@ -178,7 +178,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 .badge-warning { background: var(--warning); color: #000; }
 .badge-primary { background: var(--primary); }
 
-/* Modals - Optimization: Fixed positioning over everything and will-change to offload to GPU */
+/* Modals - Optimization: Fixed positioning over everything and removed will-change to avoid layer restucture lag */
 .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(3px); opacity: 0; transition: opacity 0.2s ease-out; }
 .modal.show { display: flex; opacity: 1; }
 .modal.hiding { opacity: 0; }
@@ -189,7 +189,6 @@ input:checked + .slider:before { transform: translateX(20px); }
     box-shadow: 0 10px 25px rgba(0,0,0,0.2);
     transition: background-color 0.3s ease, color 0.3s ease;
     animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1); 
-    will-change: transform, opacity;
 }
 .modal-content.large { max-width: 800px; height: 75vh; }
 .flex-column { display: flex; flex-direction: column; }
@@ -207,12 +206,12 @@ input:checked + .slider:before { transform: translateX(20px); }
 .relative { position: relative; }
 .flex-grow { flex: 1; min-height: 0; }
 
-/* Editor Wrappers - Absolute Positioning to Prevent Layout Reflow on Toggle */
+/* Editor Wrappers */
 .editor-wrapper { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 .editor-pane { 
     position: absolute; inset: 0; display: flex; flex-direction: column; overflow-y: auto; 
     opacity: 0; pointer-events: none; transition: opacity 0.15s ease-out; padding: 12px; 
-    visibility: hidden; will-change: opacity, visibility; overscroll-behavior: contain;
+    visibility: hidden; overscroll-behavior: contain;
 }
 .editor-pane.active { opacity: 1; pointer-events: auto; visibility: visible; z-index: 1; }
 .editor-pane#globalRaw, .editor-pane#appRaw, .editor-pane#ignoreRaw { padding: 0; }
@@ -233,12 +232,11 @@ input:checked + .slider:before { transform: translateX(20px); }
 .fab-container { position: absolute; bottom: 20px; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; z-index: 10; }
 .fab-container button { pointer-events: auto; width: auto; padding: 8px 20px; border-radius: 20px; font-size: 13px; }
 
-/* Autocomplete - Optimization: will-change to prevent layout thrashing overhead */
+/* Autocomplete */
 .suggestion-box { 
     position: fixed; background: var(--bg-surface); border: 1px solid var(--border); 
     z-index: 3000; max-height: 200px; overflow-y: auto; display: none; 
     border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); 
-    will-change: top, bottom, left, width; 
 }
 .suggestion-item { padding: 10px 12px; display: flex; align-items: center; cursor: pointer; border-bottom: 1px solid var(--border); color: var(--text-main); font-size: 13px; }
 .suggestion-item:active { background: var(--bg-input); }

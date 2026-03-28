@@ -34,7 +34,7 @@ const parseRules = (text) => {
     return { redirects, hides };
 };
 
-export async function syncToPlugin(appMap, globalConfText) {
+export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates) {
     const settings = await getSettings();
     if (!settings.syncPlugin) return;
 
@@ -43,6 +43,7 @@ export async function syncToPlugin(appMap, globalConfText) {
 
     let templates = [];
 
+    // 处理全局配置 (省略 apply_to_app)
     const globalRules = parseRules(globalConfText);
     if (globalRules.redirects.length > 0 || globalRules.hides.length > 0) {
         templates.push({
@@ -54,21 +55,56 @@ export async function syncToPlugin(appMap, globalConfText) {
         });
     }
 
+    let pkgMap = new Map();
+
+    const addRulesToPkg = (pkg, text) => {
+        if (!text) return;
+        const r = parseRules(text);
+        if (r.hides.length || r.redirects.length) {
+            if (!pkgMap.has(pkg)) pkgMap.set(pkg, { hides: [], redirects: [] });
+            pkgMap.get(pkg).hides.push(...r.hides);
+            pkgMap.get(pkg).redirects.push(...r.redirects);
+        }
+    };
+
+    // 1. 合并 App-rules 中的规则
     appMap.forEach((app, pkg) => {
         const u0 = app.users[0];
         if (u0 && u0.isEnabled) {
-            const rules = parseRules(u0.text);
-            if (rules.redirects.length > 0 || rules.hides.length > 0) {
-                templates.push({
-                    template_name: app.appLabel || pkg,
-                    hook_operation: ["query", "insert"],
-                    apply_to_app: [pkg],
-                    permitted_media_types: [0, 1, 2, 3, 4, 5, 6],
-                    filter_path: rules.hides.length ? rules.hides : undefined,
-                    redirect_rules: rules.redirects.length ? rules.redirects : undefined
-                });
-            }
+            addRulesToPkg(pkg, u0.text);
         }
+    });
+
+    // 2. 合并 injector.conf 中的内联规则（兼容类似 [bin.mt.plus] 下属有直接规则的情况）
+    if (injectorRulesMap) {
+        injectorRulesMap.forEach((lines, section) => {
+            if (section === 'GLOBAL') return;
+            const state = injectorStates.get(section);
+            if (state === 'OFF') return;
+
+            const pkg = section.split(':')[0];
+            addRulesToPkg(pkg, lines.join('\n'));
+        });
+    }
+
+    // 将有规则集的包注入到模板中，避免无规则的 OFF 拦截器成为垃圾信息干扰
+    pkgMap.forEach((rules, pkg) => {
+        // 对隐藏规则去重
+        const uniqueHides = [...new Set(rules.hides)];
+        
+        // 对重定向规则按 source 去重
+        const rMap = new Map();
+        rules.redirects.forEach(r => rMap.set(r.source, r));
+        const uniqueRedirects = Array.from(rMap.values());
+
+        templates.push({
+            template_name: pkg,
+            hook_operation: ["query", "insert"],
+            apply_to_app: [pkg], // 特有应用必须指定 apply_to_app
+            permitted_media_types: [0, 1, 2, 3, 4, 5, 6],
+            filter_path: uniqueHides.length ? uniqueHides : undefined,
+            redirect_rules: uniqueRedirects.length ? uniqueRedirects : undefined
+        });
     });
 
     const jsonStr = JSON.stringify(templates);
@@ -85,12 +121,11 @@ export async function syncToPlugin(appMap, globalConfText) {
     await exec(`mkdir -p ${targetDir}`);
     await exec(`echo '${jsonStr.replace(/'/g, "'\\''")}' > ${targetPath}`);
     
-    // 获取父级目录的 UID 和 GID，将文件权限强制对齐，防止应用无权读取
+    // 重要：同步父级目录的用户与用户组权限（防止插件无权读取我们用 Root 写入的配置）
     const statRes = await exec(`stat -c '%u:%g' ${targetDir} 2>/dev/null`);
     const ug = statRes.stdout ? statRes.stdout.trim() : "";
     if (ug) {
         await exec(`chown ${ug} ${targetPath}`);
     }
-    // 赋予基础的读取权限
     await exec(`chmod 644 ${targetPath}`);
 }

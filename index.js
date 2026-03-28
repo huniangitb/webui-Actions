@@ -20,6 +20,7 @@ const PATH_PREFIX_REAL = '/data/media/0';
 let appMap = new Map();
 let globalConfText = "";
 let injectorStates = new Map();
+let injectorRulesMap = new Map();
 
 let activeUsers = [0];
 let activeMounts = new Set();
@@ -243,19 +244,19 @@ document.addEventListener('DOMContentLoaded', () => {
         await saveSettings({ syncPlugin: val });
         toast("设置已保存");
         closeModal('settingsModal');
-        await syncToPlugin(appMap, globalConfText);
+        await syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates);
     };
 
-    // 优化：键盘弹出与收起时更新补全框，替代之前的死循环
+    // 优化：键盘弹出与收起时隐藏补全框，彻底杜绝高频卡顿重排
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
-            if (window._currentInput && document.getElementById('suggestionBox').style.display !== 'none') {
-                requestAnimationFrame(() => updateBoxPosition(window._currentInput));
+            const box = document.getElementById('suggestionBox');
+            if (box && box.style.display !== 'none') {
+                box.style.display = 'none';
             }
         });
     }
 
-    // 优化：当在模态框中滑动时主动隐藏补全框，节省性能
     document.addEventListener('scroll', (e) => {
         if (e.target && e.target.classList && e.target.classList.contains('editor-pane')) {
             const box = document.getElementById('suggestionBox');
@@ -441,25 +442,25 @@ const loadData = async () => {
         const injectorConf = await run(`cat ${INJECTOR_CONF} 2>/dev/null`);
         globalConfText = "";
         injectorStates.clear();
+        injectorRulesMap.clear();
         
-        let currentSection = "";
-        let globalLines = [];
-
         if (injectorConf) {
+            let currentSection = "";
             injectorConf.split('\n').forEach(line => {
                 const tLine = line.trim();
                 if (!tLine) return;
                 const secMatch = tLine.match(/^\[(.*?)\](?:\s+(ON|OFF))?/);
                 if (secMatch) {
-                    if (currentSection === '[GLOBAL]') globalConfText = globalLines.join('\n');
-                    currentSection = `[${secMatch[1]}]`;
-                    if (secMatch[1] !== 'GLOBAL') injectorStates.set(secMatch[1], secMatch[2] || "ON");
-                    globalLines = [];
-                } else if (currentSection === '[GLOBAL]') {
-                    globalLines.push(tLine);
+                    currentSection = secMatch[1];
+                    if (currentSection !== 'GLOBAL') injectorStates.set(currentSection, secMatch[2] || "ON");
+                    if (!injectorRulesMap.has(currentSection)) {
+                        injectorRulesMap.set(currentSection, []);
+                    }
+                } else if (currentSection) {
+                    injectorRulesMap.get(currentSection).push(tLine);
                 }
             });
-            if (currentSection === '[GLOBAL]') globalConfText = globalLines.join('\n');
+            globalConfText = (injectorRulesMap.get('GLOBAL') || []).join('\n');
         }
 
         let ruleFilesMap = new Map();
@@ -690,8 +691,14 @@ const flushInjectorConf = async () => {
     if (gt) {
         res += `${gt}\n`;
     }
+    
     injectorStates.forEach((state, key) => {
+        if (key === 'GLOBAL') return;
         res += `[${key}] ${state}\n`;
+        const inlineRules = injectorRulesMap.get(key) || [];
+        if (inlineRules.length > 0) {
+            res += inlineRules.join('\n') + '\n';
+        }
     });
     const safeResult = res.trim().replace(/'/g, "'\\''");
     await exec(`echo '${safeResult}' > ${INJECTOR_CONF}`);
@@ -710,7 +717,6 @@ window.openAppConfig = (pkg) => {
         `<button class="nav-item ${uid === activeUsers[0] ? 'active' : ''}" data-uid="${uid}" onclick="window.switchAppUser(${uid})">${ICONS.USER} 用户 ${uid}</button>`
     ).join('');
     
-    // 稍微延迟内部渲染，保证 Modal 的 CSS pop-up 动画不会卡顿
     setTimeout(() => {
         window.switchAppUser(activeUsers[0]);
     }, 50);
@@ -767,7 +773,7 @@ document.getElementById('btnSaveAppConfig').onclick = async () => {
         toast("当前用户应用配置已保存");
         closeModal('appConfigModal');
         await loadData();
-        await syncToPlugin(appMap, globalConfText);
+        await syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates);
     } catch (e) {
         toast("保存失败: " + e.message);
     }
@@ -785,7 +791,7 @@ document.getElementById('btnDeleteAppConfig').onclick = async () => {
         toast("配置已清除");
         closeModal('appConfigModal');
         await loadData();
-        await syncToPlugin(appMap, globalConfText);
+        await syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates);
     } catch (e) {
         toast("清除失败: " + e.message);
     }
@@ -799,7 +805,7 @@ document.getElementById('btnSaveGlobal').onclick = async () => {
         await flushInjectorConf();
         toast("全局规则已保存");
         await loadData();
-        await syncToPlugin(appMap, globalConfText);
+        await syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates);
     } catch (e) {
         toast("保存失败: " + e.message);
     }
@@ -833,12 +839,10 @@ const updateBoxPosition = (input) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none' || !input) return;
     
-    // 读阶段，获取节点信息
     const rect = input.getBoundingClientRect();
     const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
     const threshold = vh * 0.5;
     
-    // 写阶段，延迟修改 DOM 减轻重排负担
     requestAnimationFrame(() => {
         box.style.width = rect.width + 'px';
         box.style.left = rect.left + 'px';
@@ -884,11 +888,10 @@ const setupAutocomplete = (input) => {
             
             updateBoxPosition(input);
         } catch (e) { box.style.display = 'none'; }
-    }, 250); // 增加防抖延迟时间
+    }, 250);
 
     input.addEventListener('input', (e) => performSearch(e.target.value));
     
-    // 优化：焦点获取后等待 300ms（留足键盘滑入动画时间）再展开自动补全框
     input.addEventListener('focus', () => { 
         window._currentInput = input; 
         setTimeout(() => {
@@ -907,7 +910,6 @@ const handleModeChange = (isVisual, visualId, rawId, alertId, fabId, contentId, 
     const rawEl = document.getElementById(rawId);
     const fab = document.getElementById(fabId);
 
-    // 优化：让主线程先优先响应 Switch 按钮的 UI 修改，再去渲染 DOM
     setTimeout(() => {
         if (isVisual) {
             parseFunc(document.getElementById(contentId).value);

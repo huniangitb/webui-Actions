@@ -83,7 +83,7 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .nav-item.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 2px 4px rgba(24, 119, 242, 0.3); transform: scale(1.02); }
 
 /* User Tabs in Modal */
-.user-tabs { padding: 4px 0 10px 0; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.user-tabs { padding: 4px 0 10px 0; margin-bottom: 12px; border-bottom: none solid var(--border); }
 .user-tabs .nav-item { padding: 6px 14px; font-size: 12px; }
 
 /* Tab Content */
@@ -155,7 +155,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 .list-item:hover { background: var(--bg-input); }
 .list-item:active { background: rgba(0,0,0,0.05); }
 .app-main { display: flex; align-items: center; flex: 1; min-width: 0; margin-right: 10px; }
-.app-icon-wrapper { width: 40px; height: 40px; margin-right: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--bg-input); border-radius: 8px; }
+.app-icon-wrapper { width: 40px; height: 40px; margin-right: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--bg-input); border-radius: 8px; overflow: hidden; }
 .app-content { flex: 1; min-width: 0; }
 .app-header { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
 .app-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.3s; }
@@ -182,17 +182,17 @@ input:checked + .slider:before { transform: translateX(20px); }
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(3px); opacity: 0; transition: opacity 0.25s ease; }
 .modal.show { display: flex; opacity: 1; }
 .modal.hiding { opacity: 0; }
-.modal.hiding .modal-content { transform: translateY(20px); }
 
 .modal-content { 
     background: var(--bg-surface); width: 92%; max-width: 420px; border-radius: 16px; 
     display: flex; flex-direction: column; max-height: 85vh; height: auto; 
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2); transform: translateY(0);
-    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s ease, color 0.3s ease;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    transition: background-color 0.3s ease, color 0.3s ease;
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
 }
 .modal-content.large { max-width: 800px; height: 75vh; }
 .flex-column { display: flex; flex-direction: column; }
+.flex-shrink-0 { flex-shrink: 0; }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 .modal-header { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; transition: border-color 0.3s; }
@@ -206,14 +206,15 @@ input:checked + .slider:before { transform: translateX(20px); }
 .relative { position: relative; }
 .flex-grow { flex: 1; min-height: 0; }
 
-.editor-pane { flex: 1; display: flex; flex-direction: column; }
-.editor-pane.scroll-y { overflow-y: auto; }
-.editor-pane.full-height { flex: 1; height: 100%; width: 100%; }
-
-/* Fade Logic */
-.fade-content { transition: opacity 0.25s ease, transform 0.25s ease; opacity: 0; transform: translateY(10px); display: none; }
-.fade-content.active { display: flex; opacity: 1; transform: translateY(0); }
-.fade-content.hidden { display: none; opacity: 0; }
+/* Editor Wrappers - Absolute Positioning to Prevent Layout Reflow on Toggle */
+.editor-wrapper { position: relative; flex: 1; min-height: 0; }
+.editor-pane { 
+    position: absolute; inset: 0; display: flex; flex-direction: column; overflow-y: auto; 
+    opacity: 0; pointer-events: none; transition: opacity 0.15s ease-out; padding: 12px; 
+    visibility: hidden; 
+}
+.editor-pane.active { opacity: 1; pointer-events: auto; visibility: visible; z-index: 1; }
+.editor-pane#globalRaw, .editor-pane#appRaw, .editor-pane#ignoreRaw { padding: 0; } /* Remove padding for textareas */
 
 /* Sticky Alert */
 .alert-info { 
@@ -228,7 +229,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 .rule-row { display: flex; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); align-items: center; background: transparent; flex-shrink: 0; transition: border-color 0.3s; }
 .rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .rule-type { width: 90px; font-size: 12px; padding: 6px 20px 6px 6px; }
-.fab-container { position: absolute; bottom: 20px; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; }
+.fab-container { position: absolute; bottom: 20px; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; z-index: 10; }
 .fab-container button { pointer-events: auto; width: auto; padding: 8px 20px; border-radius: 20px; font-size: 13px; }
 
 /* Autocomplete */
@@ -242,7 +243,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 .s-icon { margin-right: 10px; width: 16px; display: flex; }
 .s-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* IO Logs - Rectangular Notification Style */
+/* IO Logs */
 .list-container { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 .scroll-y { overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .io-log-list { display: flex; flex-direction: column; gap: 8px; padding-bottom: 80px; }
@@ -258,7 +259,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 .io-op { font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px; color: #fff; font-family: var(--code-font); flex-shrink: 0; }
 .io-card-body { background: var(--bg-input); padding: 8px; border-radius: 6px; font-size: 12px; line-height: 1.4; color: var(--text-muted); }
 
-/* Code Editors & Viewers - Fully Responsive to Theme Variables */
+/* Code Editors & Viewers */
 .log-viewer { 
     flex: 1; background: var(--code-bg); color: var(--code-text); 
     padding: 12px; font-family: var(--code-font); font-size: 11px; 

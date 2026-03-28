@@ -15,7 +15,10 @@
                     <small id="statusInfo">Checking</small>
                 </div>
             </div>
-            <button id="btnToggleStatus" class="btn btn-icon"></button>
+            <div style="display: flex; gap: 8px;">
+                <button id="btnSettings" class="btn btn-icon-sm" style="background:var(--bg-input); color:var(--text-muted)"></button>
+                <button id="btnToggleStatus" class="btn btn-icon"></button>
+            </div>
         </div>
 
         <div class="nav-tabs main-tabs">
@@ -57,33 +60,35 @@
                             <label><input type="radio" name="globalEditorMode" value="raw"><span>源码</span></label>
                         </div>
                     </div>
-                    <div class="flex-grow relative" style="overflow: hidden; display:flex; flex-direction:column;">
+                    <div class="flex-grow flex-column" style="overflow: hidden;">
                         <div id="globalAlert" class="alert-info sticky-top">配置将写入 injector.conf，对所有应用默认生效</div>
-                        <div id="globalVisual" class="editor-pane scroll-y fade-content active" style="padding:12px;">
-                            <div class="grid-2-col mb-3">
-                                <div class="form-group">
-                                    <label class="control-label">全局监控 (MONITOR)</label>
-                                    <select id="globalMonitorSelect" class="form-select">
-                                        <option value="">默认 (OFF)</option>
-                                        <option value="ON">全局开启 (ON)</option>
-                                        <option value="OFF">全局关闭 (OFF)</option>
-                                    </select>
+                        <div class="editor-wrapper">
+                            <div id="globalVisual" class="editor-pane active">
+                                <div class="grid-2-col mb-3">
+                                    <div class="form-group">
+                                        <label class="control-label">全局监控 (MONITOR)</label>
+                                        <select id="globalMonitorSelect" class="form-select">
+                                            <option value="">默认 (OFF)</option>
+                                            <option value="ON">全局开启 (ON)</option>
+                                            <option value="OFF">全局关闭 (OFF)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="control-label">全局沙盒 (SANDBOX)</label>
+                                        <select id="globalSandboxSelect" class="form-select">
+                                            <option value="">默认 (OFF)</option>
+                                            <option value="ON">全局开启 (ON)</option>
+                                            <option value="OFF">全局关闭 (OFF)</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div class="form-group">
-                                    <label class="control-label">全局沙盒 (SANDBOX)</label>
-                                    <select id="globalSandboxSelect" class="form-select">
-                                        <option value="">默认 (OFF)</option>
-                                        <option value="ON">全局开启 (ON)</option>
-                                        <option value="OFF">全局关闭 (OFF)</option>
-                                    </select>
-                                </div>
+                                <h4 style="margin:5px 0 10px 0; font-size:14px;">全局路径映射</h4>
+                                <div id="globalRuleBuilderContainer"></div>
+                                <div class="spacer"></div>
                             </div>
-                            <h4 style="margin:5px 0 10px 0; font-size:14px;">全局路径映射</h4>
-                            <div id="globalRuleBuilderContainer"></div>
-                            <div class="spacer"></div>
-                        </div>
-                        <div id="globalRaw" class="editor-pane full-height fade-content hidden">
-                            <textarea id="globalRuleContent" class="code-editor" style="border:none; border-radius:0;"></textarea>
+                            <div id="globalRaw" class="editor-pane">
+                                <textarea id="globalRuleContent" class="code-editor" style="border:none; border-radius:0; height:100%;"></textarea>
+                            </div>
                         </div>
                         <div class="fab-container" id="fabGlobal"><button id="btnGlobalAddRule" class="btn btn-primary rounded shadow">添加规则</button></div>
                     </div>
@@ -93,7 +98,7 @@
                 </div>
             </div>
 
-            <!-- 3. 监控 (矩形通知风格) -->
+            <!-- 3. 监控 -->
             <div id="content-io" class="tab-pane">
                 <div class="card full-height-card relative" style="padding: 10px 10px 0 10px;">
                     <div style="display:flex; gap:10px; margin-bottom:10px; align-items:center">
@@ -117,14 +122,14 @@
 
             <!-- 4. 日志 -->
             <div id="content-log" class="tab-pane">
-                <div class="card full-height-card relative">
-                    <div class="mb-2">
+                <div class="card full-height-card relative flex-column">
+                    <div class="mb-2 flex-shrink-0">
                         <select id="logSourceSelect" class="form-select">
                             <option value="internal">注入器日志</option>
                             <option value="zygisk">Zygisk (Logcat)</option>
                         </select>
                     </div>
-                    <div id="logViewer" class="log-viewer"></div>
+                    <div id="logViewer" class="log-viewer flex-grow"></div>
                     <div id="sysLoadingIndicator" class="text-center text-muted small hidden" style="position:absolute;bottom:5px;left:0;right:0;background:rgba(0,0,0,0.5);color:#fff;">加载中...</div>
                     <div class="fab-log-container" style="position:absolute; bottom:20px; right:20px; z-index:10">
                         <button id="btnClearLog" class="btn btn-primary fab-main shadow" style="background:var(--danger)">
@@ -159,45 +164,46 @@
                     <div class="nav-tabs user-tabs" id="appUserTabs" style="margin-bottom:0; padding-bottom:0;"></div>
                 </div>
             </div>
-            <div class="modal-body no-padding relative flex-grow" style="overflow: hidden; display:flex; flex-direction:column;">
-                <div id="appVisual" class="editor-pane scroll-y fade-content active" style="padding:12px;">
-                    
-                    <div class="app-state-toggle-wrapper mb-3">
-                        <label class="switch-row">
-                            <span class="fw-bold">允许注入 (当前用户)</span>
-                            <div class="switch">
-                                <input type="checkbox" id="appEnableToggle" checked>
-                                <span class="slider"></span>
-                            </div>
-                        </label>
-                        <small class="text-muted d-block mt-1" style="font-size:11px; margin-top:4px;">关闭将强制屏蔽注入，配置不生效。</small>
-                    </div>
+            <div class="modal-body no-padding relative flex-grow flex-column" style="overflow: hidden;">
+                <div class="editor-wrapper">
+                    <div id="appVisual" class="editor-pane active">
+                        <div class="app-state-toggle-wrapper mb-3">
+                            <label class="switch-row">
+                                <span class="fw-bold">允许注入 (当前用户)</span>
+                                <div class="switch">
+                                    <input type="checkbox" id="appEnableToggle">
+                                    <span class="slider"></span>
+                                </div>
+                            </label>
+                            <small class="text-muted d-block mt-1" style="font-size:11px; margin-top:4px;">关闭将强制屏蔽注入，配置不生效。</small>
+                        </div>
 
-                    <div class="grid-2-col mb-3">
-                        <div class="form-group">
-                            <label class="control-label">监控 (MONITOR)</label>
-                            <select id="appMonitorSelect" class="form-select">
-                                <option value="">跟随全局</option>
-                                <option value="ON">强制开启 (ON)</option>
-                                <option value="OFF">强制关闭 (OFF)</option>
-                            </select>
+                        <div class="grid-2-col mb-3">
+                            <div class="form-group">
+                                <label class="control-label">监控 (MONITOR)</label>
+                                <select id="appMonitorSelect" class="form-select">
+                                    <option value="">跟随全局</option>
+                                    <option value="ON">强制开启 (ON)</option>
+                                    <option value="OFF">强制关闭 (OFF)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="control-label">沙盒 (SANDBOX)</label>
+                                <select id="appSandboxSelect" class="form-select">
+                                    <option value="">跟随全局</option>
+                                    <option value="ON">强制开启 (ON)</option>
+                                    <option value="OFF">强制关闭 (OFF)</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label class="control-label">沙盒 (SANDBOX)</label>
-                            <select id="appSandboxSelect" class="form-select">
-                                <option value="">跟随全局</option>
-                                <option value="ON">强制开启 (ON)</option>
-                                <option value="OFF">强制关闭 (OFF)</option>
-                            </select>
-                        </div>
+                        
+                        <h4 style="margin:5px 0 10px 0; font-size:14px;">专属路径映射</h4>
+                        <div id="appRuleBuilderContainer"></div>
+                        <div class="spacer"></div>
                     </div>
-                    
-                    <h4 style="margin:5px 0 10px 0; font-size:14px;">专属路径映射</h4>
-                    <div id="appRuleBuilderContainer"></div>
-                    <div class="spacer"></div>
-                </div>
-                <div id="appRaw" class="editor-pane full-height fade-content hidden">
-                    <textarea id="appRuleContent" class="code-editor" style="border:none; border-radius:0;"></textarea>
+                    <div id="appRaw" class="editor-pane">
+                        <textarea id="appRuleContent" class="code-editor" style="border:none; border-radius:0; height:100%;"></textarea>
+                    </div>
                 </div>
                 <div class="fab-container" id="fabApp"><button id="btnAppAddRule" class="btn btn-primary rounded shadow">添加规则</button></div>
             </div>
@@ -224,19 +230,52 @@
                     <button class="btn-close" onclick="closeModal('monitorIgnoreModal')"></button>
                 </div>
             </div>
-            <div class="modal-body no-padding relative flex-grow" style="overflow: hidden;">
+            <div class="modal-body no-padding relative flex-grow flex-column" style="overflow: hidden;">
                 <div id="alertIgnore" class="alert-info sticky-top">匹配规则：<b>前缀匹配</b></div>
-                <div id="ignoreVisual" class="editor-pane scroll-y fade-content active">
-                    <div id="ignoreBuilderContainer" style="padding:12px;"></div>
-                    <div class="spacer"></div>
-                </div>
-                <div id="ignoreRaw" class="editor-pane full-height fade-content hidden">
-                    <textarea id="monitorIgnoreContent" class="code-editor"></textarea>
+                <div class="editor-wrapper">
+                    <div id="ignoreVisual" class="editor-pane active">
+                        <div id="ignoreBuilderContainer"></div>
+                        <div class="spacer"></div>
+                    </div>
+                    <div id="ignoreRaw" class="editor-pane">
+                        <textarea id="monitorIgnoreContent" class="code-editor" style="height:100%"></textarea>
+                    </div>
                 </div>
                 <div class="fab-container" id="fabIgnore"><button id="btnAddIgnoreRow" class="btn btn-primary rounded shadow">添加路径</button></div>
             </div>
             <div class="modal-footer">
                 <button id="btnSaveIgnore" class="btn btn-primary full-width">保存配置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框：设置 -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content flex-column">
+            <div class="modal-header nowrap">
+                <div class="header-title-group"><h3>全局设置</h3></div>
+                <button class="btn-close" onclick="closeModal('settingsModal')"></button>
+            </div>
+            <div class="modal-body">
+                <div class="app-state-toggle-wrapper mb-3">
+                    <label class="switch-row">
+                        <div style="display:flex; flex-direction:column;">
+                            <span class="fw-bold">插件规则覆写同步</span>
+                            <small class="text-muted" style="font-size:11px; margin-top:2px;">同步至 me.gm.cleaner.plugin</small>
+                        </div>
+                        <div class="switch">
+                            <input type="checkbox" id="pluginSyncToggle">
+                            <span class="slider"></span>
+                        </div>
+                    </label>
+                </div>
+                <p class="text-muted" style="font-size: 12px; line-height: 1.5;">
+                    开启后，当检测到插件存在时，会自动将图形界面中的隐藏与重定向规则转换为插件支持的 JSON 格式并写入其配置目录。
+                </p>
+                <div id="pluginStatusLabel" class="text-muted font-monospace mt-1" style="font-size: 11px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="btnSaveSettings" class="btn btn-primary full-width">保存并应用</button>
             </div>
         </div>
     </div>

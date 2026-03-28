@@ -1,10 +1,11 @@
 import './style.css';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
+import { getSettings, saveSettings, checkPluginInstalled, syncToPlugin } from './plugin.js';
 import { 
     mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
     mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight,
     mdiFilterVariant, mdiViewGrid, mdiViewList, mdiStop, mdiPlay,
-    mdiEyeOff, mdiDeleteSweep, mdiClockOutline, mdiShieldAccount, mdiAccountCircle
+    mdiEyeOff, mdiDeleteSweep, mdiClockOutline, mdiShieldAccount, mdiAccountCircle, mdiCog
 } from '@mdi/js';
 
 const BASE_DIR = "/data/Namespace-Proxy";
@@ -49,10 +50,11 @@ const ICONS = {
     CLEAR: getSvg(mdiDeleteSweep, 20, '#fff'),
     CLOCK: getSvg(mdiClockOutline, 14, 'currentColor'),
     SHIELD: getSvg(mdiShieldAccount, 16, 'currentColor'),
-    USER: getSvg(mdiAccountCircle, 14, 'currentColor')
+    USER: getSvg(mdiAccountCircle, 14, 'currentColor'),
+    COG: getSvg(mdiCog, 20, 'currentColor')
 };
 
-// 全局应用图标加载失败降级方案
+// 图标加载失败降级
 window.onIconError = (ele) => {
     ele.outerHTML = ICONS.ANDROID;
 };
@@ -142,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setIcon('btnMonitorIgnore', ICONS.EYE_OFF);
     setIcon('iconClearIo', ICONS.CLEAR);
     setIcon('iconClearLog', ICONS.CLEAR);
+    setIcon('btnSettings', ICONS.COG);
     document.querySelectorAll('.btn-close').forEach(el => el.innerHTML = ICONS.CLOSE);
     
     const setHtml = (id, html) => { const el = document.getElementById(id); if(el) el.innerHTML = html; };
@@ -225,6 +228,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('btnMonitorIgnore').onclick = openMonitorIgnoreEditor;
+    
+    document.getElementById('btnSettings').onclick = async () => {
+        const settings = await getSettings();
+        document.getElementById('pluginSyncToggle').checked = settings.syncPlugin;
+        const isInstalled = await checkPluginInstalled();
+        const lbl = document.getElementById('pluginStatusLabel');
+        lbl.textContent = isInstalled ? "状态: 发现清理插件 (已就绪)" : "状态: 未发现清理插件";
+        lbl.style.color = isInstalled ? "var(--success)" : "var(--danger)";
+        openModal('settingsModal');
+    };
+    
+    document.getElementById('btnSaveSettings').onclick = async () => {
+        const val = document.getElementById('pluginSyncToggle').checked;
+        await saveSettings({ syncPlugin: val });
+        toast("设置已保存");
+        closeModal('settingsModal');
+        await syncToPlugin(appMap, globalConfText);
+    };
 });
 
 const debounce = (func, wait) => {
@@ -411,7 +432,7 @@ const loadData = async () => {
         if (injectorConf) {
             injectorConf.split('\n').forEach(line => {
                 const tLine = line.trim();
-                if (!tLine) return; // Ignore empty lines during parsing
+                if (!tLine) return;
                 const secMatch = tLine.match(/^\[(.*?)\](?:\s+(ON|OFF))?/);
                 if (secMatch) {
                     if (currentSection === '[GLOBAL]') globalConfText = globalLines.join('\n');
@@ -430,12 +451,14 @@ const loadData = async () => {
             const dir = uid === 0 ? `${BASE_DIR}/App-rules` : `${BASE_DIR}/App-rules-${uid}`;
             const lsRes = await run(`ls -1 ${dir} 2>/dev/null`);
             if (lsRes) {
-                // 兼容读取已禁用状态的规则文件 (.conf.disabled)
                 const files = lsRes.split('\n').filter(f => f.endsWith('.conf') || f.endsWith('.conf.disabled'));
                 for (const file of files) {
+                    const isDisabled = file.endsWith('.conf.disabled');
                     const pkg = file.replace(/\.conf(\.disabled)?$/, '');
                     const content = await run(`cat ${dir}/${file} 2>/dev/null`);
                     ruleFilesMap.set(`${pkg}:${uid}`, content);
+                    if (isDisabled) ruleFilesMap.set(`${pkg}:${uid}_disabled`, true);
+                    else ruleFilesMap.set(`${pkg}:${uid}_enabled`, true);
                 }
             }
         }
@@ -463,14 +486,7 @@ const loadData = async () => {
                         const pkg = trimLine.substring(0, firstEq).trim();
                         const name = trimLine.substring(firstEq + 1).trim();
                         if (pkg) {
-                            infos.push({
-                                packageName: pkg,
-                                appLabel: name || pkg,
-                                isSystem: false,
-                                versionName: "",
-                                versionCode: 0,
-                                uid: 0
-                            });
+                            infos.push({ packageName: pkg, appLabel: name || pkg, isSystem: false, versionName: "", versionCode: 0, uid: 0 });
                         }
                     }
                 });
@@ -495,11 +511,19 @@ const loadData = async () => {
 
                     const ruleText = ruleFilesMap.get(exactKey) || "";
                     const hasRulesFile = ruleFilesMap.has(exactKey);
+                    const isExplicitlyEnabled = ruleFilesMap.get(`${exactKey}_enabled`);
+                    const isExplicitlyDisabled = ruleFilesMap.get(`${exactKey}_disabled`);
+
+                    let isEnabled = false;
+                    if (isExplicitlyEnabled) isEnabled = true;
+                    else if (isExplicitlyDisabled) isEnabled = false;
+                    else if (state === 'ON' && hasRulesFile) isEnabled = true;
+                    // 如果没有任何文件存在，默认 isEnabled 为 false
 
                     if (hasRulesFile || state === 'OFF') isConfiguredAny = true;
 
                     appUsers[uid] = {
-                        isEnabled: state !== 'OFF',
+                        isEnabled: isEnabled,
                         text: ruleText,
                         hasMonitor: ruleText.includes('MONITOR ON'),
                         hasSandbox: ruleText.includes('SANDBOX ON'),
@@ -557,8 +581,8 @@ const renderAppList = () => {
         return `
         <div class="list-item" data-pkg="${app.packageName}" onclick="openAppConfig('${app.packageName}')">
             <div class="app-main">
-                <div class="app-icon-wrapper">
-                    <img src="ksu://icon/${app.packageName}" style="width: 32px; height: 32px; object-fit: contain;" onerror="window.onIconError(this)" />
+                <div class="app-icon-wrapper" style="background: transparent;">
+                    <img src="ksu://icon/${app.packageName}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: contain; background: var(--bg-input);" onerror="window.onIconError(this)" />
                 </div>
                 <div class="app-content">
                     <div class="app-header"><span class="app-name ${isOverallDisabled ? 'text-muted' : ''}">${app.appLabel}</span>${mountedBadge}</div>
@@ -577,7 +601,7 @@ const renderGlobalRules = () => {
     const visualRadio = document.querySelector('input[name="globalEditorMode"][value="visual"]');
     if (visualRadio && !visualRadio.checked) { 
         visualRadio.checked = true; 
-        handleModeChange(true, 'content-global', 'globalVisual', 'globalRaw', 'globalAlert', 'fabGlobal', 'globalRuleContent', 
+        handleModeChange(true, 'globalVisual', 'globalRaw', 'globalAlert', 'fabGlobal', 'globalRuleContent', 
             (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'),
             () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'));
     }
@@ -682,7 +706,7 @@ window.switchAppUser = (uid) => {
     });
 
     const app = appMap.get(currentBindingPkg);
-    const uConf = app.users[uid] || { isEnabled: true, text: '' };
+    const uConf = app.users[uid] || { isEnabled: false, text: '' };
 
     document.getElementById('appEnableToggle').checked = uConf.isEnabled;
     document.getElementById('appRuleContent').value = uConf.text;
@@ -713,12 +737,10 @@ document.getElementById('btnSaveAppConfig').onclick = async () => {
         
         await run(`mkdir -p ${dir}`);
         
-        // 无论规则内容是否为空都生成文件，实现“将应用添加到列表中”的逻辑
         if (isEnabled) {
             await exec(`echo '${cleanText.replace(/'/g, "'\\''")}' > ${file}`);
             await run(`rm -f ${disabledFile}`);
         } else {
-            // 通过后缀名禁用
             await exec(`echo '${cleanText.replace(/'/g, "'\\''")}' > ${disabledFile}`);
             await run(`rm -f ${file}`);
         }
@@ -726,7 +748,8 @@ document.getElementById('btnSaveAppConfig').onclick = async () => {
         await flushInjectorConf();
         toast("当前用户应用配置已保存");
         closeModal('appConfigModal');
-        loadData();
+        await loadData();
+        await syncToPlugin(appMap, globalConfText);
     } catch (e) {
         toast("保存失败: " + e.message);
     }
@@ -737,14 +760,14 @@ document.getElementById('btnDeleteAppConfig').onclick = async () => {
         if (!confirm(`确定清除当前用户 (${currentBindingUser}) 的应用配置吗?`)) return;
         
         const dir = currentBindingUser === 0 ? `${BASE_DIR}/App-rules` : `${BASE_DIR}/App-rules-${currentBindingUser}`;
-        // 清理所有可能的配置文件
         await run(`rm -f ${dir}/${currentBindingPkg}.conf ${dir}/${currentBindingPkg}.conf.disabled`);
         injectorStates.delete(`${currentBindingPkg}:${currentBindingUser}`);
         
         await flushInjectorConf();
         toast("配置已清除");
         closeModal('appConfigModal');
-        loadData();
+        await loadData();
+        await syncToPlugin(appMap, globalConfText);
     } catch (e) {
         toast("清除失败: " + e.message);
     }
@@ -757,7 +780,8 @@ document.getElementById('btnSaveGlobal').onclick = async () => {
         
         await flushInjectorConf();
         toast("全局规则已保存");
-        loadData();
+        await loadData();
+        await syncToPlugin(appMap, globalConfText);
     } catch (e) {
         toast("保存失败: " + e.message);
     }
@@ -839,36 +863,30 @@ const setupAutocomplete = (input) => {
 
 window.applySuggestion = (text) => { if (window._currentInput) { window._currentInput.value = text; window._currentInput.dispatchEvent(new Event('input')); } };
 
-const handleModeChange = (isVisual, containerId, visualId, rawId, alertId, fabId, contentId, parseFunc, genFunc) => {
+const handleModeChange = (isVisual, visualId, rawId, alertId, fabId, contentId, parseFunc, genFunc) => {
     const alertBox = document.getElementById(alertId);
     const visualEl = document.getElementById(visualId);
     const rawEl = document.getElementById(rawId);
-    const containerEl = document.getElementById(containerId);
-    const fab = document.getElementById(fabId) || (containerEl ? containerEl.querySelector('.fab-container') : null);
+    const fab = document.getElementById(fabId);
 
     if (isVisual) {
+        parseFunc(document.getElementById(contentId).value);
         rawEl.classList.remove('active');
-        setTimeout(() => {
-            rawEl.classList.add('hidden'); visualEl.classList.remove('hidden');
-            if (alertBox) alertBox.classList.remove('collapsed');
-            if (fab) fab.classList.remove('hidden');
-            parseFunc(document.getElementById(contentId).value);
-            requestAnimationFrame(() => { visualEl.classList.add('active'); });
-        }, 250);
+        visualEl.classList.add('active');
+        if (alertBox) alertBox.classList.remove('collapsed');
+        if (fab) fab.classList.remove('hidden');
     } else {
+        document.getElementById(contentId).value = genFunc();
         visualEl.classList.remove('active');
+        rawEl.classList.add('active');
         if (alertBox) alertBox.classList.add('collapsed');
         if (fab) fab.classList.add('hidden');
-        setTimeout(() => {
-            visualEl.classList.add('hidden'); rawEl.classList.remove('hidden');
-            document.getElementById(contentId).value = genFunc();
-            requestAnimationFrame(() => { rawEl.classList.add('active'); });
-        }, 250);
     }
 };
 
-document.querySelectorAll('input[name="globalEditorMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'content-global', 'globalVisual', 'globalRaw', 'globalAlert', 'fabGlobal', 'globalRuleContent', (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'), () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect')); });
-document.querySelectorAll('input[name="appEditorMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'appConfigModal', 'appVisual', 'appRaw', null, 'fabApp', 'appRuleContent', (val) => parseConfigTextToVisual(val, 'appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect'), () => generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect')); });
+document.querySelectorAll('input[name="globalEditorMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'globalVisual', 'globalRaw', 'globalAlert', 'fabGlobal', 'globalRuleContent', (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'), () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect')); });
+document.querySelectorAll('input[name="appEditorMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'appVisual', 'appRaw', null, 'fabApp', 'appRuleContent', (val) => parseConfigTextToVisual(val, 'appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect'), () => generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect')); });
+document.querySelectorAll('input[name="ignoreMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'ignoreVisual', 'ignoreRaw', 'alertIgnore', 'fabIgnore', 'monitorIgnoreContent', parseIgnoreToVisual, generateIgnoreFromVisual); });
 
 document.getElementById('btnGlobalAddRule').onclick = () => addRuleRow('REDIRECT', '', '', 'globalRuleBuilderContainer');
 document.getElementById('btnAppAddRule').onclick = () => addRuleRow('REDIRECT', '', '', 'appRuleBuilderContainer');
@@ -896,7 +914,6 @@ const openMonitorIgnoreEditor = async () => {
     if (visualRadio) { visualRadio.checked = true; visualRadio.dispatchEvent(new Event('change')); }
     openModal('monitorIgnoreModal');
 };
-document.querySelectorAll('input[name="ignoreMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'monitorIgnoreModal', 'ignoreVisual', 'ignoreRaw', 'alertIgnore', 'fabIgnore', 'monitorIgnoreContent', parseIgnoreToVisual, generateIgnoreFromVisual); });
 document.getElementById('btnAddIgnoreRow').onclick = () => addIgnoreRow('');
 document.getElementById('btnSaveIgnore').onclick = async () => {
     try {

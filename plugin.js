@@ -73,7 +73,7 @@ export async function syncToPlugin(appMap, globalConfText) {
 
     const jsonStr = JSON.stringify(templates);
     
-    // Resolve MediaProvider path dynamically
+    // 动态获取媒体提供者的包名
     const findCmd = `pm list packages | grep providers.media.module | cut -d: -f2 | head -n 1`;
     const res = await exec(findCmd);
     let mpPkg = res.stdout ? res.stdout.trim() : "";
@@ -84,5 +84,13 @@ export async function syncToPlugin(appMap, globalConfText) {
     
     await exec(`mkdir -p ${targetDir}`);
     await exec(`echo '${jsonStr.replace(/'/g, "'\\''")}' > ${targetPath}`);
-    await exec(`chmod 600 ${targetPath} && chown system:system ${targetPath}`);
+    
+    // 获取父级目录的 UID 和 GID，将文件权限强制对齐，防止应用无权读取
+    const statRes = await exec(`stat -c '%u:%g' ${targetDir} 2>/dev/null`);
+    const ug = statRes.stdout ? statRes.stdout.trim() : "";
+    if (ug) {
+        await exec(`chown ${ug} ${targetPath}`);
+    }
+    // 赋予基础的读取权限
+    await exec(`chmod 644 ${targetPath}`);
 }

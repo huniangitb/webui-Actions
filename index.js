@@ -54,7 +54,6 @@ const ICONS = {
     COG: getSvg(mdiCog, 20, 'currentColor')
 };
 
-// 图标加载失败降级
 window.onIconError = (ele) => {
     ele.outerHTML = ICONS.ANDROID;
 };
@@ -246,6 +245,23 @@ document.addEventListener('DOMContentLoaded', () => {
         closeModal('settingsModal');
         await syncToPlugin(appMap, globalConfText);
     };
+
+    // 优化：键盘弹出与收起时更新补全框，替代之前的死循环
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+            if (window._currentInput && document.getElementById('suggestionBox').style.display !== 'none') {
+                requestAnimationFrame(() => updateBoxPosition(window._currentInput));
+            }
+        });
+    }
+
+    // 优化：当在模态框中滑动时主动隐藏补全框，节省性能
+    document.addEventListener('scroll', (e) => {
+        if (e.target && e.target.classList && e.target.classList.contains('editor-pane')) {
+            const box = document.getElementById('suggestionBox');
+            if (box.style.display !== 'none') box.style.display = 'none';
+        }
+    }, true);
 });
 
 const debounce = (func, wait) => {
@@ -518,7 +534,6 @@ const loadData = async () => {
                     if (isExplicitlyEnabled) isEnabled = true;
                     else if (isExplicitlyDisabled) isEnabled = false;
                     else if (state === 'ON' && hasRulesFile) isEnabled = true;
-                    // 如果没有任何文件存在，默认 isEnabled 为 false
 
                     if (hasRulesFile || state === 'OFF') isConfiguredAny = true;
 
@@ -695,7 +710,10 @@ window.openAppConfig = (pkg) => {
         `<button class="nav-item ${uid === activeUsers[0] ? 'active' : ''}" data-uid="${uid}" onclick="window.switchAppUser(${uid})">${ICONS.USER} 用户 ${uid}</button>`
     ).join('');
     
-    window.switchAppUser(activeUsers[0]);
+    // 稍微延迟内部渲染，保证 Modal 的 CSS pop-up 动画不会卡顿
+    setTimeout(() => {
+        window.switchAppUser(activeUsers[0]);
+    }, 50);
     openModal('appConfigModal');
 };
 
@@ -814,25 +832,32 @@ document.getElementById('btnToggleStatus').onclick = async () => {
 const updateBoxPosition = (input) => {
     const box = document.getElementById('suggestionBox');
     if (box.style.display === 'none' || !input) return;
+    
+    // 读阶段，获取节点信息
     const rect = input.getBoundingClientRect();
-    const threshold = window.innerHeight * 0.5;
-    box.style.width = rect.width + 'px';
-    box.style.left = rect.left + 'px';
-    if (rect.bottom > threshold) {
-        box.style.top = 'auto'; box.style.bottom = (window.innerHeight - rect.top) + 'px';
-        box.style.maxHeight = (rect.top - 10) + 'px'; box.style.borderRadius = '8px 8px 0 0';
-        box.style.borderBottom = 'none'; box.style.borderTop = '1px solid var(--border)';
-    } else {
-        box.style.top = rect.bottom + 'px'; box.style.bottom = 'auto';
-        box.style.maxHeight = (window.innerHeight - rect.bottom - 10) + 'px'; box.style.borderRadius = '0 0 8px 8px';
-        box.style.borderTop = 'none'; box.style.borderBottom = '1px solid var(--border)';
-    }
-};
-
-const startAutoUpdate = (input) => {
-    const box = document.getElementById('suggestionBox');
-    const loop = () => { if (box.style.display !== 'none' && window._currentInput === input) { updateBoxPosition(input); requestAnimationFrame(loop); } };
-    requestAnimationFrame(loop);
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const threshold = vh * 0.5;
+    
+    // 写阶段，延迟修改 DOM 减轻重排负担
+    requestAnimationFrame(() => {
+        box.style.width = rect.width + 'px';
+        box.style.left = rect.left + 'px';
+        if (rect.bottom > threshold) {
+            box.style.top = 'auto'; 
+            box.style.bottom = (vh - rect.top) + 'px';
+            box.style.maxHeight = (rect.top - 10) + 'px'; 
+            box.style.borderRadius = '8px 8px 0 0';
+            box.style.borderBottom = 'none'; 
+            box.style.borderTop = '1px solid var(--border)';
+        } else {
+            box.style.top = rect.bottom + 'px'; 
+            box.style.bottom = 'auto';
+            box.style.maxHeight = (vh - rect.bottom - 10) + 'px'; 
+            box.style.borderRadius = '0 0 8px 8px';
+            box.style.borderTop = 'none'; 
+            box.style.borderBottom = '1px solid var(--border)';
+        }
+    });
 };
 
 const setupAutocomplete = (input) => {
@@ -853,12 +878,25 @@ const setupAutocomplete = (input) => {
             if (!res || !res.stdout) { box.style.display = 'none'; return; }
             const suggestions = res.stdout.split('\n').filter(l => l.startsWith(searchPrefix)).map(line => { const isDir = line.endsWith('/'); return { text: displayBase + (isDir ? line : line) + (isDir ? '' : ''), icon: isDir ? ICONS.FOLDER : ICONS.FILE }; });
             if (suggestions.length === 0) { box.style.display = 'none'; return; }
+            
             box.innerHTML = suggestions.map(s => `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window.applySuggestion('${s.text}')"><div class="s-icon">${s.icon}</div><div class="s-text">${s.text}</div></div>`).join('');
-            box.style.display = 'block'; updateBoxPosition(input); startAutoUpdate(input);
+            box.style.display = 'block'; 
+            
+            updateBoxPosition(input);
         } catch (e) { box.style.display = 'none'; }
-    }, 150);
+    }, 250); // 增加防抖延迟时间
+
     input.addEventListener('input', (e) => performSearch(e.target.value));
-    input.addEventListener('focus', () => { window._currentInput = input; if (input.value) input.dispatchEvent(new Event('input')); });
+    
+    // 优化：焦点获取后等待 300ms（留足键盘滑入动画时间）再展开自动补全框
+    input.addEventListener('focus', () => { 
+        window._currentInput = input; 
+        setTimeout(() => {
+            if (input.value && window._currentInput === input) {
+                input.dispatchEvent(new Event('input')); 
+            }
+        }, 300);
+    });
 };
 
 window.applySuggestion = (text) => { if (window._currentInput) { window._currentInput.value = text; window._currentInput.dispatchEvent(new Event('input')); } };
@@ -869,19 +907,22 @@ const handleModeChange = (isVisual, visualId, rawId, alertId, fabId, contentId, 
     const rawEl = document.getElementById(rawId);
     const fab = document.getElementById(fabId);
 
-    if (isVisual) {
-        parseFunc(document.getElementById(contentId).value);
-        rawEl.classList.remove('active');
-        visualEl.classList.add('active');
-        if (alertBox) alertBox.classList.remove('collapsed');
-        if (fab) fab.classList.remove('hidden');
-    } else {
-        document.getElementById(contentId).value = genFunc();
-        visualEl.classList.remove('active');
-        rawEl.classList.add('active');
-        if (alertBox) alertBox.classList.add('collapsed');
-        if (fab) fab.classList.add('hidden');
-    }
+    // 优化：让主线程先优先响应 Switch 按钮的 UI 修改，再去渲染 DOM
+    setTimeout(() => {
+        if (isVisual) {
+            parseFunc(document.getElementById(contentId).value);
+            rawEl.classList.remove('active');
+            visualEl.classList.add('active');
+            if (alertBox) alertBox.classList.remove('collapsed');
+            if (fab) fab.classList.remove('hidden');
+        } else {
+            document.getElementById(contentId).value = genFunc();
+            visualEl.classList.remove('active');
+            rawEl.classList.add('active');
+            if (alertBox) alertBox.classList.add('collapsed');
+            if (fab) fab.classList.add('hidden');
+        }
+    }, 10);
 };
 
 document.querySelectorAll('input[name="globalEditorMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'globalVisual', 'globalRaw', 'globalAlert', 'fabGlobal', 'globalRuleContent', (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'), () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect')); });

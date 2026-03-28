@@ -83,7 +83,7 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .nav-item.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 2px 4px rgba(24, 119, 242, 0.3); transform: scale(1.02); }
 
 /* User Tabs in Modal */
-.user-tabs { padding: 4px 0 10px 0; margin-bottom: 12px; border-bottom: none solid var(--border); }
+.user-tabs { padding: 4px 0 10px 0; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
 .user-tabs .nav-item { padding: 6px 14px; font-size: 12px; }
 
 /* Tab Content */
@@ -104,7 +104,7 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .btn:active { filter: brightness(0.9); transform: translateY(0); }
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-danger-outline { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
-.btn-icon { background: var(--warning); color: #000; width: 36px; height: 36px; border-radius: 50%; padding: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.15); transition: background 0.3s, color 0.3s; }
+.btn-icon { background: var(--warning); color: #000; width: 36px; height: 36px; border-radius: 50%; padding: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.15); transition: background 0.3s, color 0.3s; display:flex; align-items:center; justify-content:center; }
 .btn-icon-sm { background: transparent; color: var(--text-muted); width: 28px; height: 28px; padding: 0; border-radius: 4px; display:flex; align-items:center; justify-content:center;}
 .btn-close { background: transparent; color: var(--text-muted); width: 32px; height: 32px; padding: 0; border-radius: 50%; flex-shrink: 0; transition: all 0.2s; border: none; outline: none; }
 .btn-close:hover { color: var(--text-main); transform: rotate(90deg); }
@@ -178,7 +178,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 .badge-warning { background: var(--warning); color: #000; }
 .badge-primary { background: var(--primary); }
 
-/* Modals - Optimization: Fixed positioning over everything and removed will-change to avoid layer restucture lag */
+/* Modals */
 .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(3px); opacity: 0; transition: opacity 0.2s ease-out; }
 .modal.show { display: flex; opacity: 1; }
 .modal.hiding { opacity: 0; }
@@ -228,8 +228,8 @@ input:checked + .slider:before { transform: translateX(20px); }
 
 .rule-row { display: flex; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); align-items: center; background: transparent; flex-shrink: 0; transition: border-color 0.3s; }
 .rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-.rule-type { width: 90px; font-size: 12px; padding: 6px 20px 6px 6px; }
-.fab-container { position: absolute; bottom: 20px; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; z-index: 10; }
+.rule-type { width: 96px; font-size: 12px; padding: 6px 20px 6px 6px; }
+.fab-container { position: absolute; bottom: 80px; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; z-index: 10; }
 .fab-container button { pointer-events: auto; width: auto; padding: 8px 20px; border-radius: 20px; font-size: 13px; }
 
 /* Autocomplete */

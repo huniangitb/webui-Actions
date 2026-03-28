@@ -30,6 +30,8 @@ const parseRules = (text) => {
         } else if (parts[0] === 'HIDE' && parts.length >= 2) {
             hides.push(parts[1]);
         }
+        // 注意：清理插件当前JSON结构仅支持 filter_path(HIDE) 与 redirect_rules(REDIRECT)。
+        // 遇到 RO 和 ALLOW 规则不应将其放入插件配置以免发生异常。
     });
     return { redirects, hides };
 };
@@ -89,10 +91,7 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
 
     // 将有规则集的包注入到模板中，避免无规则的 OFF 拦截器成为垃圾信息干扰
     pkgMap.forEach((rules, pkg) => {
-        // 对隐藏规则去重
         const uniqueHides = [...new Set(rules.hides)];
-        
-        // 对重定向规则按 source 去重
         const rMap = new Map();
         rules.redirects.forEach(r => rMap.set(r.source, r));
         const uniqueRedirects = Array.from(rMap.values());
@@ -100,7 +99,7 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
         templates.push({
             template_name: pkg,
             hook_operation: ["query", "insert"],
-            apply_to_app: [pkg], // 特有应用必须指定 apply_to_app
+            apply_to_app: [pkg],
             permitted_media_types: [0, 1, 2, 3, 4, 5, 6],
             filter_path: uniqueHides.length ? uniqueHides : undefined,
             redirect_rules: uniqueRedirects.length ? uniqueRedirects : undefined
@@ -121,7 +120,7 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     await exec(`mkdir -p ${targetDir}`);
     await exec(`echo '${jsonStr.replace(/'/g, "'\\''")}' > ${targetPath}`);
     
-    // 重要：同步父级目录的用户与用户组权限（防止插件无权读取我们用 Root 写入的配置）
+    // 同步父级目录的用户与用户组权限（防止插件无权读取我们用 Root 写入的配置）
     const statRes = await exec(`stat -c '%u:%g' ${targetDir} 2>/dev/null`);
     const ug = statRes.stdout ? statRes.stdout.trim() : "";
     if (ug) {

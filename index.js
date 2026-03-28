@@ -247,7 +247,6 @@ document.addEventListener('DOMContentLoaded', () => {
         await syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates);
     };
 
-    // 优化：键盘弹出与收起时隐藏补全框，彻底杜绝高频卡顿重排
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
             const box = document.getElementById('suggestionBox');
@@ -543,7 +542,7 @@ const loadData = async () => {
                         text: ruleText,
                         hasMonitor: ruleText.includes('MONITOR ON'),
                         hasSandbox: ruleText.includes('SANDBOX ON'),
-                        hasRules: ruleText.includes('REDIRECT') || ruleText.includes('HIDE')
+                        hasRules: ruleText.includes('REDIRECT') || ruleText.includes('HIDE') || ruleText.includes('RO') || ruleText.includes('ALLOW')
                     };
                 });
 
@@ -638,8 +637,8 @@ const parseConfigTextToVisual = (text, containerId, monitorSelectId, sandboxSele
             const parts = line.trim().split(/\s+/);
             if (parts[0] === 'REDIRECT' && parts.length >= 3) {
                 addRuleRow('REDIRECT', normalizeToDisplay(parts[1]), normalizeToDisplay(parts.slice(2).join(' ')), containerId);
-            } else if (parts[0] === 'HIDE' && parts.length >= 2) {
-                addRuleRow('HIDE', normalizeToDisplay(parts[1]), '', containerId);
+            } else if (['HIDE', 'RO', 'ALLOW'].includes(parts[0]) && parts.length >= 2) {
+                addRuleRow(parts[0], normalizeToDisplay(parts[1]), '', containerId);
             } else if (parts[0] === 'MONITOR' && parts.length >= 2 && selMonitor) {
                 if (parts[1] === 'ON') selMonitor.value = 'ON';
                 else if (parts[1] === 'OFF') selMonitor.value = 'OFF';
@@ -666,7 +665,7 @@ const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelec
         const source = row.querySelector('.rule-source').value.trim();
         if (target) {
             if (type === 'REDIRECT' && source) res += `REDIRECT ${normalizeToConfig(target, true)} ${normalizeToConfig(source, false)}\n`;
-            else if (type === 'HIDE') res += `HIDE ${normalizeToConfig(target, true)}\n`;
+            else if (['HIDE', 'RO', 'ALLOW'].includes(type)) res += `${type} ${normalizeToConfig(target, true)}\n`;
         }
     });
     return res.trim();
@@ -675,10 +674,10 @@ const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelec
 const addRuleRow = (type, target, source, containerId) => {
     const div = document.createElement('div');
     div.className = 'rule-row';
-    div.innerHTML = `<select class="form-select rule-type"><option value="REDIRECT">重定向</option><option value="HIDE">隐藏</option></select><div class="rule-inputs"><input type="text" class="form-control rule-target" placeholder="原始路径" value="${target}"><input type="text" class="form-control rule-source ${type==='HIDE'?'hidden':''}" placeholder="重定向至" value="${source}"></div><button class="btn btn-icon-sm btn-del">${ICONS.DELETE}</button>`;
+    div.innerHTML = `<select class="form-select rule-type"><option value="REDIRECT">重定向</option><option value="HIDE">隐藏</option><option value="RO">只读</option><option value="ALLOW">沙盒豁免</option></select><div class="rule-inputs"><input type="text" class="form-control rule-target" placeholder="原始路径" value="${target}"><input type="text" class="form-control rule-source ${type!=='REDIRECT'?'hidden':''}" placeholder="重定向至" value="${source}"></div><button class="btn btn-icon-sm btn-del">${ICONS.DELETE}</button>`;
     const select = div.querySelector('.rule-type');
     select.value = type;
-    select.onchange = (e) => div.querySelector('.rule-source').classList.toggle('hidden', e.target.value === 'HIDE');
+    select.onchange = (e) => div.querySelector('.rule-source').classList.toggle('hidden', e.target.value !== 'REDIRECT');
     div.querySelector('.btn-del').onclick = () => div.remove();
     setupAutocomplete(div.querySelector('.rule-target'));
     setupAutocomplete(div.querySelector('.rule-source'));

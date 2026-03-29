@@ -49,7 +49,10 @@ const convertToStoragePath = (p) => {
 const parseRules = (text) => {
     let redirects = [];
     let hides = [];
-    if (!text) return { redirects, hides };
+    let isSandboxOn = false;
+    
+    if (!text) return { redirects, hides, isSandboxOn };
+    
     text.split('\n').forEach(line => {
         const parts = line.trim().split(/\s+/);
         if (parts[0] === 'REDIRECT' && parts.length >= 3) {
@@ -59,9 +62,14 @@ const parseRules = (text) => {
             });
         } else if (parts[0] === 'HIDE' && parts.length >= 2) {
             hides.push(convertToStoragePath(parts[1]));
+        } else if (parts[0] === 'SANDBOX' && parts.length >= 2) {
+            if (parts[1] === 'ON') {
+                isSandboxOn = true;
+            }
         }
     });
-    return { redirects, hides };
+    
+    return { redirects, hides, isSandboxOn };
 };
 
 export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates) {
@@ -75,11 +83,12 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
 
     // 1. 处理全局配置
     const globalRules = parseRules(globalConfText);
-    if (globalRules.redirects.length > 0 || globalRules.hides.length > 0) {
+    // 只要有重定向、隐藏规则，或者开启了全局沙盒，就下发全局模板
+    if (globalRules.redirects.length > 0 || globalRules.hides.length > 0 || globalRules.isSandboxOn) {
         templates.push({
             template_name: "NS-Proxy-Global",
             hook_operation: ["query", "insert"],
-            permitted_media_types: [0, 1, 2, 3, 4, 5, 6],
+            permitted_media_types: globalRules.isSandboxOn ? [0] : [0, 1, 2, 3, 4, 5, 6],
             filter_path: globalRules.hides.length ? globalRules.hides : undefined,
             redirect_rules: globalRules.redirects.length ? globalRules.redirects : undefined
         });
@@ -89,10 +98,12 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     const addRulesToPkg = (pkg, text) => {
         if (!text) return;
         const r = parseRules(text);
-        if (r.hides.length || r.redirects.length) {
-            if (!pkgMap.has(pkg)) pkgMap.set(pkg, { hides: [], redirects: [] });
+        // 如果有规则，或者该应用开启了沙盒，则录入 map
+        if (r.hides.length || r.redirects.length || r.isSandboxOn) {
+            if (!pkgMap.has(pkg)) pkgMap.set(pkg, { hides: [], redirects: [], isSandboxOn: false });
             pkgMap.get(pkg).hides.push(...r.hides);
             pkgMap.get(pkg).redirects.push(...r.redirects);
+            if (r.isSandboxOn) pkgMap.get(pkg).isSandboxOn = true;
         }
     };
 
@@ -115,7 +126,7 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
         });
     }
 
-    // 4. 生成模板 JSON，使用应用名称作为 template_name
+    // 4. 生成模板 JSON
     pkgMap.forEach((rules, pkg) => {
         const uniqueHides = [...new Set(rules.hides)];
         const rMap = new Map();
@@ -129,7 +140,8 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
             template_name: displayName,
             hook_operation: ["query", "insert"],
             apply_to_app: [pkg],
-            permitted_media_types: [0, 1, 2, 3, 4, 5, 6],
+            // 核心修改：如果应用开启了沙盒，类型限制为 0，否则保持放行所有类型
+            permitted_media_types: rules.isSandboxOn ? [0] : [0, 1, 2, 3, 4, 5, 6],
             filter_path: uniqueHides.length ? uniqueHides : undefined,
             redirect_rules: uniqueRedirects.length ? uniqueRedirects : undefined
         });
@@ -146,13 +158,13 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     await exec(`mkdir -p ${targetDir}`);
     await exec(`echo '${jsonStr.replace(/'/g, "'\\''")}' > ${targetPath}`);
     
-    // 设置权限
+    // 5. 设置权限
     const statRes = await exec(`stat -c '%u:%g' ${targetDir} 2>/dev/null`);
     const ug = statRes.stdout ? statRes.stdout.trim() : "";
     if (ug) { await exec(`chown ${ug} ${targetPath}`); }
     await exec(`chmod 644 ${targetPath}`);
 
-    // 5. 执行重载命令通知插件
+    // 6. 执行重载命令通知插件
     const reloadRes = await exec("/data/Namespace-Proxy/reload_rules");
     if (reloadRes.stdout && reloadRes.stdout.trim().includes("SUCCESS")) {
         toast("同步成功：插件规则已重载");

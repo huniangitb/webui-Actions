@@ -78,7 +78,7 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
 
     let templates = [];
 
-    // 1. 处理全局配置
+    // 1. 处理全局配置 [GLOBAL]
     const globalRules = parseRules(globalConfText);
     if (globalRules.redirects.length > 0 || globalRules.hides.length > 0) {
         templates.push({
@@ -101,7 +101,7 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
         }
     };
 
-    // 2. 处理 App-rules 目录下的配置
+    // 2. 收集 App-rules 目录下的配置
     appMap.forEach((app, pkg) => {
         const u0 = app.users[0];
         if (u0 && u0.isEnabled) {
@@ -109,26 +109,31 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
         }
     });
 
-    // 3. 处理 injector.conf 里的内联配置
+    // 3. 收集 injector.conf 里的内联配置 (如 [bin.mt.plus] 这种)
     if (injectorRulesMap) {
         injectorRulesMap.forEach((lines, section) => {
             if (section === 'GLOBAL') return;
             const state = injectorStates.get(section);
             if (state === 'OFF') return;
+            // 提取包名（去掉可能存在的 :uid 后缀）
             const pkg = section.split(':')[0];
             addRulesToPkg(pkg, lines.join('\n'));
         });
     }
 
-    // 4. 生成模板 JSON
+    // 4. 将收集到的规则映射为模板 JSON
     pkgMap.forEach((rules, pkg) => {
         const uniqueHides = [...new Set(rules.hides)];
         const rMap = new Map();
         rules.redirects.forEach(r => rMap.set(r.source, r));
         const uniqueRedirects = Array.from(rMap.values());
 
+        // 获取应用名称，如果获取不到则使用包名
+        const appInfo = appMap.get(pkg);
+        const displayName = (appInfo && appInfo.appLabel) ? appInfo.appLabel : pkg;
+
         templates.push({
-            template_name: pkg,
+            template_name: displayName,
             hook_operation: ["query", "insert"],
             apply_to_app: [pkg],
             permitted_media_types: [0, 1, 2, 3, 4, 5, 6],
@@ -138,6 +143,8 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     });
 
     const jsonStr = JSON.stringify(templates);
+    
+    // 动态定位 MediaProvider 包名
     const findCmd = `pm list packages | grep providers.media.module | cut -d: -f2 | head -n 1`;
     const res = await exec(findCmd);
     let mpPkg = (res.stdout ? res.stdout.trim() : "") || "com.android.providers.media.module";
@@ -148,8 +155,11 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     await exec(`mkdir -p ${targetDir}`);
     await exec(`echo '${jsonStr.replace(/'/g, "'\\''")}' > ${targetPath}`);
     
+    // 同步目录权限
     const statRes = await exec(`stat -c '%u:%g' ${targetDir} 2>/dev/null`);
     const ug = statRes.stdout ? statRes.stdout.trim() : "";
-    if (ug) { await exec(`chown ${ug} ${targetPath}`); }
+    if (ug) {
+        await exec(`chown ${ug} ${targetPath}`);
+    }
     await exec(`chmod 644 ${targetPath}`);
 }

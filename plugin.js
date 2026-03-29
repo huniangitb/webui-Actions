@@ -156,4 +156,7 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     const reloadRes = await exec("/data/Namespace-Proxy/reload_rules");
     if (reloadRes.stdout && reloadRes.stdout.trim().includes("SUCCESS")) {
         toast("同步成功：插件规则已重载");
-    } els
+    } else {
+        console.warn("Reload rules failed:", reloadRes.stderr);
+    }
+}

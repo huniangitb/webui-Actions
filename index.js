@@ -62,15 +62,8 @@ window.onIconError = (ele) => {
 const run = async (cmd) => {
     try {
         const res = await exec(cmd);
-        if (res.errno && res.errno !== 0) {
-            console.warn(`Cmd failed: ${cmd}`, res.stderr);
-            return ""; 
-        }
-        return res.stdout ? res.stdout.trim() : "";
-    } catch (e) {
-        console.error("Exec exception:", e);
-        return "";
-    }
+        return (res.errno === 0 && res.stdout) ? res.stdout.trim() : "";
+    } catch (e) { return ""; }
 };
 
 const fetchActiveMounts = async () => {
@@ -108,49 +101,36 @@ const checkStatus = async () => {
         const badge = document.getElementById('statusBadge');
         const info = document.getElementById('statusInfo');
         const toggleBtn = document.getElementById('btnToggleStatus');
-        
-        let pid = await run("pidof injector");
-        if (!pid) pid = await run("pgrep -x injector");
+        let pid = await run("pidof injector") || await run("pgrep -x injector");
         currentPid = pid ? pid.split(' ')[0] : null;
 
         if (currentPid) {
-            badge.className = "badge badge-success";
-            badge.textContent = "RUNNING";
-            info.textContent = `PID: ${currentPid}`;
+            badge.className = "badge badge-success"; badge.textContent = "RUNNING"; info.textContent = `PID: ${currentPid}`;
             if (toggleBtn.getAttribute('data-status') !== 'running') {
-                toggleBtn.innerHTML = ICONS.STOP;
-                toggleBtn.style.background = "rgba(220, 53, 69, 0.1)";
+                toggleBtn.innerHTML = ICONS.STOP; toggleBtn.style.background = "rgba(220, 53, 69, 0.1)";
                 toggleBtn.setAttribute('data-status', 'running');
             }
         } else {
-            badge.className = "badge badge-gray";
-            badge.textContent = "STOPPED";
-            info.textContent = "OFFLINE";
+            badge.className = "badge badge-gray"; badge.textContent = "STOPPED"; info.textContent = "OFFLINE";
             if (toggleBtn.getAttribute('data-status') !== 'stopped') {
-                toggleBtn.innerHTML = ICONS.PLAY;
-                toggleBtn.style.background = "rgba(54, 164, 32, 0.1)";
+                toggleBtn.innerHTML = ICONS.PLAY; toggleBtn.style.background = "rgba(54, 164, 32, 0.1)";
                 toggleBtn.setAttribute('data-status', 'stopped');
             }
         }
         await updateMountStatus();
-    } catch (e) { console.error(e); }
+    } catch (e) {}
 };
 
 document.addEventListener('DOMContentLoaded', () => {
     const setIcon = (id, icon) => { const el = document.getElementById(id); if(el) el.innerHTML = icon; };
-    setIcon('iconSearch', ICONS.SEARCH);
-    setIcon('iconIoSearch', ICONS.SEARCH);
-    setIcon('iconFilter', ICONS.FILTER);
-    setIcon('btnMonitorIgnore', ICONS.EYE_OFF);
-    setIcon('iconClearIo', ICONS.CLEAR);
-    setIcon('iconClearLog', ICONS.CLEAR);
+    setIcon('iconSearch', ICONS.SEARCH); setIcon('iconIoSearch', ICONS.SEARCH); setIcon('iconFilter', ICONS.FILTER);
+    setIcon('btnMonitorIgnore', ICONS.EYE_OFF); setIcon('iconClearIo', ICONS.CLEAR); setIcon('iconClearLog', ICONS.CLEAR);
     setIcon('btnSettings', ICONS.COG);
     document.querySelectorAll('.btn-close').forEach(el => el.innerHTML = ICONS.CLOSE);
     
-    const setHtml = (id, html) => { const el = document.getElementById(id); if(el) el.innerHTML = html; };
-    setHtml('btnAppAddRule', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${ICONS.PLUS} 添加规则</span>`);
-    setHtml('btnGlobalAddRule', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${ICONS.PLUS} 添加规则</span>`);
-    setHtml('btnAddIgnoreRow', `<span style="display:flex;align-items:center;justify-content:center;gap:6px">${ICONS.PLUS} 添加路径</span>`);
+    document.getElementById('btnGlobalAddRule').innerHTML = `${ICONS.PLUS} 添加规则`;
+    document.getElementById('btnAppAddRule').innerHTML = `${ICONS.PLUS} 添加规则`;
+    document.getElementById('btnAddIgnoreRow').innerHTML = `${ICONS.PLUS} 添加路径`;
 
     loadData();
     checkStatus();
@@ -158,20 +138,14 @@ document.addEventListener('DOMContentLoaded', () => {
     statusPolling = setInterval(checkStatus, 2000);
 
     document.getElementById('appSearch').oninput = renderAppList;
-    
-    const fabBtn = document.getElementById('btnFilterFab');
-    const filterOpts = document.getElementById('filterOptions');
-    if (fabBtn) {
-        fabBtn.onclick = (e) => { e.stopPropagation(); filterOpts.classList.toggle('show'); };
-        document.addEventListener('click', (e) => { if (!filterOpts.contains(e.target) && !fabBtn.contains(e.target)) filterOpts.classList.remove('show'); });
-    }
+    document.getElementById('btnFilterFab').onclick = (e) => { e.stopPropagation(); document.getElementById('filterOptions').classList.toggle('show'); };
     
     document.querySelectorAll('.filter-opt').forEach(btn => {
         btn.onclick = () => {
             currentAppFilter = btn.dataset.filter;
             document.querySelectorAll('.filter-opt').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            filterOpts.classList.remove('show');
+            document.getElementById('filterOptions').classList.remove('show');
             renderAppList();
         };
     });
@@ -240,24 +214,17 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     document.getElementById('btnSaveSettings').onclick = async () => {
-        const val = document.getElementById('pluginSyncToggle').checked;
-        await saveSettings({ syncPlugin: val });
-        toast("设置已保存");
-        closeModal('settingsModal');
+        await saveSettings({ syncPlugin: document.getElementById('pluginSyncToggle').checked });
+        toast("设置已保存"); closeModal('settingsModal');
         await syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates);
     };
 
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
             const box = document.getElementById('suggestionBox');
-            if (box && box.style.display !== 'none') {
-                box.style.display = 'none';
-            }
-            // 键盘弹起时自动将处于焦点的输入框滚动到中间区域避免遮挡
-            if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.classList.contains('form-control')) {
-                setTimeout(() => {
-                    document.activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 100);
+            if (box) box.style.display = 'none';
+            if (document.activeElement && document.activeElement.classList.contains('form-control')) {
+                setTimeout(() => { document.activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150);
             }
         });
     }
@@ -617,18 +584,18 @@ const renderAppList = () => {
 
 const renderGlobalRules = () => {
     document.getElementById('globalRuleContent').value = globalConfText;
-    parseConfigTextToVisual(globalConfText, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect');
+    parseConfigTextToVisual(globalConfText, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect', 'globalInjectSelect');
     
     const visualRadio = document.querySelector('input[name="globalEditorMode"][value="visual"]');
     if (visualRadio && !visualRadio.checked) { 
         visualRadio.checked = true; 
         handleModeChange(true, 'globalVisual', 'globalRaw', 'globalAlert', 'globalRuleContent', 
-            (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'),
-            () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'));
+            (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect', 'globalInjectSelect'),
+            () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect', 'globalInjectSelect'));
     }
 };
 
-const parseConfigTextToVisual = (text, containerId, monitorSelectId, sandboxSelectId) => {
+const parseConfigTextToVisual = (text, containerId, monitorSelectId, sandboxSelectId, injectSelectId) => {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
     
@@ -637,6 +604,9 @@ const parseConfigTextToVisual = (text, containerId, monitorSelectId, sandboxSele
     
     const selSandbox = sandboxSelectId ? document.getElementById(sandboxSelectId) : null;
     if (selSandbox) selSandbox.value = "";
+
+    const selInject = injectSelectId ? document.getElementById(injectSelectId) : null;
+    if (selInject) selInject.value = "";
 
     if (text) {
         text.split('\n').forEach(line => {
@@ -651,14 +621,21 @@ const parseConfigTextToVisual = (text, containerId, monitorSelectId, sandboxSele
             } else if (parts[0] === 'SANDBOX' && parts.length >= 2 && selSandbox) {
                 if (parts[1] === 'ON') selSandbox.value = 'ON';
                 else if (parts[1] === 'OFF') selSandbox.value = 'OFF';
+            } else if (parts[0] === 'GLOBAL_INJECT' && parts.length >= 2 && selInject) {
+                if (parts[1] === 'ON') selInject.value = 'ON';
+                else if (parts[1] === 'OFF') selInject.value = 'OFF';
             }
         });
     }
     if (container.children.length === 0) addRuleRow('REDIRECT', '', '', containerId);
 };
 
-const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelectId) => {
+const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelectId, injectSelectId) => {
     let res = "";
+
+    const selInject = injectSelectId ? document.getElementById(injectSelectId) : null;
+    if (selInject && selInject.value) res += `GLOBAL_INJECT ${selInject.value}\n`;
+
     const selMonitor = monitorSelectId ? document.getElementById(monitorSelectId) : null;
     if (selMonitor && selMonitor.value) res += `MONITOR ${selMonitor.value}\n`;
     
@@ -692,7 +669,6 @@ const addRuleRow = (type, target, source, containerId) => {
     setupAutocomplete(targetInput);
     setupAutocomplete(sourceInput);
     
-    // 焦点中心滚动支持
     const scrollToCenter = (e) => {
         setTimeout(() => { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300);
     };
@@ -751,7 +727,7 @@ window.switchAppUser = (uid) => {
 
     document.getElementById('appEnableToggle').checked = uConf.isEnabled;
     document.getElementById('appRuleContent').value = uConf.text;
-    parseConfigTextToVisual(uConf.text, 'appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect');
+    parseConfigTextToVisual(uConf.text, 'appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect', null);
     
     const visualRadio = document.querySelector('input[name="appEditorMode"][value="visual"]');
     if (visualRadio) { visualRadio.checked = true; visualRadio.dispatchEvent(new Event('change')); }
@@ -760,7 +736,7 @@ window.switchAppUser = (uid) => {
 document.getElementById('btnSaveAppConfig').onclick = async () => {
     try {
         const isVisual = document.querySelector('input[name="appEditorMode"][value="visual"]').checked;
-        const text = isVisual ? generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect') : document.getElementById('appRuleContent').value;
+        const text = isVisual ? generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect', null) : document.getElementById('appRuleContent').value;
         const cleanText = text.trim();
         const isEnabled = document.getElementById('appEnableToggle').checked;
 
@@ -817,7 +793,7 @@ document.getElementById('btnDeleteAppConfig').onclick = async () => {
 document.getElementById('btnSaveGlobal').onclick = async () => {
     try {
         const isVisual = document.querySelector('input[name="globalEditorMode"][value="visual"]').checked;
-        globalConfText = isVisual ? generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect') : document.getElementById('globalRuleContent').value;
+        globalConfText = isVisual ? generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect', 'globalInjectSelect') : document.getElementById('globalRuleContent').value;
         
         await flushInjectorConf();
         toast("全局规则已保存");
@@ -941,8 +917,8 @@ const handleModeChange = (isVisual, visualId, rawId, alertId, contentId, parseFu
     }, 10);
 };
 
-document.querySelectorAll('input[name="globalEditorMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'globalVisual', 'globalRaw', 'globalAlert', 'globalRuleContent', (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'), () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect')); });
-document.querySelectorAll('input[name="appEditorMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'appVisual', 'appRaw', null, 'appRuleContent', (val) => parseConfigTextToVisual(val, 'appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect'), () => generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect')); });
+document.querySelectorAll('input[name="globalEditorMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'globalVisual', 'globalRaw', 'globalAlert', 'globalRuleContent', (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect', 'globalInjectSelect'), () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect', 'globalInjectSelect')); });
+document.querySelectorAll('input[name="appEditorMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'appVisual', 'appRaw', null, 'appRuleContent', (val) => parseConfigTextToVisual(val, 'appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect', null), () => generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect', null)); });
 document.querySelectorAll('input[name="ignoreMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'ignoreVisual', 'ignoreRaw', 'alertIgnore', 'monitorIgnoreContent', parseIgnoreToVisual, generateIgnoreFromVisual); });
 
 document.getElementById('btnGlobalAddRule').onclick = () => addRuleRow('REDIRECT', '', '', 'globalRuleBuilderContainer');

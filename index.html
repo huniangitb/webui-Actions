@@ -64,6 +64,14 @@
                         <div id="globalAlert" class="alert-info sticky-top">配置将写入 injector.conf，对所有应用默认生效</div>
                         <div class="editor-wrapper">
                             <div id="globalVisual" class="editor-pane active">
+                                <div class="form-group mb-3">
+                                    <label class="control-label" style="color:var(--primary);">全局应用注入 (GLOBAL_INJECT)</label>
+                                    <select id="globalInjectSelect" class="form-select">
+                                        <option value="">默认 (关闭)</option>
+                                        <option value="ON">全局开启 (ON)</option>
+                                        <option value="OFF">全局关闭 (OFF)</option>
+                                    </select>
+                                </div>
                                 <div class="grid-2-col mb-3">
                                     <div class="form-group">
                                         <label class="control-label">全局监控 (MONITOR)</label>

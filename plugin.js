@@ -19,6 +19,38 @@ export async function checkPluginInstalled() {
     return !!(res.stdout && res.stdout.trim());
 }
 
+/**
+ * 核心转换逻辑：
+ * 1. 处理真实路径 /data/media/0 -> /storage/emulated/0
+ * 2. 处理相对根路径 /123云盘 -> /storage/emulated/0/123云盘
+ * 3. 确保以 / 结尾
+ */
+const convertToStoragePath = (p) => {
+    if (!p) return p;
+    let result = p.trim();
+    
+    // 处理真实路径
+    if (result.startsWith('/data/media/0')) {
+        result = '/storage/emulated/0' + result.substring(13);
+    } 
+    // 处理简化路径 (如 /123云盘)
+    else if (result.startsWith('/') && !result.startsWith('/storage/emulated/0')) {
+        result = '/storage/emulated/0' + result;
+    }
+    // 如果没有任何前缀，补全前缀
+    else if (!result.startsWith('/')) {
+        result = '/storage/emulated/0/' + result;
+    }
+
+    // 规范化斜杠：确保以 / 结尾
+    if (!result.endsWith('/')) {
+        result += '/';
+    }
+
+    // 移除多余的双斜杠
+    return result.replace(/\/+/g, '/');
+};
+
 const parseRules = (text) => {
     let redirects = [];
     let hides = [];
@@ -26,12 +58,13 @@ const parseRules = (text) => {
     text.split('\n').forEach(line => {
         const parts = line.trim().split(/\s+/);
         if (parts[0] === 'REDIRECT' && parts.length >= 3) {
-            redirects.push({ source: parts[1], target: parts.slice(2).join(' ') });
+            redirects.push({ 
+                source: convertToStoragePath(parts[1]), 
+                target: convertToStoragePath(parts.slice(2).join(' ')) 
+            });
         } else if (parts[0] === 'HIDE' && parts.length >= 2) {
-            hides.push(parts[1]);
+            hides.push(convertToStoragePath(parts[1]));
         }
-        // 注意：清理插件当前JSON结构仅支持 filter_path(HIDE) 与 redirect_rules(REDIRECT)。
-        // 遇到 RO 和 ALLOW 规则不应将其放入插件配置以免发生异常。
     });
     return { redirects, hides };
 };
@@ -45,7 +78,7 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
 
     let templates = [];
 
-    // 处理全局配置 (省略 apply_to_app)
+    // 1. 处理全局配置
     const globalRules = parseRules(globalConfText);
     if (globalRules.redirects.length > 0 || globalRules.hides.length > 0) {
         templates.push({
@@ -58,7 +91,6 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     }
 
     let pkgMap = new Map();
-
     const addRulesToPkg = (pkg, text) => {
         if (!text) return;
         const r = parseRules(text);
@@ -69,7 +101,7 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
         }
     };
 
-    // 1. 合并 App-rules 中的规则
+    // 2. 处理 App-rules 目录下的配置
     appMap.forEach((app, pkg) => {
         const u0 = app.users[0];
         if (u0 && u0.isEnabled) {
@@ -77,19 +109,18 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
         }
     });
 
-    // 2. 合并 injector.conf 中的内联规则（兼容类似 [bin.mt.plus] 下属有直接规则的情况）
+    // 3. 处理 injector.conf 里的内联配置
     if (injectorRulesMap) {
         injectorRulesMap.forEach((lines, section) => {
             if (section === 'GLOBAL') return;
             const state = injectorStates.get(section);
             if (state === 'OFF') return;
-
             const pkg = section.split(':')[0];
             addRulesToPkg(pkg, lines.join('\n'));
         });
     }
 
-    // 将有规则集的包注入到模板中，避免无规则的 OFF 拦截器成为垃圾信息干扰
+    // 4. 生成模板 JSON
     pkgMap.forEach((rules, pkg) => {
         const uniqueHides = [...new Set(rules.hides)];
         const rMap = new Map();
@@ -107,12 +138,9 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     });
 
     const jsonStr = JSON.stringify(templates);
-    
-    // 动态获取媒体提供者的包名
     const findCmd = `pm list packages | grep providers.media.module | cut -d: -f2 | head -n 1`;
     const res = await exec(findCmd);
-    let mpPkg = res.stdout ? res.stdout.trim() : "";
-    if (!mpPkg) mpPkg = "com.android.providers.media.module";
+    let mpPkg = (res.stdout ? res.stdout.trim() : "") || "com.android.providers.media.module";
     
     const targetDir = `/data/data/${mpPkg}/files`;
     const targetPath = `${targetDir}/rule`;
@@ -120,11 +148,8 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     await exec(`mkdir -p ${targetDir}`);
     await exec(`echo '${jsonStr.replace(/'/g, "'\\''")}' > ${targetPath}`);
     
-    // 同步父级目录的用户与用户组权限（防止插件无权读取我们用 Root 写入的配置）
     const statRes = await exec(`stat -c '%u:%g' ${targetDir} 2>/dev/null`);
     const ug = statRes.stdout ? statRes.stdout.trim() : "";
-    if (ug) {
-        await exec(`chown ${ug} ${targetPath}`);
-    }
+    if (ug) { await exec(`chown ${ug} ${targetPath}`); }
     await exec(`chmod 644 ${targetPath}`);
 }

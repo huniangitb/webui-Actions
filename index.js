@@ -253,13 +253,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (box && box.style.display !== 'none') {
                 box.style.display = 'none';
             }
+            // 键盘弹起时自动将处于焦点的输入框滚动到中间区域避免遮挡
+            if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.classList.contains('form-control')) {
+                setTimeout(() => {
+                    document.activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+            }
         });
     }
 
     document.addEventListener('scroll', (e) => {
         if (e.target && e.target.classList && e.target.classList.contains('editor-pane')) {
             const box = document.getElementById('suggestionBox');
-            if (box.style.display !== 'none') box.style.display = 'none';
+            if (box && box.style.display !== 'none') box.style.display = 'none';
         }
     }, true);
 });
@@ -616,7 +622,7 @@ const renderGlobalRules = () => {
     const visualRadio = document.querySelector('input[name="globalEditorMode"][value="visual"]');
     if (visualRadio && !visualRadio.checked) { 
         visualRadio.checked = true; 
-        handleModeChange(true, 'globalVisual', 'globalRaw', 'globalAlert', 'fabGlobal', 'globalRuleContent', 
+        handleModeChange(true, 'globalVisual', 'globalRaw', 'globalAlert', 'globalRuleContent', 
             (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'),
             () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'));
     }
@@ -679,8 +685,20 @@ const addRuleRow = (type, target, source, containerId) => {
     select.value = type;
     select.onchange = (e) => div.querySelector('.rule-source').classList.toggle('hidden', e.target.value !== 'REDIRECT');
     div.querySelector('.btn-del').onclick = () => div.remove();
-    setupAutocomplete(div.querySelector('.rule-target'));
-    setupAutocomplete(div.querySelector('.rule-source'));
+    
+    const targetInput = div.querySelector('.rule-target');
+    const sourceInput = div.querySelector('.rule-source');
+    
+    setupAutocomplete(targetInput);
+    setupAutocomplete(sourceInput);
+    
+    // 焦点中心滚动支持
+    const scrollToCenter = (e) => {
+        setTimeout(() => { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300);
+    };
+    targetInput.addEventListener('focus', scrollToCenter);
+    sourceInput.addEventListener('focus', scrollToCenter);
+    
     document.getElementById(containerId).appendChild(div);
 };
 
@@ -903,11 +921,10 @@ const setupAutocomplete = (input) => {
 
 window.applySuggestion = (text) => { if (window._currentInput) { window._currentInput.value = text; window._currentInput.dispatchEvent(new Event('input')); } };
 
-const handleModeChange = (isVisual, visualId, rawId, alertId, fabId, contentId, parseFunc, genFunc) => {
+const handleModeChange = (isVisual, visualId, rawId, alertId, contentId, parseFunc, genFunc) => {
     const alertBox = document.getElementById(alertId);
     const visualEl = document.getElementById(visualId);
     const rawEl = document.getElementById(rawId);
-    const fab = document.getElementById(fabId);
 
     setTimeout(() => {
         if (isVisual) {
@@ -915,20 +932,18 @@ const handleModeChange = (isVisual, visualId, rawId, alertId, fabId, contentId, 
             rawEl.classList.remove('active');
             visualEl.classList.add('active');
             if (alertBox) alertBox.classList.remove('collapsed');
-            if (fab) fab.classList.remove('hidden');
         } else {
             document.getElementById(contentId).value = genFunc();
             visualEl.classList.remove('active');
             rawEl.classList.add('active');
             if (alertBox) alertBox.classList.add('collapsed');
-            if (fab) fab.classList.add('hidden');
         }
     }, 10);
 };
 
-document.querySelectorAll('input[name="globalEditorMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'globalVisual', 'globalRaw', 'globalAlert', 'fabGlobal', 'globalRuleContent', (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'), () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect')); });
-document.querySelectorAll('input[name="appEditorMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'appVisual', 'appRaw', null, 'fabApp', 'appRuleContent', (val) => parseConfigTextToVisual(val, 'appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect'), () => generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect')); });
-document.querySelectorAll('input[name="ignoreMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'ignoreVisual', 'ignoreRaw', 'alertIgnore', 'fabIgnore', 'monitorIgnoreContent', parseIgnoreToVisual, generateIgnoreFromVisual); });
+document.querySelectorAll('input[name="globalEditorMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'globalVisual', 'globalRaw', 'globalAlert', 'globalRuleContent', (val) => parseConfigTextToVisual(val, 'globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect'), () => generateConfigTextFromVisual('globalRuleBuilderContainer', 'globalMonitorSelect', 'globalSandboxSelect')); });
+document.querySelectorAll('input[name="appEditorMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'appVisual', 'appRaw', null, 'appRuleContent', (val) => parseConfigTextToVisual(val, 'appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect'), () => generateConfigTextFromVisual('appRuleBuilderContainer', 'appMonitorSelect', 'appSandboxSelect')); });
+document.querySelectorAll('input[name="ignoreMode"]').forEach(el => { el.onchange = (e) => handleModeChange(e.target.value === 'visual', 'ignoreVisual', 'ignoreRaw', 'alertIgnore', 'monitorIgnoreContent', parseIgnoreToVisual, generateIgnoreFromVisual); });
 
 document.getElementById('btnGlobalAddRule').onclick = () => addRuleRow('REDIRECT', '', '', 'globalRuleBuilderContainer');
 document.getElementById('btnAppAddRule').onclick = () => addRuleRow('REDIRECT', '', '', 'appRuleBuilderContainer');

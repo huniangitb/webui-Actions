@@ -84,13 +84,14 @@
                                 </div>
                                 <h4 style="margin:5px 0 10px 0; font-size:14px;">全局路径映射</h4>
                                 <div id="globalRuleBuilderContainer"></div>
-                                <div class="spacer"></div>
+                                <div class="rule-add-container">
+                                    <button id="btnGlobalAddRule" class="btn btn-primary rounded shadow">添加规则</button>
+                                </div>
                             </div>
                             <div id="globalRaw" class="editor-pane">
                                 <textarea id="globalRuleContent" class="code-editor" style="border:none; border-radius:0; height:100%;"></textarea>
                             </div>
                         </div>
-                        <div class="fab-container" id="fabGlobal"><button id="btnGlobalAddRule" class="btn btn-primary rounded shadow">添加规则</button></div>
                     </div>
                     <div class="card-footer" style="padding:12px; border-top:1px solid var(--border);">
                         <button id="btnSaveGlobal" class="btn btn-primary full-width">保存全局规则</button>
@@ -198,13 +199,14 @@
                         
                         <h4 style="margin:5px 0 10px 0; font-size:14px;">专属路径映射</h4>
                         <div id="appRuleBuilderContainer"></div>
-                        <div class="spacer"></div>
+                        <div class="rule-add-container">
+                            <button id="btnAppAddRule" class="btn btn-primary rounded shadow">添加规则</button>
+                        </div>
                     </div>
                     <div id="appRaw" class="editor-pane">
                         <textarea id="appRuleContent" class="code-editor" style="border:none; border-radius:0; height:100%;"></textarea>
                     </div>
                 </div>
-                <div class="fab-container" id="fabApp"><button id="btnAppAddRule" class="btn btn-primary rounded shadow">添加规则</button></div>
             </div>
             <div class="modal-footer">
                 <button id="btnDeleteAppConfig" class="btn btn-danger-outline">清除当前配置</button>
@@ -234,13 +236,14 @@
                 <div class="editor-wrapper">
                     <div id="ignoreVisual" class="editor-pane active">
                         <div id="ignoreBuilderContainer"></div>
-                        <div class="spacer"></div>
+                        <div class="rule-add-container">
+                            <button id="btnAddIgnoreRow" class="btn btn-primary rounded shadow">添加路径</button>
+                        </div>
                     </div>
                     <div id="ignoreRaw" class="editor-pane">
                         <textarea id="monitorIgnoreContent" class="code-editor" style="height:100%"></textarea>
                     </div>
                 </div>
-                <div class="fab-container" id="fabIgnore"><button id="btnAddIgnoreRow" class="btn btn-primary rounded shadow">添加路径</button></div>
             </div>
             <div class="modal-footer">
                 <button id="btnSaveIgnore" class="btn btn-primary full-width">保存配置</button>

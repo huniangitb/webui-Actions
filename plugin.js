@@ -1,4 +1,4 @@
-import { exec } from 'kernelsu';
+import { exec, toast } from 'kernelsu';
 
 const SETTINGS_FILE = "/data/Namespace-Proxy/webui_settings.json";
 
@@ -29,25 +29,20 @@ const convertToStoragePath = (p) => {
     if (!p) return p;
     let result = p.trim();
     
-    // 处理真实路径
     if (result.startsWith('/data/media/0')) {
         result = '/storage/emulated/0' + result.substring(13);
     } 
-    // 处理简化路径 (如 /123云盘)
     else if (result.startsWith('/') && !result.startsWith('/storage/emulated/0')) {
         result = '/storage/emulated/0' + result;
     }
-    // 如果没有任何前缀，补全前缀
     else if (!result.startsWith('/')) {
         result = '/storage/emulated/0/' + result;
     }
 
-    // 规范化斜杠：确保以 / 结尾
     if (!result.endsWith('/')) {
         result += '/';
     }
 
-    // 移除多余的双斜杠
     return result.replace(/\/+/g, '/');
 };
 
@@ -78,7 +73,7 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
 
     let templates = [];
 
-    // 1. 处理全局配置 [GLOBAL]
+    // 1. 处理全局配置
     const globalRules = parseRules(globalConfText);
     if (globalRules.redirects.length > 0 || globalRules.hides.length > 0) {
         templates.push({
@@ -101,7 +96,7 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
         }
     };
 
-    // 2. 收集 App-rules 目录下的配置
+    // 2. 收集 App-rules 配置
     appMap.forEach((app, pkg) => {
         const u0 = app.users[0];
         if (u0 && u0.isEnabled) {
@@ -109,26 +104,24 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
         }
     });
 
-    // 3. 收集 injector.conf 里的内联配置 (如 [bin.mt.plus] 这种)
+    // 3. 收集 injector.conf 内联配置
     if (injectorRulesMap) {
         injectorRulesMap.forEach((lines, section) => {
             if (section === 'GLOBAL') return;
             const state = injectorStates.get(section);
             if (state === 'OFF') return;
-            // 提取包名（去掉可能存在的 :uid 后缀）
             const pkg = section.split(':')[0];
             addRulesToPkg(pkg, lines.join('\n'));
         });
     }
 
-    // 4. 将收集到的规则映射为模板 JSON
+    // 4. 生成模板 JSON，使用应用名称作为 template_name
     pkgMap.forEach((rules, pkg) => {
         const uniqueHides = [...new Set(rules.hides)];
         const rMap = new Map();
         rules.redirects.forEach(r => rMap.set(r.source, r));
         const uniqueRedirects = Array.from(rMap.values());
 
-        // 获取应用名称，如果获取不到则使用包名
         const appInfo = appMap.get(pkg);
         const displayName = (appInfo && appInfo.appLabel) ? appInfo.appLabel : pkg;
 
@@ -143,8 +136,6 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     });
 
     const jsonStr = JSON.stringify(templates);
-    
-    // 动态定位 MediaProvider 包名
     const findCmd = `pm list packages | grep providers.media.module | cut -d: -f2 | head -n 1`;
     const res = await exec(findCmd);
     let mpPkg = (res.stdout ? res.stdout.trim() : "") || "com.android.providers.media.module";
@@ -155,11 +146,14 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     await exec(`mkdir -p ${targetDir}`);
     await exec(`echo '${jsonStr.replace(/'/g, "'\\''")}' > ${targetPath}`);
     
-    // 同步目录权限
+    // 设置权限
     const statRes = await exec(`stat -c '%u:%g' ${targetDir} 2>/dev/null`);
     const ug = statRes.stdout ? statRes.stdout.trim() : "";
-    if (ug) {
-        await exec(`chown ${ug} ${targetPath}`);
-    }
+    if (ug) { await exec(`chown ${ug} ${targetPath}`); }
     await exec(`chmod 644 ${targetPath}`);
-}
+
+    // 5. 执行重载命令通知插件
+    const reloadRes = await exec("/data/Namespace-Proxy/reload_rules");
+    if (reloadRes.stdout && reloadRes.stdout.trim().includes("SUCCESS")) {
+        toast("同步成功：插件规则已重载");
+    } els

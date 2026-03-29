@@ -19,136 +19,138 @@ export async function checkPluginInstalled() {
     return !!(res.stdout && res.stdout.trim());
 }
 
+/**
+ * 路径转换：处理相对路径并补全存储前缀与斜杠
+ */
 const convertToStoragePath = (p) => {
     if (!p) return p;
     let result = p.trim();
     if (result.startsWith('/data/media/0')) {
         result = '/storage/emulated/0' + result.substring(13);
-    } 
-    else if (result.startsWith('/') && !result.startsWith('/storage/emulated/0')) {
+    } else if (result.startsWith('/') && !result.startsWith('/storage/emulated/0')) {
         result = '/storage/emulated/0' + result;
-    }
-    else if (!result.startsWith('/')) {
+    } else if (!result.startsWith('/')) {
         result = '/storage/emulated/0/' + result;
     }
-    if (!result.endsWith('/')) { result += '/'; }
+    if (!result.endsWith('/')) result += '/';
     return result.replace(/\/+/g, '/');
 };
 
+/**
+ * 解析规则文本
+ */
 const parseRules = (text) => {
     let redirects = [];
     let hides = [];
     let isSandboxOn = false;
-    
-    if (!text) return { redirects, hides, isSandboxOn };
-    
+    let isSandboxExplicitOff = false;
+
+    if (!text) return { redirects, hides, isSandboxOn, isSandboxExplicitOff };
+
     text.split('\n').forEach(line => {
-        const parts = line.trim().split(/\s+/);
-        if (parts[0] === 'REDIRECT' && parts.length >= 3) {
-            redirects.push({ 
-                source: convertToStoragePath(parts[1]), 
-                target: convertToStoragePath(parts.slice(2).join(' ')) 
-            });
-        } else if (parts[0] === 'HIDE' && parts.length >= 2) {
-            hides.push(convertToStoragePath(parts[1]));
-        } else if (parts[0] === 'SANDBOX' && parts.length >= 2) {
-            if (parts[1] === 'ON') isSandboxOn = true;
+        const p = line.trim().split(/\s+/);
+        if (p[0] === 'REDIRECT' && p.length >= 3) {
+            redirects.push({ source: convertToStoragePath(p[1]), target: convertToStoragePath(p.slice(2).join(' ')) });
+        } else if (p[0] === 'HIDE' && p.length >= 2) {
+            hides.push(convertToStoragePath(p[1]));
+        } else if (p[0] === 'SANDBOX' && p.length >= 2) {
+            if (p[1] === 'ON') isSandboxOn = true;
+            if (p[1] === 'OFF') isSandboxExplicitOff = true;
         }
     });
-    
-    return { redirects, hides, isSandboxOn };
+    return { redirects, hides, isSandboxOn, isSandboxExplicitOff };
 };
 
 export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates) {
     const settings = await getSettings();
     if (!settings.syncPlugin) return;
-
-    const isInstalled = await checkPluginInstalled();
-    if (!isInstalled) return;
+    if (!(await checkPluginInstalled())) return;
 
     let templates = [];
-
-    // 1. 处理全局配置
     const globalRules = parseRules(globalConfText);
-    
-    // 2. 收集所有用户目录下的配置
-    // pkgMap: key=pkgName, value={hides:[], redirects:[], isSandboxOn:bool}
-    let pkgMap = new Map();
-    let globalTargetApps = new Set(); // 用于记录所有开启了该包注入的应用
 
-    appMap.forEach((app, pkg) => {
-        let allUserRulesText = "";
-        let isPkgEnabled = false;
-        let isPkgSandboxOn = false;
+    // 存储每个包名最终合并的规则集
+    const mergedData = new Map();
 
-        // 遍历所有用户配置（支持 App-rules, App-rules-10, 等）
-        for (const uid in app.users) {
-            const uConf = app.users[uid];
-            if (uConf.isEnabled) {
-                isPkgEnabled = true;
-                if (uConf.text) allUserRulesText += uConf.text + "\n";
-            }
+    // 辅助函数：合并规则到包名
+    const mergeToPkg = (pkg, ruleText) => {
+        const parsed = parseRules(ruleText);
+        if (!mergedData.has(pkg)) {
+            mergedData.set(pkg, { 
+                hides: new Set(), 
+                redirects: new Map(), 
+                isSandboxOn: false 
+            });
         }
+        const target = mergedData.get(pkg);
+        parsed.hides.forEach(h => target.hides.add(h));
+        parsed.redirects.forEach(r => target.redirects.set(r.source, r.target));
+        
+        // 沙盒逻辑：如果解析到 ON 且未被显式 OFF 覆盖，则开启
+        if (parsed.isSandboxOn && !parsed.isSandboxExplicitOff) {
+            target.isSandboxOn = true;
+        }
+    };
 
-        // 处理 injector.conf 中的内联配置 (如 com.package:10)
-        // 尝试匹配 pkg 以及带 uid 的 section
-        injectorRulesMap.forEach((lines, section) => {
-            const basePkg = section.split(':')[0];
-            if (basePkg === pkg && injectorStates.get(section) === 'ON') {
-                isPkgEnabled = true;
-                allUserRulesText += lines.join('\n') + "\n";
+    // 1. 遍历 appMap 收集所有状态为 ON 的应用
+    appMap.forEach((app, pkg) => {
+        // 检查该应用在任何一个用户下是否开启了注入
+        let isAnyUserOn = false;
+        Object.keys(app.users).forEach(uid => {
+            const userConf = app.users[uid];
+            // 检查 injectorStates 里的状态
+            const state = injectorStates.get(`${pkg}:${uid}`) || injectorStates.get(pkg) || "ON";
+            if (state === 'ON') {
+                isAnyUserOn = true;
+                // 合并该用户的独立规则文件
+                if (userConf.text) mergeToPkg(pkg, userConf.text);
             }
         });
 
-        if (isPkgEnabled) {
-            const parsed = parseRules(allUserRulesText);
-            
-            // 加入全局生效目标列表
-            globalTargetApps.add(pkg);
-
-            // 存入独立模板规则
-            if (parsed.hides.length > 0 || parsed.redirects.length > 0 || parsed.isSandboxOn) {
-                if (!pkgMap.has(pkg)) pkgMap.set(pkg, { hides: [], redirects: [], isSandboxOn: false });
-                pkgMap.get(pkg).hides.push(...parsed.hides);
-                pkgMap.get(pkg).redirects.push(...parsed.redirects);
-                if (parsed.isSandboxOn) pkgMap.get(pkg).isSandboxOn = true;
-            }
+        // 如果开启了注入，则必须合并全局规则
+        if (isAnyUserOn) {
+            mergeToPkg(pkg, globalConfText);
         }
     });
 
-    // 3. 构建统一的全局规则模板
-    if ((globalRules.redirects.length > 0 || globalRules.hides.length > 0 || globalRules.isSandboxOn) && globalTargetApps.size > 0) {
-        templates.push({
-            template_name: "NS-Proxy-Global",
-            hook_operation: ["query", "insert"],
-            apply_to_app: Array.from(globalTargetApps),
-            permitted_media_types: globalRules.isSandboxOn ? [0] : [0, 1, 2, 3, 4, 5, 6],
-            filter_path: globalRules.hides.length > 0 ? globalRules.hides : undefined,
-            redirect_rules: globalRules.redirects.length > 0 ? globalRules.redirects : undefined
+    // 2. 兼容处理 injector.conf 里的内联规则 [pkg] 或 [pkg:uid]
+    if (injectorRulesMap) {
+        injectorRulesMap.forEach((lines, section) => {
+            if (section === 'GLOBAL') return;
+            const state = injectorStates.get(section) || "ON";
+            if (state === 'OFF') return;
+
+            const pkg = section.split(':')[0];
+            if (appMap.has(pkg)) {
+                mergeToPkg(pkg, lines.join('\n'));
+            }
         });
     }
 
-    // 4. 构建独立的专属规则模板
-    pkgMap.forEach((rules, pkg) => {
-        const uniqueHides = [...new Set(rules.hides)];
-        const rMap = new Map();
-        rules.redirects.forEach(r => rMap.set(r.source, r));
-        const uniqueRedirects = Array.from(rMap.values());
-
+    // 3. 构建最终模板
+    mergedData.forEach((data, pkg) => {
         const appInfo = appMap.get(pkg);
         const displayName = (appInfo && appInfo.appLabel) ? appInfo.appLabel : pkg;
 
-        templates.push({
-            template_name: displayName,
-            hook_operation: ["query", "insert"],
-            apply_to_app: [pkg],
-            permitted_media_types: rules.isSandboxOn ? [0] : [0, 1, 2, 3, 4, 5, 6],
-            filter_path: uniqueHides.length > 0 ? uniqueHides : undefined,
-            redirect_rules: uniqueRedirects.length > 0 ? uniqueRedirects : undefined
-        });
+        // 仅在有实际规则或开启沙盒时生成模板
+        if (data.hides.size > 0 || data.redirect_rules || data.isSandboxOn) {
+            const redirectArray = [];
+            data.redirects.forEach((target, source) => {
+                redirectArray.push({ source, target });
+            });
+
+            templates.push({
+                template_name: displayName,
+                hook_operation: ["query", "insert"],
+                apply_to_app: [pkg],
+                permitted_media_types: data.isSandboxOn ? [0] : [0, 1, 2, 3, 4, 5, 6],
+                filter_path: data.hides.size > 0 ? Array.from(data.hides) : undefined,
+                redirect_rules: redirectArray.length > 0 ? redirectArray : undefined
+            });
+        }
     });
 
-    // 5. 写入文件
+    // 4. 写入文件
     const jsonStr = JSON.stringify(templates);
     const findCmd = `pm list packages | grep providers.media.module | cut -d: -f2 | head -n 1`;
     const res = await exec(findCmd);
@@ -162,14 +164,14 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     
     const statRes = await exec(`stat -c '%u:%g' ${targetDir} 2>/dev/null`);
     const ug = statRes.stdout ? statRes.stdout.trim() : "";
-    if (ug) { await exec(`chown ${ug} ${targetPath}`); }
+    if (ug) await exec(`chown ${ug} ${targetPath}`);
     await exec(`chmod 644 ${targetPath}`);
 
-    // 6. 执行重载并反馈
+    // 5. 执行重载并反馈
     const reloadRes = await exec("/data/Namespace-Proxy/reload_rules");
     if (reloadRes.stdout && reloadRes.stdout.trim().includes("SUCCESS")) {
-        toast(`同步成功：已转换 ${templates.length} 个规则模板，插件已重载`);
+        toast(`同步成功：已转换 ${templates.length} 个应用规则`);
     } else {
-        console.warn("Reload rules failed:", reloadRes.stderr);
+        toast(`同步完成，但插件重载失败`);
     }
 }

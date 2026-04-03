@@ -67,10 +67,11 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .title { margin: 0; font-size: 20px; color: var(--primary); font-weight: 800; letter-spacing: -0.5px; }
 .status-bar { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
 
-/* Navigation */
+/* Navigation & Tabs */
 .nav-tabs { 
-    flex-shrink: 0; display: flex; gap: 8px; margin-bottom: 10px; 
-    overflow-x: auto; padding: 0 4px 4px 4px; scrollbar-width: none; 
+    flex-shrink: 0; display: flex; gap: 8px; margin-bottom: 8px; 
+    overflow-x: auto; padding: 4px 4px 12px 4px; /* 增加底部 padding 防止阴影被截断 */
+    scrollbar-width: none; 
 }
 .nav-tabs::-webkit-scrollbar { display: none; }
 .nav-item { 
@@ -80,10 +81,23 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
     transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
     display: inline-flex; align-items: center; gap: 4px;
 }
-.nav-item.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 2px 4px rgba(24, 119, 242, 0.3); transform: scale(1.02); }
+.nav-item.active { 
+    background: var(--primary); color: #fff; border-color: var(--primary); 
+    box-shadow: 0 3px 6px rgba(24, 119, 242, 0.3); 
+    transform: translateY(-1px);
+}
 
-/* User Tabs in Modal */
-.user-tabs { padding: 4px 0 10px 0; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+/* User Selector - 去除下划线并修正阴影截断 */
+.user-selector-container { 
+    flex-shrink: 0; display: flex; flex-direction: column; 
+    padding: 0 16px; margin-bottom: 4px;
+}
+.user-tabs { 
+    white-space: nowrap; overflow-x: auto; flex-shrink: 0; 
+    border-bottom: none; /* 移除下划线 */
+    padding: 6px 0 14px 0; /* 底部预留足够空间显示阴影 */
+    margin-bottom: 0;
+}
 .user-tabs .nav-item { padding: 6px 14px; font-size: 12px; }
 
 /* Tab Content */
@@ -156,6 +170,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 .list-item:active { background: rgba(0,0,0,0.05); }
 .app-main { display: flex; align-items: center; flex: 1; min-width: 0; margin-right: 10px; }
 .app-icon-wrapper { width: 40px; height: 40px; margin-right: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--bg-input); border-radius: 8px; overflow: hidden; }
+.app-icon-img { width: 100%; height: 100%; object-fit: contain; }
 .app-content { flex: 1; min-width: 0; }
 .app-header { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
 .app-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.3s; }
@@ -195,7 +210,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 .flex-shrink-0 { flex-shrink: 0; }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-.modal-header { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; transition: border-color 0.3s; }
+.modal-header { padding: 10px 16px 4px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; transition: border-color 0.3s; }
 .modal-header.nowrap { flex-wrap: nowrap; gap: 10px; }
 .header-title-group { flex: 1; min-width: 0; margin-top: -2px; }
 .header-actions-group { display: flex; align-items: center; gap: 12px; flex-shrink: 0; margin-top: -2px; }
@@ -229,8 +244,19 @@ input:checked + .slider:before { transform: translateX(20px); }
 .rule-row { display: flex; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); align-items: center; background: transparent; flex-shrink: 0; transition: border-color 0.3s; }
 .rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .rule-type { width: 96px; font-size: 12px; padding: 6px 20px 6px 6px; }
-.fab-container { position: absolute; bottom: 80px; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; z-index: 10; }
-.fab-container button { pointer-events: auto; width: auto; padding: 8px 20px; border-radius: 20px; font-size: 13px; }
+
+/* 固定底部的添加规则按钮区域 */
+.rule-add-container {
+    position: sticky;
+    bottom: 0;
+    margin: auto -12px -12px -12px; 
+    padding: 12px;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: center;
+    z-index: 10;
+}
 
 /* Autocomplete */
 .suggestion-box { 

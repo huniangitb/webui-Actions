@@ -52,7 +52,6 @@ body {
     user-select: none; -webkit-user-select: none;
     height: 100vh; overflow: hidden;
 }
-
 img, a { -webkit-user-drag: none; }
 input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -webkit-user-select: text; }
 
@@ -68,10 +67,10 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .title { margin: 0; font-size: 20px; color: var(--primary); font-weight: 800; letter-spacing: -0.5px; }
 .status-bar { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
 
-/* Navigation */
+/* Navigation Tabs */
 .nav-tabs { 
     flex-shrink: 0; display: flex; gap: 8px; margin-bottom: 10px; 
-    overflow-x: auto; padding: 4px; scrollbar-width: none; 
+    overflow-x: auto; padding: 4px 4px 8px 4px; scrollbar-width: none; 
 }
 .nav-tabs::-webkit-scrollbar { display: none; }
 .nav-item { 
@@ -81,23 +80,23 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
     transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
     display: inline-flex; align-items: center; gap: 4px;
 }
-.nav-item.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 3px 8px rgba(24, 119, 242, 0.35); transform: translateY(-1px); }
+.nav-item.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 3px 6px rgba(24, 119, 242, 0.3); transform: scale(1.02); }
 
-/* User Tabs in Modal - 修复闪烁与阴影截断 */
+/* User Selector Context (Modal) */
 .user-selector-container { 
     flex-shrink: 0; 
     display: flex; 
     flex-direction: column; 
-    min-height: 70px; /* 锁定高度防止抖动 */
+    padding: 0 4px;
 }
-
+/* 去除下划线，并增加底部内边距防止激活状态阴影被截断 */
 .user-tabs { 
-    padding: 8px 4px 16px 4px; /* 增大底部边距防止阴影截断 */
-    margin-bottom: 0; 
-    border-bottom: none; /* 去除用户空间下的下划线 */
     white-space: nowrap; 
-    overflow-x: auto;
-    display: flex;
+    overflow-x: auto; 
+    flex-shrink: 0; 
+    padding: 8px 0 12px 0; /* 增大底部间距 */
+    margin-bottom: 4px;
+    border-bottom: none; /* 移除下划线 */
 }
 .user-tabs .nav-item { padding: 6px 14px; font-size: 12px; }
 
@@ -171,10 +170,10 @@ input:checked + .slider:before { transform: translateX(20px); }
 .list-item:active { background: rgba(0,0,0,0.05); }
 .app-main { display: flex; align-items: center; flex: 1; min-width: 0; margin-right: 10px; }
 .app-icon-wrapper { width: 40px; height: 40px; margin-right: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--bg-input); border-radius: 8px; overflow: hidden; }
-.app-icon-img { width: 40px; height: 40px; border-radius: 8px; object-fit: contain; background: var(--bg-input); }
+.app-icon-img { width: 100%; height: 100%; object-fit: contain; }
 .app-content { flex: 1; min-width: 0; }
 .app-header { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
-.app-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.3s; }
 .app-end { flex-shrink: 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 120px;}
 
 /* FABs */
@@ -246,11 +245,11 @@ input:checked + .slider:before { transform: translateX(20px); }
 .rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .rule-type { width: 96px; font-size: 12px; padding: 6px 20px 6px 6px; }
 
-/* 固定底部的添加规则按钮区域 */
+/* Fixed Rule Add Container */
 .rule-add-container {
     position: sticky;
     bottom: 0;
-    margin: auto -12px -12px -12px; 
+    margin: auto -12px -12px -12px;
     padding: 12px;
     background: var(--bg-surface);
     border-top: 1px solid var(--border);

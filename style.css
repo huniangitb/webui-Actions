@@ -52,6 +52,7 @@ body {
     user-select: none; -webkit-user-select: none;
     height: 100vh; overflow: hidden;
 }
+
 img, a { -webkit-user-drag: none; }
 input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -webkit-user-select: text; }
 
@@ -67,11 +68,10 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
 .title { margin: 0; font-size: 20px; color: var(--primary); font-weight: 800; letter-spacing: -0.5px; }
 .status-bar { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
 
-/* Navigation & Tabs */
+/* Navigation */
 .nav-tabs { 
-    flex-shrink: 0; display: flex; gap: 8px; margin-bottom: 8px; 
-    overflow-x: auto; padding: 4px 4px 12px 4px; /* 增加底部 padding 防止阴影被截断 */
-    scrollbar-width: none; 
+    flex-shrink: 0; display: flex; gap: 8px; margin-bottom: 10px; 
+    overflow-x: auto; padding: 4px; scrollbar-width: none; 
 }
 .nav-tabs::-webkit-scrollbar { display: none; }
 .nav-item { 
@@ -81,22 +81,23 @@ input, textarea, .log-viewer, .code-editor, .selectable { user-select: text; -we
     transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
     display: inline-flex; align-items: center; gap: 4px;
 }
-.nav-item.active { 
-    background: var(--primary); color: #fff; border-color: var(--primary); 
-    box-shadow: 0 3px 6px rgba(24, 119, 242, 0.3); 
-    transform: translateY(-1px);
+.nav-item.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 3px 8px rgba(24, 119, 242, 0.35); transform: translateY(-1px); }
+
+/* User Tabs in Modal - 修复闪烁与阴影截断 */
+.user-selector-container { 
+    flex-shrink: 0; 
+    display: flex; 
+    flex-direction: column; 
+    min-height: 70px; /* 锁定高度防止抖动 */
 }
 
-/* User Selector - 去除下划线并修正阴影截断 */
-.user-selector-container { 
-    flex-shrink: 0; display: flex; flex-direction: column; 
-    padding: 0 16px; margin-bottom: 4px;
-}
 .user-tabs { 
-    white-space: nowrap; overflow-x: auto; flex-shrink: 0; 
-    border-bottom: none; /* 移除下划线 */
-    padding: 6px 0 14px 0; /* 底部预留足够空间显示阴影 */
-    margin-bottom: 0;
+    padding: 8px 4px 16px 4px; /* 增大底部边距防止阴影截断 */
+    margin-bottom: 0; 
+    border-bottom: none; /* 去除用户空间下的下划线 */
+    white-space: nowrap; 
+    overflow-x: auto;
+    display: flex;
 }
 .user-tabs .nav-item { padding: 6px 14px; font-size: 12px; }
 
@@ -170,10 +171,10 @@ input:checked + .slider:before { transform: translateX(20px); }
 .list-item:active { background: rgba(0,0,0,0.05); }
 .app-main { display: flex; align-items: center; flex: 1; min-width: 0; margin-right: 10px; }
 .app-icon-wrapper { width: 40px; height: 40px; margin-right: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--bg-input); border-radius: 8px; overflow: hidden; }
-.app-icon-img { width: 100%; height: 100%; object-fit: contain; }
+.app-icon-img { width: 40px; height: 40px; border-radius: 8px; object-fit: contain; background: var(--bg-input); }
 .app-content { flex: 1; min-width: 0; }
 .app-header { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
-.app-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.3s; }
+.app-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-end { flex-shrink: 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 120px;}
 
 /* FABs */
@@ -210,7 +211,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 .flex-shrink-0 { flex-shrink: 0; }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-.modal-header { padding: 10px 16px 4px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; transition: border-color 0.3s; }
+.modal-header { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; transition: border-color 0.3s; }
 .modal-header.nowrap { flex-wrap: nowrap; gap: 10px; }
 .header-title-group { flex: 1; min-width: 0; margin-top: -2px; }
 .header-actions-group { display: flex; align-items: center; gap: 12px; flex-shrink: 0; margin-top: -2px; }

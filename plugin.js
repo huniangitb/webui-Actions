@@ -19,12 +19,6 @@ export async function checkPluginInstalled() {
     return !!(res.stdout && res.stdout.trim());
 }
 
-/**
- * 核心转换逻辑：
- * 1. 处理真实路径 /data/media/0 -> /storage/emulated/0
- * 2. 处理相对根路径 /123云盘 -> /storage/emulated/0/123云盘
- * 3. 确保以 / 结尾
- */
 const convertToStoragePath = (p) => {
     if (!p) return p;
     let result = p.trim();
@@ -45,8 +39,10 @@ const parseRules = (text) => {
     let redirects = [];
     let hides = [];
     let ros = [];
+    let allows = [];
+    let sandboxState = undefined;
     
-    if (!text) return { redirects, hides, ros };
+    if (!text) return { redirects, hides, ros, allows, sandboxState };
     
     text.split('\n').forEach(line => {
         const parts = line.trim().split(/\s+/);
@@ -59,9 +55,14 @@ const parseRules = (text) => {
             hides.push(convertToStoragePath(parts[1]));
         } else if (parts[0] === 'RO' && parts.length >= 2) {
             ros.push(convertToStoragePath(parts[1]));
+        } else if (parts[0] === 'ALLOW' && parts.length >= 2) {
+            allows.push(convertToStoragePath(parts[1]));
+        } else if (parts[0] === 'SANDBOX' && parts.length >= 2) {
+            if (parts[1] === 'ON') sandboxState = 'ON';
+            else if (parts[1] === 'OFF') sandboxState = 'OFF';
         }
     });
-    return { redirects, hides, ros };
+    return { redirects, hides, ros, allows, sandboxState };
 };
 
 export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates) {
@@ -71,15 +72,11 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     const isInstalled = await checkPluginInstalled();
     if (!isInstalled) return;
 
-    // 是否开启了全局注入大开关
     const isGlobalInjectOn = (globalConfText || "").includes('GLOBAL_INJECT ON');
-
     let allEnabledApps = new Set(); 
     let pkgRules = new Map();
-    // 默认全选媒体类型
-    const defaultMediaTypes = [0, 1, 2, 3, 4, 5, 6];
 
-    // 1. 收集 App-rules
+    // 1. 收集应用启用状态与配置
     appMap.forEach((app, pkg) => {
         let combinedText = "";
         let isPkgEnabled = false;
@@ -100,13 +97,12 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
         if (isPkgEnabled) {
             allEnabledApps.add(pkg);
             if (combinedText.trim()) {
-                const parsed = parseRules(combinedText);
-                pkgRules.set(pkg, { ...parsed });
+                pkgRules.set(pkg, parseRules(combinedText));
             }
         }
     });
 
-    // 2. 收集 injector.conf 内联配置
+    // 2. 收集内联配置
     injectorRulesMap.forEach((lines, section) => {
         if (section === 'GLOBAL') return;
         const pkg = section.split(':')[0];
@@ -116,11 +112,12 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
         if (isPkgEnabled) {
             allEnabledApps.add(pkg);
             const parsed = parseRules(lines.join('\n'));
-            const existing = pkgRules.get(pkg) || { hides: [], redirects: [], ros: [] };
-            
+            const existing = pkgRules.get(pkg) || { hides: [], redirects: [], ros: [], allows: [], sandboxState: undefined };
             existing.hides.push(...parsed.hides);
             existing.ros.push(...parsed.ros);
+            existing.allows.push(...parsed.allows);
             existing.redirects.push(...parsed.redirects);
+            if (parsed.sandboxState) existing.sandboxState = parsed.sandboxState;
             pkgRules.set(pkg, existing);
         }
     });
@@ -129,29 +126,43 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
 
     // 3. 全局模板
     const globalRules = parseRules(globalConfText);
-    if ((globalRules.redirects.length > 0 || globalRules.hides.length > 0 || globalRules.ros.length > 0) && allEnabledApps.size > 0) {
+    const hasGlobalRules = globalRules.redirects.length > 0 || globalRules.hides.length > 0 || globalRules.ros.length > 0 || globalRules.allows.length > 0 || globalRules.sandboxState === 'ON';
+    
+    if (hasGlobalRules && allEnabledApps.size > 0) {
         templates.push({
             template_name: "NS-Proxy-Global",
             hook_operation: ["query", "insert"],
             apply_to_app: Array.from(allEnabledApps),
-            permitted_media_types: defaultMediaTypes,
-            filter_path: globalRules.hides.length > 0 ? globalRules.hides : undefined,
-            read_only_path: globalRules.ros.length > 0 ? globalRules.ros : undefined,
+            enable_sandbox: globalRules.sandboxState === 'ON',
+            exempt_path: globalRules.allows.length > 0 ? [...new Set(globalRules.allows)] : undefined,
+            filter_path: globalRules.hides.length > 0 ? [...new Set(globalRules.hides)] : undefined,
+            read_only_path: globalRules.ros.length > 0 ? [...new Set(globalRules.ros)] : undefined,
             redirect_rules: globalRules.redirects.length > 0 ? globalRules.redirects : undefined
         });
     }
 
-    // 4. 专属模板
+    // 4. 应用专属模板名称冲突检测与生成
+    const labelCounts = {};
+    pkgRules.forEach((_, pkg) => {
+        const appInfo = appMap.get(pkg);
+        const label = (appInfo && appInfo.appLabel) ? appInfo.appLabel : pkg;
+        labelCounts[label] = (labelCounts[label] || 0) + 1;
+    });
+
     pkgRules.forEach((data, pkg) => {
-        if (data.hides.length > 0 || data.redirects.length > 0 || data.ros.length > 0) {
+        const isSpecial = data.sandboxState === 'ON' || data.hides.length > 0 || data.redirects.length > 0 || data.ros.length > 0 || data.allows.length > 0;
+        if (isSpecial) {
             const appInfo = appMap.get(pkg);
-            const displayName = (appInfo && appInfo.appLabel) ? appInfo.appLabel : pkg;
+            const label = (appInfo && appInfo.appLabel) ? appInfo.appLabel : pkg;
+            // 只有在名称出现重复时，才附加包名以保持辨识度和唯一性
+            const finalName = (labelCounts[label] > 1 && label !== pkg) ? `${label} (${pkg})` : label;
 
             templates.push({
-                template_name: displayName,
+                template_name: finalName,
                 hook_operation: ["query", "insert"],
                 apply_to_app: [pkg],
-                permitted_media_types: defaultMediaTypes,
+                enable_sandbox: data.sandboxState === 'ON',
+                exempt_path: data.allows.length > 0 ? [...new Set(data.allows)] : undefined,
                 filter_path: data.hides.length > 0 ? [...new Set(data.hides)] : undefined,
                 read_only_path: data.ros.length > 0 ? [...new Set(data.ros)] : undefined,
                 redirect_rules: data.redirects.length > 0 ? [...new Map(data.redirects.map(r => [r.source, r])).values()] : undefined
@@ -159,13 +170,12 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
         }
     });
 
-    // 5. 写入 JSON 配置到指定路径
+    // 5. 写入规则文件
     const jsonStr = JSON.stringify(templates);
     const findCmd = `pm list packages | grep providers.media.module | cut -d: -f2 | head -n 1`;
     const res = await exec(findCmd);
     let mpPkg = (res.stdout ? res.stdout.trim() : "") || "com.android.providers.media.module";
     
-    // 目标路径变更为 user_de/0/...
     const targetDir = `/data/user_de/0/${mpPkg}/files`;
     const targetPath = `${targetDir}/rule`;
     
@@ -177,7 +187,7 @@ export async function syncToPlugin(appMap, globalConfText, injectorRulesMap, inj
     if (ug) { await exec(`chown ${ug} ${targetPath}`); }
     await exec(`chmod 644 ${targetPath}`);
 
-    // 6. 重载通知
+    // 6. 重载反馈
     const reloadRes = await exec("/data/Namespace-Proxy/reload_rules");
     if (reloadRes.stdout && reloadRes.stdout.trim().includes("SUCCESS")) {
         toast(`同步成功：已转换 ${templates.length} 个规则模板，插件已重载`);

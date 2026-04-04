@@ -777,14 +777,26 @@ document.getElementById('btnDeleteAppConfig').onclick = async () => {
         if (!confirm(`确定清除当前用户 (${currentBindingUser}) 的应用配置吗?`)) return;
         
         const dir = currentBindingUser === 0 ? `${BASE_DIR}/App-rules` : `${BASE_DIR}/App-rules-${currentBindingUser}`;
+        
+        // 1. 执行物理删除
         await run(`rm -f ${dir}/${currentBindingPkg}.conf ${dir}/${currentBindingPkg}.conf.disabled`);
+        
+        // 2. 清除内存中的状态
         injectorStates.delete(`${currentBindingPkg}:${currentBindingUser}`);
         
+        // 3. 刷新配置文件 (injector.conf)
         await flushInjectorConf();
-        toast("配置已清除");
-        closeModal('appConfigModal');
+        
+        // 4. 重新加载本地数据模型
         await loadData();
+        
+        // 5. 【关键】同步删除后的状态给插件
+        // 因为 syncToPlugin 会重新读取 appMap，此时被删的应用已经不再处于启用状态
+        // 插件会自动根据新的规则集更新 JSON，实现删除同步
         await syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates);
+        
+     //   toast("配置已清除并同步至插件");
+        closeModal('appConfigModal');
     } catch (e) {
         toast("清除失败: " + e.message);
     }

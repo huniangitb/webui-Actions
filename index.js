@@ -34,6 +34,10 @@ const PAGE_LIMIT = 50;
 let ioState = { offset: 0, loading: false, hasMore: true, term: '' };
 let sysState = { offset: 0, loading: false, hasMore: true, term: '' };
 
+// 懒加载观察器与渲染队列
+let iconObserver = null;
+let renderQueueId = null;
+
 const getSvg = (path, size = 24, color = 'currentColor') => `<svg viewBox="0 0 24 24" fill="${color}" width="${size}" height="${size}"><path d="${path}"/></svg>`;
 
 const ICONS = {
@@ -64,6 +68,20 @@ const run = async (cmd) => {
         const res = await exec(cmd);
         return (res.errno === 0 && res.stdout) ? res.stdout.trim() : "";
     } catch (e) { return ""; }
+};
+
+const debounce = (func, wait) => {
+    let timeout;
+    return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), wait); };
+};
+
+// 分块处理大数据函数，避免卡死主线程
+const processInChunks = async (array, processFn, chunkSize = 100) => {
+    for (let i = 0; i < array.length; i += chunkSize) {
+        const chunk = array.slice(i, i + chunkSize);
+        chunk.forEach(processFn);
+        await new Promise(resolve => setTimeout(resolve, 0)); 
+    }
 };
 
 const fetchActiveMounts = async () => {
@@ -137,7 +155,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (statusPolling) clearInterval(statusPolling);
     statusPolling = setInterval(checkStatus, 2000);
 
-    document.getElementById('appSearch').oninput = renderAppList;
+    const debouncedAppSearch = debounce(() => { renderAppList(); }, 250);
+    document.getElementById('appSearch').addEventListener('input', debouncedAppSearch);
+
     document.getElementById('btnFilterFab').onclick = (e) => { e.stopPropagation(); document.getElementById('filterOptions').classList.toggle('show'); };
     
     document.querySelectorAll('.filter-opt').forEach(btn => {
@@ -237,168 +257,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }, true);
 });
 
-const debounce = (func, wait) => {
-    let timeout;
-    return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), wait); };
-};
-
-const fetchIoLogs = async () => {
-    if (ioState.loading || !ioState.hasMore) return;
-    ioState.loading = true;
-    const indicator = document.getElementById('ioLoadingIndicator');
-    if (indicator) indicator.classList.remove('hidden');
-
-    try {
-        const res = await run(`${LOG_CTL} search-io "${ioState.term}" ${PAGE_LIMIT} ${ioState.offset} api`);
-        if (!res) {
-            ioState.hasMore = false;
-        } else {
-            const lines = res.split('\n');
-            let dataLines = lines;
-            const lastLine = lines[lines.length - 1];
-
-            if (lastLine.startsWith('DONE|')) {
-                const parts = lastLine.split('|');
-                if (parts.length >= 3) {
-                    const remain = parseInt(parts[2]);
-                    ioState.hasMore = !isNaN(remain) && remain > 0;
-                } else ioState.hasMore = false;
-                dataLines = lines.slice(0, -1);
-            } else if (lastLine === 'OK') {
-                ioState.hasMore = false;
-                dataLines = lines.slice(0, -1);
-            }
-
-            if (dataLines.length > 0) {
-                ioState.offset += dataLines.length;
-                renderIoRows(dataLines);
-            } else {
-                if (!ioState.hasMore && ioState.offset === 0) {
-                    document.getElementById('ioLogList').innerHTML = '<div class="empty-state">暂无监控数据</div>';
-                }
-            }
-        }
-    } catch (e) {
-        toast("获取 IO 日志失败"); ioState.hasMore = false;
-    } finally {
-        ioState.loading = false;
-        if (indicator) indicator.classList.add('hidden');
-    }
-};
-
-const renderIoRows = (lines) => {
-    const listEl = document.getElementById('ioLogList');
-    if (listEl.innerHTML.includes('暂无监控数据')) listEl.innerHTML = '';
-
-    const html = lines.map(line => {
-        if (!line.trim()) return '';
-        const parts = line.split('|');
-        if (parts.length < 2) return '';
-        
-        const ts = parseInt(parts[0]);
-        const content = parts.slice(1).join('|');
-        
-        let pkg = "未知", op = "INFO", details = content;
-        const match = content.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
-        if (match) { pkg = match[1]; op = match[2]; details = match[3]; }
-
-        const date = new Date(ts * 1000);
-        const timeStr = isNaN(date.getTime()) ? "--:--:--" : date.toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-
-        const app = appMap.get(pkg);
-        const appName = app ? app.appLabel : pkg;
-
-        return `
-            <div class="io-card">
-                <div class="io-card-header">
-                    <div class="io-time">${ICONS.CLOCK} <span>${timeStr}</span></div>
-                    <div class="io-app text-truncate" title="${pkg}">${appName}</div>
-                    <div class="io-op op-${op}">${op}</div>
-                </div>
-                <div class="io-card-body break-all font-monospace text-muted">
-                    ${details}
-                </div>
-            </div>
-        `;
-    }).join('');
-    listEl.insertAdjacentHTML('beforeend', html);
-};
-
-const fetchSysLogs = async () => {
-    const source = document.getElementById('logSourceSelect').value;
-    const viewer = document.getElementById('logViewer');
-    const indicator = document.getElementById('sysLoadingIndicator');
-
-    if (source === 'zygisk') {
-        try {
-            const content = await run("logcat -d -s Zygisk_NSProxy NamespaceProxy_Injector");
-            viewer.textContent = content || "无 Zygisk 日志";
-            viewer.scrollTop = viewer.scrollHeight;
-        } catch (e) { toast("获取 Logcat 失败"); }
-        return;
-    }
-
-    if (sysState.loading || !sysState.hasMore) return;
-    sysState.loading = true;
-    if (indicator) indicator.classList.remove('hidden');
-
-    try {
-        const res = await run(`${LOG_CTL} search-sys "" ${PAGE_LIMIT} ${sysState.offset} api`);
-        if (!res) {
-            sysState.hasMore = false;
-        } else {
-            const lines = res.split('\n');
-            let dataLines = lines;
-            const lastLine = lines[lines.length - 1];
-
-            if (lastLine.startsWith('DONE|')) {
-                const parts = lastLine.split('|');
-                if (parts.length >= 3) {
-                    const remain = parseInt(parts[2]);
-                    sysState.hasMore = !isNaN(remain) && remain > 0;
-                }
-                dataLines = lines.slice(0, -1);
-            } else if (lastLine === 'OK') {
-                sysState.hasMore = false;
-                dataLines = lines.slice(0, -1);
-            }
-
-            if (dataLines.length > 0) {
-                sysState.offset += dataLines.length;
-                const text = dataLines.join('\n') + '\n';
-                viewer.insertAdjacentText('beforeend', text);
-            } else {
-                if (sysState.offset === 0) viewer.textContent = "无内部日志";
-            }
-        }
-    } catch (e) { sysState.hasMore = false; } finally {
-        sysState.loading = false;
-        if (indicator) indicator.classList.add('hidden');
-    }
-};
-
-document.querySelectorAll('.main-tabs .nav-item').forEach(btn => {
-    btn.onclick = () => {
-        document.querySelectorAll('.main-tabs .nav-item').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        const targetId = btn.dataset.target;
-        document.getElementById(targetId).classList.add('active');
-        
-        if (targetId === 'content-io') {
-             ioState = { offset: 0, loading: false, hasMore: true, term: document.getElementById('ioSearch').value.trim() };
-             document.getElementById('ioLogList').innerHTML = '';
-             fetchIoLogs();
-        } else if (targetId === 'content-log') {
-             if (document.getElementById('logSourceSelect').value === 'internal') {
-                 sysState = { offset: 0, loading: false, hasMore: true, term: '' };
-                 document.getElementById('logViewer').innerHTML = '';
-             }
-             fetchSysLogs();
-        }
-    };
-});
-
 const loadData = async () => {
     try {
         activeMounts = await fetchActiveMounts();
@@ -441,14 +299,14 @@ const loadData = async () => {
             const lsRes = await run(`ls -1 ${dir} 2>/dev/null`);
             if (lsRes) {
                 const files = lsRes.split('\n').filter(f => f.endsWith('.conf') || f.endsWith('.conf.disabled'));
-                for (const file of files) {
+                await processInChunks(files, async (file) => {
                     const isDisabled = file.endsWith('.conf.disabled');
                     const pkg = file.replace(/\.conf(\.disabled)?$/, '');
                     const content = await run(`cat ${dir}/${file} 2>/dev/null`);
                     ruleFilesMap.set(`${pkg}:${uid}`, content);
                     if (isDisabled) ruleFilesMap.set(`${pkg}:${uid}_disabled`, true);
                     else ruleFilesMap.set(`${pkg}:${uid}_enabled`, true);
-                }
+                }, 20);
             }
         }
 
@@ -474,9 +332,7 @@ const loadData = async () => {
                         const firstEq = trimLine.indexOf('=');
                         const pkg = trimLine.substring(0, firstEq).trim();
                         const name = trimLine.substring(firstEq + 1).trim();
-                        if (pkg) {
-                            infos.push({ packageName: pkg, appLabel: name || pkg, isSystem: false, versionName: "", versionCode: 0, uid: 0 });
-                        }
+                        if (pkg) infos.push({ packageName: pkg, appLabel: name || pkg, isSystem: false, versionName: "", versionCode: 0, uid: 0 });
                     }
                 });
             }
@@ -484,7 +340,8 @@ const loadData = async () => {
 
         appMap.clear();
         if (Array.isArray(infos)) {
-            infos.forEach(info => {
+            // 切片处理规则状态比对，防止大量正则运算卡死 UI
+            await processInChunks(infos, info => {
                 if (!info || !info.packageName) return;
                 
                 let appUsers = {};
@@ -513,14 +370,12 @@ const loadData = async () => {
                     appUsers[uid] = {
                         isEnabled: isEnabled,
                         text: ruleText,
-                        hasMonitor: ruleText.includes('MONITOR ON'),
-                        hasSandbox: ruleText.includes('SANDBOX ON'),
-                        hasRules: ruleText.includes('REDIRECT') || ruleText.includes('HIDE') || ruleText.includes('RO') || ruleText.includes('ALLOW')
+                        hasRules: /REDIRECT|HIDE|RO|ALLOW/.test(ruleText) || /REDIRECT|HIDE|RO|ALLOW/.test((injectorRulesMap.get(exactKey)||[]).join(''))
                     };
                 });
 
                 appMap.set(info.packageName, { ...info, isConfigured: isConfiguredAny, users: appUsers });
-            });
+            }, 100);
         }
 
         renderAppList();
@@ -533,53 +388,95 @@ const loadData = async () => {
 const renderAppList = () => {
     const listEl = document.getElementById('appList');
     const searchVal = document.getElementById('appSearch').value.toLowerCase();
-    const items = [];
-    appMap.forEach(app => {
-        if (currentAppFilter === 'filterUser' && app.isSystem) return;
-        if (currentAppFilter === 'filterSystem' && !app.isSystem) return;
-        if (currentAppFilter === 'filterBound' && !app.isConfigured) return;
-        const label = app.appLabel || app.packageName;
-        if (searchVal && !label.toLowerCase().includes(searchVal) && !app.packageName.toLowerCase().includes(searchVal)) return;
-        items.push(app);
-    });
     
-    items.sort((a, b) => (!!b.isConfigured - !!a.isConfigured) || (a.appLabel || "").localeCompare(b.appLabel || ""));
-    
-    listEl.innerHTML = items.length ? items.map(app => {
-        let mountedBadge = activeMounts.has(app.packageName) ? `<span class="badge badge-success badge-mount">MOUNTED</span>` : "";
-        
-        let badges = [];
-        let configuredUsers = activeUsers.filter(u => app.users[u].text.trim() || app.users[u].hasRules || app.isConfigured);
-        
-        configuredUsers.forEach(u => {
-            const uConf = app.users[u];
-            if (!uConf.isEnabled) {
-                badges.push(`<span class="badge badge-gray badge-pill">U${u}: OFF</span>`);
-            } else {
-                let txt = `U${u}`;
-                let color = 'badge-primary';
-                if(uConf.hasSandbox) color = 'badge-success';
-                else if(uConf.hasMonitor) color = 'badge-warning';
-                badges.push(`<span class="badge ${color} badge-pill">${txt}</span>`);
-            }
-        });
-        
-        const isOverallDisabled = configuredUsers.length > 0 && configuredUsers.every(u => !app.users[u].isEnabled);
+    // 中断之前的渲染队列
+    if (renderQueueId) {
+        cancelAnimationFrame(renderQueueId);
+        renderQueueId = null;
+    }
 
-        return `
-        <div class="list-item" data-pkg="${app.packageName}" onclick="openAppConfig('${app.packageName}')">
-            <div class="app-main">
-                <div class="app-icon-wrapper" style="background: transparent;">
-                    <img src="ksu://icon/${app.packageName}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: contain; background: var(--bg-input);" onerror="window.onIconError(this)" />
+    // 初始化懒加载观察器
+    if (!iconObserver) {
+        iconObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    if (img.dataset.src) {
+                        img.src = img.dataset.src;
+                        img.removeAttribute('data-src');
+                    }
+                    observer.unobserve(img);
+                }
+            });
+        }, { root: listEl, rootMargin: '100px 0px' });
+    } else {
+        iconObserver.disconnect();
+    }
+
+    // 过滤与排序
+    const items = Array.from(appMap.values()).filter(app => {
+        if (currentAppFilter === 'filterUser' && app.isSystem) return false;
+        if (currentAppFilter === 'filterSystem' && !app.isSystem) return false;
+        if (currentAppFilter === 'filterBound' && !app.isConfigured) return false;
+        const label = (app.appLabel || app.packageName).toLowerCase();
+        return !searchVal || label.includes(searchVal) || app.packageName.toLowerCase().includes(searchVal);
+    }).sort((a, b) => (!!b.isConfigured - !!a.isConfigured) || (a.appLabel || "").localeCompare(b.appLabel || ""));
+    
+    listEl.innerHTML = '';
+    
+    if (items.length === 0) {
+        listEl.innerHTML = '<div class="empty-state">无匹配应用</div>';
+        return;
+    }
+
+    let currentIndex = 0;
+    const CHUNK_SIZE = 40;
+
+    // 分块异步渲染DOM
+    const renderChunk = () => {
+        const chunk = items.slice(currentIndex, currentIndex + CHUNK_SIZE);
+        if (chunk.length === 0) {
+            renderQueueId = null;
+            return;
+        }
+
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = chunk.map(app => {
+            let mountedBadge = activeMounts.has(app.packageName) ? `<span class="badge badge-success badge-mount">MOUNTED</span>` : "";
+            let badges = activeUsers.filter(u => app.users[u].text.trim() || app.users[u].hasRules || app.isConfigured).map(u => {
+                const c = app.users[u];
+                return `<span class="badge ${c.isEnabled?'badge-primary':'badge-gray'} badge-pill">U${u}${c.isEnabled?'':' OFF'}</span>`;
+            });
+            const isOverallDisabled = badges.every(b => b.includes('OFF'));
+
+            return `
+            <div class="list-item" data-pkg="${app.packageName}" onclick="openAppConfig('${app.packageName}')">
+                <div class="app-main">
+                    <div class="app-icon-wrapper" style="background: transparent;">
+                        <img data-src="ksu://icon/${app.packageName}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="width: 40px; height: 40px; border-radius: 8px; object-fit: contain; background: var(--bg-input);" class="lazy-icon" onerror="window.onIconError(this)" />
+                    </div>
+                    <div class="app-content">
+                        <div class="app-header"><span class="app-name ${isOverallDisabled ? 'text-muted' : ''}">${app.appLabel}</span>${mountedBadge}</div>
+                        <small class="text-muted font-monospace text-truncate d-block">${app.packageName}</small>
+                    </div>
                 </div>
-                <div class="app-content">
-                    <div class="app-header"><span class="app-name ${isOverallDisabled ? 'text-muted' : ''}">${app.appLabel}</span>${mountedBadge}</div>
-                    <small class="text-muted font-monospace text-truncate d-block">${app.packageName}</small>
-                </div>
-            </div>
-            <div class="app-end">${badges.join(' ')}</div>
-        </div>`;
-    }).join('') : '<div class="empty-state">无匹配应用</div>';
+                <div class="app-end">${badges.join(' ')}</div>
+            </div>`;
+        }).join('');
+
+        const newImgs = tempDiv.querySelectorAll('.lazy-icon');
+        
+        while (tempDiv.firstChild) {
+            listEl.appendChild(tempDiv.firstChild);
+        }
+
+        newImgs.forEach(img => iconObserver.observe(img));
+
+        currentIndex += CHUNK_SIZE;
+        renderQueueId = requestAnimationFrame(renderChunk);
+    };
+
+    renderQueueId = requestAnimationFrame(renderChunk);
 };
 
 const renderGlobalRules = () => {
@@ -777,25 +674,14 @@ document.getElementById('btnDeleteAppConfig').onclick = async () => {
         if (!confirm(`确定清除当前用户 (${currentBindingUser}) 的应用配置吗?`)) return;
         
         const dir = currentBindingUser === 0 ? `${BASE_DIR}/App-rules` : `${BASE_DIR}/App-rules-${currentBindingUser}`;
-        
-        // 1. 执行物理删除
         await run(`rm -f ${dir}/${currentBindingPkg}.conf ${dir}/${currentBindingPkg}.conf.disabled`);
-        
-        // 2. 清除内存中的状态
         injectorStates.delete(`${currentBindingPkg}:${currentBindingUser}`);
         
-        // 3. 刷新配置文件 (injector.conf)
         await flushInjectorConf();
-        
-        // 4. 重新加载本地数据模型
         await loadData();
-        
-        // 5. 【关键】同步删除后的状态给插件
-        // 因为 syncToPlugin 会重新读取 appMap，此时被删的应用已经不再处于启用状态
-        // 插件会自动根据新的规则集更新 JSON，实现删除同步
         await syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates);
         
-     //   toast("配置已清除并同步至插件");
+        toast("配置已清除并同步");
         closeModal('appConfigModal');
     } catch (e) {
         toast("清除失败: " + e.message);
@@ -968,3 +854,160 @@ document.getElementById('btnSaveIgnore').onclick = async () => {
         toast("忽略配置已保存"); closeModal('monitorIgnoreModal');
     } catch (e) { toast("保存失败: " + e.message); }
 };
+
+const fetchIoLogs = async () => {
+    if (ioState.loading || !ioState.hasMore) return;
+    ioState.loading = true;
+    const indicator = document.getElementById('ioLoadingIndicator');
+    if (indicator) indicator.classList.remove('hidden');
+
+    try {
+        const res = await run(`${LOG_CTL} search-io "${ioState.term}" ${PAGE_LIMIT} ${ioState.offset} api`);
+        if (!res) {
+            ioState.hasMore = false;
+        } else {
+            const lines = res.split('\n');
+            let dataLines = lines;
+            const lastLine = lines[lines.length - 1];
+
+            if (lastLine.startsWith('DONE|')) {
+                const parts = lastLine.split('|');
+                if (parts.length >= 3) {
+                    const remain = parseInt(parts[2]);
+                    ioState.hasMore = !isNaN(remain) && remain > 0;
+                } else ioState.hasMore = false;
+                dataLines = lines.slice(0, -1);
+            } else if (lastLine === 'OK') {
+                ioState.hasMore = false;
+                dataLines = lines.slice(0, -1);
+            }
+
+            if (dataLines.length > 0) {
+                ioState.offset += dataLines.length;
+                renderIoRows(dataLines);
+            } else {
+                if (!ioState.hasMore && ioState.offset === 0) {
+                    document.getElementById('ioLogList').innerHTML = '<div class="empty-state">暂无监控数据</div>';
+                }
+            }
+        }
+    } catch (e) {
+        toast("获取 IO 日志失败"); ioState.hasMore = false;
+    } finally {
+        ioState.loading = false;
+        if (indicator) indicator.classList.add('hidden');
+    }
+};
+
+const renderIoRows = (lines) => {
+    const listEl = document.getElementById('ioLogList');
+    if (listEl.innerHTML.includes('暂无监控数据')) listEl.innerHTML = '';
+
+    const html = lines.map(line => {
+        if (!line.trim()) return '';
+        const parts = line.split('|');
+        if (parts.length < 2) return '';
+        
+        const ts = parseInt(parts[0]);
+        const content = parts.slice(1).join('|');
+        
+        let pkg = "未知", op = "INFO", details = content;
+        const match = content.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
+        if (match) { pkg = match[1]; op = match[2]; details = match[3]; }
+
+        const date = new Date(ts * 1000);
+        const timeStr = isNaN(date.getTime()) ? "--:--:--" : date.toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
+        const app = appMap.get(pkg);
+        const appName = app ? app.appLabel : pkg;
+
+        return `
+            <div class="io-card">
+                <div class="io-card-header">
+                    <div class="io-time">${ICONS.CLOCK} <span>${timeStr}</span></div>
+                    <div class="io-app text-truncate" title="${pkg}">${appName}</div>
+                    <div class="io-op op-${op}">${op}</div>
+                </div>
+                <div class="io-card-body break-all font-monospace text-muted">
+                    ${details}
+                </div>
+            </div>
+        `;
+    }).join('');
+    listEl.insertAdjacentHTML('beforeend', html);
+};
+
+const fetchSysLogs = async () => {
+    const source = document.getElementById('logSourceSelect').value;
+    const viewer = document.getElementById('logViewer');
+    const indicator = document.getElementById('sysLoadingIndicator');
+
+    if (source === 'zygisk') {
+        try {
+            const content = await run("logcat -d -s Zygisk_NSProxy NamespaceProxy_Injector");
+            viewer.textContent = content || "无 Zygisk 日志";
+            viewer.scrollTop = viewer.scrollHeight;
+        } catch (e) { toast("获取 Logcat 失败"); }
+        return;
+    }
+
+    if (sysState.loading || !sysState.hasMore) return;
+    sysState.loading = true;
+    if (indicator) indicator.classList.remove('hidden');
+
+    try {
+        const res = await run(`${LOG_CTL} search-sys "" ${PAGE_LIMIT} ${sysState.offset} api`);
+        if (!res) {
+            sysState.hasMore = false;
+        } else {
+            const lines = res.split('\n');
+            let dataLines = lines;
+            const lastLine = lines[lines.length - 1];
+
+            if (lastLine.startsWith('DONE|')) {
+                const parts = lastLine.split('|');
+                if (parts.length >= 3) {
+                    const remain = parseInt(parts[2]);
+                    sysState.hasMore = !isNaN(remain) && remain > 0;
+                }
+                dataLines = lines.slice(0, -1);
+            } else if (lastLine === 'OK') {
+                sysState.hasMore = false;
+                dataLines = lines.slice(0, -1);
+            }
+
+            if (dataLines.length > 0) {
+                sysState.offset += dataLines.length;
+                const text = dataLines.join('\n') + '\n';
+                viewer.insertAdjacentText('beforeend', text);
+            } else {
+                if (sysState.offset === 0) viewer.textContent = "无内部日志";
+            }
+        }
+    } catch (e) { sysState.hasMore = false; } finally {
+        sysState.loading = false;
+        if (indicator) indicator.classList.add('hidden');
+    }
+};
+
+document.querySelectorAll('.main-tabs .nav-item').forEach(btn => {
+    btn.onclick = () => {
+        document.querySelectorAll('.main-tabs .nav-item').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        const targetId = btn.dataset.target;
+        document.getElementById(targetId).classList.add('active');
+        
+        if (targetId === 'content-io') {
+             ioState = { offset: 0, loading: false, hasMore: true, term: document.getElementById('ioSearch').value.trim() };
+             document.getElementById('ioLogList').innerHTML = '';
+             fetchIoLogs();
+        } else if (targetId === 'content-log') {
+             if (document.getElementById('logSourceSelect').value === 'internal') {
+                 sysState = { offset: 0, loading: false, hasMore: true, term: '' };
+                 document.getElementById('logViewer').innerHTML = '';
+             }
+             fetchSysLogs();
+        }
+    };
+});

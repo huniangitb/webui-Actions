@@ -907,32 +907,39 @@ const renderIoRows = (lines) => {
         if (!line.trim()) return '';
         const parts = line.split('|');
         if (parts.length < 2) return '';
-        
-        const ts = parseInt(parts[0]);
-        const content = parts.slice(1).join('|');
-        
-        let pkg = "未知", op = "INFO", details = content;
-        const match = content.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
-        if (match) { pkg = match[1]; op = match[2]; details = match[3]; }
 
-        const date = new Date(ts * 1000);
-        const timeStr = isNaN(date.getTime()) ? "--:--:--" : date.toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        const rawTs = parts[0];
+        const content = parts.slice(1).join('|');
+
+        let timeStr;
+        if (/^\d+$/.test(rawTs)) {
+            const ts = parseInt(rawTs);
+            const date = new Date(ts * 1000);
+            timeStr = isNaN(date.getTime()) ? "--:--:--" : date.toLocaleString('zh-CN', { hour: '2-digit', minute:'2-digit', second:'2-digit', hour12: false });
+        } else {
+            const match = rawTs.match(/\d{2}:\d{2}:\d{2}/);
+            timeStr = match ? match[0] : rawTs.slice(0, 8);
+        }
+
+        let pkg = "未知", op = "INFO", details = content;
+        const matchContent = content.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
+        if (matchContent) {
+            pkg = matchContent[1];
+            op = matchContent[2];
+            details = matchContent[3];
+        }
 
         const app = appMap.get(pkg);
         const appName = app ? app.appLabel : pkg;
 
-        return `
-            <div class="io-card">
-                <div class="io-card-header">
-                    <div class="io-time">${ICONS.CLOCK} <span>${timeStr}</span></div>
-                    <div class="io-app text-truncate" title="${pkg}">${appName}</div>
-                    <div class="io-op op-${op}">${op}</div>
-                </div>
-                <div class="io-card-body break-all font-monospace text-muted">
-                    ${details}
-                </div>
-            </div>
-        `;
+        return `<div class="io-card">
+                    <div class="io-card-header">
+                        <div class="io-time">${ICONS.CLOCK} <span>${timeStr}</span></div>
+                        <div class="io-app text-truncate" title="${pkg}">${appName}</div>
+                        <div class="io-op op-${op}">${op}</div>
+                    </div>
+                    <div class="io-card-body break-all font-monospace text-muted">${details}</div>
+                </div>`;
     }).join('');
     listEl.insertAdjacentHTML('beforeend', html);
 };

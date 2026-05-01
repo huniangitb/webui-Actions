@@ -31,7 +31,7 @@ function parseLogContent(ndjsonContent) {
             }; 
             parsedEntries.push(parsedEntry); 
         } catch (error) { 
-            console.error("解析 JSON 行失败:", error, "行内容:", line); 
+            toast("解析 JSON 行失败:", error, "行内容:", line); 
         } 
     }); 
     return parsedEntries; 
@@ -324,7 +324,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         appInfoMap.set(info.packageName, info);
                     });
                 } catch (e) {
-                    console.error("KernelSU getPackagesInfo 失败:", e);
+                    toast("KernelSU getPackagesInfo 失败:", e);
                 }
             }
         }
@@ -420,7 +420,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 rawInfos.forEach(info => uniqueMap.set(info.packageName, info));
                 Array.from(uniqueMap.values()).forEach(info => appInfoMap.set(info.packageName, info));
             } catch (e) {
-                console.error("初始化应用列表失败:", e);
+                toast("初始化应用列表失败:", e);
             }
 
             await loadLogFile();
@@ -512,7 +512,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('edit-whitelist').addEventListener('click', () => editRuleFile('whitelist.txt'));
 
         return async function() {
-            try { const { stdout } = await exec(`mount | grep " /data " | awk '{print $5}'`); f2fsGcConfigContainer.style.display = (stdout.trim() === 'ext4') ? 'none' : 'flex'; } catch (e) { console.error("Failed to check file system:", e); }
+            try { const { stdout } = await exec(`mount | grep " /data " | awk '{print $5}'`); f2fsGcConfigContainer.style.display = (stdout.trim() === 'ext4') ? 'none' : 'flex'; } catch (e) { toast("Failed to check file system:", e); }
             generateCronEditorUI();
             await loadConfigFile();
         };
@@ -562,18 +562,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         async function populatePackages() {
-            try {
-                const pkgs = await listPackages("user");
-                const rawInfos = await getPackagesInfo(pkgs);
-                const uniqueMap = new Map();
-                rawInfos.forEach(info => uniqueMap.set(info.packageName, info));
-                allAppInfos = Array.from(uniqueMap.values());
-                allAppInfos.sort((a, b) => a.appLabel.localeCompare(b.appLabel));
-                renderAppOptions(getFilteredAppInfos());
-            } catch (e) {
-                console.error("加载监控应用列表失败:", e);
-            }
-        }
+    try {
+        const userPkgs = await listPackages("user");
+        const systemPkgs = await listPackages("system");
+        const allPkgs = [...new Set([...userPkgs, ...systemPkgs])];
+        const rawInfos = await getPackagesInfo(allPkgs);
+        const uniqueMap = new Map();
+        rawInfos.forEach(info => uniqueMap.set(info.packageName, info));
+        allAppInfos = Array.from(uniqueMap.values());
+        allAppInfos.sort((a, b) => a.appLabel.localeCompare(b.appLabel));
+        renderAppOptions(getFilteredAppInfos());
+    } catch (e) {
+        toast("加载监控应用列表失败:", e);
+    }
+}
 
         function renderAppOptions(infos) {
             customAppList.innerHTML = '';
@@ -629,7 +631,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if(b1.errno === 0) rules.black.push(...parse(b1.stdout));
                 if(b2.errno === 0) rules.black.push(...parse(b2.stdout));
                 if(w1.errno === 0) rules.white.push(...parse(w1.stdout));
-            } catch (e) { console.error("获取规则失败", e); }
+            } catch (e) { toast("获取规则失败", e); }
             return rules;
         }
 

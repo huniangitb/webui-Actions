@@ -10,6 +10,9 @@
 html, body { height: 100%; width: 100%; margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--text-main); background-color: transparent; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; user-select: none; -webkit-user-select: none; font-size: 16px; }
 svg, .nav-icon { transform: translateZ(0); backface-visibility: hidden; }
 
+/* 彻底隐藏所有的多余 input checkbox/radio 等，避免原生冲突 */
+.btn-check { display: none !important; }
+
 @keyframes aurora-1 { 0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.5); opacity: 0.7; } 50% { transform: translate(-20%, -40%) rotate(180deg) scale(2); opacity: 1; } 100% { transform: translate(-50%, -50%) rotate(360deg) scale(1.5); opacity: 0.7; } }
 @keyframes aurora-2 { 0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.8); opacity: 1; } 50% { transform: translate(-80%, -60%) rotate(-180deg) scale(1.5); opacity: 0.8; } 100% { transform: translate(-50%, -50%) rotate(-360deg) scale(1.8); opacity: 1; } }
 body::before, body::after { content: ''; position: fixed; top: 50%; left: 50%; width: 150vmax; height: 150vmax; z-index: -1; pointer-events: none; transform-origin: center center; }
@@ -70,12 +73,13 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .schedule-input-group { overflow: hidden; transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, margin 0.4s ease; max-height: 200px; opacity: 1; }
 .schedule-input-group.hidden { max-height: 0; opacity: 0; margin: 0 !important; padding: 0 !important; pointer-events: none; border: none !important; }
 
-/* Cron Editor Custom Pills & Circles */
+/* Cron Editor Custom Pills & Circles 无闪烁展开/折叠方案 */
 .cron-pill { flex: 1; text-align: center; padding: 8px 16px; border-radius: 50px; background: rgba(0,0,0,0.05); color: var(--text-muted); cursor: pointer; transition: all 0.2s; font-size: 0.95rem; border: 1px solid var(--glass-border); }
 .btn-check:checked + .cron-pill { background: var(--primary-color); color: #fff; border-color: var(--primary-color); font-weight: 600; box-shadow: 0 4px 10px rgba(59, 113, 202, 0.3); }
 
-.cron-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-height: 300px; opacity: 1; overflow-y: auto; transition: max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease; }
-.cron-grid.collapsed { max-height: 0; opacity: 0; pointer-events: none; margin: 0; overflow: hidden; }
+/* 通过 display 控制显隐，杜绝闪烁和占位 */
+.cron-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; overflow-y: auto; max-height: 280px; }
+.cron-grid.collapsed { display: none; }
 .cron-item { position: relative; }
 .cron-circle { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,0.05); color: var(--text-main); font-size: 0.9rem; cursor: pointer; border: 1px solid var(--glass-border); transition: all 0.2s; }
 .btn-check:checked + .cron-circle { background: var(--primary-color); color: #fff; border-color: var(--primary-color); box-shadow: 0 4px 10px rgba(59, 113, 202, 0.3); font-weight: bold; transform: scale(1.05); }
@@ -138,7 +142,7 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .app-picker-item .app-pkg { font-size: 0.75rem; color: var(--text-muted); }
 
 /* 结构化日志输出区 */
-.log-output-container { height: 350px; overflow-y: auto; background: rgba(0, 0, 0, 0.03); border-radius: 0 0 20px 20px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.log-output-container { height: 380px; overflow-y: auto; background: rgba(0, 0, 0, 0.03); border-radius: 0 0 20px 20px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
 .log-card { display: flex; align-items: flex-start; background: var(--glass-bg); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--glass-border); word-break: break-all; transition: background 0.3s, box-shadow 0.3s; }
 .log-api { font-size: 0.75rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-right: 8px; flex-shrink: 0; margin-top: 1px; }
 .log-path { font-size: 0.85rem; color: var(--text-main); font-family: monospace; line-height: 1.4; }

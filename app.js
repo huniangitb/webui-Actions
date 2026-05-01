@@ -2,7 +2,7 @@ import { exec, spawn, toast, listPackages, getPackagesInfo, fullScreen, enableEd
 import Chart from 'chart.js/auto';
 import { mdiHome, mdiPencilBoxOutline } from '@mdi/js';
 
-// 允许状态栏显示，但保持边缘延伸以适应透明状态栏
+// 允许状态栏显示
 fullScreen(false);
 enableEdgeToEdge(true);
 
@@ -417,7 +417,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const userPkgs = await listPackages("user");
                 const infos = await getPackagesInfo(userPkgs);
-                infos.forEach(info => appInfoMap.set(info.packageName, info));
+                // 去重
+                const uMap = new Map();
+                infos.forEach(i => uMap.set(i.packageName, i));
+                Array.from(uMap.values()).forEach(info => appInfoMap.set(info.packageName, info));
             } catch (e) {
                 console.error("初始化应用列表失败:", e);
             }
@@ -466,7 +469,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.querySelectorAll('.mode-selector').forEach(radio => {
                 radio.addEventListener('change', (e) => {
                     const grid = e.target.closest('.tab-pane').querySelector('.cron-grid');
-                    grid.classList.toggle('collapsed', e.target.value === '*');
+                    if (e.target.value === '*') {
+                        grid.classList.add('collapsed');
+                    } else {
+                        grid.classList.remove('collapsed');
+                    }
                 });
             });
         }
@@ -530,7 +537,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         async function populatePackages() {
             try {
                 const pkgs = await listPackages("user");
-                allAppInfos = await getPackagesInfo(pkgs);
+                const rawInfos = await getPackagesInfo(pkgs);
+                
+                // 去重
+                const uniqueMap = new Map();
+                rawInfos.forEach(info => uniqueMap.set(info.packageName, info));
+                allAppInfos = Array.from(uniqueMap.values());
+                
                 allAppInfos.sort((a, b) => a.appLabel.localeCompare(b.appLabel));
                 renderAppOptions(allAppInfos);
             } catch (e) {
@@ -590,7 +603,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         function appendLogCard(line) {
             if (!line.trim()) return;
             
-            // 解析日志 [API] /path/... 或者 Fallback
             const match = line.match(/^\[(.*?)\]\s+(.*)$/);
             let api = "SYS", path = line, isHit = false;
 
@@ -612,7 +624,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             logOutput.appendChild(card);
             
-            // 限制DOM数量防卡顿
             if (logOutput.children.length > 300) {
                 logOutput.removeChild(logOutput.firstChild);
             }
@@ -628,16 +639,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (e) { /* 无日志忽略 */ }
         }
 
+        // 仅命中开关改变时立即刷新列表
+        filterHitsToggle.addEventListener('change', async () => {
+            if (readingLogs) {
+                logOutput.innerHTML = '';
+                await loadHistoricalLogs();
+            }
+        });
+
         startBtn.addEventListener('click', async () => {
             if (!selectedPkg) return toast('未选择应用');
             
-            // 状态切换与动画
             setupContainer.classList.add('hidden-collapse');
             activeContainer.classList.remove('hidden-collapse');
             logOutput.innerHTML = '';
             
             activeRules = await getRules();
-            await loadHistoricalLogs();
             
             readingLogs = true;
 
@@ -647,7 +664,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await delay(1000);
                 await exec(`monkey -p ${selectedPkg} 1`);
                 
-                tailProcess = spawn('tail', ['-f', '/dev/fuse-app/io.log']);
+                // 加载完整日志历史，随后用 tail -n 0 -F 捕获接下来的实时增量日志
+                await loadHistoricalLogs();
+                
+                tailProcess = spawn('tail', ['-n', '0', '-F', '/dev/fuse-app/io.log']);
                 let buffer = '';
                 tailProcess.stdout.on('data', (data) => {
                     if (!readingLogs) return;
@@ -665,7 +685,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         async function stopMonitor() {
             readingLogs = false;
             if (tailProcess) {
-                await exec(`pkill -f "tail -f /dev/fuse-app/io.log"`);
+                await exec(`pkill -f "tail -n 0 -F /dev/fuse-app/io.log"`);
                 tailProcess = null;
             }
             if (selectedPkg) await exec(`am force-stop ${selectedPkg}`);
@@ -673,7 +693,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             appendLogCard(`[SYSTEM] 监控已停止，应用 ${selectedPkg} 已关闭。`);
             
-            // 恢复 UI 状态
             setupContainer.classList.remove('hidden-collapse');
             activeContainer.classList.add('hidden-collapse');
             selectedPkg = '';

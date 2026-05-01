@@ -291,11 +291,11 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .api-sys, .api-system { background: rgba(149, 165, 166, 0.2); color: #95a5a6; border: 1px solid rgba(149, 165, 166, 0.4); }
 
 @media (prefers-color-scheme: dark) {
-  :root { 
+  :root {
       --text-main: #ffffff;
-      --text-muted: #ccc; 
-      --glass-bg: rgba(150, 150, 150, 0.5); 
-      --glass-border: rgba(255, 255, 255, 0.15); 
+      --text-muted: #e0e0e0;
+      --glass-bg: rgba(180, 180, 180, 0.6);
+      --glass-border: rgba(255, 255, 255, 0.25);
   }
   body::before, body::after { mix-blend-mode: screen; }
   .radio-toggle-group, .nav-pills { background: rgba(255,255,255,0.1); }
@@ -306,25 +306,54 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
   .modal-header, .modal-footer { border-color: rgba(255,255,255,0.1); }
   .btn-close { color: #fff; }
   .filter-pill {
-    background: rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.15);
     border-color: rgba(255,255,255,0.2);
   }
+  .cron-pill, .cron-circle { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
+  .app-picker-item:hover { background: rgba(255,255,255,0.05); }
+  .app-picker-item { border-bottom: 1px solid rgba(255,255,255,0.1); }
+  #monitor-log-output { background: rgba(0,0,0,0.2); }
+  .log-card { background: rgba(255,255,255,0.05); }
+  .log-card.whitelist-glow .log-path { color: #2ecc71; }
+
+  #loader { background: #000; }
+  .list-group-item { background: rgba(255, 255, 255, 0.1); }
+
+  .icon-btn.active,
+  .icon-btn:hover {
+    background: rgba(255,255,255,0.1);
+  }
+  .filter-panel {
+    background: rgba(60, 60, 60, 0.95);
+  }
+  .filter-separator {
+    border-top-color: rgba(255,255,255,0.2);
+  }
+
   .search-collapse .form-control-transparent {
     background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.15);
     color: #fff;
   }
-   .search-collapse .form-control-transparent::placeholder {
+
+  .search-collapse .form-control-transparent::placeholder {
     color: rgba(255, 255, 255, 0.5);
   }
-  
+
   .search-toggle-btn {
     color: rgba(255, 255, 255, 0.7);
   }
-  
+
+  .search-toggle-btn:hover,
   .search-toggle-btn.active {
     color: #fff;
-    background: rgba(255, 255, 255, 0.1);
+  }
+
+  #monitor-pkg-search {
+    color: #fff;
+  }
+  #monitor-pkg-search::placeholder {
+    color: rgba(255,255,255,0.5);
   }
 }
   .cron-pill, .cron-circle { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }

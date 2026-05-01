@@ -1,9 +1,11 @@
 import { exec, spawn, toast, listPackages, getPackagesInfo, fullScreen, enableEdgeToEdge } from 'kernelsu';
 import Chart from 'chart.js/auto';
 import { mdiHome, mdiPencilBoxOutline } from '@mdi/js';
-fullScreen(true);
+
+// 允许状态栏显示，但保持边缘延伸以适应透明状态栏
+fullScreen(false);
 enableEdgeToEdge(true);
-// 添加控制台图标
+
 const mdiConsole = "M20,19V7H4V19H20M20,3A2,2 0 0,1 22,5V19A2,2 0 0,1 20,21H4A2,2 0 0,1 2,19V5C2,3.89 2.9,3 4,3H20M13,17V15H18V17H13M9.58,13L5.57,9H8.4L12.41,13L8.4,17H5.57L9.58,13Z";
 
 function parseLogContent(ndjsonContent) { 
@@ -142,7 +144,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     function injectIcons() { document.querySelectorAll('[data-icon]').forEach(el => { const iconName = el.getAttribute('data-icon'); if (icons[iconName]) el.setAttribute('d', icons[iconName]); }); }
 
-    // 更新页面映射
     const pages = { 
         home: document.getElementById('page-home'), 
         edit: document.getElementById('page-edit'),
@@ -154,7 +155,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (pageId === currentPageId || !pagesContainer) return;
         const pageIndex = Object.keys(pages).indexOf(pageId);
         if (pageIndex === -1) return;
-        // 使用 100/3% 作为三页布局的偏移量
         pagesContainer.style.transform = `translateX(${pageIndex * -(100 / 3)}%)`;
         navItems.forEach(item => item.classList.toggle('active', item.dataset.page === pageId));
         currentPageId = pageId;
@@ -442,12 +442,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         const cronFields = { minutes: { el: document.getElementById('cron-minutes'), min: 0, max: 59, name: '分钟' }, hours: { el: document.getElementById('cron-hours'), min: 0, max: 23, name: '小时' }, dom: { el: document.getElementById('cron-dom'), min: 1, max: 31, name: '日' }, months: { el: document.getElementById('cron-months'), min: 1, max: 12, name: '月', labels: ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'] }, dow: { el: document.getElementById('cron-dow'), min: 0, max: 6, name: '星期', labels: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] } };
 
         function updateScheduleModeUI() { const isCron = scheduleModeCronRadio.checked; intervalInputGroup.classList.toggle('hidden', isCron); cronInputGroup.classList.toggle('hidden', !isCron); cleanIntervalInput.required = !isCron; cronExpressionInput.required = isCron; }
+        
         function generateCronEditorUI() {
             for (const key in cronFields) {
                 const { el, min, max, name, labels } = cronFields[key];
                 let gridHtml = '<div class="cron-grid collapsed">';
-                for (let i = min; i <= max; i++) { gridHtml += `<div><input type="checkbox" class="btn-check" id="${key}-${i}" value="${i}"><label class="btn btn-outline-primary" for="${key}-${i}">${labels ? labels[i - min] : i}</label></div>`; }
-                el.innerHTML = `<div class="btn-group mb-3 w-100"><input type="radio" class="btn-check mode-selector" name="${key}-mode" id="${key}-every" value="*" checked><label class="btn btn-outline-primary" for="${key}-every">每${(labels ? '个' : '') + name}</label><input type="radio" class="btn-check mode-selector" name="${key}-mode" id="${key}-specific" value="specific"><label class="btn btn-outline-primary" for="${key}-specific">指定</label></div>` + gridHtml + '</div>';
+                for (let i = min; i <= max; i++) { 
+                    gridHtml += `
+                    <div class="cron-item">
+                        <input type="checkbox" class="btn-check" id="${key}-${i}" value="${i}">
+                        <label class="cron-circle" for="${key}-${i}">${labels ? labels[i - min] : i}</label>
+                    </div>`; 
+                }
+                el.innerHTML = `
+                <div class="d-flex gap-2 mb-3 w-100 justify-content-center">
+                    <input type="radio" class="btn-check mode-selector" name="${key}-mode" id="${key}-every" value="*" checked>
+                    <label class="cron-pill" for="${key}-every">每${(labels ? '个' : '') + name}</label>
+                    <input type="radio" class="btn-check mode-selector" name="${key}-mode" id="${key}-specific" value="specific">
+                    <label class="cron-pill" for="${key}-specific">指定</label>
+                </div>
+                ${gridHtml}</div>`;
             }
             document.querySelectorAll('.mode-selector').forEach(radio => {
                 radio.addEventListener('change', (e) => {
@@ -456,6 +470,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
         }
+
         function parseCronToUI(expression) {
             const parts = expression.split(' ');
             if (parts.length !== 5) return;
@@ -498,17 +513,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const initMonitorPage = (() => {
         const pkgSearch = document.getElementById('monitor-pkg-search');
-        const pkgSelect = document.getElementById('monitor-pkg-select');
+        const customAppList = document.getElementById('custom-app-list');
         const startBtn = document.getElementById('start-monitor-btn');
         const stopBtn = document.getElementById('stop-monitor-btn');
         const logOutput = document.getElementById('monitor-log-output');
         const filterHitsToggle = document.getElementById('filter-hits-only');
-        const clearMonitorBtn = document.getElementById('clear-monitor-log');
+        const setupContainer = document.getElementById('monitor-setup-container');
+        const activeContainer = document.getElementById('monitor-active-container');
         
         let tailProcess = null;
         let readingLogs = false;
         let allAppInfos = [];
         let activeRules = [];
+        let selectedPkg = '';
 
         async function populatePackages() {
             try {
@@ -522,16 +539,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         function renderAppOptions(infos) {
-            pkgSelect.innerHTML = '<option value="" disabled selected>选择应用...</option>';
+            customAppList.innerHTML = '';
+            if(infos.length === 0) {
+                customAppList.innerHTML = '<div class="text-muted text-center p-3">未找到应用</div>';
+                return;
+            }
             infos.forEach(info => {
-                const opt = document.createElement('option');
-                opt.value = info.packageName;
-                opt.textContent = `${info.appLabel} (${info.packageName})`;
-                pkgSelect.appendChild(opt);
+                const item = document.createElement('div');
+                item.className = `app-picker-item ${selectedPkg === info.packageName ? 'selected' : ''}`;
+                item.innerHTML = `
+                    <img src="ksu://icon/${info.packageName}" onerror="this.style.display='none'">
+                    <div class="app-info">
+                        <div class="app-name">${info.appLabel}</div>
+                        <div class="app-pkg">${info.packageName}</div>
+                    </div>
+                `;
+                item.addEventListener('click', () => {
+                    document.querySelectorAll('.app-picker-item').forEach(el => el.classList.remove('selected'));
+                    item.classList.add('selected');
+                    selectedPkg = info.packageName;
+                    startBtn.disabled = false;
+                });
+                customAppList.appendChild(item);
             });
         }
 
-        // 应用搜索过滤
         pkgSearch.addEventListener('input', (e) => {
             const val = e.target.value.toLowerCase();
             const filtered = allAppInfos.filter(info => 
@@ -555,40 +587,54 @@ document.addEventListener('DOMContentLoaded', async () => {
             return rules;
         }
 
-        function appendLogLine(line) {
+        function appendLogCard(line) {
             if (!line.trim()) return;
-            const isHit = activeRules.some(r => line.includes(r));
             
-            // 过滤：如果开启了“仅显示命中”且当前行未命中，则跳过
+            // 解析日志 [API] /path/... 或者 Fallback
+            const match = line.match(/^\[(.*?)\]\s+(.*)$/);
+            let api = "SYS", path = line, isHit = false;
+
+            if (match) {
+                api = match[1].trim();
+                path = match[2].trim();
+            }
+
+            isHit = activeRules.some(r => path.includes(r));
+            
             if (filterHitsToggle.checked && !isHit) return;
 
-            const div = document.createElement('div');
-            div.textContent = line;
-            if (isHit) div.className = 'text-highlight';
+            const card = document.createElement('div');
+            card.className = `log-card ${isHit ? 'hit-glow' : ''}`;
+            card.innerHTML = `
+                <div class="log-api api-${api.toLowerCase()}">${api}</div>
+                <div class="log-path">${path}</div>
+            `;
             
-            logOutput.appendChild(div);
+            logOutput.appendChild(card);
+            
+            // 限制DOM数量防卡顿
+            if (logOutput.children.length > 300) {
+                logOutput.removeChild(logOutput.firstChild);
+            }
             logOutput.scrollTop = logOutput.scrollHeight;
         }
 
-        // 加载历史日志
         async function loadHistoricalLogs() {
             try {
                 const { errno, stdout } = await exec('cat /dev/fuse-app/io.log');
                 if (errno === 0 && stdout) {
-                    logOutput.innerHTML += '<div class="text-info">--- 历史日志开始 ---</div>';
-                    stdout.split('\n').forEach(appendLogLine);
-                    logOutput.innerHTML += '<div class="text-info">--- 历史日志结束 ---</div>';
+                    stdout.split('\n').forEach(appendLogCard);
                 }
-            } catch (e) { console.log("无历史日志或读取失败"); }
+            } catch (e) { /* 无日志忽略 */ }
         }
 
         startBtn.addEventListener('click', async () => {
-            const pkg = pkgSelect.value;
-            if (!pkg) return toast('未选择应用');
+            if (!selectedPkg) return toast('未选择应用');
             
-            startBtn.disabled = true;
-            stopBtn.disabled = false;
-            logOutput.innerHTML = '<div class="text-info">正在准备环境...</div>';
+            // 状态切换与动画
+            setupContainer.classList.add('hidden-collapse');
+            activeContainer.classList.remove('hidden-collapse');
+            logOutput.innerHTML = '';
             
             activeRules = await getRules();
             await loadHistoricalLogs();
@@ -597,8 +643,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             try {
                 await exec(`mkdir -p /cache/fuse/ && cp /data/adb/modules/Clean-C/injector /cache/fuse/ && cp /data/adb/modules/Clean-C/fuse_daemon /cache/fuse/ && chmod 777 /cache/fuse/*`);
-                await exec(`/cache/fuse/injector "${pkg}"`);
-                await exec(`monkey -p ${pkg} 1`);
+                await exec(`/cache/fuse/injector "${selectedPkg}"`);
+                await delay(1000);
+                await exec(`monkey -p ${selectedPkg} 1`);
                 
                 tailProcess = spawn('tail', ['-f', '/dev/fuse-app/io.log']);
                 let buffer = '';
@@ -607,7 +654,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     buffer += data;
                     let lines = buffer.split('\n');
                     buffer = lines.pop();
-                    lines.forEach(appendLogLine);
+                    lines.forEach(appendLogCard);
                 });
             } catch (e) {
                 toast('启动失败: ' + e.message);
@@ -617,29 +664,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         async function stopMonitor() {
             readingLogs = false;
-            const pkg = pkgSelect.value;
             if (tailProcess) {
                 await exec(`pkill -f "tail -f /dev/fuse-app/io.log"`);
                 tailProcess = null;
             }
-            // 杀死目标应用
-            if (pkg) await exec(`am force-stop ${pkg}`);
-            
+            if (selectedPkg) await exec(`am force-stop ${selectedPkg}`);
             await exec(`rm -r /cache/fuse/`);
-            logOutput.innerHTML += `<div class="text-info">[系统] 监控已停止，应用已关闭。</div>`;
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
+            
+            appendLogCard(`[SYSTEM] 监控已停止，应用 ${selectedPkg} 已关闭。`);
+            
+            // 恢复 UI 状态
+            setupContainer.classList.remove('hidden-collapse');
+            activeContainer.classList.add('hidden-collapse');
+            selectedPkg = '';
+            startBtn.disabled = true;
+            document.querySelectorAll('.app-picker-item').forEach(el => el.classList.remove('selected'));
         }
 
         stopBtn.addEventListener('click', stopMonitor);
-        clearMonitorBtn.addEventListener('click', () => { logOutput.innerHTML = ''; });
 
         return async function() {
             await populatePackages();
-            activeRules = await getRules(); // 预加载规则
+            activeRules = await getRules();
         };
     })();
-
 
     try {
         generateRandomAurora();

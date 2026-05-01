@@ -123,46 +123,42 @@
                     </div>
                 </main>
 
-<!-- 找到 page-monitor 部分并替换其内容 -->
-<main id="page-monitor">
-    <div class="container">
-        <div class="main-title-wrapper">
-            <h1>监控中心</h1>
-        </div>
-        <div class="card">
-            <div class="card-header d-flex justify-content-between">
-                <h5>Fuse IO 实时监控</h5>
-                <button id="clear-monitor-log" class="btn btn-sm btn-outline-secondary">清空终端</button>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label">搜索并选择应用</label>
-                    <div class="input-glass-wrapper mb-2">
-                        <input type="text" id="monitor-pkg-search" class="form-control-transparent" placeholder="搜索应用名称或包名...">
+                <main id="page-monitor">
+                    <div class="container">
+                        <div class="main-title-wrapper">
+                            <h1>监控中心</h1>
+                        </div>
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5>Fuse IO 实时监控</h5>
+                                <div class="form-check form-switch m-0 d-flex align-items-center">
+                                    <input class="form-check-input" type="checkbox" id="filter-hits-only">
+                                    <label class="form-check-label ms-2" for="filter-hits-only" style="font-size: 0.85rem;">仅命中</label>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <!-- 状态1：准备阶段 -->
+                                <div id="monitor-setup-container" class="p-3 transition-collapse">
+                                    <div class="input-glass-wrapper mb-3">
+                                        <input type="text" id="monitor-pkg-search" class="form-control-transparent" placeholder="搜索应用名称或包名...">
+                                    </div>
+                                    <div id="custom-app-list" class="app-picker-list mb-3">
+                                        <!-- JS 渲染应用列表 -->
+                                    </div>
+                                    <button id="start-monitor-btn" class="btn btn-primary w-100" disabled>开始监控并启动应用</button>
+                                </div>
+                                
+                                <!-- 状态2：监控阶段 -->
+                                <div id="monitor-active-container" class="p-3 transition-collapse hidden-collapse border-bottom">
+                                    <button id="stop-monitor-btn" class="btn btn-danger w-100">停止监控并关闭应用</button>
+                                </div>
+                                
+                                <!-- 日志输出列表 -->
+                                <div id="monitor-log-output" class="log-output-container"></div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="input-glass-wrapper">
-                        <select id="monitor-pkg-select" class="form-control-transparent">
-                            <option value="" disabled selected>请先搜索或选择...</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="d-flex align-items-center mb-3">
-                    <div class="form-check form-switch flex-grow-1">
-                        <input class="form-check-input" type="checkbox" id="filter-hits-only">
-                        <label class="form-check-label ms-2" for="filter-hits-only">仅显示命中规则的路径</label>
-                    </div>
-                </div>
-
-                <div class="d-flex gap-2 mb-3">
-                    <button id="start-monitor-btn" class="btn btn-primary flex-fill">开始监控</button>
-                    <button id="stop-monitor-btn" class="btn btn-danger flex-fill" disabled>停止监控并关闭应用</button>
-                </div>
-                <div id="monitor-log-output">终端就绪，等待指令...</div>
-            </div>
-        </div>
-    </div>
-</main>
+                </main>
             </div>
         </div>
 
@@ -182,6 +178,7 @@
         </nav>
     </div>
 
+    <!-- Modals 保持不变 -->
     <div class="modal" id="partitions-modal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">

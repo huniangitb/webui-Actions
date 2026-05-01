@@ -416,11 +416,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             try {
                 const userPkgs = await listPackages("user");
-                const infos = await getPackagesInfo(userPkgs);
-                // 去重
-                const uMap = new Map();
-                infos.forEach(i => uMap.set(i.packageName, i));
-                Array.from(uMap.values()).forEach(info => appInfoMap.set(info.packageName, info));
+                const rawInfos = await getPackagesInfo(userPkgs);
+                const uniqueMap = new Map();
+                rawInfos.forEach(info => uniqueMap.set(info.packageName, info));
+                Array.from(uniqueMap.values()).forEach(info => appInfoMap.set(info.packageName, info));
             } catch (e) {
                 console.error("初始化应用列表失败:", e);
             }
@@ -449,7 +448,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         function generateCronEditorUI() {
             for (const key in cronFields) {
                 const { el, min, max, name, labels } = cronFields[key];
-                let gridHtml = '<div class="cron-grid collapsed">';
+                let gridHtml = '';
                 for (let i = min; i <= max; i++) { 
                     gridHtml += `
                     <div class="cron-item">
@@ -457,6 +456,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <label class="cron-circle" for="${key}-${i}">${labels ? labels[i - min] : i}</label>
                     </div>`; 
                 }
+                // 使用 Grid 高效无闪烁动画方案
                 el.innerHTML = `
                 <div class="d-flex gap-2 mb-3 w-100 justify-content-center">
                     <input type="radio" class="btn-check mode-selector" name="${key}-mode" id="${key}-every" value="*" checked>
@@ -464,15 +464,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <input type="radio" class="btn-check mode-selector" name="${key}-mode" id="${key}-specific" value="specific">
                     <label class="cron-pill" for="${key}-specific">指定</label>
                 </div>
-                ${gridHtml}</div>`;
+                <div class="cron-grid-wrapper collapsed">
+                    <div class="cron-grid">${gridHtml}</div>
+                </div>`;
             }
             document.querySelectorAll('.mode-selector').forEach(radio => {
                 radio.addEventListener('change', (e) => {
-                    const grid = e.target.closest('.tab-pane').querySelector('.cron-grid');
+                    const wrapper = e.target.closest('.tab-pane').querySelector('.cron-grid-wrapper');
                     if (e.target.value === '*') {
-                        grid.classList.add('collapsed');
+                        wrapper.classList.add('collapsed');
                     } else {
-                        grid.classList.remove('collapsed');
+                        wrapper.classList.remove('collapsed');
                     }
                 });
             });
@@ -482,14 +484,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const parts = expression.split(' ');
             if (parts.length !== 5) return;
             ['minutes', 'hours', 'dom', 'months', 'dow'].forEach((key, i) => {
-                const part = parts[i], field = cronFields[key], grid = field.el.querySelector('.cron-grid');
+                const part = parts[i], field = cronFields[key], wrapper = field.el.querySelector('.cron-grid-wrapper');
                 field.el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
                 if (part === '*') {
                     field.el.querySelector(`#${key}-every`).checked = true;
-                    grid.classList.add('collapsed');
+                    wrapper.classList.add('collapsed');
                 } else {
                     field.el.querySelector(`#${key}-specific`).checked = true;
-                    grid.classList.remove('collapsed');
+                    wrapper.classList.remove('collapsed');
                     part.split(',').forEach(range => {
                         if (range.includes('-')) { const [start, end] = range.split('-').map(Number); for (let j = start; j <= end; j++) { const cb = field.el.querySelector(`#${key}-${j}`); if (cb) cb.checked = true; } }
                         else if (range.includes('/')) { const [_, step] = range.split('/').map(Number); for (let j = field.min; j <= field.max; j += step) { const cb = field.el.querySelector(`#${key}-${j}`); if (cb) cb.checked = true; } }
@@ -518,7 +520,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     })();
 
-    const initMonitorPage = (() => {
+const initMonitorPage = (() => {
         const pkgSearch = document.getElementById('monitor-pkg-search');
         const customAppList = document.getElementById('custom-app-list');
         const startBtn = document.getElementById('start-monitor-btn');
@@ -526,12 +528,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const logOutput = document.getElementById('monitor-log-output');
         const filterHitsToggle = document.getElementById('filter-hits-only');
         const setupContainer = document.getElementById('monitor-setup-container');
-        const activeContainer = document.getElementById('monitor-active-container');
         
         let tailProcess = null;
+        let tailTimer = null;
         let readingLogs = false;
         let allAppInfos = [];
-        let activeRules = [];
+        let activeRules = { black: [], white: [] };
         let selectedPkg = '';
 
         async function populatePackages() {
@@ -568,6 +570,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                 `;
                 item.addEventListener('click', () => {
+                    if (readingLogs) return; // 监控中禁止切换
                     document.querySelectorAll('.app-picker-item').forEach(el => el.classList.remove('selected'));
                     item.classList.add('selected');
                     selectedPkg = info.packageName;
@@ -586,17 +589,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderAppOptions(filtered);
         });
 
+        // 解析并分类规则
         async function getRules() {
-            let rules = [];
+            const rules = { black: [], white: [] };
+            const parse = (stdout) => stdout.split('\n')
+                .map(r => r.trim())
+                .filter(r => r && !r.startsWith('#') && !r.startsWith('//') && !r.includes('*'));
+
             try {
-                const [b1, b2] = await Promise.all([
+                const [b1, b2, w1] = await Promise.all([
                     exec('cat /data/media/0/Android/清理规则/blacklist1.txt'),
-                    exec('cat /data/media/0/Android/清理规则/blacklist2.txt')
+                    exec('cat /data/media/0/Android/清理规则/blacklist2.txt'),
+                    exec('cat /data/media/0/Android/清理规则/whitelist.txt')
                 ]);
-                if(b1.errno === 0) rules.push(...b1.stdout.split('\n'));
-                if(b2.errno === 0) rules.push(...b2.stdout.split('\n'));
-                rules = rules.map(r => r.trim()).filter(r => r && !r.startsWith('#') && !r.startsWith('//') && !r.includes('*')); 
+                
+                if(b1.errno === 0) rules.black.push(...parse(b1.stdout));
+                if(b2.errno === 0) rules.black.push(...parse(b2.stdout));
+                if(w1.errno === 0) rules.white.push(...parse(w1.stdout));
             } catch (e) { console.error("获取规则失败", e); }
+            
             return rules;
         }
 
@@ -604,19 +615,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!line.trim()) return;
             
             const match = line.match(/^\[(.*?)\]\s+(.*)$/);
-            let api = "SYS", path = line, isHit = false;
+            let api = "SYS", path = line;
 
             if (match) {
                 api = match[1].trim();
                 path = match[2].trim();
             }
 
-            isHit = activeRules.some(r => path.includes(r));
+            // 白名单优先级高于黑名单
+            const isWhiteHit = activeRules.white.some(r => path.includes(r));
+            const isBlackHit = !isWhiteHit && activeRules.black.some(r => path.includes(r));
             
-            if (filterHitsToggle.checked && !isHit) return;
+            // 仅命中模式下，过滤掉既不是黑名单也不是白名单的日志
+            if (filterHitsToggle.checked && !isWhiteHit && !isBlackHit) return;
+
+            let glowClass = '';
+            if (isWhiteHit) glowClass = 'whitelist-glow';
+            else if (isBlackHit) glowClass = 'hit-glow';
 
             const card = document.createElement('div');
-            card.className = `log-card ${isHit ? 'hit-glow' : ''}`;
+            card.className = `log-card ${glowClass}`;
             card.innerHTML = `
                 <div class="log-api api-${api.toLowerCase()}">${api}</div>
                 <div class="log-path">${path}</div>
@@ -639,7 +657,29 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (e) { /* 无日志忽略 */ }
         }
 
-        // 仅命中开关改变时立即刷新列表
+        // 定时轮询的 tail -F，每秒重启防止卡死丢输出
+        async function startTailLoop() {
+            if (!readingLogs) return;
+            tailProcess = spawn('tail', ['-n', '0', '-F', '/dev/fuse-app/io.log']);
+            let buffer = '';
+            tailProcess.stdout.on('data', (data) => {
+                if (!readingLogs) return;
+                buffer += data;
+                let lines = buffer.split('\n');
+                buffer = lines.pop();
+                lines.forEach(appendLogCard);
+            });
+
+            tailTimer = setTimeout(async () => {
+                if (tailProcess) {
+                    await exec('pkill -f "tail -n 0 -F /dev/fuse-app/io.log"');
+                    tailProcess = null;
+                }
+                if (readingLogs) startTailLoop();
+            }, 1000);
+        }
+
+        // 仅命中开关切换：立即清空并重新完整 cat
         filterHitsToggle.addEventListener('change', async () => {
             if (readingLogs) {
                 logOutput.innerHTML = '';
@@ -650,12 +690,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         startBtn.addEventListener('click', async () => {
             if (!selectedPkg) return toast('未选择应用');
             
-            setupContainer.classList.add('hidden-collapse');
-            activeContainer.classList.remove('hidden-collapse');
+            // UI 过渡：锁定顶部，隐藏开始，显示停止
+            setupContainer.classList.add('locked');
+            startBtn.style.display = 'none';
+            stopBtn.style.display = 'block';
             logOutput.innerHTML = '';
             
             activeRules = await getRules();
-            
             readingLogs = true;
 
             try {
@@ -664,18 +705,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await delay(1000);
                 await exec(`monkey -p ${selectedPkg} 1`);
                 
-                // 加载完整日志历史，随后用 tail -n 0 -F 捕获接下来的实时增量日志
+                // 加载已存在的日志，然后启动实时轮询尾部监控
                 await loadHistoricalLogs();
-                
-                tailProcess = spawn('tail', ['-n', '0', '-F', '/dev/fuse-app/io.log']);
-                let buffer = '';
-                tailProcess.stdout.on('data', (data) => {
-                    if (!readingLogs) return;
-                    buffer += data;
-                    let lines = buffer.split('\n');
-                    buffer = lines.pop();
-                    lines.forEach(appendLogCard);
-                });
+                startTailLoop();
             } catch (e) {
                 toast('启动失败: ' + e.message);
                 stopMonitor();
@@ -684,8 +716,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         async function stopMonitor() {
             readingLogs = false;
+            clearTimeout(tailTimer);
+            
             if (tailProcess) {
-                await exec(`pkill -f "tail -n 0 -F /dev/fuse-app/io.log"`);
+                await exec('pkill -f "tail -n 0 -F /dev/fuse-app/io.log"');
                 tailProcess = null;
             }
             if (selectedPkg) await exec(`am force-stop ${selectedPkg}`);
@@ -693,10 +727,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             appendLogCard(`[SYSTEM] 监控已停止，应用 ${selectedPkg} 已关闭。`);
             
-            setupContainer.classList.remove('hidden-collapse');
-            activeContainer.classList.add('hidden-collapse');
-            selectedPkg = '';
+            // 恢复 UI 状态
+            setupContainer.classList.remove('locked');
+            startBtn.style.display = 'block';
+            stopBtn.style.display = 'none';
             startBtn.disabled = true;
+            selectedPkg = '';
             document.querySelectorAll('.app-picker-item').forEach(el => el.classList.remove('selected'));
         }
 

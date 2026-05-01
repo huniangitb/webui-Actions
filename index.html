@@ -129,34 +129,31 @@
                             <h1>监控中心</h1>
                         </div>
                         <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="card-header">
                                 <h5>Fuse IO 实时监控</h5>
                             </div>
-                            <div class="card-body p-0">
-                                <!-- 状态1：准备阶段 -->
-                                <div id="monitor-setup-container" class="p-3 transition-collapse">
+                            <div class="card-body p-3">
+                                <div id="monitor-setup-container" class="transition-blur">
                                     <div class="input-glass-wrapper mb-3">
                                         <input type="text" id="monitor-pkg-search" class="form-control-transparent" placeholder="搜索应用名称或包名...">
                                     </div>
-                                    <div id="custom-app-list" class="app-picker-list mb-3">
-                                        <!-- JS 渲染应用列表 -->
-                                    </div>
-                                    <button id="start-monitor-btn" class="btn btn-primary w-100" disabled>开始监控并启动应用</button>
+                                    <div id="custom-app-list" class="app-picker-list"></div>
                                 </div>
                                 
-                                <!-- 状态2：监控阶段 -->
-                                <div id="monitor-active-container" class="p-3 transition-collapse hidden-collapse border-bottom">
+                                <div class="mt-3 pt-3 border-top border-secondary">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="text-muted" style="font-size: 0.9rem;">正在运行日志捕捉...</span>
+                                        <span class="text-muted" style="font-size: 0.9rem;">日志过滤</span>
                                         <div class="form-check form-switch m-0 d-flex align-items-center">
                                             <input class="form-check-input" type="checkbox" id="filter-hits-only">
                                             <label class="form-check-label ms-2" for="filter-hits-only" style="font-size: 0.85rem;">仅命中</label>
                                         </div>
                                     </div>
-                                    <button id="stop-monitor-btn" class="btn btn-danger w-100">停止监控并关闭应用</button>
+                                    <div class="d-flex gap-2 mb-3">
+                                        <button id="start-monitor-btn" class="btn btn-primary flex-fill" disabled>开始监控并启动</button>
+                                        <button id="stop-monitor-btn" class="btn btn-danger flex-fill" style="display: none;">停止并关闭应用</button>
+                                    </div>
                                 </div>
                                 
-                                <!-- 日志输出列表 -->
                                 <div id="monitor-log-output" class="log-output-container"></div>
                             </div>
                         </div>
@@ -181,7 +178,7 @@
         </nav>
     </div>
 
-    <!-- Modals 保持不变 -->
+    <!-- Modals -->
     <div class="modal" id="partitions-modal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">

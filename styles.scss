@@ -80,11 +80,11 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 /* 通过 Grid 控制 1fr / 0fr 彻底解决 max-height 闪烁和截断，完美动画 */
 .cron-grid-wrapper { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
 .cron-grid-wrapper.collapsed { grid-template-rows: 0fr; }
-.cron-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; overflow: hidden; margin-top: 16px; opacity: 1; transition: opacity 0.3s ease, margin 0.3s ease; }
-.cron-grid-wrapper.collapsed .cron-grid { opacity: 0; margin-top: 0; }
+.cron-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; overflow: hidden; margin-top: 16px; opacity: 1; transition: opacity 0.3s ease, margin 0.3s ease; padding-bottom: 10px; }
+.cron-grid-wrapper.collapsed .cron-grid { opacity: 0; margin-top: 0; padding-bottom: 0; }
 
 .cron-item { position: relative; }
-.cron-circle { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,0.05); color: var(--text-main); font-size: 0.9rem; cursor: pointer; border: 1px solid var(--glass-border); transition: all 0.2s; }
+.cron-circle { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,0.05); color: var(--text-main); font-size: 0.9rem; cursor: pointer; border: 1px solid var(--glass-border); transition: all 0.2s; margin-bottom: 4px; }
 .btn-check:checked + .cron-circle { background: var(--primary-color); color: #fff; border-color: var(--primary-color); box-shadow: 0 4px 10px rgba(59, 113, 202, 0.3); font-weight: bold; transform: scale(1.05); }
 
 .nav-pills { display: flex; list-style: none; padding: 4px; margin: 0 0 1rem 0; background: rgba(0,0,0,0.05); border-radius: 12px; }
@@ -132,6 +132,7 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 /* --- 监控页面专项样式 --- */
 .transition-blur { transition: opacity 0.4s ease, pointer-events 0.4s ease; }
 .transition-blur.locked { opacity: 0.4; pointer-events: none; }
+.monitor-hit-switch { background: rgba(0,0,0,0.05); padding: 5px 10px 5px 0px; border-radius: 10px; border: 1px solid var(--glass-border); }
 
 /* 自定义应用选择器 */
 .app-picker-list { max-height: 180px; overflow-y: auto; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(255,255,255,0.05); }
@@ -145,16 +146,21 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .app-picker-item .app-pkg { font-size: 0.75rem; color: var(--text-muted); }
 
 /* 结构化日志输出区 */
-.log-output-container { height: 350px; overflow-y: auto; background: rgba(0, 0, 0, 0.03); border-radius: 0 0 20px 20px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.log-output-container { height: 320px; overflow-y: auto; background: rgba(0, 0, 0, 0.03); border-radius: 0 0 20px 20px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
 .log-card { display: flex; align-items: flex-start; background: var(--glass-bg); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--glass-border); word-break: break-all; transition: background 0.3s, box-shadow 0.3s; }
+.d-none-log { display: none !important; }
+
 .log-api { font-size: 0.75rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-right: 8px; flex-shrink: 0; margin-top: 1px; text-transform: uppercase; }
 .log-path { font-size: 0.85rem; color: var(--text-main); font-family: monospace; line-height: 1.4; }
 
-/* 高亮命中动画 */
+/* 高亮命中动画 - 黑名单 */
 .log-card.hit-glow { background: rgba(220, 76, 100, 0.1); border-color: rgba(220, 76, 100, 0.5); box-shadow: 0 0 10px rgba(220, 76, 100, 0.2); }
 .log-card.hit-glow .log-path { color: var(--danger-color); font-weight: 500; }
+
+/* 高亮命中动画 - 白名单 */
 .log-card.whitelist-glow { background: rgba(46, 204, 113, 0.1); border-color: rgba(46, 204, 113, 0.5); box-shadow: 0 0 10px rgba(46, 204, 113, 0.2); }
 .log-card.whitelist-glow .log-path { color: #27ae60; font-weight: 500; }
+
 /* API 颜色映射 */
 .api-open { background: rgba(46, 204, 113, 0.2); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.4); }
 .api-readdir { background: rgba(52, 152, 219, 0.2); color: #3498db; border: 1px solid rgba(52, 152, 219, 0.4); }
@@ -180,11 +186,13 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
   .btn-close { color: #fff; }
   
   .cron-pill, .cron-circle { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
+  .monitor-hit-switch { background: rgba(255,255,255,0.1); }
   .app-picker-item:hover { background: rgba(255,255,255,0.05); }
   .app-picker-item { border-bottom: 1px solid rgba(255,255,255,0.1); }
   .log-output-container { background: rgba(0,0,0,0.4); }
   .log-card { background: rgba(255,255,255,0.05); }
   .log-card.whitelist-glow .log-path { color: #2ecc71; }
+  
   #loader { background: #000; }
   .list-group-item { background: rgba(255, 255, 255, 0.05); }
 }

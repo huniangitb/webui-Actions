@@ -456,7 +456,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <label class="cron-circle" for="${key}-${i}">${labels ? labels[i - min] : i}</label>
                     </div>`; 
                 }
-                // 使用 Grid 高效无闪烁动画方案
                 el.innerHTML = `
                 <div class="d-flex gap-2 mb-3 w-100 justify-content-center">
                     <input type="radio" class="btn-check mode-selector" name="${key}-mode" id="${key}-every" value="*" checked>
@@ -520,7 +519,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     })();
 
-const initMonitorPage = (() => {
+    const initMonitorPage = (() => {
         const pkgSearch = document.getElementById('monitor-pkg-search');
         const customAppList = document.getElementById('custom-app-list');
         const startBtn = document.getElementById('start-monitor-btn');
@@ -528,20 +527,24 @@ const initMonitorPage = (() => {
         const logOutput = document.getElementById('monitor-log-output');
         const filterHitsToggle = document.getElementById('filter-hits-only');
         const setupContainer = document.getElementById('monitor-setup-container');
+        const logSearchInput = document.getElementById('monitor-log-search');
         
         let tailProcess = null;
-        let tailTimer = null;
         let readingLogs = false;
         let allAppInfos = [];
         let activeRules = { black: [], white: [] };
         let selectedPkg = '';
+        
+        // 分段渲染变量
+        let logLineBuffer = [];
+        let isRendering = false;
+        let pathSearchKeyword = '';
 
         async function populatePackages() {
             try {
                 const pkgs = await listPackages("user");
                 const rawInfos = await getPackagesInfo(pkgs);
                 
-                // 去重
                 const uniqueMap = new Map();
                 rawInfos.forEach(info => uniqueMap.set(info.packageName, info));
                 allAppInfos = Array.from(uniqueMap.values());
@@ -570,7 +573,7 @@ const initMonitorPage = (() => {
                     </div>
                 `;
                 item.addEventListener('click', () => {
-                    if (readingLogs) return; // 监控中禁止切换
+                    if (readingLogs) return; 
                     document.querySelectorAll('.app-picker-item').forEach(el => el.classList.remove('selected'));
                     item.classList.add('selected');
                     selectedPkg = info.packageName;
@@ -589,7 +592,6 @@ const initMonitorPage = (() => {
             renderAppOptions(filtered);
         });
 
-        // 解析并分类规则
         async function getRules() {
             const rules = { black: [], white: [] };
             const parse = (stdout) => stdout.split('\n')
@@ -611,103 +613,139 @@ const initMonitorPage = (() => {
             return rules;
         }
 
-        function appendLogCard(line) {
-            if (!line.trim()) return;
-            
-            const match = line.match(/^\[(.*?)\]\s+(.*)$/);
-            let api = "SYS", path = line;
-
-            if (match) {
-                api = match[1].trim();
-                path = match[2].trim();
+        // 高效渲染：按批次将缓存数据刷入 DOM
+        function flushLogBuffer() {
+            if (logLineBuffer.length === 0) {
+                isRendering = false;
+                return;
             }
-
-            // 白名单优先级高于黑名单
-            const isWhiteHit = activeRules.white.some(r => path.includes(r));
-            const isBlackHit = !isWhiteHit && activeRules.black.some(r => path.includes(r));
             
-            // 仅命中模式下，过滤掉既不是黑名单也不是白名单的日志
-            if (filterHitsToggle.checked && !isWhiteHit && !isBlackHit) return;
-
-            let glowClass = '';
-            if (isWhiteHit) glowClass = 'whitelist-glow';
-            else if (isBlackHit) glowClass = 'hit-glow';
-
-            const card = document.createElement('div');
-            card.className = `log-card ${glowClass}`;
-            card.innerHTML = `
-                <div class="log-api api-${api.toLowerCase()}">${api}</div>
-                <div class="log-path">${path}</div>
-            `;
+            const linesToProcess = logLineBuffer.splice(0, 150); 
+            const fragment = document.createDocumentFragment();
             
-            logOutput.appendChild(card);
+            linesToProcess.forEach(line => {
+                if (!line.trim()) return;
+                
+                const match = line.match(/^\[(.*?)\]\s+(.*)$/);
+                let api = "SYS", path = line;
+
+                if (match) {
+                    api = match[1].trim();
+                    path = match[2].trim();
+                }
+
+                const isWhiteHit = activeRules.white.some(r => path.includes(r));
+                const isBlackHit = !isWhiteHit && activeRules.black.some(r => path.includes(r));
+                
+                let show = true;
+                if (filterHitsToggle.checked && !isWhiteHit && !isBlackHit) show = false;
+                if (pathSearchKeyword && !path.toLowerCase().includes(pathSearchKeyword)) show = false;
+
+                const card = document.createElement('div');
+                let glowClass = '';
+                if (isWhiteHit) glowClass = 'whitelist-glow';
+                else if (isBlackHit) glowClass = 'hit-glow';
+                
+                card.className = `log-card ${glowClass} ${show ? '' : 'd-none-log'}`;
+                card.innerHTML = `
+                    <div class="log-api api-${api.toLowerCase()}">${api}</div>
+                    <div class="log-path">${path}</div>
+                `;
+                fragment.appendChild(card);
+            });
             
-            if (logOutput.children.length > 300) {
-                logOutput.removeChild(logOutput.firstChild);
+            if (fragment.children.length > 0) {
+                logOutput.appendChild(fragment);
+                while (logOutput.children.length > 400) {
+                    logOutput.removeChild(logOutput.firstChild);
+                }
+                logOutput.scrollTop = logOutput.scrollHeight;
             }
-            logOutput.scrollTop = logOutput.scrollHeight;
+            
+            if (logLineBuffer.length > 0) {
+                requestAnimationFrame(flushLogBuffer);
+            } else {
+                isRendering = false;
+            }
         }
+
+        // 应用过滤规则到已经存在 DOM 元素，实现无缝切换
+        function applyLogFiltersToDOM() {
+            Array.from(logOutput.children).forEach(card => {
+                const pathText = card.querySelector('.log-path').textContent.toLowerCase();
+                const isWhiteHit = card.classList.contains('whitelist-glow');
+                const isBlackHit = card.classList.contains('hit-glow');
+                
+                let show = true;
+                if (filterHitsToggle.checked && !isWhiteHit && !isBlackHit) show = false;
+                if (pathSearchKeyword && !pathText.includes(pathSearchKeyword)) show = false;
+                
+                if (show) card.classList.remove('d-none-log');
+                else card.classList.add('d-none-log');
+            });
+        }
+
+        logSearchInput.addEventListener('input', (e) => {
+            pathSearchKeyword = e.target.value.toLowerCase();
+            applyLogFiltersToDOM();
+        });
+
+        filterHitsToggle.addEventListener('change', applyLogFiltersToDOM);
 
         async function loadHistoricalLogs() {
             try {
-                const { errno, stdout } = await exec('cat /dev/fuse-app/io.log');
+                // 读取近期历史记录避免文件过大卡死
+                const { errno, stdout } = await exec('tail -n 300 /dev/fuse-app/io.log');
                 if (errno === 0 && stdout) {
-                    stdout.split('\n').forEach(appendLogCard);
+                    const lines = stdout.split('\n');
+                    logLineBuffer.push(...lines);
+                    if (!isRendering) {
+                        isRendering = true;
+                        requestAnimationFrame(flushLogBuffer);
+                    }
                 }
-            } catch (e) { /* 无日志忽略 */ }
+            } catch (e) { /* 忽略 */ }
         }
-
-        // 定时轮询的 tail -F，每秒重启防止卡死丢输出
-        async function startTailLoop() {
-            if (!readingLogs) return;
-            tailProcess = spawn('tail', ['-n', '0', '-F', '/dev/fuse-app/io.log']);
-            let buffer = '';
-            tailProcess.stdout.on('data', (data) => {
-                if (!readingLogs) return;
-                buffer += data;
-                let lines = buffer.split('\n');
-                buffer = lines.pop();
-                lines.forEach(appendLogCard);
-            });
-
-            tailTimer = setTimeout(async () => {
-                if (tailProcess) {
-                    await exec('pkill -f "tail -n 0 -F /dev/fuse-app/io.log"');
-                    tailProcess = null;
-                }
-                if (readingLogs) startTailLoop();
-            }, 1000);
-        }
-
-        // 仅命中开关切换：立即清空并重新完整 cat
-        filterHitsToggle.addEventListener('change', async () => {
-            if (readingLogs) {
-                logOutput.innerHTML = '';
-                await loadHistoricalLogs();
-            }
-        });
 
         startBtn.addEventListener('click', async () => {
             if (!selectedPkg) return toast('未选择应用');
             
-            // UI 过渡：锁定顶部，隐藏开始，显示停止
             setupContainer.classList.add('locked');
-            startBtn.style.display = 'none';
-            stopBtn.style.display = 'block';
             logOutput.innerHTML = '';
+            logLineBuffer = [];
             
             activeRules = await getRules();
+            const totalRules = activeRules.black.length + activeRules.white.length;
+            toast(`已加载 ${totalRules} 条规则`);
+            
             readingLogs = true;
 
             try {
                 await exec(`mkdir -p /cache/fuse/ && cp /data/adb/modules/Clean-C/injector /cache/fuse/ && cp /data/adb/modules/Clean-C/fuse_daemon /cache/fuse/ && chmod 777 /cache/fuse/*`);
-                await exec(`/cache/fuse/injector "${selectedPkg}"`);
+                // 启用独立挂载空间防止 fuse 影响主环境
+                await exec(`unshare --mount --propagation private /cache/fuse/injector "${selectedPkg}"`);
                 await delay(1000);
                 await exec(`monkey -p ${selectedPkg} 1`);
                 
-                // 加载已存在的日志，然后启动实时轮询尾部监控
                 await loadHistoricalLogs();
-                startTailLoop();
+                
+                // 长期驻留进程流式读取
+                tailProcess = spawn('tail', ['-n', '0', '-F', '/dev/fuse-app/io.log']);
+                let streamBuffer = '';
+                tailProcess.stdout.on('data', (data) => {
+                    if (!readingLogs) return;
+                    streamBuffer += data;
+                    let lines = streamBuffer.split('\n');
+                    streamBuffer = lines.pop(); // 保留不完整的一行
+                    
+                    if (lines.length > 0) {
+                        logLineBuffer.push(...lines);
+                        if (!isRendering) {
+                            isRendering = true;
+                            requestAnimationFrame(flushLogBuffer);
+                        }
+                    }
+                });
             } catch (e) {
                 toast('启动失败: ' + e.message);
                 stopMonitor();
@@ -716,8 +754,6 @@ const initMonitorPage = (() => {
 
         async function stopMonitor() {
             readingLogs = false;
-            clearTimeout(tailTimer);
-            
             if (tailProcess) {
                 await exec('pkill -f "tail -n 0 -F /dev/fuse-app/io.log"');
                 tailProcess = null;
@@ -725,12 +761,13 @@ const initMonitorPage = (() => {
             if (selectedPkg) await exec(`am force-stop ${selectedPkg}`);
             await exec(`rm -r /cache/fuse/`);
             
-            appendLogCard(`[SYSTEM] 监控已停止，应用 ${selectedPkg} 已关闭。`);
+            logLineBuffer.push(`[SYS] 监控已停止，应用 ${selectedPkg} 已关闭。`);
+            if (!isRendering) {
+                isRendering = true;
+                requestAnimationFrame(flushLogBuffer);
+            }
             
-            // 恢复 UI 状态
             setupContainer.classList.remove('locked');
-            startBtn.style.display = 'block';
-            stopBtn.style.display = 'none';
             startBtn.disabled = true;
             selectedPkg = '';
             document.querySelectorAll('.app-picker-item').forEach(el => el.classList.remove('selected'));

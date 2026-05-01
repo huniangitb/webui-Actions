@@ -525,30 +525,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         const stopBtn = document.getElementById('stop-monitor-btn');
         const logOutput = document.getElementById('monitor-log-output');
         const filterHitsToggle = document.getElementById('filter-hits-only');
+        const filterDedupToggle = document.getElementById('filter-dedup');
         const setupContainer = document.getElementById('monitor-setup-container');
         const logSearchInput = document.getElementById('monitor-log-search');
         const searchToggleBtn = document.getElementById('search-toggle-btn');
         const searchCollapse = document.getElementById('search-collapse');
+        const hitsSwitchWrapper = document.getElementById('hits-switch-wrapper');
         
         let readingLogs = false;
         let allAppInfos = [];
         let activeRules = { black: [], white: [] };
         let selectedPkg = '';
         
-        // 分页状态
         const PAGE_SIZE = 50;
-        let currentPage = 0;           // 0=最新，1=更早一页...
+        let currentPage = 0;
         let totalLinesCache = 0;
-        let renderedLines = [];        // 当前渲染的所有行（可能过滤后）
-        let useFilteredLines = false;  // 是否处于仅命中模式
-        
-        // 搜索关键词
+        let renderedLines = [];
+        let useFilteredLines = false;
         let pathSearchKeyword = '';
-        let searchInputVisible = false;
-
-        // 监控定时器
+        let dedupSet = new Set();
+        
         let monitorInterval = null;
         const IO_LOG_PATH = '/dev/fuse-app/io.log';
+
+        function setButtonsState(running) {
+            startBtn.style.display = running ? 'none' : '';
+            stopBtn.style.display = running ? '' : 'none';
+        }
 
         async function populatePackages() {
             try {
@@ -618,7 +621,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return rules;
         }
 
-        // 从文件读取指定行范围的行（1-based）
         async function readLinesFromFile(startLine, endLine) {
             if (startLine <= 0) startLine = 1;
             const cmd = `tail -n +${startLine} ${IO_LOG_PATH} | head -n ${endLine - startLine + 1}`;
@@ -626,13 +628,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const { errno, stdout } = await exec(cmd);
                 if (errno === 0) return stdout.split('\n').filter(line => line.trim() !== '');
                 return [];
-            } catch (e) {
-                console.error('读取日志文件失败:', e);
-                return [];
-            }
+            } catch (e) { return []; }
         }
 
-        // 获取文件总行数
         async function getTotalLines() {
             try {
                 const { stdout } = await exec(`wc -l < ${IO_LOG_PATH}`);
@@ -640,32 +638,45 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (e) { return 0; }
         }
 
-        // 构建grep正则表达式
         function buildGrepPattern(rules) {
             const patterns = [...rules.black, ...rules.white];
             if (patterns.length === 0) return '';
-            // 转义特殊字符
             const escaped = patterns.map(p => p.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
             return escaped.join('|');
         }
 
-        // 执行grep获取匹配行
         async function grepLines(pattern) {
             if (!pattern) return [];
             try {
                 const { errno, stdout } = await exec(`grep -E '${pattern}' ${IO_LOG_PATH}`);
                 if (errno === 0) return stdout.split('\n').filter(line => line.trim() !== '');
-                // grep没有匹配时返回非0，忽略
                 return [];
             } catch (e) { return []; }
         }
 
-        // 渲染当前页的日志卡片
+        function deduplicateLines(lines) {
+            if (!filterDedupToggle.checked) return lines;
+            const filtered = [];
+            for (const line of lines) {
+                if (!dedupSet.has(line)) {
+                    dedupSet.add(line);
+                    filtered.push(line);
+                }
+            }
+            return filtered;
+        }
+
         function renderLogCards(lines) {
             logOutput.innerHTML = '';
+            if (lines.length === 0) {
+                logOutput.classList.remove('show');
+                return;
+            }
+            logOutput.classList.add('show');
             const fragment = document.createDocumentFragment();
+            const processedLines = deduplicateLines(lines);
             
-            lines.forEach(line => {
+            processedLines.forEach(line => {
                 if (!line.trim()) return;
                 
                 const match = line.match(/^\[(.*?)\]\s+(.*)$/);
@@ -697,24 +708,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             logOutput.appendChild(fragment);
         }
 
-        // 刷新当前视图（根据当前状态加载数据）
         async function refreshCurrentView() {
             if (!readingLogs) return;
             if (useFilteredLines) {
-                // 仅命中模式：使用已缓存的过滤行？或重新grep？重新grep保证实时
                 const pattern = buildGrepPattern(activeRules);
                 const allGrepLines = await grepLines(pattern);
                 renderedLines = allGrepLines;
-                // 每次显示最新一页（PAGE_SIZE条）
                 const startIdx = Math.max(0, allGrepLines.length - PAGE_SIZE);
-                const pageLines = allGrepLines.slice(startIdx);
-                renderLogCards(pageLines);
-                currentPage = 0; // 仅命中始终显示最新
+                renderLogCards(allGrepLines.slice(startIdx));
+                currentPage = 0;
             } else {
-                // 普通模式：按偏移显示最新一页
                 totalLinesCache = await getTotalLines();
                 if (totalLinesCache === 0) {
-                    logOutput.innerHTML = '<div class="text-muted text-center p-3">暂无日志</div>';
+                    logOutput.classList.remove('show');
+                    logOutput.innerHTML = '';
                     return;
                 }
                 const startLine = Math.max(1, totalLinesCache - PAGE_SIZE + 1);
@@ -724,28 +731,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 renderLogCards(lines);
                 currentPage = 0;
             }
-            // 应用搜索过滤到DOM
             applySearchToDOM();
         }
 
-        // 加载更早的一页（page+1）
         async function loadPreviousPage() {
             if (!readingLogs || useFilteredLines) return;
             const page = currentPage + 1;
             const startLine = Math.max(1, totalLinesCache - (page + 1) * PAGE_SIZE + 1);
             const endLine = totalLinesCache - page * PAGE_SIZE;
-            if (startLine > endLine) return; // 没有更早的
+            if (startLine > endLine) return;
             const lines = await readLinesFromFile(startLine, endLine);
             if (lines.length === 0) return;
-            // 替换当前显示？根据需求“滑动到末尾时，读取下50条日志，自动抛弃上50条日志”，这里抛弃当前显示，显示更早的
+            dedupSet.clear(); // 新页数据可能需要重新去重，简单清空
             renderedLines = lines;
             renderLogCards(lines);
             currentPage = page;
             applySearchToDOM();
-            logOutput.scrollTop = logOutput.scrollHeight; // 滚动到底部以查看更早日志（因为更早的日志插入了前面，但这里我们完全替换了，所以scrollTop=height显示最后一条）
+            logOutput.scrollTop = logOutput.scrollHeight;
         }
 
-        // 加载更晚的一页（page-1）
         async function loadNextPage() {
             if (!readingLogs || useFilteredLines) return;
             if (currentPage <= 0) return;
@@ -754,30 +758,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             const endLine = totalLinesCache - page * PAGE_SIZE;
             const lines = await readLinesFromFile(startLine, endLine);
             if (lines.length === 0) return;
+            dedupSet.clear();
             renderedLines = lines;
             renderLogCards(lines);
             currentPage = page;
             applySearchToDOM();
-            logOutput.scrollTop = 0; // 滚动到顶部
+            logOutput.scrollTop = 0;
         }
 
-        // 滑动监听
         logOutput.addEventListener('scroll', () => {
             const { scrollTop, scrollHeight, clientHeight } = logOutput;
-            // 滑动到底部（即内容最上方？这里假设日志顺序从上到下是旧->新，那么最底部是最新，滑到底部即查看最新）
-            // 但我们的分页是替换内容，所以滑到底部可能表示想看更早的日志？设计：当前显示一页50条，最上面是较旧，最下面是较新。
-            // 滑动到底部（scrollTop + clientHeight >= scrollHeight - 5）触发加载更早的（因为想要看更旧的，需要向上滚动？）这有些反直觉。
-            // 通常：向上滚动看更旧，向下滚动看更新。但我们的列表是新日志在底部，所以向上滚动看更旧。因此，当scrollTop接近0时加载更早（previousPage），当scrollTop接近max时加载更新（nextPage）。
             if (scrollTop <= 10) {
-                // 到了顶部，加载更早页
                 loadPreviousPage();
             } else if (scrollTop + clientHeight >= scrollHeight - 10) {
-                // 到了底部，加载更新页（回到更近页）
                 loadNextPage();
             }
         });
 
-        // 搜索关键词改变时，直接在DOM上应用d-none-log
         function applySearchToDOM() {
             Array.from(logOutput.children).forEach(card => {
                 const pathText = card.querySelector('.log-path')?.textContent.toLowerCase() || '';
@@ -793,26 +790,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             applySearchToDOM();
         });
 
-        // 搜索折叠切换
         searchToggleBtn.addEventListener('click', () => {
-            searchInputVisible = !searchInputVisible;
-            if (searchInputVisible) {
-                searchCollapse.classList.add('show');
-                searchToggleBtn.classList.add('active');
+            const isOpen = searchCollapse.classList.toggle('show');
+            searchToggleBtn.classList.toggle('active', isOpen);
+            if (isOpen) {
+                hitsSwitchWrapper.classList.add('hidden');
             } else {
-                searchCollapse.classList.remove('show');
-                searchToggleBtn.classList.remove('active');
+                hitsSwitchWrapper.classList.remove('hidden');
                 logSearchInput.value = '';
                 pathSearchKeyword = '';
                 applySearchToDOM();
             }
         });
 
-        // 仅命中切换
         filterHitsToggle.addEventListener('change', async () => {
             if (!readingLogs) return;
             useFilteredLines = filterHitsToggle.checked;
-            logOutput.innerHTML = ''; // 清空
+            logOutput.innerHTML = '';
+            dedupSet.clear();
             if (useFilteredLines) {
                 const pattern = buildGrepPattern(activeRules);
                 if (!pattern) {
@@ -821,46 +816,45 @@ document.addEventListener('DOMContentLoaded', async () => {
                     useFilteredLines = false;
                     return;
                 }
-                const allGrepLines = await grepLines(pattern);
-                renderedLines = allGrepLines;
-                const startIdx = Math.max(0, allGrepLines.length - PAGE_SIZE);
-                renderLogCards(allGrepLines.slice(startIdx));
-                currentPage = 0;
+                await refreshCurrentView();
             } else {
-                // 关闭仅命中，恢复普通偏移模式，回到最新页
-                currentPage = 0;
                 await refreshCurrentView();
             }
+        });
+
+        filterDedupToggle.addEventListener('change', () => {
+            if (!readingLogs) return;
+            dedupSet.clear();
+            renderLogCards(renderedLines);
             applySearchToDOM();
         });
 
-        // 定时刷新（普通模式下定时拉取最新日志，若用户在最新页自动更新）
         async function startMonitorInterval() {
             if (monitorInterval) clearInterval(monitorInterval);
             monitorInterval = setInterval(async () => {
                 if (!readingLogs) return;
                 if (useFilteredLines) {
-                    // 仅命中模式下也刷新grep
                     const pattern = buildGrepPattern(activeRules);
                     const allGrepLines = await grepLines(pattern);
                     if (allGrepLines.length !== renderedLines.length || JSON.stringify(allGrepLines.slice(-PAGE_SIZE)) !== JSON.stringify(renderedLines.slice(-PAGE_SIZE))) {
                         renderedLines = allGrepLines;
+                        dedupSet.clear();
                         const startIdx = Math.max(0, allGrepLines.length - PAGE_SIZE);
                         renderLogCards(allGrepLines.slice(startIdx));
                         applySearchToDOM();
                     }
                 } else {
-                    // 普通模式：检查总行数是否增加，若增加且用户在最新页则刷新
                     const newTotal = await getTotalLines();
                     if (newTotal > totalLinesCache && currentPage === 0) {
                         totalLinesCache = newTotal;
                         const startLine = Math.max(1, totalLinesCache - PAGE_SIZE + 1);
                         const lines = await readLinesFromFile(startLine, totalLinesCache);
                         renderedLines = lines;
+                        dedupSet.clear();
                         renderLogCards(lines);
                         applySearchToDOM();
                     } else {
-                        totalLinesCache = newTotal; // 更新缓存
+                        totalLinesCache = newTotal;
                     }
                 }
             }, 2000);
@@ -871,6 +865,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             setupContainer.classList.add('locked');
             logOutput.innerHTML = '';
+            dedupSet.clear();
             renderedLines = [];
             currentPage = 0;
             useFilteredLines = filterHitsToggle.checked;
@@ -880,6 +875,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             toast(`已加载 ${totalRules} 条规则`);
             
             readingLogs = true;
+            setButtonsState(true);
             startMonitorInterval();
 
             try {
@@ -888,7 +884,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await delay(1000);
                 await exec(`monkey -p ${selectedPkg} 1`);
                 
-                // 首次加载日志
                 await refreshCurrentView();
             } catch (e) {
                 toast('启动失败: ' + e.message);
@@ -905,11 +900,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (selectedPkg) await exec(`am force-stop ${selectedPkg}`);
             await exec(`rm -r /cache/fuse/`);
             
+            logOutput.classList.remove('show');
             logOutput.innerHTML += '<div class="text-muted text-center">[SYS] 监控已停止</div>';
             setupContainer.classList.remove('locked');
             startBtn.disabled = true;
             selectedPkg = '';
             document.querySelectorAll('.app-picker-item').forEach(el => el.classList.remove('selected'));
+            setButtonsState(false);
         }
 
         startBtn.addEventListener('click', startMonitoring);
@@ -918,6 +915,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return async function() {
             await populatePackages();
             activeRules = await getRules();
+            setButtonsState(false);
         };
     })();
 

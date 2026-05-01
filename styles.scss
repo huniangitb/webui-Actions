@@ -20,7 +20,7 @@ body::after { background: radial-gradient(circle at 70% 30%, var(--aurora-color-
 .app-wrapper { position: relative; height: 100%; width: 100%; overflow: hidden; display: flex; flex-direction: column; opacity: 0; transition: opacity 0.4s ease-in-out, transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), filter 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
 .app-wrapper.loaded { opacity: 1; }
 .app-wrapper.is-blurred { filter: blur(10px); transform: scale(0.97); pointer-events: none; }
-.main-content-scroll-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding-top: max(40px, env(safe-area-inset-top)); padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+.main-content-scroll-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding-top: calc(env(safe-area-inset-top) - 15px); padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
 
 .pages-container { display: flex; width: 300%; height: auto; min-height: 100%; transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); will-change: transform; }
 main { width: 33.333333%; flex-shrink: 0; padding: 0 15px; }

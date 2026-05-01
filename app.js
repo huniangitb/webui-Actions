@@ -530,7 +530,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const logSearchInput = document.getElementById('monitor-log-search');
         const searchToggleBtn = document.getElementById('search-toggle-btn');
         const searchCollapse = document.getElementById('search-collapse');
-        const hitsSwitchWrapper = document.getElementById('hits-switch-wrapper');
+        const switchesWrapper = document.getElementById('switches-wrapper'); // 开关容器
         
         let readingLogs = false;
         let allAppInfos = [];
@@ -742,7 +742,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (startLine > endLine) return;
             const lines = await readLinesFromFile(startLine, endLine);
             if (lines.length === 0) return;
-            dedupSet.clear(); // 新页数据可能需要重新去重，简单清空
+            dedupSet.clear();
             renderedLines = lines;
             renderLogCards(lines);
             currentPage = page;
@@ -794,9 +794,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const isOpen = searchCollapse.classList.toggle('show');
             searchToggleBtn.classList.toggle('active', isOpen);
             if (isOpen) {
-                hitsSwitchWrapper.classList.add('hidden');
+                switchesWrapper.classList.add('hidden');
             } else {
-                hitsSwitchWrapper.classList.remove('hidden');
+                switchesWrapper.classList.remove('hidden');
                 logSearchInput.value = '';
                 pathSearchKeyword = '';
                 applySearchToDOM();

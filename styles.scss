@@ -128,6 +128,10 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .monitor-hit-switch { background: rgba(0,0,0,0.05); padding: 5px 10px; border-radius: 10px; border: 1px solid var(--glass-border); white-space: nowrap; transition: opacity 0.3s ease, width 0.3s ease, padding 0.3s ease, margin 0.3s ease; }
 .monitor-hit-switch.hidden { opacity: 0; width: 0; padding: 0; margin: 0; overflow: hidden; border: none; }
 
+/* 开关容器隐藏动画 */
+.switches-wrapper { transition: opacity 0.3s ease, width 0.3s ease, padding 0.3s ease, margin 0.3s ease; }
+.switches-wrapper.hidden { opacity: 0; width: 0; padding: 0; margin: 0; overflow: hidden; }
+
 .app-picker-list { max-height: 180px; overflow-y: auto; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(255,255,255,0.05); }
 .app-picker-item { display: flex; align-items: center; padding: 10px 12px; cursor: pointer; transition: background 0.2s; border-bottom: 1px solid rgba(0,0,0,0.05); }
 .app-picker-item:last-child { border-bottom: none; }

@@ -1,7 +1,8 @@
-import { exec, spawn, toast, listPackages, getPackagesInfo } from 'kernelsu';
+import { exec, spawn, toast, listPackages, getPackagesInfo, fullScreen, enableEdgeToEdge } from 'kernelsu';
 import Chart from 'chart.js/auto';
 import { mdiHome, mdiPencilBoxOutline } from '@mdi/js';
-
+fullScreen(true);
+enableEdgeToEdge(true);
 // 添加控制台图标
 const mdiConsole = "M20,19V7H4V19H20M20,3A2,2 0 0,1 22,5V19A2,2 0 0,1 20,21H4A2,2 0 0,1 2,19V5C2,3.89 2.9,3 4,3H20M13,17V15H18V17H13M9.58,13L5.57,9H8.4L12.41,13L8.4,17H5.57L9.58,13Z";
 
@@ -496,28 +497,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     })();
 
     const initMonitorPage = (() => {
+        const pkgSearch = document.getElementById('monitor-pkg-search');
         const pkgSelect = document.getElementById('monitor-pkg-select');
         const startBtn = document.getElementById('start-monitor-btn');
         const stopBtn = document.getElementById('stop-monitor-btn');
         const logOutput = document.getElementById('monitor-log-output');
+        const filterHitsToggle = document.getElementById('filter-hits-only');
+        const clearMonitorBtn = document.getElementById('clear-monitor-log');
+        
         let tailProcess = null;
         let readingLogs = false;
+        let allAppInfos = [];
+        let activeRules = [];
 
         async function populatePackages() {
             try {
                 const pkgs = await listPackages("user");
-                const infos = await getPackagesInfo(pkgs);
-                infos.sort((a, b) => a.appLabel.localeCompare(b.appLabel));
-                infos.forEach(info => {
-                    const opt = document.createElement('option');
-                    opt.value = info.packageName;
-                    opt.textContent = `${info.appLabel} (${info.packageName})`;
-                    pkgSelect.appendChild(opt);
-                });
+                allAppInfos = await getPackagesInfo(pkgs);
+                allAppInfos.sort((a, b) => a.appLabel.localeCompare(b.appLabel));
+                renderAppOptions(allAppInfos);
             } catch (e) {
                 console.error("加载监控应用列表失败:", e);
             }
         }
+
+        function renderAppOptions(infos) {
+            pkgSelect.innerHTML = '<option value="" disabled selected>选择应用...</option>';
+            infos.forEach(info => {
+                const opt = document.createElement('option');
+                opt.value = info.packageName;
+                opt.textContent = `${info.appLabel} (${info.packageName})`;
+                pkgSelect.appendChild(opt);
+            });
+        }
+
+        // 应用搜索过滤
+        pkgSearch.addEventListener('input', (e) => {
+            const val = e.target.value.toLowerCase();
+            const filtered = allAppInfos.filter(info => 
+                info.appLabel.toLowerCase().includes(val) || 
+                info.packageName.toLowerCase().includes(val)
+            );
+            renderAppOptions(filtered);
+        });
 
         async function getRules() {
             let rules = [];
@@ -528,12 +550,36 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ]);
                 if(b1.errno === 0) rules.push(...b1.stdout.split('\n'));
                 if(b2.errno === 0) rules.push(...b2.stdout.split('\n'));
-                
                 rules = rules.map(r => r.trim()).filter(r => r && !r.startsWith('#') && !r.startsWith('//') && !r.includes('*')); 
-            } catch (e) {
-                console.error("获取规则失败", e);
-            }
-            return rules.filter(Boolean);
+            } catch (e) { console.error("获取规则失败", e); }
+            return rules;
+        }
+
+        function appendLogLine(line) {
+            if (!line.trim()) return;
+            const isHit = activeRules.some(r => line.includes(r));
+            
+            // 过滤：如果开启了“仅显示命中”且当前行未命中，则跳过
+            if (filterHitsToggle.checked && !isHit) return;
+
+            const div = document.createElement('div');
+            div.textContent = line;
+            if (isHit) div.className = 'text-highlight';
+            
+            logOutput.appendChild(div);
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        // 加载历史日志
+        async function loadHistoricalLogs() {
+            try {
+                const { errno, stdout } = await exec('cat /dev/fuse-app/io.log');
+                if (errno === 0 && stdout) {
+                    logOutput.innerHTML += '<div class="text-info">--- 历史日志开始 ---</div>';
+                    stdout.split('\n').forEach(appendLogLine);
+                    logOutput.innerHTML += '<div class="text-info">--- 历史日志结束 ---</div>';
+                }
+            } catch (e) { console.log("无历史日志或读取失败"); }
         }
 
         startBtn.addEventListener('click', async () => {
@@ -542,74 +588,58 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             startBtn.disabled = true;
             stopBtn.disabled = false;
-            logOutput.innerHTML = '<div class="text-info">正在准备监控环境...</div>';
+            logOutput.innerHTML = '<div class="text-info">正在准备环境...</div>';
+            
+            activeRules = await getRules();
+            await loadHistoricalLogs();
+            
             readingLogs = true;
 
-            const rules = await getRules();
-
             try {
-                // 环境清理与设置
                 await exec(`mkdir -p /cache/fuse/ && cp /data/adb/modules/Clean-C/injector /cache/fuse/ && cp /data/adb/modules/Clean-C/fuse_daemon /cache/fuse/ && chmod 777 /cache/fuse/*`);
-                
-                logOutput.innerHTML += `<div>[系统] 执行注入器: ${pkg}</div>`;
                 await exec(`/cache/fuse/injector "${pkg}"`);
-                
-                await delay(1000);
-                
-                logOutput.innerHTML += `<div>[系统] 启动目标应用...</div>`;
                 await exec(`monkey -p ${pkg} 1`);
                 
-                // 监听日志
                 tailProcess = spawn('tail', ['-f', '/dev/fuse-app/io.log']);
-                
                 let buffer = '';
                 tailProcess.stdout.on('data', (data) => {
                     if (!readingLogs) return;
                     buffer += data;
                     let lines = buffer.split('\n');
-                    buffer = lines.pop(); // 保留最后一行不完整的
-                    
-                    const frag = document.createDocumentFragment();
-                    lines.forEach(line => {
-                        if (!line.trim()) return;
-                        const div = document.createElement('div');
-                        div.textContent = line;
-                        if (rules.some(r => line.includes(r))) {
-                            div.className = 'text-highlight';
-                        }
-                        frag.appendChild(div);
-                    });
-                    logOutput.appendChild(frag);
-                    logOutput.scrollTop = logOutput.scrollHeight;
+                    buffer = lines.pop();
+                    lines.forEach(appendLogLine);
                 });
-                
             } catch (e) {
-                toast('监控启动失败: ' + e.message);
+                toast('启动失败: ' + e.message);
                 stopMonitor();
             }
         });
 
         async function stopMonitor() {
             readingLogs = false;
+            const pkg = pkgSelect.value;
             if (tailProcess) {
-                // 发送命令杀死 tail 进程
                 await exec(`pkill -f "tail -f /dev/fuse-app/io.log"`);
                 tailProcess = null;
             }
-            await exec(`rm -r /cache/fuse/`);
+            // 杀死目标应用
+            if (pkg) await exec(`am force-stop ${pkg}`);
             
-            logOutput.innerHTML += `<div class="text-info">[系统] 监控已停止并清理环境。</div>`;
-            logOutput.scrollTop = logOutput.scrollHeight;
+            await exec(`rm -r /cache/fuse/`);
+            logOutput.innerHTML += `<div class="text-info">[系统] 监控已停止，应用已关闭。</div>`;
             startBtn.disabled = false;
             stopBtn.disabled = true;
         }
 
         stopBtn.addEventListener('click', stopMonitor);
+        clearMonitorBtn.addEventListener('click', () => { logOutput.innerHTML = ''; });
 
         return async function() {
             await populatePackages();
+            activeRules = await getRules(); // 预加载规则
         };
     })();
+
 
     try {
         generateRandomAurora();

@@ -19,7 +19,7 @@ body::after { background: radial-gradient(circle at 70% 30%, var(--aurora-color-
 .app-wrapper { position: relative; height: 100%; width: 100%; overflow: hidden; display: flex; flex-direction: column; opacity: 0; transition: opacity 0.4s ease-in-out, transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), filter 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
 .app-wrapper.loaded { opacity: 1; }
 .app-wrapper.is-blurred { filter: blur(10px); transform: scale(0.97); pointer-events: none; }
-.main-content-scroll-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: 80px; padding-top: max(35px, env(safe-area-inset-top)); }
+/*.main-content-scroll-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: 80px; padding-top: max(35px, env(safe-area-inset-top)); }*/
 
 /* 更新多页容器样式 */
 .pages-container { display: flex; width: 300%; height: auto; min-height: 100%; transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); will-change: transform; }
@@ -120,29 +120,40 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 
 /* 日志监控控制台样式 */
 #monitor-log-output {
-    background: rgba(0, 0, 0, 0.85);
-    color: #0f0;
-    font-family: Consolas, Monaco, monospace;
-    height: 380px;
+    background: #0d0d0d;
+    color: #d1d1d1;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    height: 450px; /* 增加高度 */
     overflow-y: auto;
-    padding: 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    word-break: break-all;
-    white-space: pre-wrap;
-    box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+    padding: 12px;
+    border-radius: 14px;
+    font-size: 11px;
+    line-height: 1.5;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
-.text-highlight {
-    color: #ff5555;
+..text-highlight {
+    color: #ff4757;
+    background: rgba(255, 71, 87, 0.15);
     font-weight: bold;
-    background: rgba(255, 0, 0, 0.15);
-    padding: 2px 0;
-    border-radius: 2px;
-}
-.text-info {
-    color: #00ffff;
+    padding: 2px 4px;
+    border-radius: 4px;
+    margin: 1px 0;
+    display: inline-block;
+    width: 100%;
+    animation: pulse-hit 2s infinite alternate;
 }
 
+.text-info {
+    color: #1e90ff;
+    border-bottom: 1px dashed #1e90ff;
+    margin: 10px 0;
+    padding-bottom: 2px;
+    display: block;
+}
+.main-content-scroll-area {
+    padding-top: env(safe-area-inset-top, 20px);
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
 @media (prefers-color-scheme: dark) {
   :root { 
       --text-main: #ffffff;
@@ -167,4 +178,9 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
   .bottom-nav { width: 500px; left: 50%; transform: translateX(-50%); bottom: 20px; border-radius: 20px; }
   .bottom-nav::before { border-radius: 20px; border: 1px solid var(--glass-border); }
   .modal-lg { max-width: 700px; }
+}
+
+@keyframes pulse-hit {
+    from { background: rgba(255, 71, 87, 0.1); }
+    to { background: rgba(255, 71, 87, 0.25); }
 }

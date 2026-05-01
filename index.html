@@ -146,7 +146,7 @@
                                 
                                 <div class="mt-3 pt-3 border-top border-secondary">
                                     <div class="d-flex align-items-center gap-2 mb-3">
-                                        <!-- 筛选图标 + 弹出面板 -->
+                                        <!-- 筛选图标 + 弹出面板（向上拉伸） -->
                                         <div class="filter-dropdown">
                                             <button id="filter-toggle-btn" class="icon-btn" title="筛选">
                                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -162,10 +162,19 @@
                                                     <input type="checkbox" class="btn-check" id="filter-dedup" autocomplete="off">
                                                     <label class="filter-pill" for="filter-dedup">去重</label>
                                                 </div>
+                                                <hr class="filter-separator">
+                                                <div class="filter-option">
+                                                    <input type="checkbox" class="btn-check" id="filter-user-apps" checked>
+                                                    <label class="filter-pill" for="filter-user-apps">用户应用</label>
+                                                </div>
+                                                <div class="filter-option">
+                                                    <input type="checkbox" class="btn-check" id="filter-system-apps" checked>
+                                                    <label class="filter-pill" for="filter-system-apps">系统应用</label>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <!-- 搜索区域（右对齐） -->
+                                        <!-- 搜索区域（右对齐，搜索框可完全展开） -->
                                         <div class="search-area ms-auto d-flex align-items-center">
                                             <div id="search-collapse" class="search-collapse">
                                                 <input type="text" id="monitor-log-search" class="form-control-transparent" placeholder="搜索路径...">

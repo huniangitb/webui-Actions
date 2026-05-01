@@ -530,6 +530,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const logSearchInput = document.getElementById('monitor-log-search');
         const searchToggleBtn = document.getElementById('search-toggle-btn');
         const searchCollapse = document.getElementById('search-collapse');
+        const filterUserApps = document.getElementById('filter-user-apps');
+        const filterSystemApps = document.getElementById('filter-system-apps');
         
         let readingLogs = false;
         let allAppInfos = [];
@@ -552,6 +554,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             stopBtn.style.display = running ? '' : 'none';
         }
 
+        function getFilteredAppInfos() {
+            return allAppInfos.filter(info => {
+                if (info.isSystem) return filterSystemApps.checked;
+                else return filterUserApps.checked;
+            });
+        }
+
         async function populatePackages() {
             try {
                 const pkgs = await listPackages("user");
@@ -560,7 +569,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 rawInfos.forEach(info => uniqueMap.set(info.packageName, info));
                 allAppInfos = Array.from(uniqueMap.values());
                 allAppInfos.sort((a, b) => a.appLabel.localeCompare(b.appLabel));
-                renderAppOptions(allAppInfos);
+                renderAppOptions(getFilteredAppInfos());
             } catch (e) {
                 console.error("加载监控应用列表失败:", e);
             }
@@ -595,12 +604,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         pkgSearch.addEventListener('input', (e) => {
             const val = e.target.value.toLowerCase();
-            const filtered = allAppInfos.filter(info => 
+            const baseList = getFilteredAppInfos();
+            const filtered = baseList.filter(info => 
                 info.appLabel.toLowerCase().includes(val) || 
                 info.packageName.toLowerCase().includes(val)
             );
             renderAppOptions(filtered);
         });
+
+        filterUserApps.addEventListener('change', () => renderAppOptions(getFilteredAppInfos()));
+        filterSystemApps.addEventListener('change', () => renderAppOptions(getFilteredAppInfos()));
 
         async function getRules() {
             const rules = { black: [], white: [] };
@@ -799,7 +812,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // 筛选下拉面板切换
         const filterToggleBtn = document.getElementById('filter-toggle-btn');
         const filterPanel = document.getElementById('filter-panel');
 
@@ -809,7 +821,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             filterToggleBtn.classList.toggle('active', isOpen);
         });
 
-        // 点击面板外部关闭
         document.addEventListener('click', (e) => {
             if (!filterToggleBtn.contains(e.target) && !filterPanel.contains(e.target)) {
                 filterPanel.classList.remove('show');

@@ -94,7 +94,29 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .bottom-nav a.active { color: var(--primary-color); } .bottom-nav a.active .nav-icon { fill: var(--primary-color); transform: scale(1.1); }
 .nav-icon { width: 22px; height: 22px; fill: currentColor; margin-bottom: 2px; transition: transform 0.2s; }
 .bottom-nav span { font-size: 11px; font-weight: 500; }
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 50px;
+  background: rgba(0,0,0,0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+  white-space: nowrap;
+}
 
+.btn-check:checked + .filter-pill {
+  background: var(--primary-color);
+  color: #fff;
+  border-color: var(--primary-color);
+  font-weight: 600;
+  box-shadow: 0 4px 10px rgba(59, 113, 202, 0.3);
+}
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.2); opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease; pointer-events: none; }
 .modal.show { opacity: 1; visibility: visible; pointer-events: auto; }
 .modal-dialog { transform: scale(0.95) translateY(10px); opacity: 0; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease; }
@@ -125,8 +147,6 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 
 .transition-blur { transition: opacity 0.4s ease, pointer-events 0.4s ease; }
 .transition-blur.locked { opacity: 0.4; pointer-events: none; }
-.monitor-hit-switch { background: rgba(0,0,0,0.05); padding: 5px 10px; border-radius: 10px; border: 1px solid var(--glass-border); white-space: nowrap; transition: opacity 0.3s ease, width 0.3s ease, padding 0.3s ease, margin 0.3s ease; }
-.monitor-hit-switch.hidden { opacity: 0; width: 0; padding: 0; margin: 0; overflow: hidden; border: none; }
 
 /* 开关容器隐藏动画 */
 .switches-wrapper { transition: opacity 0.3s ease, width 0.3s ease, padding 0.3s ease, margin 0.3s ease; }
@@ -182,9 +202,11 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
   .modal-content { background: rgba(70, 70, 70, 0.9); border-color: rgba(255,255,255,0.3); }
   .modal-header, .modal-footer { border-color: rgba(255,255,255,0.1); }
   .btn-close { color: #fff; }
-  
+  .filter-pill {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.2);
+  }
   .cron-pill, .cron-circle { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
-  .monitor-hit-switch { background: rgba(255,255,255,0.1); }
   .app-picker-item:hover { background: rgba(255,255,255,0.05); }
   .app-picker-item { border-bottom: 1px solid rgba(255,255,255,0.1); }
   #monitor-log-output { background: rgba(0,0,0,0.4); }

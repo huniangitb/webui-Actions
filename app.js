@@ -1,9 +1,49 @@
-import { exec, toast } from 'kernelsu';
+import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import Chart from 'chart.js/auto';
 import { mdiHome, mdiPencilBoxOutline } from '@mdi/js';
 
-function parseLogContent(ndjsonContent) { if (!ndjsonContent || ndjsonContent.trim() === '') return []; const parsedEntries = []; const lines = ndjsonContent.split('\n'); lines.forEach(line => { if (line.trim() === '') return; try { const stats = JSON.parse(line); if (!stats.timestamp || !stats.global_stats) return; const formattedTimestamp = stats.timestamp.replace('T', ' ').replace('Z', ''); const reclaimedSegments = (stats.gc_trim_stats && stats.gc_trim_stats.reclaimed_segments) ? stats.gc_trim_stats.reclaimed_segments : 0; const trimmedMBValue = (stats.gc_trim_stats && stats.gc_trim_stats.trimmed_mb) ? stats.gc_trim_stats.trimmed_mb : 0; const parsedEntry = { timestamp: formattedTimestamp, date: stats.timestamp.split('T')[0], deletedFiles: stats.global_stats.files_deleted || 0, deletedDirs: stats.global_stats.dirs_deleted || 0, dirtySegments: reclaimedSegments, fileCleanedMB: stats.global_stats.megabytes_deleted || 0, trimMB: trimmedMBValue, appStats: stats.app_stats || [] }; parsedEntries.push(parsedEntry); } catch (error) { console.error("解析 JSON 行失败:", error, "行内容:", line); } }); return parsedEntries; }
-function updateLocalStorage(newData) { if (!newData || newData.length === 0) return; const storedData = JSON.parse(localStorage.getItem('logData') || '[]'); const dataMap = new Map(storedData.map(entry => [entry.timestamp, entry])); newData.forEach(newEntry => { dataMap.set(newEntry.timestamp, newEntry); }); const combinedData = Array.from(dataMap.values()); const cutoffDate = new Date(); cutoffDate.setDate(cutoffDate.getDate() - 6); const filteredData = combinedData.filter(entry => new Date(entry.date) >= cutoffDate); localStorage.setItem('logData', JSON.stringify(filteredData)); }
+function parseLogContent(ndjsonContent) { 
+    if (!ndjsonContent || ndjsonContent.trim() === '') return []; 
+    const parsedEntries = []; 
+    const lines = ndjsonContent.split('\n'); 
+    lines.forEach(line => { 
+        if (line.trim() === '') return; 
+        try { 
+            const stats = JSON.parse(line); 
+            if (!stats.timestamp || !stats.global_stats) return; 
+            const formattedTimestamp = stats.timestamp.replace('T', ' ').replace('Z', ''); 
+            const reclaimedSegments = (stats.gc_trim_stats && stats.gc_trim_stats.reclaimed_segments) ? stats.gc_trim_stats.reclaimed_segments : 0; 
+            const trimmedMBValue = (stats.gc_trim_stats && stats.gc_trim_stats.trimmed_mb) ? stats.gc_trim_stats.trimmed_mb : 0; 
+            const parsedEntry = { 
+                timestamp: formattedTimestamp, 
+                date: stats.timestamp.split('T')[0], 
+                deletedFiles: stats.global_stats.files_deleted || 0, 
+                deletedDirs: stats.global_stats.dirs_deleted || 0, 
+                dirtySegments: reclaimedSegments, 
+                fileCleanedMB: stats.global_stats.megabytes_deleted || 0, 
+                trimMB: trimmedMBValue, 
+                appStats: stats.app_stats || [] 
+            }; 
+            parsedEntries.push(parsedEntry); 
+        } catch (error) { 
+            console.error("解析 JSON 行失败:", error, "行内容:", line); 
+        } 
+    }); 
+    return parsedEntries; 
+}
+
+function updateLocalStorage(newData) { 
+    if (!newData || newData.length === 0) return; 
+    const storedData = JSON.parse(localStorage.getItem('logData') || '[]'); 
+    const dataMap = new Map(storedData.map(entry => [entry.timestamp, entry])); 
+    newData.forEach(newEntry => { dataMap.set(newEntry.timestamp, newEntry); }); 
+    const combinedData = Array.from(dataMap.values()); 
+    const cutoffDate = new Date(); 
+    cutoffDate.setDate(cutoffDate.getDate() - 6); 
+    const filteredData = combinedData.filter(entry => new Date(entry.date) >= cutoffDate); 
+    localStorage.setItem('logData', JSON.stringify(filteredData)); 
+}
+
 function getStoredData() { return JSON.parse(localStorage.getItem('logData') || '[]'); }
 function clearStoredData() { localStorage.removeItem('logData'); }
 
@@ -158,7 +198,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const partitionsModalBody = document.getElementById('partitions-modal-body');
         const savePartitionsBtn = document.getElementById('save-partitions-btn');
         let partitionCharts = new Map();
-        let appNamesMap = new Map();
+        let appInfoMap = new Map(); // 改为存储完整的应用信息
         let allDiscoveredPartitions = new Set();
         let hiddenPartitions = new Set(JSON.parse(localStorage.getItem('hiddenF2fsPartitions') || '[]'));
 
@@ -260,15 +300,35 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
         }
+        
         function updatePartitionGcStatus(gcStatusArray) { if (isExt4) return; partitionGcStatusContainer.innerHTML = ''; const runningPartitions = gcStatusArray.filter(p => p.is_running && !hiddenPartitions.has(p.device_name)); const anyGcRunning = runningPartitions.length > 0; if (anyGcRunning) { document.getElementById('global-gc-status').style.display = 'none'; partitionGcStatusContainer.style.display = 'flex'; runningPartitions.forEach(({ device_name, is_paused, elapsed_seconds, reclaimed_segments, pause_reason }) => { const itemDiv = document.createElement('div'); itemDiv.className = 'partition-gc-status-item'; itemDiv.innerHTML = `<p>${device_name}</p><span class="badge ${is_paused ? 'bg-warning' : 'bg-success'}">${is_paused ? `暂停<br>原因: ${pause_reason || "未知"}` : '运行中'}<br>运行: ${formatDuration(elapsed_seconds || 0)} | 回收: ${reclaimed_segments || 0}</span>`; partitionGcStatusContainer.appendChild(itemDiv); }); gcControlButton.textContent = '停止所有'; gcControlButton.className = 'btn btn-sm btn-danger'; gcControlButton.dataset.action = 'stop'; } else { partitionGcStatusContainer.style.display = 'none'; const globalGcStatusSpan = document.getElementById('global-gc-status'); globalGcStatusSpan.style.display = 'inline-block'; globalGcStatusSpan.textContent = 'GC回收: 关闭'; globalGcStatusSpan.className = 'badge bg-secondary'; gcControlButton.textContent = '开始'; gcControlButton.className = 'btn btn-sm btn-success'; gcControlButton.dataset.action = 'start'; } }
         async function initDatePicker() { try { const { stdout } = await exec('date +"%F"'); const today = new Date(stdout.trim()); const sixDaysAgo = new Date(today); sixDaysAgo.setDate(today.getDate() - 6); const formatDate = (d) => d.toISOString().split('T')[0]; dateSelect.min = formatDate(sixDaysAgo); dateSelect.max = dateSelect.value = formatDate(today); } catch (e) { toast(`初始化日期选择器失败`); } }
         async function loadLogFile() { try { const { errno, stdout, stderr } = await exec('cat /data/adb/modules/Clean-C/stats.json'); if (errno === 0 && stdout.trim() !== '') updateLocalStorage(parseLogContent(stdout)); else if (errno !== 0 && !stderr.includes('No such file')) throw new Error(stderr); } catch (e) { toast(`加载统计数据失败: ${e.message}`); } updateDisplaysForSelectedDate(); }
         
-        function updateDisplaysForSelectedDate() {
+        // 使用 KernelSU API 获取应用信息并更新缓存
+        async function refreshAppInfoCache(packageNames) {
+            if (!packageNames || packageNames.length === 0) return;
+            const unknownPackages = packageNames.filter(pkg => !appInfoMap.has(pkg));
+            if (unknownPackages.length > 0) {
+                try {
+                    const infos = await getPackagesInfo(unknownPackages);
+                    infos.forEach(info => {
+                        appInfoMap.set(info.packageName, info);
+                    });
+                } catch (e) {
+                    console.error("KernelSU getPackagesInfo 失败:", e);
+                }
+            }
+        }
+
+        async function updateDisplaysForSelectedDate() {
             const selectedDate = dateSelect.value;
             const storedData = getStoredData();
             const filteredData = selectedDate ? storedData.filter(entry => entry.date === selectedDate) : storedData;
+            
             const aggregatedData = {};
+            const allPackagesInLog = new Set();
+
             filteredData.forEach(entry => {
                 const date = entry.date;
                 if (!aggregatedData[date]) aggregatedData[date] = { deletedFiles: 0, deletedDirs: 0, dirtySegments: 0, fileCleanedMB: 0 };
@@ -276,7 +336,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 aggregatedData[date].deletedDirs += entry.deletedDirs || 0;
                 aggregatedData[date].dirtySegments += entry.dirtySegments || 0;
                 aggregatedData[date].fileCleanedMB += entry.fileCleanedMB || 0;
+                entry.appStats?.forEach(app => allPackagesInLog.add(app.package_name));
             });
+
+            // 异步刷新应用信息，但不阻塞图表渲染
+            refreshAppInfoCache(Array.from(allPackagesInLog)).then(() => {
+                // 如果是当前选择的日期，刷新列表显示（为了获取名称和图标）
+                if (dateSelect.value === selectedDate) renderAppStatsList(selectedDate);
+            });
+
             barChart.data.datasets.forEach(ds => { if (ds.label.includes('脏段')) ds.hidden = isExt4; });
             const dates = Object.keys(aggregatedData).sort();
             barChart.data.labels = dates;
@@ -285,6 +353,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             barChart.data.datasets[2].data = dates.map(d => aggregatedData[d].deletedFiles);
             barChart.data.datasets[3].data = dates.map(d => aggregatedData[d].deletedDirs);
             barChart.update('none');
+            
+            renderAppStatsList(selectedDate);
+        }
+
+        function renderAppStatsList(selectedDate) {
             appStatsTitle.textContent = `应用清理详情 (${selectedDate})`;
             const dailyEntries = getStoredData().filter(entry => entry.date === selectedDate);
             const aggregatedStats = new Map();
@@ -294,6 +367,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 existing.megabytes_deleted += app.megabytes_deleted;
                 aggregatedStats.set(app.package_name, existing);
             }));
+            
             const appStats = Array.from(aggregatedStats.values());
             appStatsList.innerHTML = '';
             if (!appStats || appStats.length === 0) {
@@ -306,11 +380,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             appStatsContainer.style.maxHeight = '500px';
             
             appStats.sort((a, b) => b.bytes_deleted - a.bytes_deleted).forEach(app => {
-                const displayName = appNamesMap.get(app.package_name) || app.package_name;
+                const info = appInfoMap.get(app.package_name);
+                const displayName = info ? info.appLabel : app.package_name;
+                const iconUrl = `ksu://icon/${app.package_name}`;
+                
                 appStatsList.innerHTML += `
-                    <li class="list-group-item">
-                        <div class="app-name text-truncate" title="${app.package_name}">${displayName}</div>
-                        <div class="app-size badge bg-primary rounded-pill">${app.megabytes_deleted.toFixed(2)} MB</div>
+                    <li class="list-group-item d-flex align-items-center">
+                        <img src="${iconUrl}" class="app-icon me-2" style="width:24px;height:24px;border-radius:4px;object-fit:cover;" onerror="this.style.display='none'">
+                        <div class="app-name text-truncate flex-grow-1" title="${app.package_name}">${displayName}</div>
+                        <div class="app-size badge bg-primary rounded-pill ms-2">${app.megabytes_deleted.toFixed(2)} MB</div>
                     </li>`;
             });
         }
@@ -328,7 +406,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         return async function() {
             await checkFileSystem();
             await initDatePicker();
-            try { const { stdout } = await exec('cat /data/media/0/Android/清理规则/list.config'); stdout.split('\n').forEach(line => { if (line.includes('=')) { const [pkg, name] = line.split('=').map(item => item.trim()); if (pkg && name) appNamesMap.set(pkg, name); } }); } catch (e) { console.error("Error loading app names:", e); }
+            
+            // 预加载所有用户应用信息以提高渲染速度
+            try {
+                const userPkgs = await listPackages("user");
+                const infos = await getPackagesInfo(userPkgs);
+                infos.forEach(info => appInfoMap.set(info.packageName, info));
+            } catch (e) {
+                console.error("初始化应用列表失败:", e);
+            }
+
             await loadLogFile();
             if (!isExt4) await updateAllF2fsInfo();
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateChartTheme);

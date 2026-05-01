@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "chart.js": "^4.4.3",
-    "kernelsu": "^1.0.6",
+    "kernelsu": "^3.0.2",
     "mdb-ui-kit": "^7.3.0"
   },
   "devDependencies": {

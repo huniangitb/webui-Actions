@@ -2,7 +2,6 @@ import { exec, spawn, toast, listPackages, getPackagesInfo, fullScreen, enableEd
 import Chart from 'chart.js/auto';
 import { mdiHome, mdiPencilBoxOutline } from '@mdi/js';
 
-// 允许状态栏显示
 fullScreen(false);
 enableEdgeToEdge(true);
 
@@ -528,27 +527,36 @@ document.addEventListener('DOMContentLoaded', async () => {
         const filterHitsToggle = document.getElementById('filter-hits-only');
         const setupContainer = document.getElementById('monitor-setup-container');
         const logSearchInput = document.getElementById('monitor-log-search');
+        const searchToggleBtn = document.getElementById('search-toggle-btn');
+        const searchCollapse = document.getElementById('search-collapse');
         
-        let tailProcess = null;
         let readingLogs = false;
         let allAppInfos = [];
         let activeRules = { black: [], white: [] };
         let selectedPkg = '';
         
-        // 分段渲染变量
-        let logLineBuffer = [];
-        let isRendering = false;
+        // 分页状态
+        const PAGE_SIZE = 50;
+        let currentPage = 0;           // 0=最新，1=更早一页...
+        let totalLinesCache = 0;
+        let renderedLines = [];        // 当前渲染的所有行（可能过滤后）
+        let useFilteredLines = false;  // 是否处于仅命中模式
+        
+        // 搜索关键词
         let pathSearchKeyword = '';
+        let searchInputVisible = false;
+
+        // 监控定时器
+        let monitorInterval = null;
+        const IO_LOG_PATH = '/dev/fuse-app/io.log';
 
         async function populatePackages() {
             try {
                 const pkgs = await listPackages("user");
                 const rawInfos = await getPackagesInfo(pkgs);
-                
                 const uniqueMap = new Map();
                 rawInfos.forEach(info => uniqueMap.set(info.packageName, info));
                 allAppInfos = Array.from(uniqueMap.values());
-                
                 allAppInfos.sort((a, b) => a.appLabel.localeCompare(b.appLabel));
                 renderAppOptions(allAppInfos);
             } catch (e) {
@@ -597,38 +605,71 @@ document.addEventListener('DOMContentLoaded', async () => {
             const parse = (stdout) => stdout.split('\n')
                 .map(r => r.trim())
                 .filter(r => r && !r.startsWith('#') && !r.startsWith('//') && !r.includes('*'));
-
             try {
                 const [b1, b2, w1] = await Promise.all([
                     exec('cat /data/media/0/Android/清理规则/blacklist1.txt'),
                     exec('cat /data/media/0/Android/清理规则/blacklist2.txt'),
                     exec('cat /data/media/0/Android/清理规则/whitelist.txt')
                 ]);
-                
                 if(b1.errno === 0) rules.black.push(...parse(b1.stdout));
                 if(b2.errno === 0) rules.black.push(...parse(b2.stdout));
                 if(w1.errno === 0) rules.white.push(...parse(w1.stdout));
             } catch (e) { console.error("获取规则失败", e); }
-            
             return rules;
         }
 
-        // 高效渲染：按批次将缓存数据刷入 DOM
-        function flushLogBuffer() {
-            if (logLineBuffer.length === 0) {
-                isRendering = false;
-                return;
+        // 从文件读取指定行范围的行（1-based）
+        async function readLinesFromFile(startLine, endLine) {
+            if (startLine <= 0) startLine = 1;
+            const cmd = `tail -n +${startLine} ${IO_LOG_PATH} | head -n ${endLine - startLine + 1}`;
+            try {
+                const { errno, stdout } = await exec(cmd);
+                if (errno === 0) return stdout.split('\n').filter(line => line.trim() !== '');
+                return [];
+            } catch (e) {
+                console.error('读取日志文件失败:', e);
+                return [];
             }
-            
-            const linesToProcess = logLineBuffer.splice(0, 150); 
+        }
+
+        // 获取文件总行数
+        async function getTotalLines() {
+            try {
+                const { stdout } = await exec(`wc -l < ${IO_LOG_PATH}`);
+                return parseInt(stdout.trim()) || 0;
+            } catch (e) { return 0; }
+        }
+
+        // 构建grep正则表达式
+        function buildGrepPattern(rules) {
+            const patterns = [...rules.black, ...rules.white];
+            if (patterns.length === 0) return '';
+            // 转义特殊字符
+            const escaped = patterns.map(p => p.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+            return escaped.join('|');
+        }
+
+        // 执行grep获取匹配行
+        async function grepLines(pattern) {
+            if (!pattern) return [];
+            try {
+                const { errno, stdout } = await exec(`grep -E '${pattern}' ${IO_LOG_PATH}`);
+                if (errno === 0) return stdout.split('\n').filter(line => line.trim() !== '');
+                // grep没有匹配时返回非0，忽略
+                return [];
+            } catch (e) { return []; }
+        }
+
+        // 渲染当前页的日志卡片
+        function renderLogCards(lines) {
+            logOutput.innerHTML = '';
             const fragment = document.createDocumentFragment();
             
-            linesToProcess.forEach(line => {
+            lines.forEach(line => {
                 if (!line.trim()) return;
                 
                 const match = line.match(/^\[(.*?)\]\s+(.*)$/);
                 let api = "SYS", path = line;
-
                 if (match) {
                     api = match[1].trim();
                     path = match[2].trim();
@@ -638,7 +679,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const isBlackHit = !isWhiteHit && activeRules.black.some(r => path.includes(r));
                 
                 let show = true;
-                if (filterHitsToggle.checked && !isWhiteHit && !isBlackHit) show = false;
                 if (pathSearchKeyword && !path.toLowerCase().includes(pathSearchKeyword)) show = false;
 
                 const card = document.createElement('div');
@@ -654,32 +694,95 @@ document.addEventListener('DOMContentLoaded', async () => {
                 fragment.appendChild(card);
             });
             
-            if (fragment.children.length > 0) {
-                logOutput.appendChild(fragment);
-                while (logOutput.children.length > 400) {
-                    logOutput.removeChild(logOutput.firstChild);
-                }
-                logOutput.scrollTop = logOutput.scrollHeight;
-            }
-            
-            if (logLineBuffer.length > 0) {
-                requestAnimationFrame(flushLogBuffer);
-            } else {
-                isRendering = false;
-            }
+            logOutput.appendChild(fragment);
         }
 
-        // 应用过滤规则到已经存在 DOM 元素，实现无缝切换
-        function applyLogFiltersToDOM() {
+        // 刷新当前视图（根据当前状态加载数据）
+        async function refreshCurrentView() {
+            if (!readingLogs) return;
+            if (useFilteredLines) {
+                // 仅命中模式：使用已缓存的过滤行？或重新grep？重新grep保证实时
+                const pattern = buildGrepPattern(activeRules);
+                const allGrepLines = await grepLines(pattern);
+                renderedLines = allGrepLines;
+                // 每次显示最新一页（PAGE_SIZE条）
+                const startIdx = Math.max(0, allGrepLines.length - PAGE_SIZE);
+                const pageLines = allGrepLines.slice(startIdx);
+                renderLogCards(pageLines);
+                currentPage = 0; // 仅命中始终显示最新
+            } else {
+                // 普通模式：按偏移显示最新一页
+                totalLinesCache = await getTotalLines();
+                if (totalLinesCache === 0) {
+                    logOutput.innerHTML = '<div class="text-muted text-center p-3">暂无日志</div>';
+                    return;
+                }
+                const startLine = Math.max(1, totalLinesCache - PAGE_SIZE + 1);
+                const endLine = totalLinesCache;
+                const lines = await readLinesFromFile(startLine, endLine);
+                renderedLines = lines;
+                renderLogCards(lines);
+                currentPage = 0;
+            }
+            // 应用搜索过滤到DOM
+            applySearchToDOM();
+        }
+
+        // 加载更早的一页（page+1）
+        async function loadPreviousPage() {
+            if (!readingLogs || useFilteredLines) return;
+            const page = currentPage + 1;
+            const startLine = Math.max(1, totalLinesCache - (page + 1) * PAGE_SIZE + 1);
+            const endLine = totalLinesCache - page * PAGE_SIZE;
+            if (startLine > endLine) return; // 没有更早的
+            const lines = await readLinesFromFile(startLine, endLine);
+            if (lines.length === 0) return;
+            // 替换当前显示？根据需求“滑动到末尾时，读取下50条日志，自动抛弃上50条日志”，这里抛弃当前显示，显示更早的
+            renderedLines = lines;
+            renderLogCards(lines);
+            currentPage = page;
+            applySearchToDOM();
+            logOutput.scrollTop = logOutput.scrollHeight; // 滚动到底部以查看更早日志（因为更早的日志插入了前面，但这里我们完全替换了，所以scrollTop=height显示最后一条）
+        }
+
+        // 加载更晚的一页（page-1）
+        async function loadNextPage() {
+            if (!readingLogs || useFilteredLines) return;
+            if (currentPage <= 0) return;
+            const page = currentPage - 1;
+            const startLine = Math.max(1, totalLinesCache - (page + 1) * PAGE_SIZE + 1);
+            const endLine = totalLinesCache - page * PAGE_SIZE;
+            const lines = await readLinesFromFile(startLine, endLine);
+            if (lines.length === 0) return;
+            renderedLines = lines;
+            renderLogCards(lines);
+            currentPage = page;
+            applySearchToDOM();
+            logOutput.scrollTop = 0; // 滚动到顶部
+        }
+
+        // 滑动监听
+        logOutput.addEventListener('scroll', () => {
+            const { scrollTop, scrollHeight, clientHeight } = logOutput;
+            // 滑动到底部（即内容最上方？这里假设日志顺序从上到下是旧->新，那么最底部是最新，滑到底部即查看最新）
+            // 但我们的分页是替换内容，所以滑到底部可能表示想看更早的日志？设计：当前显示一页50条，最上面是较旧，最下面是较新。
+            // 滑动到底部（scrollTop + clientHeight >= scrollHeight - 5）触发加载更早的（因为想要看更旧的，需要向上滚动？）这有些反直觉。
+            // 通常：向上滚动看更旧，向下滚动看更新。但我们的列表是新日志在底部，所以向上滚动看更旧。因此，当scrollTop接近0时加载更早（previousPage），当scrollTop接近max时加载更新（nextPage）。
+            if (scrollTop <= 10) {
+                // 到了顶部，加载更早页
+                loadPreviousPage();
+            } else if (scrollTop + clientHeight >= scrollHeight - 10) {
+                // 到了底部，加载更新页（回到更近页）
+                loadNextPage();
+            }
+        });
+
+        // 搜索关键词改变时，直接在DOM上应用d-none-log
+        function applySearchToDOM() {
             Array.from(logOutput.children).forEach(card => {
-                const pathText = card.querySelector('.log-path').textContent.toLowerCase();
-                const isWhiteHit = card.classList.contains('whitelist-glow');
-                const isBlackHit = card.classList.contains('hit-glow');
-                
+                const pathText = card.querySelector('.log-path')?.textContent.toLowerCase() || '';
                 let show = true;
-                if (filterHitsToggle.checked && !isWhiteHit && !isBlackHit) show = false;
                 if (pathSearchKeyword && !pathText.includes(pathSearchKeyword)) show = false;
-                
                 if (show) card.classList.remove('d-none-log');
                 else card.classList.add('d-none-log');
             });
@@ -687,93 +790,130 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         logSearchInput.addEventListener('input', (e) => {
             pathSearchKeyword = e.target.value.toLowerCase();
-            applyLogFiltersToDOM();
+            applySearchToDOM();
         });
 
-        filterHitsToggle.addEventListener('change', applyLogFiltersToDOM);
+        // 搜索折叠切换
+        searchToggleBtn.addEventListener('click', () => {
+            searchInputVisible = !searchInputVisible;
+            if (searchInputVisible) {
+                searchCollapse.classList.add('show');
+                searchToggleBtn.classList.add('active');
+            } else {
+                searchCollapse.classList.remove('show');
+                searchToggleBtn.classList.remove('active');
+                logSearchInput.value = '';
+                pathSearchKeyword = '';
+                applySearchToDOM();
+            }
+        });
 
-        async function loadHistoricalLogs() {
-            try {
-                // 读取近期历史记录避免文件过大卡死
-                const { errno, stdout } = await exec('tail -n 300 /dev/fuse-app/io.log');
-                if (errno === 0 && stdout) {
-                    const lines = stdout.split('\n');
-                    logLineBuffer.push(...lines);
-                    if (!isRendering) {
-                        isRendering = true;
-                        requestAnimationFrame(flushLogBuffer);
+        // 仅命中切换
+        filterHitsToggle.addEventListener('change', async () => {
+            if (!readingLogs) return;
+            useFilteredLines = filterHitsToggle.checked;
+            logOutput.innerHTML = ''; // 清空
+            if (useFilteredLines) {
+                const pattern = buildGrepPattern(activeRules);
+                if (!pattern) {
+                    toast('没有可用规则，无法过滤');
+                    filterHitsToggle.checked = false;
+                    useFilteredLines = false;
+                    return;
+                }
+                const allGrepLines = await grepLines(pattern);
+                renderedLines = allGrepLines;
+                const startIdx = Math.max(0, allGrepLines.length - PAGE_SIZE);
+                renderLogCards(allGrepLines.slice(startIdx));
+                currentPage = 0;
+            } else {
+                // 关闭仅命中，恢复普通偏移模式，回到最新页
+                currentPage = 0;
+                await refreshCurrentView();
+            }
+            applySearchToDOM();
+        });
+
+        // 定时刷新（普通模式下定时拉取最新日志，若用户在最新页自动更新）
+        async function startMonitorInterval() {
+            if (monitorInterval) clearInterval(monitorInterval);
+            monitorInterval = setInterval(async () => {
+                if (!readingLogs) return;
+                if (useFilteredLines) {
+                    // 仅命中模式下也刷新grep
+                    const pattern = buildGrepPattern(activeRules);
+                    const allGrepLines = await grepLines(pattern);
+                    if (allGrepLines.length !== renderedLines.length || JSON.stringify(allGrepLines.slice(-PAGE_SIZE)) !== JSON.stringify(renderedLines.slice(-PAGE_SIZE))) {
+                        renderedLines = allGrepLines;
+                        const startIdx = Math.max(0, allGrepLines.length - PAGE_SIZE);
+                        renderLogCards(allGrepLines.slice(startIdx));
+                        applySearchToDOM();
+                    }
+                } else {
+                    // 普通模式：检查总行数是否增加，若增加且用户在最新页则刷新
+                    const newTotal = await getTotalLines();
+                    if (newTotal > totalLinesCache && currentPage === 0) {
+                        totalLinesCache = newTotal;
+                        const startLine = Math.max(1, totalLinesCache - PAGE_SIZE + 1);
+                        const lines = await readLinesFromFile(startLine, totalLinesCache);
+                        renderedLines = lines;
+                        renderLogCards(lines);
+                        applySearchToDOM();
+                    } else {
+                        totalLinesCache = newTotal; // 更新缓存
                     }
                 }
-            } catch (e) { /* 忽略 */ }
+            }, 2000);
         }
 
-        startBtn.addEventListener('click', async () => {
+        async function startMonitoring() {
             if (!selectedPkg) return toast('未选择应用');
             
             setupContainer.classList.add('locked');
             logOutput.innerHTML = '';
-            logLineBuffer = [];
+            renderedLines = [];
+            currentPage = 0;
+            useFilteredLines = filterHitsToggle.checked;
             
             activeRules = await getRules();
             const totalRules = activeRules.black.length + activeRules.white.length;
             toast(`已加载 ${totalRules} 条规则`);
             
             readingLogs = true;
+            startMonitorInterval();
 
             try {
                 await exec(`mkdir -p /cache/fuse/ && cp /data/adb/modules/Clean-C/injector /cache/fuse/ && cp /data/adb/modules/Clean-C/fuse_daemon /cache/fuse/ && chmod 777 /cache/fuse/*`);
-                // 启用独立挂载空间防止 fuse 影响主环境
                 await exec(`unshare --mount --propagation private /cache/fuse/injector "${selectedPkg}"`);
                 await delay(1000);
                 await exec(`monkey -p ${selectedPkg} 1`);
                 
-                await loadHistoricalLogs();
-                
-                // 长期驻留进程流式读取
-                tailProcess = spawn('tail', ['-n', '0', '-F', '/dev/fuse-app/io.log']);
-                let streamBuffer = '';
-                tailProcess.stdout.on('data', (data) => {
-                    if (!readingLogs) return;
-                    streamBuffer += data;
-                    let lines = streamBuffer.split('\n');
-                    streamBuffer = lines.pop(); // 保留不完整的一行
-                    
-                    if (lines.length > 0) {
-                        logLineBuffer.push(...lines);
-                        if (!isRendering) {
-                            isRendering = true;
-                            requestAnimationFrame(flushLogBuffer);
-                        }
-                    }
-                });
+                // 首次加载日志
+                await refreshCurrentView();
             } catch (e) {
                 toast('启动失败: ' + e.message);
-                stopMonitor();
+                stopMonitoring();
             }
-        });
+        }
 
-        async function stopMonitor() {
+        async function stopMonitoring() {
             readingLogs = false;
-            if (tailProcess) {
-                await exec('pkill -f "tail -n 0 -F /dev/fuse-app/io.log"');
-                tailProcess = null;
+            if (monitorInterval) {
+                clearInterval(monitorInterval);
+                monitorInterval = null;
             }
             if (selectedPkg) await exec(`am force-stop ${selectedPkg}`);
             await exec(`rm -r /cache/fuse/`);
             
-            logLineBuffer.push(`[SYS] 监控已停止，应用 ${selectedPkg} 已关闭。`);
-            if (!isRendering) {
-                isRendering = true;
-                requestAnimationFrame(flushLogBuffer);
-            }
-            
+            logOutput.innerHTML += '<div class="text-muted text-center">[SYS] 监控已停止</div>';
             setupContainer.classList.remove('locked');
             startBtn.disabled = true;
             selectedPkg = '';
             document.querySelectorAll('.app-picker-item').forEach(el => el.classList.remove('selected'));
         }
 
-        stopBtn.addEventListener('click', stopMonitor);
+        startBtn.addEventListener('click', startMonitoring);
+        stopBtn.addEventListener('click', stopMonitoring);
 
         return async function() {
             await populatePackages();

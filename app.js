@@ -530,7 +530,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const logSearchInput = document.getElementById('monitor-log-search');
         const searchToggleBtn = document.getElementById('search-toggle-btn');
         const searchCollapse = document.getElementById('search-collapse');
-        const switchesWrapper = document.getElementById('switches-wrapper'); // 开关容器
         
         let readingLogs = false;
         let allAppInfos = [];
@@ -793,13 +792,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         searchToggleBtn.addEventListener('click', () => {
             const isOpen = searchCollapse.classList.toggle('show');
             searchToggleBtn.classList.toggle('active', isOpen);
-            if (isOpen) {
-                switchesWrapper.classList.add('hidden');
-            } else {
-                switchesWrapper.classList.remove('hidden');
+            if (!isOpen) {
                 logSearchInput.value = '';
                 pathSearchKeyword = '';
                 applySearchToDOM();
+            }
+        });
+
+        // 筛选下拉面板切换
+        const filterToggleBtn = document.getElementById('filter-toggle-btn');
+        const filterPanel = document.getElementById('filter-panel');
+
+        filterToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = filterPanel.classList.toggle('show');
+            filterToggleBtn.classList.toggle('active', isOpen);
+        });
+
+        // 点击面板外部关闭
+        document.addEventListener('click', (e) => {
+            if (!filterToggleBtn.contains(e.target) && !filterPanel.contains(e.target)) {
+                filterPanel.classList.remove('show');
+                filterToggleBtn.classList.remove('active');
             }
         });
 

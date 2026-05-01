@@ -117,6 +117,71 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
   font-weight: 600;
   box-shadow: 0 4px 10px rgba(59, 113, 202, 0.3);
 }
+
+/* ===== 监控筛选下拉面板样式 ===== */
+.filter-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  padding: 8px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn.active,
+.icon-btn:hover {
+  background: rgba(0,0,0,0.08);
+  color: var(--primary-color);
+}
+
+.filter-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: var(--glass-bg);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-5px);
+  transition: opacity 0.2s, visibility 0.2s, transform 0.2s;
+  min-width: 140px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+
+.filter-panel.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+}
+
+/* 搜索框展开宽度 */
+.search-collapse.show {
+  width: 150px;
+}
+
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.2); opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease; pointer-events: none; }
 .modal.show { opacity: 1; visibility: visible; pointer-events: auto; }
 .modal-dialog { transform: scale(0.95) translateY(10px); opacity: 0; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease; }
@@ -147,10 +212,6 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 
 .transition-blur { transition: opacity 0.4s ease, pointer-events 0.4s ease; }
 .transition-blur.locked { opacity: 0.4; pointer-events: none; }
-
-/* 开关容器隐藏动画 */
-.switches-wrapper { transition: opacity 0.3s ease, width 0.3s ease, padding 0.3s ease, margin 0.3s ease; }
-.switches-wrapper.hidden { opacity: 0; width: 0; padding: 0; margin: 0; overflow: hidden; }
 
 .app-picker-list { max-height: 180px; overflow-y: auto; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(255,255,255,0.05); }
 .app-picker-item { display: flex; align-items: center; padding: 10px 12px; cursor: pointer; transition: background 0.2s; border-bottom: 1px solid rgba(0,0,0,0.05); }
@@ -202,16 +263,19 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
   flex-shrink: 1;
 }
 
-.search-collapse.show {
-  width: 180px; // 或根据需要调整
-}
-
 .search-collapse .form-control-transparent {
   background: rgba(255,255,255,0.1);
   border: 1px solid var(--glass-border);
   border-radius: 10px;
   padding: 0.4rem 0.8rem;
   font-size: 0.85rem;
+}
+
+.search-area {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -242,15 +306,17 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
   
   #loader { background: #000; }
   .list-group-item { background: rgba(255, 255, 255, 0.05); }
+  
+  .icon-btn.active,
+  .icon-btn:hover {
+    background: rgba(255,255,255,0.1);
+  }
+  .filter-panel {
+    background: rgba(40,40,40,0.9);
+  }
 }
 @media (min-width: 768px) {
   .bottom-nav { width: 500px; left: 50%; transform: translateX(-50%); bottom: 20px; border-radius: 20px; }
   .bottom-nav::before { border-radius: 20px; border: 1px solid var(--glass-border); }
   .modal-lg { max-width: 700px; }
-}
-.search-area {
-  display: flex;
-  align-items: center;
-  margin-left: auto;
-  flex-shrink: 0;
 }

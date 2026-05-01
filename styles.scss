@@ -182,10 +182,37 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
 .api-rename { background: rgba(230, 126, 34, 0.2); color: #e67e22; border: 1px solid rgba(230, 126, 34, 0.4); }
 .api-sys, .api-system { background: rgba(149, 165, 166, 0.2); color: #95a5a6; border: 1px solid rgba(149, 165, 166, 0.4); }
 
-.search-toggle-btn { background: none; border: none; padding: 5px; cursor: pointer; color: var(--text-muted); transition: color 0.2s; }
-.search-toggle-btn.active { color: var(--primary-color); }
-.search-collapse { overflow: hidden; width: 0; transition: width 0.3s ease; }
-.search-collapse.show { width: 100%; }
+.search-toggle-btn {
+  background: none;
+  border: none;
+  padding: 5px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+
+.search-toggle-btn.active {
+  color: var(--primary-color);
+}
+.search-collapse {
+  overflow: hidden;
+  width: 0;
+  transition: width 0.3s ease;
+  flex-shrink: 1;
+}
+
+.search-collapse.show {
+  width: 180px; // 或根据需要调整
+}
+
+.search-collapse .form-control-transparent {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+}
 
 @media (prefers-color-scheme: dark) {
   :root { 
@@ -220,4 +247,10 @@ h1 { font-size: 1.75rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); fo
   .bottom-nav { width: 500px; left: 50%; transform: translateX(-50%); bottom: 20px; border-radius: 20px; }
   .bottom-nav::before { border-radius: 20px; border: 1px solid var(--glass-border); }
   .modal-lg { max-width: 700px; }
+}
+.search-area {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
 }

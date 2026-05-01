@@ -1,6 +1,9 @@
-import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
+import { exec, spawn, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import Chart from 'chart.js/auto';
 import { mdiHome, mdiPencilBoxOutline } from '@mdi/js';
+
+// 添加控制台图标
+const mdiConsole = "M20,19V7H4V19H20M20,3A2,2 0 0,1 22,5V19A2,2 0 0,1 20,21H4A2,2 0 0,1 2,19V5C2,3.89 2.9,3 4,3H20M13,17V15H18V17H13M9.58,13L5.57,9H8.4L12.41,13L8.4,17H5.57L9.58,13Z";
 
 function parseLogContent(ndjsonContent) { 
     if (!ndjsonContent || ndjsonContent.trim() === '') return []; 
@@ -47,7 +50,7 @@ function updateLocalStorage(newData) {
 function getStoredData() { return JSON.parse(localStorage.getItem('logData') || '[]'); }
 function clearStoredData() { localStorage.removeItem('logData'); }
 
-const icons = { home: mdiHome, edit: mdiPencilBoxOutline };
+const icons = { home: mdiHome, edit: mdiPencilBoxOutline, monitor: mdiConsole };
 
 const NativeUI = {
     openModal(modalId) {
@@ -138,14 +141,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     function injectIcons() { document.querySelectorAll('[data-icon]').forEach(el => { const iconName = el.getAttribute('data-icon'); if (icons[iconName]) el.setAttribute('d', icons[iconName]); }); }
 
-    const pages = { home: document.getElementById('page-home'), edit: document.getElementById('page-edit') };
+    // 更新页面映射
+    const pages = { 
+        home: document.getElementById('page-home'), 
+        edit: document.getElementById('page-edit'),
+        monitor: document.getElementById('page-monitor')
+    };
     const navItems = document.querySelectorAll('.nav-item');
     let currentPageId = 'home';
     function showPage(pageId) {
         if (pageId === currentPageId || !pagesContainer) return;
         const pageIndex = Object.keys(pages).indexOf(pageId);
         if (pageIndex === -1) return;
-        pagesContainer.style.transform = `translateX(${pageIndex * -50}%)`;
+        // 使用 100/3% 作为三页布局的偏移量
+        pagesContainer.style.transform = `translateX(${pageIndex * -(100 / 3)}%)`;
         navItems.forEach(item => item.classList.toggle('active', item.dataset.page === pageId));
         currentPageId = pageId;
     }
@@ -198,7 +207,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const partitionsModalBody = document.getElementById('partitions-modal-body');
         const savePartitionsBtn = document.getElementById('save-partitions-btn');
         let partitionCharts = new Map();
-        let appInfoMap = new Map(); // 改为存储完整的应用信息
+        let appInfoMap = new Map(); 
         let allDiscoveredPartitions = new Set();
         let hiddenPartitions = new Set(JSON.parse(localStorage.getItem('hiddenF2fsPartitions') || '[]'));
 
@@ -305,7 +314,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         async function initDatePicker() { try { const { stdout } = await exec('date +"%F"'); const today = new Date(stdout.trim()); const sixDaysAgo = new Date(today); sixDaysAgo.setDate(today.getDate() - 6); const formatDate = (d) => d.toISOString().split('T')[0]; dateSelect.min = formatDate(sixDaysAgo); dateSelect.max = dateSelect.value = formatDate(today); } catch (e) { toast(`初始化日期选择器失败`); } }
         async function loadLogFile() { try { const { errno, stdout, stderr } = await exec('cat /data/adb/modules/Clean-C/stats.json'); if (errno === 0 && stdout.trim() !== '') updateLocalStorage(parseLogContent(stdout)); else if (errno !== 0 && !stderr.includes('No such file')) throw new Error(stderr); } catch (e) { toast(`加载统计数据失败: ${e.message}`); } updateDisplaysForSelectedDate(); }
         
-        // 使用 KernelSU API 获取应用信息并更新缓存
         async function refreshAppInfoCache(packageNames) {
             if (!packageNames || packageNames.length === 0) return;
             const unknownPackages = packageNames.filter(pkg => !appInfoMap.has(pkg));
@@ -339,9 +347,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 entry.appStats?.forEach(app => allPackagesInLog.add(app.package_name));
             });
 
-            // 异步刷新应用信息，但不阻塞图表渲染
             refreshAppInfoCache(Array.from(allPackagesInLog)).then(() => {
-                // 如果是当前选择的日期，刷新列表显示（为了获取名称和图标）
                 if (dateSelect.value === selectedDate) renderAppStatsList(selectedDate);
             });
 
@@ -407,7 +413,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             await checkFileSystem();
             await initDatePicker();
             
-            // 预加载所有用户应用信息以提高渲染速度
             try {
                 const userPkgs = await listPackages("user");
                 const infos = await getPackagesInfo(userPkgs);
@@ -490,6 +495,122 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     })();
 
+    const initMonitorPage = (() => {
+        const pkgSelect = document.getElementById('monitor-pkg-select');
+        const startBtn = document.getElementById('start-monitor-btn');
+        const stopBtn = document.getElementById('stop-monitor-btn');
+        const logOutput = document.getElementById('monitor-log-output');
+        let tailProcess = null;
+        let readingLogs = false;
+
+        async function populatePackages() {
+            try {
+                const pkgs = await listPackages("user");
+                const infos = await getPackagesInfo(pkgs);
+                infos.sort((a, b) => a.appLabel.localeCompare(b.appLabel));
+                infos.forEach(info => {
+                    const opt = document.createElement('option');
+                    opt.value = info.packageName;
+                    opt.textContent = `${info.appLabel} (${info.packageName})`;
+                    pkgSelect.appendChild(opt);
+                });
+            } catch (e) {
+                console.error("加载监控应用列表失败:", e);
+            }
+        }
+
+        async function getRules() {
+            let rules = [];
+            try {
+                const [b1, b2] = await Promise.all([
+                    exec('cat /data/media/0/Android/清理规则/blacklist1.txt'),
+                    exec('cat /data/media/0/Android/清理规则/blacklist2.txt')
+                ]);
+                if(b1.errno === 0) rules.push(...b1.stdout.split('\n'));
+                if(b2.errno === 0) rules.push(...b2.stdout.split('\n'));
+                
+                rules = rules.map(r => r.trim()).filter(r => r && !r.startsWith('#') && !r.startsWith('//') && !r.includes('*')); 
+            } catch (e) {
+                console.error("获取规则失败", e);
+            }
+            return rules.filter(Boolean);
+        }
+
+        startBtn.addEventListener('click', async () => {
+            const pkg = pkgSelect.value;
+            if (!pkg) return toast('未选择应用');
+            
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            logOutput.innerHTML = '<div class="text-info">正在准备监控环境...</div>';
+            readingLogs = true;
+
+            const rules = await getRules();
+
+            try {
+                // 环境清理与设置
+                await exec(`mkdir -p /cache/fuse/ && cp /data/adb/modules/Clean-C/injector /cache/fuse/ && cp /data/adb/modules/Clean-C/fuse_daemon /cache/fuse/ && chmod 777 /cache/fuse/*`);
+                
+                logOutput.innerHTML += `<div>[系统] 执行注入器: ${pkg}</div>`;
+                await exec(`/cache/fuse/injector "${pkg}"`);
+                
+                await delay(1000);
+                
+                logOutput.innerHTML += `<div>[系统] 启动目标应用...</div>`;
+                await exec(`monkey -p ${pkg} 1`);
+                
+                // 监听日志
+                tailProcess = spawn('tail', ['-f', '/dev/fuse-app/io.log']);
+                
+                let buffer = '';
+                tailProcess.stdout.on('data', (data) => {
+                    if (!readingLogs) return;
+                    buffer += data;
+                    let lines = buffer.split('\n');
+                    buffer = lines.pop(); // 保留最后一行不完整的
+                    
+                    const frag = document.createDocumentFragment();
+                    lines.forEach(line => {
+                        if (!line.trim()) return;
+                        const div = document.createElement('div');
+                        div.textContent = line;
+                        if (rules.some(r => line.includes(r))) {
+                            div.className = 'text-highlight';
+                        }
+                        frag.appendChild(div);
+                    });
+                    logOutput.appendChild(frag);
+                    logOutput.scrollTop = logOutput.scrollHeight;
+                });
+                
+            } catch (e) {
+                toast('监控启动失败: ' + e.message);
+                stopMonitor();
+            }
+        });
+
+        async function stopMonitor() {
+            readingLogs = false;
+            if (tailProcess) {
+                // 发送命令杀死 tail 进程
+                await exec(`pkill -f "tail -f /dev/fuse-app/io.log"`);
+                tailProcess = null;
+            }
+            await exec(`rm -r /cache/fuse/`);
+            
+            logOutput.innerHTML += `<div class="text-info">[系统] 监控已停止并清理环境。</div>`;
+            logOutput.scrollTop = logOutput.scrollHeight;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        }
+
+        stopBtn.addEventListener('click', stopMonitor);
+
+        return async function() {
+            await populatePackages();
+        };
+    })();
+
     try {
         generateRandomAurora();
         injectIcons();
@@ -501,11 +622,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         await initHomePage();
         await initEditPage();
+        await initMonitorPage();
         
         const initialPageId = window.location.hash.substring(1) || 'home';
         const initialPageIndex = Object.keys(pages).indexOf(initialPageId);
         const validPageIndex = initialPageIndex > -1 ? initialPageIndex : 0;
-        const initialTranslateX = validPageIndex * -50;
+        const initialTranslateX = validPageIndex * -(100 / 3);
         currentPageId = Object.keys(pages)[validPageIndex];
 
         if (pagesContainer) {

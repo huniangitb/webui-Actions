@@ -9,7 +9,7 @@ import {
 } from '@mdi/js';
 
 // Setup KernelSU immersive mode
-try { fullScreen(true); enableEdgeToEdge(true); } catch(e) {}
+try { fullScreen(false); enableEdgeToEdge(true); } catch(e) {}
 
 const BASE_DIR = "/data/Namespace-Proxy";
 const INJECTOR_CONF = `${BASE_DIR}/injector.conf`;
@@ -539,12 +539,13 @@ const renderIoRows = (lines) => {
 
         return `
         <div class="io-item">
-            <div class="io-header">
-              <span class="io-time" style="display:flex; align-items:center; gap:4px;">
+            <div class="io-header" style="display:flex; align-items:center;">
+              <span class="io-time" style="display:flex; align-items:center; gap:4px; flex:1;">
             ${ICONS.CLOCK}
             <span>${timeStr}</span>
                 <span class="io-app">${appName}</span>
-                <span class="io-op op-${op}" style="margin-left: auto;">${op}</span>
+              </span>
+              <span class="io-op op-${op}">${op}</span>
             </div>
             <div class="io-detail">${details}</div>
         </div>`;

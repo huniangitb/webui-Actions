@@ -24,6 +24,7 @@ let injectorRulesMap = new Map();
 
 let activeUsers = [0];
 let activeMounts = new Set();
+let injectedApps = new Map(); // pkg -> {pid, uid, redirect, hide, ro}
 let statusPolling = null;
 let currentAppFilter = 'filterUser';
 let currentPid = null;
@@ -114,6 +115,30 @@ const updateMountStatus = async () => {
     } catch (e) { console.error(e); }
 };
 
+const fetchInjectedApps = async () => {
+    try {
+        const res = await run(`${LOG_CTL} list-injected api`);
+        injectedApps.clear();
+        if (res) {
+            res.split('\n').forEach(line => {
+                if (line.startsWith('APP|')) {
+                    const parts = line.split('|');
+                    // APP|pkg|pid|uid|redirect|hide|ro
+                    if (parts.length >= 7) {
+                        injectedApps.set(parts[1], {
+                            pid: parts[2],
+                            uid: parts[3],
+                            redirect: parts[4],
+                            hide: parts[5],
+                            ro: parts[6]
+                        });
+                    }
+                }
+            });
+        }
+    } catch (e) { /* ignore */ }
+};
+
 const checkStatus = async () => {
     try {
         const badge = document.getElementById('statusBadge');
@@ -136,6 +161,28 @@ const checkStatus = async () => {
             }
         }
         await updateMountStatus();
+        await fetchInjectedApps();
+        // 更新已有列表项的注入状态显示
+        document.querySelectorAll('#appList .list-item').forEach(item => {
+            const pkg = item.dataset.pkg;
+            if (!pkg) return;
+            const small = item.querySelector('.app-content > small');
+            if (!small) return;
+            const inj = injectedApps.get(pkg);
+            if (inj) {
+                const flags = [];
+                if (inj.redirect === '1') flags.push('R');
+                if (inj.hide === '1') flags.push('H');
+                if (inj.ro === '1') flags.push('RO');
+                small.textContent = `PID:${inj.pid} ${flags.join(' ')}`;
+                small.classList.remove('text-truncate', 'd-block');
+                small.style.fontSize = '10px';
+            } else {
+                small.textContent = pkg;
+                small.classList.add('text-truncate', 'd-block');
+                small.style.fontSize = '';
+            }
+        });
     } catch (e) {}
 };
 
@@ -260,7 +307,8 @@ document.addEventListener('DOMContentLoaded', () => {
 const loadData = async () => {
     try {
         activeMounts = await fetchActiveMounts();
-        
+        await fetchInjectedApps();
+
         const userRes = await run("pm list users");
         activeUsers = [];
         if (userRes) {
@@ -457,7 +505,17 @@ const renderAppList = () => {
                     </div>
                     <div class="app-content">
                         <div class="app-header"><span class="app-name ${isOverallDisabled ? 'text-muted' : ''}">${app.appLabel}</span>${mountedBadge}</div>
-                        <small class="text-muted font-monospace text-truncate d-block">${app.packageName}</small>
+                        ${(() => {
+                            const inj = injectedApps.get(app.packageName);
+                            if (inj) {
+                                const flags = [];
+                                if (inj.redirect === '1') flags.push('R');
+                                if (inj.hide === '1') flags.push('H');
+                                if (inj.ro === '1') flags.push('RO');
+                                return `<small class="text-muted font-monospace" style="font-size:10px;">PID:${inj.pid} ${flags.length ? flags.join(' ') : ''}</small>`;
+                            }
+                            return `<small class="text-muted font-monospace text-truncate d-block">${app.packageName}</small>`;
+                        })()}
                     </div>
                 </div>
                 <div class="app-end">${badges.join(' ')}</div>

@@ -31,6 +31,7 @@ let activeMounts = new Set();
 let injectedApps = new Map();
 let statusPolling = null;
 let currentAppFilter = 'filterUser';
+let usingFallback = false;
 let currentPid = null;
 let currentBindingPkg = null;
 let currentBindingUser = 0;
@@ -357,36 +358,49 @@ const loadData = async () => {
             }
         }
 
+        const buildAppMap = (src) => {
+            appMap.clear();
+            (src || []).forEach(info => {
+                if (!info || !info.packageName) return;
+                let appUsers = {}, isConfiguredAny = false;
+                activeUsers.forEach(uid => {
+                    const exactKey = `${info.packageName}:${uid}`;
+                    let state = injectorStates.get(exactKey) || injectorStates.get(info.packageName) || "ON";
+                    const ruleText = ruleFilesMap.get(exactKey) || "", hasRulesFile = ruleFilesMap.has(exactKey);
+                    const isEnabled = ruleFilesMap.get(`${exactKey}_enabled`) ? true : (ruleFilesMap.get(`${exactKey}_disabled`) ? false : (state === 'ON' && hasRulesFile));
+                    if (hasRulesFile || state === 'OFF') isConfiguredAny = true;
+                    appUsers[uid] = { isEnabled, text: ruleText, hasRules: /REDIRECT|HIDE|RO|ALLOW/.test(ruleText) || /REDIRECT|HIDE|RO|ALLOW/.test((injectorRulesMap.get(exactKey)||[]).join('')) };
+                });
+                appMap.set(info.packageName, { ...info, isConfigured: isConfiguredAny, users: appUsers });
+            });
+        };
+
         let infos = [];
+        let usedFallback = false;
         try {
             const allPkgs = [...new Set([...(await listPackages('user')||[]), ...(await listPackages('system')||[])])];
             if (allPkgs.length > 0) infos = await getPackagesInfo(allPkgs);
         } catch (e) {}
 
-        if (!Array.isArray(infos) || infos.length === 0) {
+        buildAppMap(infos);
+
+        if (appMap.size === 0) {
             const fallbackList = await run(`cat ${LIST_CONFIG} 2>/dev/null`);
-            if (fallbackList) fallbackList.split('\n').forEach(line => {
-                const tl = line.trim(); if (tl && !tl.startsWith('#') && tl.includes('=')) {
-                    const pkg = tl.substring(0, tl.indexOf('=')).trim();
-                    if (pkg) infos.push({ packageName: pkg, appLabel: tl.substring(tl.indexOf('=') + 1).trim() || pkg, isSystem: false });
-                }
-            });
+            if (fallbackList) {
+                infos = [];
+                fallbackList.split('\n').forEach(line => {
+                    const tl = line.trim(); if (tl && !tl.startsWith('#') && tl.includes('=')) {
+                        const pkg = tl.substring(0, tl.indexOf('=')).trim();
+                        if (pkg) infos.push({ packageName: pkg, appLabel: tl.substring(tl.indexOf('=') + 1).trim() || pkg, isSystem: false });
+                    }
+                });
+                buildAppMap(infos);
+                usedFallback = true;
+            }
         }
 
-        appMap.clear();
-        infos.forEach(info => {
-            if (!info || !info.packageName) return;
-            let appUsers = {}, isConfiguredAny = false;
-            activeUsers.forEach(uid => {
-                const exactKey = `${info.packageName}:${uid}`;
-                let state = injectorStates.get(exactKey) || injectorStates.get(info.packageName) || "ON";
-                const ruleText = ruleFilesMap.get(exactKey) || "", hasRulesFile = ruleFilesMap.has(exactKey);
-                const isEnabled = ruleFilesMap.get(`${exactKey}_enabled`) ? true : (ruleFilesMap.get(`${exactKey}_disabled`) ? false : (state === 'ON' && hasRulesFile));
-                if (hasRulesFile || state === 'OFF') isConfiguredAny = true;
-                appUsers[uid] = { isEnabled, text: ruleText, hasRules: /REDIRECT|HIDE|RO|ALLOW/.test(ruleText) || /REDIRECT|HIDE|RO|ALLOW/.test((injectorRulesMap.get(exactKey)||[]).join('')) };
-            });
-            appMap.set(info.packageName, { ...info, isConfigured: isConfiguredAny, users: appUsers });
-        });
+        usingFallback = usedFallback;
+        if (usedFallback) showToast("应用列表为空，已回退至兼容模式");
 
         renderAppList(); renderGlobalRules();
     } catch (e) { showToast("加载异常: " + e.message); }
@@ -397,6 +411,7 @@ const renderAppList = () => {
     const searchVal = document.getElementById('appSearch').value.toLowerCase();
     
     const items = Array.from(appMap.values()).filter(app => {
+        if (usingFallback && app.isSystem) return false;
         if (currentAppFilter === 'filterUser' && app.isSystem) return false;
         if (currentAppFilter === 'filterSystem' && !app.isSystem) return false;
         if (currentAppFilter === 'filterBound' && !app.isConfigured) return false;

@@ -300,6 +300,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     loadData(); checkStatus(); statusPolling = setInterval(checkStatus, 2000);
+    const closeBtns = document.querySelectorAll('.mx-btn-close');
+    closeBtns.forEach(btn => btn.innerHTML = ICONS.CLOSE);
 });
 
 // Setup Mode Toggles

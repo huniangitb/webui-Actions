@@ -296,7 +296,10 @@ body {
 .suggestion-item { padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--mx-border); display: flex; align-items: center; gap: 8px;}
 .suggestion-item:hover { background: var(--mx-s4); }
 .suggestion-item:last-child { border-bottom: none; }
-
+/* 运行日志容器顶部增加 10px 间隔 */
+#sec-log .mx-card {
+    margin-top: 10px;
+}
 /* Animations */
 .mx-anim-slide-up { animation: slideUp 0.3s var(--mx-ease) both; }
 .mx-anim-card-in { animation: cardIn 0.4s var(--mx-ease) both; animation-delay: 0.1s; }

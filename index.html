@@ -86,7 +86,7 @@
                         <div class="mx-pill-group" id="appFilterGroup">
                             <button class="active" data-filter="filterUser">用户</button>
                             <button data-filter="filterSystem">系统</button>
-                            <button data-filter="filterBound">已配</button>
+                            <button data-filter="filterBound">已配置App</button>
                         </div>
                     </div>
                     <div class="mx-card-body p-0 list-scrollable" id="appList"></div>
@@ -112,28 +112,28 @@
                         <div class="editor-pane active" id="globalVisual">
                             <div class="p-4 flex-col gap-4 overflow-y-auto" style="height:100%">
                                 <div class="mx-form-group flex-shrink-0">
-                                    <label class="mx-label">全局应用注入 (GLOBAL_INJECT)</label>
+                                    <label class="mx-label">全局应用注入</label>
                                     <select id="globalInjectSelect" class="mx-select">
                                         <option value="">默认 (关闭)</option>
-                                        <option value="ON">全局开启 (ON)</option>
-                                        <option value="OFF">全局关闭 (OFF)</option>
+                                        <option value="ON">开启</option>
+                                        <option value="OFF">关闭</option>
                                     </select>
                                 </div>
                                 <div class="grid-2 gap-4 flex-shrink-0">
                                     <div class="mx-form-group">
-                                        <label class="mx-label">全局监控 (MONITOR)</label>
+                                        <label class="mx-label">全局监控</label>
                                         <select id="globalMonitorSelect" class="mx-select">
                                             <option value="">默认 (OFF)</option>
-                                            <option value="ON">全局开启 (ON)</option>
-                                            <option value="OFF">全局关闭 (OFF)</option>
+                                            <option value="ON">全局开启</option>
+                                            <option value="OFF">全局关闭</option>
                                         </select>
                                     </div>
                                     <div class="mx-form-group">
-                                        <label class="mx-label">全局沙盒 (SANDBOX)</label>
+                                        <label class="mx-label">全局沙盒</label>
                                         <select id="globalSandboxSelect" class="mx-select">
-                                            <option value="">默认 (OFF)</option>
-                                            <option value="ON">全局开启 (ON)</option>
-                                            <option value="OFF">全局关闭 (OFF)</option>
+                                            <option value="">默认</option>
+                                            <option value="ON">开启</option>
+                                            <option value="OFF">关闭</option>
                                         </select>
                                     </div>
                                 </div>
@@ -182,13 +182,13 @@
             <div class="demo-section" id="sec-log">
                 <div class="mx-page-head mx-anim-slide-up">
                     <h1 class="mx-page-title">运行日志</h1>
-                    <p class="mx-page-sub">结构化后台注入器输出</p>
+                    <!-- <p class="mx-page-sub">结构化后台注入器输出</p> -->
                 </div>
 
                 <div class="mx-card mx-anim-card-in flex-col-full" style="max-height: calc(100vh - 180px);">
                     <div class="mx-card-head">
                         <select id="logSourceSelect" class="mx-select" style="width: 160px;">
-                            <option value="internal">注入器日志</option>
+                            <option value="internal">注入日志</option>
                             <option value="zygisk">Zygisk (Logcat)</option>
                         </select>
                         <button class="mx-btn mx-btn-danger mx-btn-sm" id="btnClearLog">清空日志</button>
@@ -256,19 +256,19 @@
 
                         <div class="grid-2 gap-4 flex-shrink-0">
                             <div class="mx-form-group">
-                                <label class="mx-label">监控 (MONITOR)</label>
+                                <label class="mx-label">监控</label>
                                 <select id="appMonitorSelect" class="mx-select">
                                     <option value="">跟随全局</option>
-                                    <option value="ON">强制开启 (ON)</option>
-                                    <option value="OFF">强制关闭 (OFF)</option>
+                                    <option value="ON">开启</option>
+                                    <option value="OFF">关闭</option>
                                 </select>
                             </div>
                             <div class="mx-form-group">
-                                <label class="mx-label">沙盒 (SANDBOX)</label>
+                                <label class="mx-label">沙盒</label>
                                 <select id="appSandboxSelect" class="mx-select">
                                     <option value="">跟随全局</option>
-                                    <option value="ON">强制开启 (ON)</option>
-                                    <option value="OFF">强制关闭 (OFF)</option>
+                                    <option value="ON">开启</option>
+                                    <option value="OFF">关闭</option>
                                 </select>
                             </div>
                         </div>

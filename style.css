@@ -280,13 +280,19 @@ body {
 .sys-log-msg { font-size: 12px; font-family: var(--mx-font-mono); color: var(--mx-t1); word-break: break-all; }
 .sys-log-raw { font-size: 11px; font-family: var(--mx-font-mono); color: var(--mx-t2); }
 
-.op-OPEN, .op-READDIR { background: #17a2b8; }
-.op-READ, .op-GETATTR { background: #28a745; }
-.op-WRITE, .op-SETATTR { background: #fd7e14; }
-.op-CLOSE, .op-FSYNC { background: #6c757d; }
+.op-OPENDIR, .op-OPEN, .op-READDIR { background: #17a2b8; }
+.op-ACCESS, .op-READ, .op-GETATTR { background: #28a745; }
+.op-TRUNCATE, .op-FALLOCATE, .op-WRITE, .op-SETATTR { background: #fd7e14; }
+.op-FLUSH, .op-RELEASE, .op-RELEASEDIR, .op-CLOSE, .op-FSYNC { background: #6c757d; }
 .op-UNLINK, .op-RMDIR { background: #dc3545; }
 .op-MKDIR, .op-CREATE { background: #6f42c1; }
 .op-RENAME { background: #ff5722; }
+.op-READLINK { background: #20c997; }
+.op-STATFS { background: #6610f2; }
+.op-LOCK, .op-FLOCK { background: #e83e8c; }
+.op-GETXATTR, .op-SETXATTR, .op-LISTXATTR, .op-REMOVEXATTR { background: #7952b3; }
+.op-IOCTL { background: #343a40; }
+.op-SYMLINK, .op-LINK { background: #0dcaf0; }
 
 /* Editors & Viewers */
 .mx-code-editor { width: 100%; height: 100%; background: var(--mx-s1); color: var(--mx-t1); border: none; padding: 16px; font-family: var(--mx-font-mono); font-size: 12px; resize: none; line-height: 1.5; }

@@ -3,9 +3,10 @@ import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { getSettings, saveSettings, checkPluginInstalled, syncToPlugin } from './plugin.js';
 import { 
     mdiAndroid, mdiDelete, mdiFolder, mdiFile, 
-    mdiMagnify, mdiPlus, mdiClose, mdiFilterVariant, 
-    mdiStop, mdiPlay, mdiEyeOff, mdiDeleteSweep, mdiClockOutline, 
-    mdiAccountCircle, mdiCog, mdiViewGrid, mdiEarth, mdiChartTimelineVariant
+    mdiMagnify, mdiPlus, mdiClose,
+    mdiFilterVariant, mdiStop, mdiPlay,
+    mdiEyeOff, mdiDeleteSweep, mdiClockOutline, mdiAccountCircle, mdiCog,
+    mdiApps, mdiEarth, mdiEye, mdiMathLog
 } from '@mdi/js';
 
 const BASE_DIR = "/data/Namespace-Proxy";
@@ -22,7 +23,7 @@ let globalConfText = "";
 let injectorStates = new Map();
 let injectorRulesMap = new Map();
 
-let activeUsers =[0];
+let activeUsers = [0];
 let activeMounts = new Set();
 let injectedApps = new Map(); 
 let statusPolling = null;
@@ -44,22 +45,22 @@ const ICONS = {
     ANDROID: getSvg(mdiAndroid, 32, 'var(--mx-text-muted)'),
     DELETE: getSvg(mdiDelete, 20, 'currentColor'),
     FOLDER: getSvg(mdiFolder, 18, '#ffca28'),
-    FILE: getSvg(mdiFile, 18, '#9e9e9e'),
+    FILE: getSvg(mdiFile, 18, 'var(--mx-text-muted)'),
     SEARCH: getSvg(mdiMagnify, 20, 'currentColor'),
     PLUS: getSvg(mdiPlus, 18, 'currentColor'),
     CLOSE: getSvg(mdiClose, 24, 'currentColor'),
     FILTER: getSvg(mdiFilterVariant, 24, '#fff'),
-    STOP: getSvg(mdiStop, 22, 'var(--mx-red)'),
-    PLAY: getSvg(mdiPlay, 22, 'var(--mx-green)'),
+    STOP: getSvg(mdiStop, 22, 'currentColor'),
+    PLAY: getSvg(mdiPlay, 22, 'currentColor'),
     EYE_OFF: getSvg(mdiEyeOff, 20, 'currentColor'),
     CLEAR: getSvg(mdiDeleteSweep, 24, '#fff'),
-    CLOCK: getSvg(mdiClockOutline, 14, 'currentColor'),
+    CLOCK: getSvg(mdiClockOutline, 16, 'currentColor'),
     USER: getSvg(mdiAccountCircle, 16, 'currentColor'),
     COG: getSvg(mdiCog, 22, 'currentColor'),
-    NAV_APPS: getSvg(mdiViewGrid, 24, 'currentColor'),
+    NAV_APPS: getSvg(mdiApps, 24, 'currentColor'),
     NAV_GLOBAL: getSvg(mdiEarth, 24, 'currentColor'),
-    NAV_IO: getSvg(mdiChartTimelineVariant, 24, 'currentColor'),
-    NAV_LOG: getSvg(mdiText, 24, 'currentColor')
+    NAV_IO: getSvg(mdiEye, 24, 'currentColor'),
+    NAV_LOG: getSvg(mdiMathLog, 24, 'currentColor')
 };
 
 window.onIconError = (ele) => {
@@ -148,15 +149,15 @@ const checkStatus = async () => {
         currentPid = pid ? pid.split(' ')[0] : null;
 
         if (currentPid) {
-            badge.className = "badge badge-success"; badge.textContent = "RUNNING"; info.textContent = `PID: ${currentPid}`;
+            badge.className = "status-dot running"; info.textContent = `PID: ${currentPid}`;
             if (toggleBtn.getAttribute('data-status') !== 'running') {
-                toggleBtn.innerHTML = ICONS.STOP;
+                toggleBtn.innerHTML = ICONS.STOP; toggleBtn.style.color = "var(--mx-red)";
                 toggleBtn.setAttribute('data-status', 'running');
             }
         } else {
-            badge.className = "badge badge-gray"; badge.textContent = "STOPPED"; info.textContent = "OFFLINE";
+            badge.className = "status-dot"; info.textContent = "OFFLINE";
             if (toggleBtn.getAttribute('data-status') !== 'stopped') {
-                toggleBtn.innerHTML = ICONS.PLAY;
+                toggleBtn.innerHTML = ICONS.PLAY; toggleBtn.style.color = "var(--mx-green)";
                 toggleBtn.setAttribute('data-status', 'stopped');
             }
         }
@@ -169,7 +170,7 @@ const checkStatus = async () => {
             if (!small) return;
             const inj = injectedApps.get(pkg);
             if (inj) {
-                const flags =[];
+                const flags = [];
                 if (inj.redirect === '1') flags.push('<span class="inj-flag inj-flag-r">R</span>');
                 if (inj.hide === '1') flags.push('<span class="inj-flag inj-flag-h">H</span>');
                 if (inj.ro === '1') flags.push('<span class="inj-flag inj-flag-ro">RO</span>');
@@ -177,7 +178,7 @@ const checkStatus = async () => {
                 small.innerHTML = `<span class="inj-pid">PID ${inj.pid}</span> ${flags.join(' ')}`;
             } else {
                 small.className = 'text-muted text-truncate d-block';
-                small.style.fontFamily = "ui-monospace, monospace";
+                small.style.fontFamily = "monospace";
                 small.textContent = pkg;
             }
         });
@@ -198,10 +199,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setIcon('iconNavGlobal', ICONS.NAV_GLOBAL);
     setIcon('iconNavIo', ICONS.NAV_IO);
     setIcon('iconNavLog', ICONS.NAV_LOG);
-    
+
     document.getElementById('btnGlobalAddRule').innerHTML = `${ICONS.PLUS} 添加规则`;
     document.getElementById('btnAppAddRule').innerHTML = `${ICONS.PLUS} 添加规则`;
-    document.getElementById('btnAddIgnoreRow').innerHTML = `${ICONS.PLUS} 添加路径`;
+    document.getElementById('btnAddIgnoreRow').innerHTML = `${ICONS.PLUS} 添加忽略路径`;
 
     loadData();
     checkStatus();
@@ -257,9 +258,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     if (logViewer) {
-        logViewer.parentNode.addEventListener('scroll', () => {
-            const scroller = logViewer.parentNode;
-            if (logSelect.value === 'internal' && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 50) fetchSysLogs();
+        logViewer.addEventListener('scroll', () => {
+            if (logSelect.value === 'internal' && logViewer.scrollTop + logViewer.clientHeight >= logViewer.scrollHeight - 50) fetchSysLogs();
         });
     }
 
@@ -297,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.visualViewport.addEventListener('resize', () => {
             const box = document.getElementById('suggestionBox');
             if (box) box.style.display = 'none';
-            if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+            if (document.activeElement && document.activeElement.classList.contains('mx-input')) {
                 setTimeout(() => { document.activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150);
             }
         });
@@ -309,11 +309,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (box && box.style.display !== 'none') box.style.display = 'none';
         }
     }, true);
-    
+
     // Bottom Navigation Logic
-    document.querySelectorAll('.mx-bottom-nav .nav-item').forEach(btn => {
+    document.querySelectorAll('.bottom-nav .nav-item').forEach(btn => {
         btn.onclick = () => {
-            document.querySelectorAll('.mx-bottom-nav .nav-item').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.bottom-nav .nav-item').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
             btn.classList.add('active');
             const targetId = btn.dataset.target;
@@ -340,7 +340,7 @@ const loadData = async () => {
         await fetchInjectedApps();
 
         const userRes = await run("pm list users");
-        activeUsers =[];
+        activeUsers = [];
         if (userRes) {
             const matches = userRes.matchAll(/UserInfo\{(\d+):/g);
             for (const m of matches) activeUsers.push(parseInt(m[1]));
@@ -362,13 +362,13 @@ const loadData = async () => {
                     currentSection = secMatch[1];
                     if (currentSection !== 'GLOBAL') injectorStates.set(currentSection, secMatch[2] || "ON");
                     if (!injectorRulesMap.has(currentSection)) {
-                        injectorRulesMap.set(currentSection,[]);
+                        injectorRulesMap.set(currentSection, []);
                     }
                 } else if (currentSection) {
                     injectorRulesMap.get(currentSection).push(tLine);
                 }
             });
-            globalConfText = (injectorRulesMap.get('GLOBAL') ||[]).join('\n');
+            globalConfText = (injectorRulesMap.get('GLOBAL') || []).join('\n');
         }
 
         let ruleFilesMap = new Map();
@@ -388,10 +388,10 @@ const loadData = async () => {
             }
         }
 
-        let infos =[];
+        let infos = [];
         try {
-            const userPkgs = await listPackages('user') ||[];
-            const systemPkgs = await listPackages('system') ||[];
+            const userPkgs = await listPackages('user') || [];
+            const systemPkgs = await listPackages('system') || [];
             const allPkgs = [...new Set([...userPkgs, ...systemPkgs])];
             if (allPkgs.length > 0) {
                 infos = await getPackagesInfo(allPkgs);
@@ -402,7 +402,7 @@ const loadData = async () => {
 
         if (!Array.isArray(infos) || infos.length === 0) {
             const fallbackList = await run(`cat ${LIST_CONFIG} 2>/dev/null`);
-            infos =[];
+            infos = [];
             if (fallbackList) {
                 fallbackList.split('\n').forEach(line => {
                     const trimLine = line.trim();
@@ -483,7 +483,7 @@ const renderAppList = () => {
                     observer.unobserve(img);
                 }
             });
-        }, { root: listEl, rootMargin: '100px 0px' });
+        }, { root: document.querySelector('.pane-content'), rootMargin: '100px 0px' });
     } else {
         iconObserver.disconnect();
     }
@@ -499,7 +499,7 @@ const renderAppList = () => {
     listEl.innerHTML = '';
     
     if (items.length === 0) {
-        listEl.innerHTML = '<div style="padding:40px; text-align:center; color:var(--mx-text-muted);">无匹配应用</div>';
+        listEl.innerHTML = '<div style="padding:60px 20px; text-align:center; color:var(--mx-text-muted); font-size: 14px;">没有找到匹配的应用</div>';
         return;
     }
 
@@ -526,20 +526,20 @@ const renderAppList = () => {
             <div class="list-item" data-pkg="${app.packageName}" onclick="openAppConfig('${app.packageName}')">
                 <div class="app-main">
                     <div class="app-icon-wrapper">
-                        <img data-src="ksu://icon/${app.packageName}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="lazy-icon" onerror="window.onIconError(this)" />
+                        <img data-src="ksu://icon/${app.packageName}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="width: 100%; height: 100%; object-fit: cover;" class="lazy-icon" onerror="window.onIconError(this)" />
                     </div>
                     <div class="app-content">
                         <div class="app-header"><span class="app-name ${isOverallDisabled ? 'text-muted' : ''}">${app.appLabel}</span>${mountedBadge}</div>
                         ${(() => {
                             const inj = injectedApps.get(app.packageName);
                             if (inj) {
-                                const flags =[];
+                                const flags = [];
                                 if (inj.redirect === '1') flags.push('<span class="inj-flag inj-flag-r">R</span>');
                                 if (inj.hide === '1') flags.push('<span class="inj-flag inj-flag-h">H</span>');
                                 if (inj.ro === '1') flags.push('<span class="inj-flag inj-flag-ro">RO</span>');
-                                return `<small class="inj-status"><span class="inj-pid">PID ${inj.pid}</span> ${flags.join(' ')}</small>`;
+                                return `<div class="inj-status"><span class="inj-pid">PID ${inj.pid}</span> ${flags.join(' ')}</div>`;
                             }
-                            return `<small class="text-muted text-truncate d-block" style="font-family:ui-monospace, monospace;">${app.packageName}</small>`;
+                            return `<small class="text-muted text-truncate" style="font-family:monospace; font-size:12px; display:block;">${app.packageName}</small>`;
                         })()}
                     </div>
                 </div>
@@ -637,7 +637,7 @@ const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelec
 const addRuleRow = (type, target, source, containerId) => {
     const div = document.createElement('div');
     div.className = 'rule-row';
-    div.innerHTML = `<select class="mx-select rule-type" style="width:110px;"><option value="REDIRECT">重定向</option><option value="HIDE">隐藏</option><option value="RO">只读</option><option value="ALLOW">沙盒豁免</option></select><div style="flex:1; display:flex; gap:8px;"><input type="text" class="mx-select rule-target" placeholder="原始路径" value="${target}"><input type="text" class="mx-select rule-source ${type!=='REDIRECT'?'hidden':''}" placeholder="重定向至" value="${source}"></div><button class="mx-btn mx-btn-icon mx-btn-text btn-del">${ICONS.DELETE}</button>`;
+    div.innerHTML = `<select class="mx-select rule-type" style="width:100px; height:36px;"><option value="REDIRECT">重定向</option><option value="HIDE">隐藏</option><option value="RO">只读</option><option value="ALLOW">沙盒豁免</option></select><div style="flex:1; display:flex; flex-direction:column; gap:6px;"><input type="text" class="mx-input rule-target" placeholder="原始路径" value="${target}" style="height:36px;"><input type="text" class="mx-input rule-source ${type!=='REDIRECT'?'hidden':''}" placeholder="重定向至" value="${source}" style="height:36px;"></div><button class="mx-btn icon-btn btn-del" style="color:var(--mx-text-muted);">${ICONS.DELETE}</button>`;
     const select = div.querySelector('.rule-type');
     select.value = type;
     select.onchange = (e) => div.querySelector('.rule-source').classList.toggle('hidden', e.target.value !== 'REDIRECT');
@@ -668,7 +668,7 @@ const flushInjectorConf = async () => {
     injectorStates.forEach((state, key) => {
         if (key === 'GLOBAL') return;
         res += `[${key}] ${state}\n`;
-        const inlineRules = injectorRulesMap.get(key) ||[];
+        const inlineRules = injectorRulesMap.get(key) || [];
         if (inlineRules.length > 0) {
             res += inlineRules.join('\n') + '\n';
         }
@@ -743,7 +743,7 @@ document.getElementById('btnSaveAppConfig').onclick = async () => {
         }
         
         await flushInjectorConf();
-        toast("当前用户应用配置已保存");
+        toast("应用配置已保存");
         closeModal('appConfigModal');
         await loadData();
         await syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates);
@@ -764,7 +764,7 @@ document.getElementById('btnDeleteAppConfig').onclick = async () => {
         await loadData();
         await syncToPlugin(appMap, globalConfText, injectorRulesMap, injectorStates);
         
-        toast("配置已清除并同步");
+        toast("配置已清除");
         closeModal('appConfigModal');
     } catch (e) {
         toast("清除失败: " + e.message);
@@ -824,16 +824,16 @@ const updateBoxPosition = (input) => {
             box.style.top = 'auto'; 
             box.style.bottom = (vh - rect.top) + 'px';
             box.style.maxHeight = (rect.top - 10) + 'px'; 
-            box.style.borderRadius = '16px 16px 0 0';
+            box.style.borderRadius = 'var(--mx-r-sm) var(--mx-r-sm) 0 0';
             box.style.borderBottom = 'none'; 
-            box.style.borderTop = '1px solid var(--mx-s3)';
+            box.style.borderTop = '1px solid var(--mx-s4)';
         } else {
             box.style.top = rect.bottom + 'px'; 
             box.style.bottom = 'auto';
             box.style.maxHeight = (vh - rect.bottom - 10) + 'px'; 
-            box.style.borderRadius = '0 0 16px 16px';
+            box.style.borderRadius = '0 0 var(--mx-r-sm) var(--mx-r-sm)';
             box.style.borderTop = 'none'; 
-            box.style.borderBottom = '1px solid var(--mx-s3)';
+            box.style.borderBottom = '1px solid var(--mx-s4)';
         }
     });
 };
@@ -915,7 +915,7 @@ const generateIgnoreFromVisual = () => {
 };
 const addIgnoreRow = (path) => {
     const div = document.createElement('div'); div.className = 'rule-row';
-    div.innerHTML = `<input type="text" class="mx-select" placeholder="输入要忽略的路径前缀" value="${path}" style="flex:1;"><button class="mx-btn mx-btn-icon mx-btn-text btn-del">${ICONS.DELETE}</button>`;
+    div.innerHTML = `<input type="text" class="mx-input" placeholder="输入要忽略的路径前缀" value="${path}" style="flex:1; height:36px;"><button class="mx-btn icon-btn btn-del" style="color:var(--mx-text-muted);">${ICONS.DELETE}</button>`;
     div.querySelector('.btn-del').onclick = () => div.remove(); setupAutocomplete(div.querySelector('input'));
     document.getElementById('ignoreBuilderContainer').appendChild(div);
 };
@@ -934,7 +934,7 @@ document.getElementById('btnSaveIgnore').onclick = async () => {
         const isVisual = document.querySelector('input[name="ignoreMode"][value="visual"]').checked;
         const content = isVisual ? generateIgnoreFromVisual() : document.getElementById('monitorIgnoreContent').value;
         await exec(`echo '${content.trim()}' > ${MONITOR_IGNORE_CONF}`);
-        toast("忽略配置已保存"); closeModal('monitorIgnoreModal');
+        toast("监控过滤配置已保存"); closeModal('monitorIgnoreModal');
     } catch (e) { toast("保存失败: " + e.message); }
 };
 
@@ -970,7 +970,7 @@ const fetchIoLogs = async () => {
                 renderIoRows(dataLines);
             } else {
                 if (!ioState.hasMore && ioState.offset === 0) {
-                    document.getElementById('ioLogList').innerHTML = '<div style="padding:40px; text-align:center; color:var(--mx-text-muted);">暂无监控数据</div>';
+                    document.getElementById('ioLogList').innerHTML = '<div style="padding:40px; text-align:center; color:var(--mx-text-muted); font-size: 13px;">暂无监控数据</div>';
                 }
             }
         }
@@ -1015,6 +1015,7 @@ const renderIoRows = (lines) => {
         const app = appMap.get(pkg);
         const appName = app ? app.appLabel : pkg;
 
+        // Note: The specific op-CLASS will override the base .io-op style if defined in CSS.
         return `<div class="io-card">
                     <div class="io-card-header">
                         <div class="io-time">${ICONS.CLOCK} <span>${timeStr}</span></div>
@@ -1035,7 +1036,7 @@ const fetchSysLogs = async () => {
     if (source === 'zygisk') {
         try {
             const content = await run("logcat -d -s Zygisk_NSProxy NamespaceProxy_Injector");
-            viewer.textContent = content || "无 Zygisk 日志";
+            viewer.textContent = content || "暂无 Zygisk 日志记录";
             viewer.scrollTop = viewer.scrollHeight;
         } catch (e) { toast("获取 Logcat 失败"); }
         return;
@@ -1071,7 +1072,7 @@ const fetchSysLogs = async () => {
                 const text = dataLines.join('\n') + '\n';
                 viewer.insertAdjacentText('beforeend', text);
             } else {
-                if (sysState.offset === 0) viewer.textContent = "无内部日志";
+                if (sysState.offset === 0) viewer.textContent = "暂无内部日志记录";
             }
         }
     } catch (e) { sysState.hasMore = false; } finally {

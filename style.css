@@ -284,6 +284,14 @@ input:checked + .slider:before { transform: translateX(20px); }
 .break-all { word-break: break-all; }
 .empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px; }
 
+/* 注入状态样式 */
+.inj-status { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 10px; }
+.inj-pid { color: var(--text-muted); font-family: var(--code-font); opacity: 0.8; }
+.inj-flag { padding: 1px 6px; border-radius: 3px; font-weight: 700; font-size: 9px; color: #fff; line-height: 1.5; display: inline-block; }
+.inj-flag-r { background: var(--primary); }
+.inj-flag-h { background: #e67e22; color: #fff; }
+.inj-flag-ro { background: var(--danger); }
+
 /* IO Tag Colors */
 .op-OPEN { background: #17a2b8; }
 .op-READ { background: #28a745; }

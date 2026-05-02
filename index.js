@@ -171,16 +171,14 @@ const checkStatus = async () => {
             const inj = injectedApps.get(pkg);
             if (inj) {
                 const flags = [];
-                if (inj.redirect === '1') flags.push('R');
-                if (inj.hide === '1') flags.push('H');
-                if (inj.ro === '1') flags.push('RO');
-                small.textContent = `PID:${inj.pid} ${flags.join(' ')}`;
-                small.classList.remove('text-truncate', 'd-block');
-                small.style.fontSize = '10px';
+                if (inj.redirect === '1') flags.push('<span class="inj-flag inj-flag-r">R</span>');
+                if (inj.hide === '1') flags.push('<span class="inj-flag inj-flag-h">H</span>');
+                if (inj.ro === '1') flags.push('<span class="inj-flag inj-flag-ro">RO</span>');
+                small.className = 'inj-status';
+                small.innerHTML = `<span class="inj-pid">PID ${inj.pid}</span> ${flags.join(' ')}`;
             } else {
+                small.className = 'text-muted font-monospace text-truncate d-block';
                 small.textContent = pkg;
-                small.classList.add('text-truncate', 'd-block');
-                small.style.fontSize = '';
             }
         });
     } catch (e) {}
@@ -509,10 +507,10 @@ const renderAppList = () => {
                             const inj = injectedApps.get(app.packageName);
                             if (inj) {
                                 const flags = [];
-                                if (inj.redirect === '1') flags.push('R');
-                                if (inj.hide === '1') flags.push('H');
-                                if (inj.ro === '1') flags.push('RO');
-                                return `<small class="text-muted font-monospace" style="font-size:10px;">PID:${inj.pid} ${flags.length ? flags.join(' ') : ''}</small>`;
+                                if (inj.redirect === '1') flags.push('<span class="inj-flag inj-flag-r">R</span>');
+                                if (inj.hide === '1') flags.push('<span class="inj-flag inj-flag-h">H</span>');
+                                if (inj.ro === '1') flags.push('<span class="inj-flag inj-flag-ro">RO</span>');
+                                return `<small class="inj-status"><span class="inj-pid">PID ${inj.pid}</span> ${flags.join(' ')}</small>`;
                             }
                             return `<small class="text-muted font-monospace text-truncate d-block">${app.packageName}</small>`;
                         })()}

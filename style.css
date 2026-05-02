@@ -291,7 +291,14 @@ body {
 .mx-toast-container { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 3000; display: flex; flex-direction: column; gap: 8px; pointer-events: none;}
 .mx-toast { background: var(--mx-s3); color: var(--mx-t1); padding: 10px 16px; border-radius: 24px; font-size: 13px; font-weight: 500; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); animation: toastIn 0.3s var(--mx-spring); pointer-events: auto;}
 @keyframes toastIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
+/* style.css */
+/* 确保监控列表的时间图标显示正常 */
+.io-time svg { 
+    display: flex; 
+    align-items: center; 
+    flex-shrink: 0; 
+    color: var(--mx-t2); 
+}
 .suggestion-box { position: fixed; background: var(--mx-s3); border: 1px solid var(--mx-border); border-radius: 12px; box-shadow: var(--mx-shadow); z-index: 3000; overflow-y: auto; display: none; }
 .suggestion-item { padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--mx-border); display: flex; align-items: center; gap: 8px;}
 .suggestion-item:hover { background: var(--mx-s4); }

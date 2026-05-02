@@ -5,11 +5,11 @@ import {
     mdiMathLog, mdiViewGridOutline, mdiMonitorDashboard, mdiWrench,
     mdiMagnify, mdiCog, mdiClose, mdiPlus, mdiDeleteOutline, 
     mdiWeatherNight, mdiWhiteBalanceSunny, mdiStopCircleOutline, mdiPlayCircleOutline,
-    mdiFolderOutline, mdiFileOutline, mdiEyeOffOutline, mdiDeleteSweepOutline
+    mdiFolderOutline, mdiFileOutline, mdiEyeOffOutline, mdiDeleteSweepOutline, mdiClockOutline
 } from '@mdi/js';
 
 // Setup KernelSU immersive mode
-try { fullScreen(true); enableEdgeToEdge(true); } catch(e) {}
+try { fullScreen(true); enableEdgeToEdge(false); } catch(e) {}
 
 const BASE_DIR = "/data/Namespace-Proxy";
 const INJECTOR_CONF = `${BASE_DIR}/injector.conf`;
@@ -63,6 +63,7 @@ const ICONS = {
     FILE: getSvg(mdiFileOutline, 16),
     IGNORE: getSvg(mdiEyeOffOutline),
     SWEEP: getSvg(mdiDeleteSweepOutline)
+    CLOCK: getSvg(mdiClockOutline, 14, 'var(--mx-t2)'),
 };
 
 const showToast = (msg) => {
@@ -539,7 +540,9 @@ const renderIoRows = (lines) => {
         return `
         <div class="io-item">
             <div class="io-header">
-                <span class="io-time">${timeStr}</span>
+                <span class="io-time" style="display:flex; align-items:center; gap:4px;">
+            ${ICONS.CLOCK}
+            <span>${timeStr}</span>
                 <span class="io-app">${appName}</span>
                 <span class="io-op op-${op}">${op}</span>
             </div>

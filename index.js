@@ -1,4 +1,3 @@
---- START OF FILE index.js ---
 import './style.css';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { getSettings, saveSettings, checkPluginInstalled, syncToPlugin } from './plugin.js';

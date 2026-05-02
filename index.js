@@ -5,7 +5,7 @@ import {
     mdiAndroid, mdiDelete, mdiFolder, mdiFile, 
     mdiMagnify, mdiPlus, mdiClose, mdiFilterVariant, 
     mdiStop, mdiPlay, mdiEyeOff, mdiDeleteSweep, mdiClockOutline, 
-    mdiAccountCircle, mdiCog, mdiViewGrid, mdiEarth, mdiChartTimelineVariant, mdiTextDocument
+    mdiAccountCircle, mdiCog, mdiViewGrid, mdiEarth, mdiChartTimelineVariant
 } from '@mdi/js';
 
 const BASE_DIR = "/data/Namespace-Proxy";
@@ -59,7 +59,7 @@ const ICONS = {
     NAV_APPS: getSvg(mdiViewGrid, 24, 'currentColor'),
     NAV_GLOBAL: getSvg(mdiEarth, 24, 'currentColor'),
     NAV_IO: getSvg(mdiChartTimelineVariant, 24, 'currentColor'),
-    NAV_LOG: getSvg(mdiTextDocument, 24, 'currentColor')
+    NAV_LOG: getSvg(mdiText, 24, 'currentColor')
 };
 
 window.onIconError = (ele) => {

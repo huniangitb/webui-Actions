@@ -540,11 +540,11 @@ const renderIoRows = (lines) => {
         return `
         <div class="io-item">
             <div class="io-header">
-                <span class="io-time" style="display:flex; align-items:center; gap:4px;">
+              <span class="io-time" style="display:flex; align-items:center; gap:4px;">
             ${ICONS.CLOCK}
             <span>${timeStr}</span>
                 <span class="io-app">${appName}</span>
-                <span class="io-op op-${op}">${op}</span>
+                <span class="io-op op-${op}" style="margin-left: auto;">${op}</span>
             </div>
             <div class="io-detail">${details}</div>
         </div>`;

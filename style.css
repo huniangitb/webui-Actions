@@ -292,12 +292,43 @@ input:checked + .slider:before { transform: translateX(20px); }
 .inj-flag-h { background: #e67e22; color: #fff; }
 .inj-flag-ro { background: var(--danger); }
 
-/* IO Tag Colors */
+/* IO Tag Colors - 文件操作类型 */
+/* 文件描述符操作 */
 .op-OPEN { background: #17a2b8; }
+.op-CLOSE { background: #5bc0de; }
 .op-READ { background: #28a745; }
 .op-WRITE { background: #fd7e14; }
 .op-CREATE { background: #6f42c1; }
+/* 目录操作 */
+.op-OPENDIR { background: #00bcd4; }
+.op-READDIR { background: #26c6da; }
 .op-MKDIR { background: #6610f2; }
 .op-RMDIR { background: #dc3545; }
+.op-STAT { background: #1e88e5; }
+/* 文件系统操作 */
 .op-UNLINK { background: #e83e8c; }
+.op-RENAME { background: #ff5722; }
+.op-LINK { background: #795548; }
+.op-SYMLINK { background: #8d6e63; }
+.op-READLINK { background: #a1887f; }
+/* 属性操作 */
+.op-GETATTR { background: #42a5f5; }
+.op-SETATTR { background: #1e88e5; }
+.op-ACCESS { background: #90a4ae; }
+.op-CHMOD { background: #ff9800; }
+.op-CHOWN { background: #f57c00; }
+/* 扩展属性 */
+.op-GETXATTR { background: #7e57c2; }
+.op-SETXATTR { background: #5e35b1; }
+.op-LISTXATTR { background: #9575cd; }
+/* 文件操作 */
+.op-TRUNCATE { background: #d32f2f; }
+.op-FSYNC { background: #00897b; }
+.op-MMAP { background: #00acc1; }
+.op-IOCTL { background: #546e7a; }
+.op-FALLOCATE { background: #78909c; }
+/* 杂项 */
 .op-INFO { background: #6c757d; }
+.op-LOOKUP { background: #26a69a; }
+.op-READPLUS { background: #66bb6a; }
+.op-WRITEPLUS { background: #ef5350; }

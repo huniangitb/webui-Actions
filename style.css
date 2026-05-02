@@ -260,8 +260,8 @@ body {
 
 /* IO Logs specific */
 .io-item { background: var(--mx-s2); border: 1px solid var(--mx-border); border-radius: 12px; padding: 12px; flex-shrink: 0; }
-.io-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap:8px;}
-.io-time { font-size: 11px; color: var(--mx-t2); font-family: var(--mx-font-mono); flex-shrink:0; white-space: nowrap; min-width: max-content; }
+.io-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap:8px;overflow: hidden; }
+.io-time { font-size: 11px; color: var(--mx-t2); font-family: var(--mx-font-mono); flex-shrink:0; white-space: nowrap; min-width: 75px; }
 .io-app { font-weight: 600; font-size: 13px; color: var(--mx-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;}
 .io-op { padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; color: #fff; font-family: var(--mx-font-mono); flex-shrink:0; background: var(--mx-gray); }
 .io-detail { background: var(--mx-s1); padding: 8px; border-radius: 8px; font-size: 12px; font-family: var(--mx-font-mono); color: var(--mx-t1); word-break: break-all; border: 1px solid var(--mx-border); }
@@ -296,8 +296,7 @@ body {
 .suggestion-item { padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--mx-border); display: flex; align-items: center; gap: 8px;}
 .suggestion-item:hover { background: var(--mx-s4); }
 .suggestion-item:last-child { border-bottom: none; }
-/* 运行日志容器顶部增加 10px 间隔 */
-#sec-log .mx-card {
+#logViewer {
     margin-top: 10px;
 }
 /* Animations */

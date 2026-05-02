@@ -2,10 +2,10 @@ import './style.css';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { getSettings, saveSettings, checkPluginInstalled, syncToPlugin } from './plugin.js';
 import { 
-    mdiAndroid, mdiLayers, mdiDelete, mdiFolder, mdiFile, 
-    mdiRefresh, mdiMagnify, mdiPlus, mdiClose, mdiChevronRight,
-    mdiFilterVariant, mdiViewGrid, mdiViewList, mdiStop, mdiPlay,
-    mdiEyeOff, mdiDeleteSweep, mdiClockOutline, mdiShieldAccount, mdiAccountCircle, mdiCog
+    mdiAndroid, mdiDelete, mdiFolder, mdiFile, 
+    mdiMagnify, mdiPlus, mdiClose, mdiFilterVariant, 
+    mdiStop, mdiPlay, mdiEyeOff, mdiDeleteSweep, mdiClockOutline, 
+    mdiAccountCircle, mdiCog, mdiViewGrid, mdiEarth, mdiChartTimelineVariant, mdiTextDocument
 } from '@mdi/js';
 
 const BASE_DIR = "/data/Namespace-Proxy";
@@ -41,22 +41,25 @@ let renderQueueId = null;
 const getSvg = (path, size = 24, color = 'currentColor') => `<svg viewBox="0 0 24 24" fill="${color}" width="${size}" height="${size}"><path d="${path}"/></svg>`;
 
 const ICONS = {
-    ANDROID: getSvg(mdiAndroid, 32, '#757575'),
-    DELETE: getSvg(mdiDelete, 18, 'currentColor'),
-    FOLDER: getSvg(mdiFolder, 16, '#ffca28'),
-    FILE: getSvg(mdiFile, 16, '#9e9e9e'),
-    SEARCH: getSvg(mdiMagnify, 18, 'currentColor'),
-    PLUS: getSvg(mdiPlus, 16, '#fff'),
+    ANDROID: getSvg(mdiAndroid, 32, 'var(--mx-text-muted)'),
+    DELETE: getSvg(mdiDelete, 20, 'currentColor'),
+    FOLDER: getSvg(mdiFolder, 18, '#ffca28'),
+    FILE: getSvg(mdiFile, 18, '#9e9e9e'),
+    SEARCH: getSvg(mdiMagnify, 20, 'currentColor'),
+    PLUS: getSvg(mdiPlus, 18, 'currentColor'),
     CLOSE: getSvg(mdiClose, 24, 'currentColor'),
     FILTER: getSvg(mdiFilterVariant, 24, '#fff'),
-    STOP: getSvg(mdiStop, 20, 'currentColor'),
-    PLAY: getSvg(mdiPlay, 20, 'currentColor'),
+    STOP: getSvg(mdiStop, 22, 'var(--mx-red)'),
+    PLAY: getSvg(mdiPlay, 22, 'var(--mx-green)'),
     EYE_OFF: getSvg(mdiEyeOff, 20, 'currentColor'),
-    CLEAR: getSvg(mdiDeleteSweep, 20, '#fff'),
+    CLEAR: getSvg(mdiDeleteSweep, 24, '#fff'),
     CLOCK: getSvg(mdiClockOutline, 14, 'currentColor'),
-    SHIELD: getSvg(mdiShieldAccount, 16, 'currentColor'),
-    USER: getSvg(mdiAccountCircle, 14, 'currentColor'),
-    COG: getSvg(mdiCog, 20, 'currentColor')
+    USER: getSvg(mdiAccountCircle, 16, 'currentColor'),
+    COG: getSvg(mdiCog, 22, 'currentColor'),
+    NAV_APPS: getSvg(mdiViewGrid, 24, 'currentColor'),
+    NAV_GLOBAL: getSvg(mdiEarth, 24, 'currentColor'),
+    NAV_IO: getSvg(mdiChartTimelineVariant, 24, 'currentColor'),
+    NAV_LOG: getSvg(mdiTextDocument, 24, 'currentColor')
 };
 
 window.onIconError = (ele) => {
@@ -147,13 +150,13 @@ const checkStatus = async () => {
         if (currentPid) {
             badge.className = "badge badge-success"; badge.textContent = "RUNNING"; info.textContent = `PID: ${currentPid}`;
             if (toggleBtn.getAttribute('data-status') !== 'running') {
-                toggleBtn.innerHTML = ICONS.STOP; toggleBtn.style.color = "var(--mx-red)";
+                toggleBtn.innerHTML = ICONS.STOP;
                 toggleBtn.setAttribute('data-status', 'running');
             }
         } else {
             badge.className = "badge badge-gray"; badge.textContent = "STOPPED"; info.textContent = "OFFLINE";
             if (toggleBtn.getAttribute('data-status') !== 'stopped') {
-                toggleBtn.innerHTML = ICONS.PLAY; toggleBtn.style.color = "var(--mx-green)";
+                toggleBtn.innerHTML = ICONS.PLAY;
                 toggleBtn.setAttribute('data-status', 'stopped');
             }
         }
@@ -174,7 +177,7 @@ const checkStatus = async () => {
                 small.innerHTML = `<span class="inj-pid">PID ${inj.pid}</span> ${flags.join(' ')}`;
             } else {
                 small.className = 'text-muted text-truncate d-block';
-                small.style.fontFamily = "monospace";
+                small.style.fontFamily = "ui-monospace, monospace";
                 small.textContent = pkg;
             }
         });
@@ -189,6 +192,12 @@ document.addEventListener('DOMContentLoaded', () => {
     setIcon('iconCloseAppModal', ICONS.CLOSE);
     setIcon('iconCloseIgnoreModal', ICONS.CLOSE);
     setIcon('iconCloseSettingsModal', ICONS.CLOSE);
+    
+    // Bottom Nav Icons
+    setIcon('iconNavApps', ICONS.NAV_APPS);
+    setIcon('iconNavGlobal', ICONS.NAV_GLOBAL);
+    setIcon('iconNavIo', ICONS.NAV_IO);
+    setIcon('iconNavLog', ICONS.NAV_LOG);
     
     document.getElementById('btnGlobalAddRule').innerHTML = `${ICONS.PLUS} 添加规则`;
     document.getElementById('btnAppAddRule').innerHTML = `${ICONS.PLUS} 添加规则`;
@@ -248,8 +257,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     if (logViewer) {
-        logViewer.addEventListener('scroll', () => {
-            if (logSelect.value === 'internal' && logViewer.scrollTop + logViewer.clientHeight >= logViewer.scrollHeight - 50) fetchSysLogs();
+        logViewer.parentNode.addEventListener('scroll', () => {
+            const scroller = logViewer.parentNode;
+            if (logSelect.value === 'internal' && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 50) fetchSysLogs();
         });
     }
 
@@ -287,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.visualViewport.addEventListener('resize', () => {
             const box = document.getElementById('suggestionBox');
             if (box) box.style.display = 'none';
-            if (document.activeElement && document.activeElement.classList.contains('mx-input')) {
+            if (document.activeElement && document.activeElement.tagName === 'INPUT') {
                 setTimeout(() => { document.activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150);
             }
         });
@@ -299,6 +309,29 @@ document.addEventListener('DOMContentLoaded', () => {
             if (box && box.style.display !== 'none') box.style.display = 'none';
         }
     }, true);
+    
+    // Bottom Navigation Logic
+    document.querySelectorAll('.mx-bottom-nav .nav-item').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('.mx-bottom-nav .nav-item').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            const targetId = btn.dataset.target;
+            document.getElementById(targetId).classList.add('active');
+            
+            if (targetId === 'content-io') {
+                 ioState = { offset: 0, loading: false, hasMore: true, term: document.getElementById('ioSearch').value.trim() };
+                 document.getElementById('ioLogList').innerHTML = '';
+                 fetchIoLogs();
+            } else if (targetId === 'content-log') {
+                 if (document.getElementById('logSourceSelect').value === 'internal') {
+                     sysState = { offset: 0, loading: false, hasMore: true, term: '' };
+                     document.getElementById('logViewer').innerHTML = '';
+                 }
+                 fetchSysLogs();
+            }
+        };
+    });
 });
 
 const loadData = async () => {
@@ -358,7 +391,7 @@ const loadData = async () => {
         let infos =[];
         try {
             const userPkgs = await listPackages('user') ||[];
-            const systemPkgs = await listPackages('system') || [];
+            const systemPkgs = await listPackages('system') ||[];
             const allPkgs = [...new Set([...userPkgs, ...systemPkgs])];
             if (allPkgs.length > 0) {
                 infos = await getPackagesInfo(allPkgs);
@@ -493,7 +526,7 @@ const renderAppList = () => {
             <div class="list-item" data-pkg="${app.packageName}" onclick="openAppConfig('${app.packageName}')">
                 <div class="app-main">
                     <div class="app-icon-wrapper">
-                        <img data-src="ksu://icon/${app.packageName}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="width: 40px; height: 40px; border-radius: 8px; object-fit: contain; background: var(--mx-s1);" class="lazy-icon" onerror="window.onIconError(this)" />
+                        <img data-src="ksu://icon/${app.packageName}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="lazy-icon" onerror="window.onIconError(this)" />
                     </div>
                     <div class="app-content">
                         <div class="app-header"><span class="app-name ${isOverallDisabled ? 'text-muted' : ''}">${app.appLabel}</span>${mountedBadge}</div>
@@ -506,7 +539,7 @@ const renderAppList = () => {
                                 if (inj.ro === '1') flags.push('<span class="inj-flag inj-flag-ro">RO</span>');
                                 return `<small class="inj-status"><span class="inj-pid">PID ${inj.pid}</span> ${flags.join(' ')}</small>`;
                             }
-                            return `<small class="text-muted text-truncate d-block" style="font-family:monospace;">${app.packageName}</small>`;
+                            return `<small class="text-muted text-truncate d-block" style="font-family:ui-monospace, monospace;">${app.packageName}</small>`;
                         })()}
                     </div>
                 </div>
@@ -604,7 +637,7 @@ const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelec
 const addRuleRow = (type, target, source, containerId) => {
     const div = document.createElement('div');
     div.className = 'rule-row';
-    div.innerHTML = `<select class="mx-select rule-type" style="width:100px; height:36px;"><option value="REDIRECT">重定向</option><option value="HIDE">隐藏</option><option value="RO">只读</option><option value="ALLOW">沙盒豁免</option></select><div class="rule-inputs" style="flex:1; display:flex; gap:8px;"><input type="text" class="mx-input rule-target" placeholder="原始路径" value="${target}" style="height:36px;"><input type="text" class="mx-input rule-source ${type!=='REDIRECT'?'hidden':''}" placeholder="重定向至" value="${source}" style="height:36px;"></div><button class="mx-btn btn-del" style="background:transparent; padding:0 8px; color:var(--mx-text-muted); border:none;">${ICONS.DELETE}</button>`;
+    div.innerHTML = `<select class="mx-select rule-type" style="width:110px;"><option value="REDIRECT">重定向</option><option value="HIDE">隐藏</option><option value="RO">只读</option><option value="ALLOW">沙盒豁免</option></select><div style="flex:1; display:flex; gap:8px;"><input type="text" class="mx-select rule-target" placeholder="原始路径" value="${target}"><input type="text" class="mx-select rule-source ${type!=='REDIRECT'?'hidden':''}" placeholder="重定向至" value="${source}"></div><button class="mx-btn mx-btn-icon mx-btn-text btn-del">${ICONS.DELETE}</button>`;
     const select = div.querySelector('.rule-type');
     select.value = type;
     select.onchange = (e) => div.querySelector('.rule-source').classList.toggle('hidden', e.target.value !== 'REDIRECT');
@@ -753,7 +786,7 @@ document.getElementById('btnSaveGlobal').onclick = async () => {
 };
 
 window.openModal = (id) => { const el = document.getElementById(id); if (el) { el.classList.remove('hiding'); el.classList.add('show'); } };
-window.closeModal = (id) => { const el = document.getElementById(id); if (el && el.classList.contains('show')) { el.classList.add('hiding'); setTimeout(() => { el.classList.remove('show'); el.classList.remove('hiding'); }, 200); document.getElementById('suggestionBox').style.display = 'none'; } };
+window.closeModal = (id) => { const el = document.getElementById(id); if (el && el.classList.contains('show')) { el.classList.add('hiding'); setTimeout(() => { el.classList.remove('show'); el.classList.remove('hiding'); }, 250); document.getElementById('suggestionBox').style.display = 'none'; } };
 
 const normalizeToDisplay = (path) => { if (!path) return ""; if (path.startsWith(PATH_PREFIX_REAL)) return path.substring(PATH_PREFIX_REAL.length) || "/"; if (path.startsWith(PATH_PREFIX_STORAGE)) return path.substring(PATH_PREFIX_STORAGE.length) || "/"; return path; };
 const normalizeToConfig = (path, isTarget) => { if (!path) return ""; path = path.trim(); if (isTarget) { if (path.startsWith('/')) return path; return (PATH_PREFIX_STORAGE + '/' + path).replace(/\/+/g, '/'); } else { if (path.startsWith('/')) return path; return (PATH_PREFIX_REAL + '/' + path).replace(/\/+/g, '/'); } };
@@ -791,16 +824,16 @@ const updateBoxPosition = (input) => {
             box.style.top = 'auto'; 
             box.style.bottom = (vh - rect.top) + 'px';
             box.style.maxHeight = (rect.top - 10) + 'px'; 
-            box.style.borderRadius = '8px 8px 0 0';
+            box.style.borderRadius = '16px 16px 0 0';
             box.style.borderBottom = 'none'; 
-            box.style.borderTop = '1px solid var(--mx-s4)';
+            box.style.borderTop = '1px solid var(--mx-s3)';
         } else {
             box.style.top = rect.bottom + 'px'; 
             box.style.bottom = 'auto';
             box.style.maxHeight = (vh - rect.bottom - 10) + 'px'; 
-            box.style.borderRadius = '0 0 8px 8px';
+            box.style.borderRadius = '0 0 16px 16px';
             box.style.borderTop = 'none'; 
-            box.style.borderBottom = '1px solid var(--mx-s4)';
+            box.style.borderBottom = '1px solid var(--mx-s3)';
         }
     });
 };
@@ -824,7 +857,7 @@ const setupAutocomplete = (input) => {
             const suggestions = res.stdout.split('\n').filter(l => l.startsWith(searchPrefix)).map(line => { const isDir = line.endsWith('/'); return { text: displayBase + (isDir ? line : line) + (isDir ? '' : ''), icon: isDir ? ICONS.FOLDER : ICONS.FILE }; });
             if (suggestions.length === 0) { box.style.display = 'none'; return; }
             
-            box.innerHTML = suggestions.map(s => `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window.applySuggestion('${s.text}')"><div class="s-icon" style="margin-right:10px;display:flex;">${s.icon}</div><div class="s-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.text}</div></div>`).join('');
+            box.innerHTML = suggestions.map(s => `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window.applySuggestion('${s.text}')"><div style="margin-right:12px;display:flex;">${s.icon}</div><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.text}</div></div>`).join('');
             box.style.display = 'block'; 
             
             updateBoxPosition(input);
@@ -881,8 +914,8 @@ const generateIgnoreFromVisual = () => {
     let res = ""; document.querySelectorAll('#ignoreBuilderContainer .rule-row input').forEach(input => { const val = input.value.trim(); if (val) res += `${val}\n`; }); return res.trim();
 };
 const addIgnoreRow = (path) => {
-    const div = document.createElement('div'); div.className = 'rule-row ignore-row';
-    div.innerHTML = `<input type="text" class="mx-input" placeholder="输入要忽略的路径前缀" value="${path}" style="flex:1; height:36px;"><button class="mx-btn btn-del" style="background:transparent; padding:0 8px; color:var(--mx-text-muted); border:none;">${ICONS.DELETE}</button>`;
+    const div = document.createElement('div'); div.className = 'rule-row';
+    div.innerHTML = `<input type="text" class="mx-select" placeholder="输入要忽略的路径前缀" value="${path}" style="flex:1;"><button class="mx-btn mx-btn-icon mx-btn-text btn-del">${ICONS.DELETE}</button>`;
     div.querySelector('.btn-del').onclick = () => div.remove(); setupAutocomplete(div.querySelector('input'));
     document.getElementById('ignoreBuilderContainer').appendChild(div);
 };
@@ -1046,25 +1079,3 @@ const fetchSysLogs = async () => {
         if (indicator) indicator.classList.add('hidden');
     }
 };
-
-document.querySelectorAll('.main-tabs .mx-tab').forEach(btn => {
-    btn.onclick = () => {
-        document.querySelectorAll('.main-tabs .mx-tab').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        const targetId = btn.dataset.target;
-        document.getElementById(targetId).classList.add('active');
-        
-        if (targetId === 'content-io') {
-             ioState = { offset: 0, loading: false, hasMore: true, term: document.getElementById('ioSearch').value.trim() };
-             document.getElementById('ioLogList').innerHTML = '';
-             fetchIoLogs();
-        } else if (targetId === 'content-log') {
-             if (document.getElementById('logSourceSelect').value === 'internal') {
-                 sysState = { offset: 0, loading: false, hasMore: true, term: '' };
-                 document.getElementById('logViewer').innerHTML = '';
-             }
-             fetchSysLogs();
-        }
-    };
-});

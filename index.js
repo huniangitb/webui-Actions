@@ -504,14 +504,49 @@ const fetchIoLogs = async () => {
 };
 
 const renderIoRows = (lines) => {
-    const listEl = document.getElementById('ioLogList'); if (listEl.innerHTML.includes('暂无记录')) listEl.innerHTML = '';
+    const listEl = document.getElementById('ioLogList');
+    if (listEl.innerHTML.includes('暂无记录')) listEl.innerHTML = '';
+    
     const html = lines.map(line => {
-        if (!line.trim()) return ''; const parts = line.split('|'); if (parts.length < 2) return '';
-        let timeStr = "--:--:--"; if (/^\d+$/.test(parts[0])) { const d = new Date(parseInt(parts[0])*1000); if(!isNaN(d)) timeStr = d.toLocaleTimeString('zh-CN', {hour12:false}); } else timeStr = parts[0].slice(0,8);
-        let pkg = "未知", op = "INFO", details = parts.slice(1).join('|'); const m = details.match(/^\[(.*?)\] \[(.*?)\] (.*)$/); if (m) { pkg = m[1]; op = m[2]; details = m[3]; }
+        if (!line.trim()) return '';
+        const parts = line.split('|');
+        if (parts.length < 2) return '';
+
+        let timeStr = "--:--:--";
+        const rawTs = parts[0];
+
+        // 1. 如果是 Unix 时间戳
+        if (/^\d+$/.test(rawTs)) {
+            const d = new Date(parseInt(rawTs) * 1000);
+            if (!isNaN(d)) timeStr = d.toLocaleTimeString('zh-CN', { hour12: false });
+        } 
+        // 2. 如果是 "YYYY-MM-DD HH:MM:SS" 格式
+        else if (rawTs.includes(' ')) {
+            // 通过空格分割，直接获取后面的 HH:MM:SS 部分
+            const dt = rawTs.split(' ');
+            timeStr = dt[1] || dt[0];
+        }
+        // 3. 其他情况原样使用
+        else {
+            timeStr = rawTs;
+        }
+
+        let pkg = "未知", op = "INFO", details = parts.slice(1).join('|');
+        const m = details.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
+        if (m) { pkg = m[1]; op = m[2]; details = m[3]; }
         const appName = appMap.has(pkg) ? appMap.get(pkg).appLabel : pkg;
-        return `<div class="io-item"><div class="io-header"><span class="io-time">${timeStr}</span><span class="io-app">${appName}</span><span class="io-op op-${op}">${op}</span></div><div class="io-detail">${details}</div></div>`;
-    }).join(''); listEl.insertAdjacentHTML('beforeend', html);
+
+        return `
+        <div class="io-item">
+            <div class="io-header">
+                <span class="io-time">${timeStr}</span>
+                <span class="io-app">${appName}</span>
+                <span class="io-op op-${op}">${op}</span>
+            </div>
+            <div class="io-detail">${details}</div>
+        </div>`;
+    }).join('');
+    listEl.insertAdjacentHTML('beforeend', html);
 };
 
 const fetchSysLogs = async () => {

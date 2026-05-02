@@ -169,7 +169,7 @@ body {
 
 /* Components */
 .mx-card { background: var(--mx-s2); border-radius: var(--mx-radius); border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); display: flex; flex-direction: column; overflow: hidden; }
-.mx-card-head { padding: 16px 16px 0 16px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.mx-card-head { padding: 16px 16px 0 16px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;}
 .mx-card-title { font-size: 16px; font-weight: 600; }
 .mx-card-body { padding: 16px; flex: 1; overflow-y: auto; }
 .mx-card-foot { padding: 12px 16px; border-top: 1px solid var(--mx-border); background: var(--mx-s2); flex-shrink: 0; }
@@ -261,7 +261,7 @@ body {
 /* IO Logs specific */
 .io-item { background: var(--mx-s2); border: 1px solid var(--mx-border); border-radius: 12px; padding: 12px; flex-shrink: 0; }
 .io-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap:8px;overflow: hidden; }
-.io-time { font-size: 11px; color: var(--mx-t2); font-family: var(--mx-font-mono); flex-shrink:0; white-space: nowrap; min-width: 75px; }
+.io-time { font-size: 11px; color: var(--mx-t2); font-family: var(--mx-font-mono); flex-shrink:0; white-space: nowrap; }
 .io-app { font-weight: 600; font-size: 13px; color: var(--mx-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;}
 .io-op { padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; color: #fff; font-family: var(--mx-font-mono); flex-shrink:0; background: var(--mx-gray); }
 .io-detail { background: var(--mx-s1); padding: 8px; border-radius: 8px; font-size: 12px; font-family: var(--mx-font-mono); color: var(--mx-t1); word-break: break-all; border: 1px solid var(--mx-border); }

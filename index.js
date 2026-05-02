@@ -9,7 +9,7 @@ import {
 } from '@mdi/js';
 
 // Setup KernelSU immersive mode
-try { fullScreen(true); enableEdgeToEdge(false); } catch(e) {}
+try { fullScreen(true); enableEdgeToEdge(true); } catch(e) {}
 
 const BASE_DIR = "/data/Namespace-Proxy";
 const INJECTOR_CONF = `${BASE_DIR}/injector.conf`;

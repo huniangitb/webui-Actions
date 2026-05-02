@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Namespace Proxy</title>
+    <!-- 引入内部环境安全边距 -->
+    <link rel="stylesheet" type="text/css" href="/internal/insets.css" />
 </head>
 <body>
     <div class="mx-app">
@@ -70,7 +72,6 @@
 
         <!-- 主内容区 -->
         <main class="mx-desktop-main mx-body">
-            
             <!-- 1. 应用配置 -->
             <div class="demo-section active" id="sec-apps">
                 <div class="mx-page-head mx-anim-slide-up">
@@ -90,9 +91,7 @@
                             <button data-filter="filterBound">已配</button>
                         </div>
                     </div>
-                    <div class="mx-card-body p-0 list-scrollable" id="appList">
-                        <!-- App items will be injected here -->
-                    </div>
+                    <div class="mx-card-body p-0 list-scrollable" id="appList"></div>
                 </div>
             </div>
 
@@ -113,8 +112,8 @@
                     </div>
                     <div class="mx-card-body flex-col-full overflow-hidden p-0">
                         <div class="editor-pane active" id="globalVisual">
-                            <div class="p-4 flex-col gap-4 overflow-y-auto">
-                                <div class="mx-form-group">
+                            <div class="p-4 flex-col gap-4 overflow-y-auto" style="height:100%">
+                                <div class="mx-form-group flex-shrink-0">
                                     <label class="mx-label">全局应用注入 (GLOBAL_INJECT)</label>
                                     <select id="globalInjectSelect" class="mx-select">
                                         <option value="">默认 (关闭)</option>
@@ -122,7 +121,7 @@
                                         <option value="OFF">全局关闭 (OFF)</option>
                                     </select>
                                 </div>
-                                <div class="grid-2 gap-4">
+                                <div class="grid-2 gap-4 flex-shrink-0">
                                     <div class="mx-form-group">
                                         <label class="mx-label">全局监控 (MONITOR)</label>
                                         <select id="globalMonitorSelect" class="mx-select">
@@ -140,12 +139,12 @@
                                         </select>
                                     </div>
                                 </div>
-                                <div class="divider"></div>
-                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div class="divider flex-shrink-0"></div>
+                                <div style="display:flex; justify-content:space-between; align-items:center;" class="flex-shrink-0">
                                     <h3 style="font-size:14px; font-weight:600; margin:0;">全局路径映射</h3>
                                     <button class="mx-btn mx-btn-secondary mx-btn-sm" id="btnGlobalAddRule">添加规则</button>
                                 </div>
-                                <div id="globalRuleBuilderContainer" class="flex-col gap-2"></div>
+                                <div id="globalRuleBuilderContainer" class="flex-col gap-2 flex-grow"></div>
                             </div>
                         </div>
                         <div class="editor-pane" id="globalRaw">
@@ -169,10 +168,10 @@
                     <div class="mx-card-head gap-2" style="padding-bottom: 12px; border-bottom: 1px solid var(--mx-border);">
                         <div class="mx-input-wrap" style="flex:1;">
                             <span class="mx-input-icon" id="iconIoSearch"></span>
-                            <input type="text" id="ioSearch" class="mx-input" placeholder="搜索操作记录或路径..." />
+                            <input type="text" id="ioSearch" class="mx-input" placeholder="搜索操作或路径..." />
                         </div>
-                        <button class="mx-btn mx-btn-secondary mx-btn-icon mx-tooltip" data-tooltip="忽略配置" id="btnMonitorIgnore"></button>
-                        <button class="mx-btn mx-btn-danger mx-btn-icon mx-tooltip" data-tooltip="清空记录" id="btnClearIo"></button>
+                        <button class="mx-btn mx-btn-secondary mx-btn-icon mx-tooltip" id="btnMonitorIgnore"></button>
+                        <button class="mx-btn mx-btn-danger mx-btn-icon mx-tooltip" id="btnClearIo"></button>
                     </div>
                     <div class="mx-card-body p-0 list-scrollable" id="ioLogContainer" style="background: var(--mx-bg);">
                         <div id="ioLogList" class="flex-col gap-2 p-3"></div>
@@ -185,24 +184,23 @@
             <div class="demo-section" id="sec-log">
                 <div class="mx-page-head mx-anim-slide-up">
                     <h1 class="mx-page-title">运行日志</h1>
-                    <p class="mx-page-sub">查看模块与注入器后台输出</p>
+                    <p class="mx-page-sub">结构化后台注入器输出</p>
                 </div>
 
                 <div class="mx-card mx-anim-card-in flex-col-full" style="max-height: calc(100vh - 180px);">
                     <div class="mx-card-head">
-                        <select id="logSourceSelect" class="mx-select" style="width: 200px;">
+                        <select id="logSourceSelect" class="mx-select" style="width: 160px;">
                             <option value="internal">注入器日志</option>
                             <option value="zygisk">Zygisk (Logcat)</option>
                         </select>
                         <button class="mx-btn mx-btn-danger mx-btn-sm" id="btnClearLog">清空日志</button>
                     </div>
-                    <div class="mx-card-body p-0 flex-col-full relative">
-                        <div id="logViewer" class="mx-log-viewer"></div>
+                    <div class="mx-card-body p-0 flex-col-full relative" style="background: var(--mx-bg);">
+                        <div id="logViewer" class="mx-log-viewer flex-col gap-2 p-3 overflow-y-auto h-full"></div>
                         <div id="sysLoadingIndicator" class="loading-overlay hidden">加载中...</div>
                     </div>
                 </div>
             </div>
-
         </main>
 
         <!-- 移动端底部导航 -->
@@ -226,14 +224,14 @@
 
     <!-- 模态框：应用配置 -->
     <div class="mx-modal-overlay" id="appConfigModal">
-        <div class="mx-modal large">
-            <div class="mx-modal-head" style="align-items: flex-start; flex-direction: column; gap: 12px; padding-bottom: 8px;">
+        <div class="mx-modal large" style="margin-top: env(safe-area-inset-top);">
+            <div class="mx-modal-head" style="align-items: stretch; flex-direction: column; gap: 12px; padding-bottom: 8px;">
                 <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-                    <div>
-                        <h3 id="bindAppName" class="m-0" style="font-size:16px;">App Name</h3>
-                        <small id="bindAppPkg" class="text-muted" style="font-family:var(--mx-font-mono);font-size:11px;">com.pkg</small>
+                    <div style="flex:1; min-width:0; margin-right: 12px;">
+                        <h3 id="bindAppName" class="m-0 text-truncate" style="font-size:16px;">App Name</h3>
+                        <div id="bindAppPkg" class="text-muted text-truncate" style="font-family:var(--mx-font-mono);font-size:11px;">com.pkg</div>
                     </div>
-                    <div style="display:flex; gap:8px; align-items:center;">
+                    <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
                         <div class="mx-pill-group">
                             <button class="active" data-mode="visual" name="appModeToggle">图形</button>
                             <button data-mode="raw" name="appModeToggle">源码</button>
@@ -246,8 +244,8 @@
             
             <div class="mx-modal-body p-0 flex-col-full overflow-hidden">
                 <div class="editor-pane active" id="appVisual">
-                    <div class="p-4 flex-col gap-4 overflow-y-auto">
-                        <label class="mx-switch-row mx-card" style="padding:12px; border:1px solid var(--mx-border); box-shadow:none; border-radius:12px; cursor:pointer;">
+                    <div class="p-4 flex-col gap-4 overflow-y-auto" style="height:100%">
+                        <label class="mx-switch-row mx-card flex-shrink-0" style="padding:12px; border:1px solid var(--mx-border); box-shadow:none; border-radius:12px; cursor:pointer;">
                             <div>
                                 <div style="font-weight:600; font-size:14px;">允许注入 (当前用户)</div>
                                 <div class="text-muted" style="font-size:11px; margin-top:2px;">关闭将强制屏蔽注入，配置不生效。</div>
@@ -258,7 +256,7 @@
                             </label>
                         </label>
 
-                        <div class="grid-2 gap-4">
+                        <div class="grid-2 gap-4 flex-shrink-0">
                             <div class="mx-form-group">
                                 <label class="mx-label">监控 (MONITOR)</label>
                                 <select id="appMonitorSelect" class="mx-select">
@@ -277,12 +275,12 @@
                             </div>
                         </div>
                         
-                        <div class="divider"></div>
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div class="divider flex-shrink-0"></div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;" class="flex-shrink-0">
                             <h3 style="font-size:14px; font-weight:600; margin:0;">专属路径映射</h3>
                             <button class="mx-btn mx-btn-secondary mx-btn-sm" id="btnAppAddRule">添加规则</button>
                         </div>
-                        <div id="appRuleBuilderContainer" class="flex-col gap-2"></div>
+                        <div id="appRuleBuilderContainer" class="flex-col gap-2 flex-grow"></div>
                     </div>
                 </div>
                 <div class="editor-pane" id="appRaw">
@@ -299,7 +297,7 @@
 
     <!-- 模态框：监控忽略配置 -->
     <div class="mx-modal-overlay" id="monitorIgnoreModal">
-        <div class="mx-modal large">
+        <div class="mx-modal large" style="margin-top: env(safe-area-inset-top);">
             <div class="mx-modal-head">
                 <div>
                     <span class="mx-modal-title">监控过滤</span>
@@ -317,7 +315,7 @@
                 <div class="editor-pane active" id="ignoreVisual">
                     <div class="p-4 flex-col gap-4 overflow-y-auto">
                         <div style="background:rgba(52, 130, 255, 0.1); color:var(--mx-primary); padding:8px 12px; border-radius:8px; font-size:12px;">匹配规则：<b>前缀匹配</b></div>
-                        <div id="ignoreBuilderContainer" class="flex-col gap-2"></div>
+                        <div id="ignoreBuilderContainer" class="flex-col gap-2 flex-grow"></div>
                         <button class="mx-btn mx-btn-secondary mx-btn-sm" style="align-self:flex-start" id="btnAddIgnoreRow">添加路径</button>
                     </div>
                 </div>
@@ -335,10 +333,21 @@
     <div class="mx-modal-overlay" id="settingsModal">
         <div class="mx-modal">
             <div class="mx-modal-head">
-                <span class="mx-modal-title">全局设置</span>
+                <span class="mx-modal-title">WebUI 设置</span>
                 <button class="mx-btn-close" onclick="document.getElementById('settingsModal').classList.remove('open')"></button>
             </div>
-            <div class="mx-modal-body">
+            <div class="mx-modal-body flex-col gap-3">
+                <label class="mx-switch-row mx-card" style="padding:12px; border:1px solid var(--mx-border); box-shadow:none; cursor:pointer;">
+                    <div>
+                        <div style="font-weight:600; font-size:14px;">跟随系统深色模式</div>
+                        <div class="text-muted" style="font-size:11px; margin-top:2px;">自动适应设备主题色</div>
+                    </div>
+                    <label class="mx-switch">
+                        <input type="checkbox" id="autoThemeToggle">
+                        <span class="mx-switch-track"><span class="mx-switch-thumb"></span></span>
+                    </label>
+                </label>
+
                 <label class="mx-switch-row mx-card" style="padding:12px; border:1px solid var(--mx-border); box-shadow:none; cursor:pointer;">
                     <div>
                         <div style="font-weight:600; font-size:14px;">插件规则同步</div>
@@ -349,10 +358,7 @@
                         <span class="mx-switch-track"><span class="mx-switch-thumb"></span></span>
                     </label>
                 </label>
-                <p class="text-muted mt-3" style="font-size: 12px; line-height: 1.5;">
-                    开启后，会自动合并模块内与应用配置目录的规则，转换为插件支持的 JSON 格式并写入其配置目录。
-                </p>
-                <div id="pluginStatusLabel" class="text-muted mt-2" style="font-size: 11px; font-family:var(--mx-font-mono);"></div>
+                <div id="pluginStatusLabel" class="text-muted" style="font-size: 11px; font-family:var(--mx-font-mono);"></div>
             </div>
             <div class="mx-modal-foot">
                 <button class="mx-btn mx-btn-primary w-full" id="btnSaveSettings">保存并应用</button>
@@ -360,10 +366,7 @@
         </div>
     </div>
 
-    <!-- Toast 容器 -->
     <div id="toastContainer" class="mx-toast-container"></div>
-    
-    <!-- 自动补全浮层 -->
     <div id="suggestionBox" class="suggestion-box"></div>
 
     <script src="index.js" type="module"></script>

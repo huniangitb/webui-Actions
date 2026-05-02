@@ -1,5 +1,6 @@
+--- START OF FILE index.html ---
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -13,170 +14,164 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/bmbxwbh/miuix-console@main/components/card.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/bmbxwbh/miuix-console@main/components/input.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/bmbxwbh/miuix-console@main/components/select.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/bmbxwbh/miuix-console@main/components/badge.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/bmbxwbh/miuix-console@main/components/tabs.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="mx-app layout-wrapper">
+    <div class="mx-app-container">
         <!-- Topbar -->
-        <header class="mx-topbar blur-header" style="justify-content: space-between; padding: 0 16px; padding-top: env(safe-area-inset-top);">
+        <header class="mx-topbar">
             <div style="display: flex; align-items: center; gap: 12px;">
-                <h2 style="margin: 0; font-size: 18px; color: var(--mx-text); font-weight: 600; letter-spacing: -0.5px;">Namespace Proxy</h2>
+                <h2 style="margin: 0; font-size: 18px; color: var(--mx-primary); font-weight: 600; letter-spacing: -0.5px;">NAMESPACE PROXY</h2>
                 <div style="display:flex; align-items:center; gap:6px;">
-                    <span class="status-dot" id="statusBadge"></span>
-                    <small id="statusInfo" style="font-size: 12px; color: var(--mx-text-muted); font-family: monospace;">Checking</small>
+                    <span class="badge badge-gray" id="statusBadge">...</span>
+                    <small id="statusInfo" style="font-size: 11px; color: var(--mx-text-muted);">Checking</small>
                 </div>
             </div>
-            <div style="display: flex; gap: 8px;">
-                <button id="btnSettings" class="mx-btn icon-btn" data-ripple></button>
-                <button id="btnToggleStatus" class="mx-btn icon-btn" data-ripple></button>
+            <div style="display: flex; gap: 4px;">
+                <button id="btnSettings" class="mx-btn" style="background:transparent; padding:8px; border:none;" data-ripple></button>
+                <button id="btnToggleStatus" class="mx-btn" style="background:transparent; padding:8px; border:none;" data-ripple></button>
             </div>
         </header>
 
-        <!-- Main Content Area -->
-        <main class="main-content-area">
-            
-            <!-- 1. 应用配置 -->
-            <div id="content-apps" class="tab-pane active">
-                <div class="pane-content">
-                    <div class="sticky-search">
-                        <div class="search-box">
-                            <span id="iconSearch" class="search-icon"></span>
-                            <input type="text" id="appSearch" class="mx-input search-input" placeholder="搜索应用名称或包名..." />
+        <!-- Main Content -->
+        <main class="mx-body">
+            <div class="tab-content-wrapper">
+                <!-- 1. 应用配置 -->
+                <div id="content-apps" class="tab-pane active">
+                    <div class="app-layout-container">
+                        <div class="app-search-wrapper">
+                            <div style="display: flex; align-items: center; gap: 8px; background: var(--mx-s1); padding: 8px 12px; border-radius: var(--mx-r-sm);">
+                                <span id="iconSearch" style="color: var(--mx-text-muted); display:flex;"></span>
+                                <input type="text" id="appSearch" class="mx-input" placeholder="搜索应用名称..." style="flex:1; border:none; background:transparent; padding:0; height:24px;" />
+                            </div>
+                        </div>
+                        <div id="appList" class="scrollable-list"></div>
+                        <div class="fab-container">
+                            <div class="filter-options" id="filterOptions">
+                                <button class="filter-opt active" data-filter="filterUser">用户应用</button>
+                                <button class="filter-opt" data-filter="filterSystem">系统应用</button>
+                                <button class="filter-opt" data-filter="filterBound">已配置</button>
+                            </div>
+                            <button id="btnFilterFab" class="mx-btn mx-btn-primary fab-main"><span id="iconFilter" style="display:flex;"></span></button>
                         </div>
                     </div>
-                    <div id="appList" class="app-list-container"></div>
                 </div>
-                <div class="fab-container">
-                    <div class="filter-options" id="filterOptions">
-                        <button class="filter-opt active" data-filter="filterUser">用户应用</button>
-                        <button class="filter-opt" data-filter="filterSystem">系统应用</button>
-                        <button class="filter-opt" data-filter="filterBound">已配置</button>
-                    </div>
-                    <button id="btnFilterFab" class="mx-btn mx-btn-primary fab-main shadow"><span id="iconFilter"></span></button>
-                </div>
-            </div>
 
-            <!-- 2. 全局规则 -->
-            <div id="content-global" class="tab-pane">
-                <div class="pane-content" style="padding: 16px;">
-                    <div class="mx-card flex-column" style="height: 100%; padding: 0;">
-                        <div class="mx-card-header card-header-custom">
-                            <h3 style="margin:0; font-size:16px;">全局配置</h3>
-                            <div class="toggle-group">
+                <!-- 2. 全局规则 -->
+                <div id="content-global" class="tab-pane">
+                    <div class="mx-card flex-card">
+                        <div class="mx-card-header" style="display:flex; justify-content:space-between; align-items:center; padding: 12px 16px; border-bottom: 1px solid var(--mx-s3);">
+                            <h3 style="margin:0; font-size:16px;">[GLOBAL] 全局配置</h3>
+                            <div class="toggle-group-pill">
                                 <label><input type="radio" name="globalEditorMode" value="visual" checked><span>图形</span></label>
                                 <label><input type="radio" name="globalEditorMode" value="raw"><span>源码</span></label>
                             </div>
                         </div>
-                        <div class="flex-1 flex-column" style="overflow: hidden; position: relative;">
-                            <div id="globalAlert" class="alert-info">配置将写入 injector.conf，默认对所有应用生效</div>
+                        <div style="flex: 1; display: flex; flex-direction: column; min-height:0; position:relative;">
+                            <div id="globalAlert" class="alert-info">配置将写入 injector.conf，对所有应用默认生效</div>
                             <div class="editor-wrapper">
                                 <div id="globalVisual" class="editor-pane active" style="padding: 16px;">
                                     <div style="margin-bottom: 16px;">
-                                        <label class="setting-label primary-label">全局应用注入 (GLOBAL_INJECT)</label>
-                                        <select id="globalInjectSelect" class="mx-select full-width">
+                                        <label style="font-size:12px; color:var(--mx-primary); margin-bottom:4px; display:block; font-weight:600;">全局应用注入 (GLOBAL_INJECT)</label>
+                                        <select id="globalInjectSelect" class="mx-select" style="width:100%;">
                                             <option value="">默认 (关闭)</option>
                                             <option value="ON">全局开启 (ON)</option>
                                             <option value="OFF">全局关闭 (OFF)</option>
                                         </select>
                                     </div>
-                                    <div class="grid-2">
+                                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom: 16px;">
                                         <div>
-                                            <label class="setting-label">全局监控 (MONITOR)</label>
-                                            <select id="globalMonitorSelect" class="mx-select full-width">
+                                            <label style="font-size:12px; color:var(--mx-text-muted); margin-bottom:4px; display:block;">全局监控 (MONITOR)</label>
+                                            <select id="globalMonitorSelect" class="mx-select" style="width:100%;">
                                                 <option value="">默认 (OFF)</option>
                                                 <option value="ON">全局开启 (ON)</option>
                                                 <option value="OFF">全局关闭 (OFF)</option>
                                             </select>
                                         </div>
                                         <div>
-                                            <label class="setting-label">全局沙盒 (SANDBOX)</label>
-                                            <select id="globalSandboxSelect" class="mx-select full-width">
+                                            <label style="font-size:12px; color:var(--mx-text-muted); margin-bottom:4px; display:block;">全局沙盒 (SANDBOX)</label>
+                                            <select id="globalSandboxSelect" class="mx-select" style="width:100%;">
                                                 <option value="">默认 (OFF)</option>
                                                 <option value="ON">全局开启 (ON)</option>
                                                 <option value="OFF">全局关闭 (OFF)</option>
                                             </select>
                                         </div>
                                     </div>
-                                    <div class="divider"></div>
-                                    <h4 class="section-title">全局路径映射</h4>
+                                    <h4 style="margin:8px 0 12px 0; font-size:14px; font-weight:600;">全局路径映射</h4>
                                     <div id="globalRuleBuilderContainer"></div>
-                                    <div style="margin-top:16px;">
-                                        <button id="btnGlobalAddRule" class="mx-btn secondary-btn full-width">添加规则</button>
+                                    <div style="margin-top:12px;">
+                                        <button id="btnGlobalAddRule" class="mx-btn" style="background:var(--mx-s3);">添加规则</button>
                                     </div>
                                 </div>
                                 <div id="globalRaw" class="editor-pane">
-                                    <textarea id="globalRuleContent" class="code-editor"></textarea>
+                                    <textarea id="globalRuleContent" class="code-editor" style="border-radius:0; border:none;"></textarea>
                                 </div>
                             </div>
                         </div>
-                        <div class="mx-card-footer card-footer-custom">
-                            <button id="btnSaveGlobal" class="mx-btn mx-btn-primary full-width">保存全局规则</button>
+                        <div class="mx-card-footer" style="padding: 12px 16px; border-top: 1px solid var(--mx-s3);">
+                            <button id="btnSaveGlobal" class="mx-btn mx-btn-primary" style="width:100%;">保存全局规则</button>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- 3. 监控 -->
-            <div id="content-io" class="tab-pane">
-                <div class="pane-content" style="padding: 16px; display: flex; flex-direction: column;">
-                    <div style="display:flex; gap:12px; margin-bottom:12px; align-items:center;">
-                        <div class="search-box flex-1">
-                            <span id="iconIoSearch" class="search-icon"></span>
-                            <input type="text" id="ioSearch" class="mx-input search-input" placeholder="搜索操作记录或路径..." />
+                <!-- 3. 监控 -->
+                <div id="content-io" class="tab-pane">
+                    <div class="mx-card flex-card" style="padding: 12px;">
+                        <div style="display:flex; gap:10px; margin-bottom:12px; align-items:center;">
+                            <div style="display: flex; align-items: center; gap: 8px; background: var(--mx-s1); padding: 8px 12px; border-radius: var(--mx-r-sm); flex:1;">
+                                <span id="iconIoSearch" style="color: var(--mx-text-muted); display:flex;"></span>
+                                <input type="text" id="ioSearch" class="mx-input" placeholder="搜索操作记录或路径..." style="flex:1; border:none; background:transparent; padding:0; height:24px;" />
+                            </div>
+                            <button id="btnMonitorIgnore" class="mx-btn" style="background:var(--mx-s1); padding:8px; display:flex;"></button>
                         </div>
-                        <button id="btnMonitorIgnore" class="mx-btn secondary-btn icon-btn-solid"></button>
-                    </div>
-                    <div class="mx-card flex-1" style="padding: 8px; overflow: hidden; display: flex; flex-direction: column; background: var(--mx-bg);">
-                        <div style="flex:1; overflow-y:auto; border-radius: var(--mx-r-sm);" id="ioLogContainer">
-                            <div id="ioLogList" style="padding-bottom: 20px;"></div>
-                            <div id="ioLoadingIndicator" class="text-center text-muted hidden" style="padding:16px; font-size: 13px;">正在加载监控数据...</div>
+                        <div style="flex:1; overflow-y:auto; position:relative;" id="ioLogContainer">
+                            <div id="ioLogList" style="padding-bottom: 60px;"></div>
+                            <div id="ioLoadingIndicator" class="text-center text-muted hidden" style="padding:10px;">加载中...</div>
                         </div>
-                    </div>
-                    <div class="fab-container">
-                        <button id="btnClearIo" class="mx-btn mx-btn-primary fab-main shadow danger-bg"><span id="iconClearIo"></span></button>
+                        <div class="fab-container" style="bottom: 28px; right: 28px;">
+                            <button id="btnClearIo" class="mx-btn mx-btn-primary fab-main" style="background:var(--mx-red); border:none;"><span id="iconClearIo" style="display:flex;"></span></button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- 4. 日志 -->
-            <div id="content-log" class="tab-pane">
-                <div class="pane-content" style="padding: 16px; display: flex; flex-direction: column;">
-                    <div class="mx-card flex-column" style="height: 100%; padding: 12px; background: var(--mx-bg);">
+                <!-- 4. 日志 -->
+                <div id="content-log" class="tab-pane">
+                    <div class="mx-card flex-card" style="padding: 12px;">
                         <div style="margin-bottom:12px;">
-                            <select id="logSourceSelect" class="mx-select full-width">
-                                <option value="internal">注入器内部日志 (Internal)</option>
-                                <option value="zygisk">Zygisk 框架日志 (Logcat)</option>
+                            <select id="logSourceSelect" class="mx-select" style="width:100%;">
+                                <option value="internal">注入器日志</option>
+                                <option value="zygisk">Zygisk (Logcat)</option>
                             </select>
                         </div>
-                        <div id="logViewer" class="log-viewer flex-1"></div>
-                        <div id="sysLoadingIndicator" class="loading-overlay hidden">加载中...</div>
-                    </div>
-                    <div class="fab-container">
-                        <button id="btnClearLog" class="mx-btn mx-btn-primary fab-main shadow danger-bg"><span id="iconClearLog"></span></button>
+                        <div id="logViewer" class="log-viewer" style="flex:1; min-height:0;"></div>
+                        <div id="sysLoadingIndicator" class="text-center hidden" style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:var(--mx-text); color:var(--mx-bg); padding:4px 12px; border-radius:16px; font-size:12px; font-weight:600; z-index:10;">加载中...</div>
+                        <div class="fab-container" style="bottom: 28px; right: 28px;">
+                            <button id="btnClearLog" class="mx-btn mx-btn-primary fab-main" style="background:var(--mx-red); border:none;"><span id="iconClearLog" style="display:flex;"></span></button>
+                        </div>
                     </div>
                 </div>
             </div>
-
         </main>
 
-        <!-- Bottom Navigation Bar -->
-        <nav class="bottom-nav">
-            <button class="nav-item active" data-target="content-apps">
-                <span class="nav-icon" id="iconNavApps"></span>
-                <span class="nav-text">应用</span>
+        <!-- Bottom Navigation -->
+        <nav class="mx-bottom-nav main-tabs">
+            <button class="bottom-nav-item active" data-target="content-apps">
+                <span id="navIconApps"></span>
+                <span>应用配置</span>
             </button>
-            <button class="nav-item" data-target="content-global">
-                <span class="nav-icon" id="iconNavGlobal"></span>
-                <span class="nav-text">全局</span>
+            <button class="bottom-nav-item" data-target="content-global">
+                <span id="navIconGlobal"></span>
+                <span>全局规则</span>
             </button>
-            <button class="nav-item" data-target="content-io">
-                <span class="nav-icon" id="iconNavIo"></span>
-                <span class="nav-text">监控</span>
+            <button class="bottom-nav-item" data-target="content-io">
+                <span id="navIconIo"></span>
+                <span>监控</span>
             </button>
-            <button class="nav-item" data-target="content-log">
-                <span class="nav-icon" id="iconNavLog"></span>
-                <span class="nav-text">日志</span>
+            <button class="bottom-nav-item" data-target="content-log">
+                <span id="navIconLog"></span>
+                <span>日志</span>
             </button>
         </nav>
     </div>
@@ -185,69 +180,68 @@
     <div id="appConfigModal" class="modal">
         <div class="modal-content large">
             <div class="modal-header">
-                <div class="flex-column flex-1" style="min-width:0;">
+                <div style="display:flex; flex-direction:column; flex:1; min-width:0;">
                     <h3 id="bindAppName" class="text-truncate" style="margin:0; font-size:16px;">App Name</h3>
-                    <small id="bindAppPkg" class="text-muted text-truncate" style="font-family:monospace; font-size:11px; margin-top:2px;">com.pkg</small>
+                    <small id="bindAppPkg" class="text-muted text-truncate" style="font-family:monospace; font-size:11px;">com.pkg</small>
                 </div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <div class="toggle-group compact">
-                        <label><input type="radio" name="appEditorMode" value="visual" checked><span>UI</span></label>
-                        <label><input type="radio" name="appEditorMode" value="raw"><span>CODE</span></label>
+                <div style="display:flex; gap:12px; align-items:center;">
+                    <div class="toggle-group-pill">
+                        <label><input type="radio" name="appEditorMode" value="visual" checked><span>图形</span></label>
+                        <label><input type="radio" name="appEditorMode" value="raw"><span>源码</span></label>
                     </div>
-                    <button class="mx-btn icon-btn" onclick="closeModal('appConfigModal')"><span id="iconCloseAppModal"></span></button>
+                    <button class="mx-btn" style="background:transparent; padding:4px; display:flex;" onclick="closeModal('appConfigModal')"><span id="iconCloseAppModal"></span></button>
                 </div>
             </div>
-            <div style="padding: 12px 16px 0; border-bottom: 1px solid var(--mx-s3);">
-                <div class="mx-tabs mx-tabs-pill" style="margin-bottom:8px;">
+            <div style="padding: 8px 16px; border-bottom: 1px solid var(--mx-s3);">
+                <div class="mx-tabs mx-tabs-pill" style="margin-bottom:0;">
                     <div class="mx-tab-list" id="appUserTabs"></div>
                 </div>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="padding:0; position:relative;">
                 <div class="editor-wrapper">
                     <div id="appVisual" class="editor-pane active" style="padding:16px;">
-                        <label class="switch-row mx-card" style="margin-bottom: 16px; padding: 12px 16px;">
+                        <label class="switch-row" style="margin-bottom: 16px;">
                             <div>
-                                <span class="fw-bold" style="font-size:15px; color:var(--mx-text);">允许注入此应用</span>
-                                <small class="text-muted" style="display:block; font-size:12px; margin-top:4px;">关闭将强制屏蔽注入，下方配置将不生效</small>
+                                <span class="fw-bold" style="font-size:14px; color:var(--mx-text);">允许注入 (当前用户)</span>
+                                <small class="text-muted" style="display:block; font-size:11px; margin-top:2px;">关闭将强制屏蔽注入，配置不生效。</small>
                             </div>
                             <div class="switch">
                                 <input type="checkbox" id="appEnableToggle">
                                 <span class="slider"></span>
                             </div>
                         </label>
-                        <div class="grid-2">
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom: 16px;">
                             <div>
-                                <label class="setting-label">监控 (MONITOR)</label>
-                                <select id="appMonitorSelect" class="mx-select full-width">
+                                <label style="font-size:12px; color:var(--mx-text-muted); margin-bottom:4px; display:block;">监控 (MONITOR)</label>
+                                <select id="appMonitorSelect" class="mx-select" style="width:100%;">
                                     <option value="">跟随全局</option>
                                     <option value="ON">强制开启 (ON)</option>
                                     <option value="OFF">强制关闭 (OFF)</option>
                                 </select>
                             </div>
                             <div>
-                                <label class="setting-label">沙盒 (SANDBOX)</label>
-                                <select id="appSandboxSelect" class="mx-select full-width">
+                                <label style="font-size:12px; color:var(--mx-text-muted); margin-bottom:4px; display:block;">沙盒 (SANDBOX)</label>
+                                <select id="appSandboxSelect" class="mx-select" style="width:100%;">
                                     <option value="">跟随全局</option>
                                     <option value="ON">强制开启 (ON)</option>
                                     <option value="OFF">强制关闭 (OFF)</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="divider"></div>
-                        <h4 class="section-title">专属路径映射</h4>
+                        <h4 style="margin:8px 0 12px 0; font-size:14px; font-weight:600;">专属路径映射</h4>
                         <div id="appRuleBuilderContainer"></div>
-                        <div style="margin-top:16px;">
-                            <button id="btnAppAddRule" class="mx-btn secondary-btn full-width">添加规则</button>
+                        <div style="margin-top:12px;">
+                            <button id="btnAppAddRule" class="mx-btn" style="background:var(--mx-s3);">添加规则</button>
                         </div>
                     </div>
                     <div id="appRaw" class="editor-pane">
-                        <textarea id="appRuleContent" class="code-editor"></textarea>
+                        <textarea id="appRuleContent" class="code-editor" style="border-radius:0; border:none;"></textarea>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer grid-2" style="gap: 12px;">
-                <button id="btnDeleteAppConfig" class="mx-btn danger-outline-btn">清除配置</button>
-                <button id="btnSaveAppConfig" class="mx-btn mx-btn-primary">保存配置</button>
+            <div class="modal-footer">
+                <button id="btnDeleteAppConfig" class="mx-btn" style="color:var(--mx-red); background:var(--mx-s1); border:1px solid var(--mx-red);">清除配置</button>
+                <button id="btnSaveAppConfig" class="mx-btn mx-btn-primary" style="flex:1;">保存应用配置</button>
             </div>
         </div>
     </div>
@@ -256,65 +250,63 @@
     <div id="monitorIgnoreModal" class="modal">
         <div class="modal-content large">
             <div class="modal-header">
-                <div class="flex-column flex-1">
+                <div style="display:flex; flex-direction:column; flex:1;">
                     <h3 style="margin:0; font-size:16px;">监控过滤</h3>
-                    <small class="text-muted" style="font-size:11px; margin-top:2px;">monitor_ignore.conf</small>
+                    <small class="text-muted" style="font-size:11px;">monitor_ignore.conf</small>
                 </div>
                 <div style="display:flex; gap:12px; align-items:center;">
-                    <div class="toggle-group compact">
-                        <label><input type="radio" name="ignoreMode" value="visual" checked><span>UI</span></label>
-                        <label><input type="radio" name="ignoreMode" value="raw"><span>CODE</span></label>
+                    <div class="toggle-group-pill">
+                        <label><input type="radio" name="ignoreMode" value="visual" checked><span>图形</span></label>
+                        <label><input type="radio" name="ignoreMode" value="raw"><span>源码</span></label>
                     </div>
-                    <button class="mx-btn icon-btn" onclick="closeModal('monitorIgnoreModal')"><span id="iconCloseIgnoreModal"></span></button>
+                    <button class="mx-btn" style="background:transparent; padding:4px; display:flex;" onclick="closeModal('monitorIgnoreModal')"><span id="iconCloseIgnoreModal"></span></button>
                 </div>
             </div>
-            <div class="modal-body">
-                <div id="alertIgnore" class="alert-info">匹配规则：<b>前缀匹配</b>。列表中的路径不会被记录。</div>
+            <div class="modal-body" style="padding:0; position:relative;">
+                <div id="alertIgnore" class="alert-info">匹配规则：<b>前缀匹配</b></div>
                 <div class="editor-wrapper">
                     <div id="ignoreVisual" class="editor-pane active" style="padding:16px;">
                         <div id="ignoreBuilderContainer"></div>
-                        <div style="margin-top:16px;">
-                            <button id="btnAddIgnoreRow" class="mx-btn secondary-btn full-width">添加忽略路径</button>
+                        <div style="margin-top:12px;">
+                            <button id="btnAddIgnoreRow" class="mx-btn" style="background:var(--mx-s3);">添加路径</button>
                         </div>
                     </div>
                     <div id="ignoreRaw" class="editor-pane">
-                        <textarea id="monitorIgnoreContent" class="code-editor"></textarea>
+                        <textarea id="monitorIgnoreContent" class="code-editor" style="border-radius:0; border:none;"></textarea>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button id="btnSaveIgnore" class="mx-btn mx-btn-primary full-width">保存配置</button>
+                <button id="btnSaveIgnore" class="mx-btn mx-btn-primary" style="width:100%;">保存配置</button>
             </div>
         </div>
     </div>
 
     <!-- Settings Modal -->
     <div id="settingsModal" class="modal">
-        <div class="modal-content bottom-sheet">
+        <div class="modal-content">
             <div class="modal-header">
-                <h3 style="margin:0; font-size:18px;">更多设置</h3>
-                <button class="mx-btn icon-btn" onclick="closeModal('settingsModal')"><span id="iconCloseSettingsModal"></span></button>
+                <h3 style="margin:0; font-size:16px;">全局设置</h3>
+                <button class="mx-btn" style="background:transparent; padding:4px; display:flex;" onclick="closeModal('settingsModal')"><span id="iconCloseSettingsModal"></span></button>
             </div>
-            <div class="modal-body" style="padding: 20px 16px;">
-                <label class="switch-row mx-card" style="padding: 16px;">
-                    <div class="flex-column">
-                        <span class="fw-bold" style="font-size:15px; color:var(--mx-text);">规则同步至清理插件</span>
-                        <small class="text-muted" style="font-size:12px; margin-top:4px;">同步至 me.gm.cleaner.plugin</small>
+            <div class="modal-body" style="padding:16px;">
+                <label class="switch-row" style="margin-bottom: 12px;">
+                    <div>
+                        <span class="fw-bold" style="font-size:14px; color:var(--mx-text);">插件规则覆写同步</span>
+                        <small class="text-muted" style="display:block; font-size:11px; margin-top:2px;">同步至 me.gm.cleaner.plugin</small>
                     </div>
                     <div class="switch">
                         <input type="checkbox" id="pluginSyncToggle">
                         <span class="slider"></span>
                     </div>
                 </label>
-                <p class="text-muted" style="font-size: 13px; line-height: 1.6; margin: 12px 4px;">
-                    开启后，会自动合并模块内与应用配置目录的规则，转换为清理插件支持的 JSON 格式并写入其配置目录，实现规则共享。
+                <p class="text-muted" style="font-size: 12px; line-height: 1.5; margin-bottom:8px;">
+                    开启后，会自动合并模块内与应用配置目录的规则，转换为插件支持的 JSON 格式并写入其配置目录。
                 </p>
-                <div class="mx-card" style="padding: 12px 16px; background: var(--mx-s1);">
-                    <div id="pluginStatusLabel" style="font-size: 12px; font-family: monospace; font-weight: 600;">检测中...</div>
-                </div>
+                <div id="pluginStatusLabel" style="font-size: 11px; font-family: monospace; color:var(--mx-text-muted);"></div>
             </div>
             <div class="modal-footer">
-                <button id="btnSaveSettings" class="mx-btn mx-btn-primary full-width" style="height: 44px; border-radius: 22px;">保存并应用</button>
+                <button id="btnSaveSettings" class="mx-btn mx-btn-primary" style="width:100%;">保存并应用</button>
             </div>
         </div>
     </div>

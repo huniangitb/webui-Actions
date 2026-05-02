@@ -62,7 +62,7 @@ const ICONS = {
     FOLDER: getSvg(mdiFolderOutline, 16),
     FILE: getSvg(mdiFileOutline, 16),
     IGNORE: getSvg(mdiEyeOffOutline),
-    SWEEP: getSvg(mdiDeleteSweepOutline)
+    SWEEP: getSvg(mdiDeleteSweepOutline),
     CLOCK: getSvg(mdiClockOutline, 14, 'var(--mx-t2)'),
 };
 

@@ -1,3 +1,4 @@
+--- START OF FILE index.js ---
 import './style.css';
 import { exec, toast, listPackages, getPackagesInfo } from 'kernelsu';
 import { getSettings, saveSettings, checkPluginInstalled, syncToPlugin } from './plugin.js';
@@ -22,9 +23,9 @@ let globalConfText = "";
 let injectorStates = new Map();
 let injectorRulesMap = new Map();
 
-let activeUsers = [0];
+let activeUsers =[0];
 let activeMounts = new Set();
-let injectedApps = new Map(); // pkg -> {pid, uid, redirect, hide, ro}
+let injectedApps = new Map(); 
 let statusPolling = null;
 let currentAppFilter = 'filterUser';
 let currentPid = null;
@@ -35,7 +36,6 @@ const PAGE_LIMIT = 50;
 let ioState = { offset: 0, loading: false, hasMore: true, term: '' };
 let sysState = { offset: 0, loading: false, hasMore: true, term: '' };
 
-// 懒加载观察器与渲染队列
 let iconObserver = null;
 let renderQueueId = null;
 
@@ -46,12 +46,12 @@ const ICONS = {
     DELETE: getSvg(mdiDelete, 18, 'currentColor'),
     FOLDER: getSvg(mdiFolder, 16, '#ffca28'),
     FILE: getSvg(mdiFile, 16, '#9e9e9e'),
-    SEARCH: getSvg(mdiMagnify, 18, '#868e96'),
+    SEARCH: getSvg(mdiMagnify, 18, 'currentColor'),
     PLUS: getSvg(mdiPlus, 16, '#fff'),
-    CLOSE: getSvg(mdiClose, 28, '#5f6368'),
+    CLOSE: getSvg(mdiClose, 24, 'currentColor'),
     FILTER: getSvg(mdiFilterVariant, 24, '#fff'),
-    STOP: getSvg(mdiStop, 20, '#dc3545'),
-    PLAY: getSvg(mdiPlay, 20, '#36a420'),
+    STOP: getSvg(mdiStop, 20, 'currentColor'),
+    PLAY: getSvg(mdiPlay, 20, 'currentColor'),
     EYE_OFF: getSvg(mdiEyeOff, 20, 'currentColor'),
     CLEAR: getSvg(mdiDeleteSweep, 20, '#fff'),
     CLOCK: getSvg(mdiClockOutline, 14, 'currentColor'),
@@ -76,7 +76,6 @@ const debounce = (func, wait) => {
     return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), wait); };
 };
 
-// 分块处理大数据函数，避免卡死主线程
 const processInChunks = async (array, processFn, chunkSize = 100) => {
     for (let i = 0; i < array.length; i += chunkSize) {
         const chunk = array.slice(i, i + chunkSize);
@@ -123,7 +122,6 @@ const fetchInjectedApps = async () => {
             res.split('\n').forEach(line => {
                 if (line.startsWith('APP|')) {
                     const parts = line.split('|');
-                    // APP|pkg|pid|uid|redirect|hide|ro
                     if (parts.length >= 7) {
                         injectedApps.set(parts[1], {
                             pid: parts[2],
@@ -150,19 +148,18 @@ const checkStatus = async () => {
         if (currentPid) {
             badge.className = "badge badge-success"; badge.textContent = "RUNNING"; info.textContent = `PID: ${currentPid}`;
             if (toggleBtn.getAttribute('data-status') !== 'running') {
-                toggleBtn.innerHTML = ICONS.STOP; toggleBtn.style.background = "rgba(220, 53, 69, 0.1)";
+                toggleBtn.innerHTML = ICONS.STOP; toggleBtn.style.color = "var(--mx-red)";
                 toggleBtn.setAttribute('data-status', 'running');
             }
         } else {
             badge.className = "badge badge-gray"; badge.textContent = "STOPPED"; info.textContent = "OFFLINE";
             if (toggleBtn.getAttribute('data-status') !== 'stopped') {
-                toggleBtn.innerHTML = ICONS.PLAY; toggleBtn.style.background = "rgba(54, 164, 32, 0.1)";
+                toggleBtn.innerHTML = ICONS.PLAY; toggleBtn.style.color = "var(--mx-green)";
                 toggleBtn.setAttribute('data-status', 'stopped');
             }
         }
         await updateMountStatus();
         await fetchInjectedApps();
-        // 更新已有列表项的注入状态显示
         document.querySelectorAll('#appList .list-item').forEach(item => {
             const pkg = item.dataset.pkg;
             if (!pkg) return;
@@ -170,14 +167,15 @@ const checkStatus = async () => {
             if (!small) return;
             const inj = injectedApps.get(pkg);
             if (inj) {
-                const flags = [];
+                const flags =[];
                 if (inj.redirect === '1') flags.push('<span class="inj-flag inj-flag-r">R</span>');
                 if (inj.hide === '1') flags.push('<span class="inj-flag inj-flag-h">H</span>');
                 if (inj.ro === '1') flags.push('<span class="inj-flag inj-flag-ro">RO</span>');
                 small.className = 'inj-status';
                 small.innerHTML = `<span class="inj-pid">PID ${inj.pid}</span> ${flags.join(' ')}`;
             } else {
-                small.className = 'text-muted font-monospace text-truncate d-block';
+                small.className = 'text-muted text-truncate d-block';
+                small.style.fontFamily = "monospace";
                 small.textContent = pkg;
             }
         });
@@ -189,7 +187,9 @@ document.addEventListener('DOMContentLoaded', () => {
     setIcon('iconSearch', ICONS.SEARCH); setIcon('iconIoSearch', ICONS.SEARCH); setIcon('iconFilter', ICONS.FILTER);
     setIcon('btnMonitorIgnore', ICONS.EYE_OFF); setIcon('iconClearIo', ICONS.CLEAR); setIcon('iconClearLog', ICONS.CLEAR);
     setIcon('btnSettings', ICONS.COG);
-    document.querySelectorAll('.btn-close').forEach(el => el.innerHTML = ICONS.CLOSE);
+    setIcon('iconCloseAppModal', ICONS.CLOSE);
+    setIcon('iconCloseIgnoreModal', ICONS.CLOSE);
+    setIcon('iconCloseSettingsModal', ICONS.CLOSE);
     
     document.getElementById('btnGlobalAddRule').innerHTML = `${ICONS.PLUS} 添加规则`;
     document.getElementById('btnAppAddRule').innerHTML = `${ICONS.PLUS} 添加规则`;
@@ -274,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isInstalled = await checkPluginInstalled();
         const lbl = document.getElementById('pluginStatusLabel');
         lbl.textContent = isInstalled ? "状态: 发现清理插件 (已就绪)" : "状态: 未发现清理插件";
-        lbl.style.color = isInstalled ? "var(--success)" : "var(--danger)";
+        lbl.style.color = isInstalled ? "var(--mx-green)" : "var(--mx-red)";
         openModal('settingsModal');
     };
     
@@ -288,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.visualViewport.addEventListener('resize', () => {
             const box = document.getElementById('suggestionBox');
             if (box) box.style.display = 'none';
-            if (document.activeElement && document.activeElement.classList.contains('form-control')) {
+            if (document.activeElement && document.activeElement.classList.contains('mx-input')) {
                 setTimeout(() => { document.activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150);
             }
         });
@@ -308,7 +308,7 @@ const loadData = async () => {
         await fetchInjectedApps();
 
         const userRes = await run("pm list users");
-        activeUsers = [];
+        activeUsers =[];
         if (userRes) {
             const matches = userRes.matchAll(/UserInfo\{(\d+):/g);
             for (const m of matches) activeUsers.push(parseInt(m[1]));
@@ -330,13 +330,13 @@ const loadData = async () => {
                     currentSection = secMatch[1];
                     if (currentSection !== 'GLOBAL') injectorStates.set(currentSection, secMatch[2] || "ON");
                     if (!injectorRulesMap.has(currentSection)) {
-                        injectorRulesMap.set(currentSection, []);
+                        injectorRulesMap.set(currentSection,[]);
                     }
                 } else if (currentSection) {
                     injectorRulesMap.get(currentSection).push(tLine);
                 }
             });
-            globalConfText = (injectorRulesMap.get('GLOBAL') || []).join('\n');
+            globalConfText = (injectorRulesMap.get('GLOBAL') ||[]).join('\n');
         }
 
         let ruleFilesMap = new Map();
@@ -356,9 +356,9 @@ const loadData = async () => {
             }
         }
 
-        let infos = [];
+        let infos =[];
         try {
-            const userPkgs = await listPackages('user') || [];
+            const userPkgs = await listPackages('user') ||[];
             const systemPkgs = await listPackages('system') || [];
             const allPkgs = [...new Set([...userPkgs, ...systemPkgs])];
             if (allPkgs.length > 0) {
@@ -370,7 +370,7 @@ const loadData = async () => {
 
         if (!Array.isArray(infos) || infos.length === 0) {
             const fallbackList = await run(`cat ${LIST_CONFIG} 2>/dev/null`);
-            infos = [];
+            infos =[];
             if (fallbackList) {
                 fallbackList.split('\n').forEach(line => {
                     const trimLine = line.trim();
@@ -386,7 +386,6 @@ const loadData = async () => {
 
         appMap.clear();
         if (Array.isArray(infos)) {
-            // 切片处理规则状态比对，防止大量正则运算卡死 UI
             await processInChunks(infos, info => {
                 if (!info || !info.packageName) return;
                 
@@ -435,13 +434,11 @@ const renderAppList = () => {
     const listEl = document.getElementById('appList');
     const searchVal = document.getElementById('appSearch').value.toLowerCase();
     
-    // 中断之前的渲染队列
     if (renderQueueId) {
         cancelAnimationFrame(renderQueueId);
         renderQueueId = null;
     }
 
-    // 初始化懒加载观察器
     if (!iconObserver) {
         iconObserver = new IntersectionObserver((entries, observer) => {
             entries.forEach(entry => {
@@ -459,7 +456,6 @@ const renderAppList = () => {
         iconObserver.disconnect();
     }
 
-    // 过滤与排序
     const items = Array.from(appMap.values()).filter(app => {
         if (currentAppFilter === 'filterUser' && app.isSystem) return false;
         if (currentAppFilter === 'filterSystem' && !app.isSystem) return false;
@@ -471,14 +467,13 @@ const renderAppList = () => {
     listEl.innerHTML = '';
     
     if (items.length === 0) {
-        listEl.innerHTML = '<div class="empty-state">无匹配应用</div>';
+        listEl.innerHTML = '<div style="padding:40px; text-align:center; color:var(--mx-text-muted);">无匹配应用</div>';
         return;
     }
 
     let currentIndex = 0;
     const CHUNK_SIZE = 40;
 
-    // 分块异步渲染DOM
     const renderChunk = () => {
         const chunk = items.slice(currentIndex, currentIndex + CHUNK_SIZE);
         if (chunk.length === 0) {
@@ -491,28 +486,28 @@ const renderAppList = () => {
             let mountedBadge = activeMounts.has(app.packageName) ? `<span class="badge badge-success badge-mount">MOUNTED</span>` : "";
             let badges = activeUsers.filter(u => app.users[u].text.trim() || app.users[u].hasRules || app.isConfigured).map(u => {
                 const c = app.users[u];
-                return `<span class="badge ${c.isEnabled?'badge-primary':'badge-gray'} badge-pill">U${u}${c.isEnabled?'':' OFF'}</span>`;
+                return `<span class="badge ${c.isEnabled?'badge-primary':'badge-gray'}">U${u}${c.isEnabled?'':' OFF'}</span>`;
             });
             const isOverallDisabled = badges.every(b => b.includes('OFF'));
 
             return `
             <div class="list-item" data-pkg="${app.packageName}" onclick="openAppConfig('${app.packageName}')">
                 <div class="app-main">
-                    <div class="app-icon-wrapper" style="background: transparent;">
-                        <img data-src="ksu://icon/${app.packageName}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="width: 40px; height: 40px; border-radius: 8px; object-fit: contain; background: var(--bg-input);" class="lazy-icon" onerror="window.onIconError(this)" />
+                    <div class="app-icon-wrapper">
+                        <img data-src="ksu://icon/${app.packageName}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="width: 40px; height: 40px; border-radius: 8px; object-fit: contain; background: var(--mx-s1);" class="lazy-icon" onerror="window.onIconError(this)" />
                     </div>
                     <div class="app-content">
                         <div class="app-header"><span class="app-name ${isOverallDisabled ? 'text-muted' : ''}">${app.appLabel}</span>${mountedBadge}</div>
                         ${(() => {
                             const inj = injectedApps.get(app.packageName);
                             if (inj) {
-                                const flags = [];
+                                const flags =[];
                                 if (inj.redirect === '1') flags.push('<span class="inj-flag inj-flag-r">R</span>');
                                 if (inj.hide === '1') flags.push('<span class="inj-flag inj-flag-h">H</span>');
                                 if (inj.ro === '1') flags.push('<span class="inj-flag inj-flag-ro">RO</span>');
                                 return `<small class="inj-status"><span class="inj-pid">PID ${inj.pid}</span> ${flags.join(' ')}</small>`;
                             }
-                            return `<small class="text-muted font-monospace text-truncate d-block">${app.packageName}</small>`;
+                            return `<small class="text-muted text-truncate d-block" style="font-family:monospace;">${app.packageName}</small>`;
                         })()}
                     </div>
                 </div>
@@ -610,7 +605,7 @@ const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelec
 const addRuleRow = (type, target, source, containerId) => {
     const div = document.createElement('div');
     div.className = 'rule-row';
-    div.innerHTML = `<select class="form-select rule-type"><option value="REDIRECT">重定向</option><option value="HIDE">隐藏</option><option value="RO">只读</option><option value="ALLOW">沙盒豁免</option></select><div class="rule-inputs"><input type="text" class="form-control rule-target" placeholder="原始路径" value="${target}"><input type="text" class="form-control rule-source ${type!=='REDIRECT'?'hidden':''}" placeholder="重定向至" value="${source}"></div><button class="btn btn-icon-sm btn-del">${ICONS.DELETE}</button>`;
+    div.innerHTML = `<select class="mx-select rule-type" style="width:100px; height:36px;"><option value="REDIRECT">重定向</option><option value="HIDE">隐藏</option><option value="RO">只读</option><option value="ALLOW">沙盒豁免</option></select><div class="rule-inputs" style="flex:1; display:flex; gap:8px;"><input type="text" class="mx-input rule-target" placeholder="原始路径" value="${target}" style="height:36px;"><input type="text" class="mx-input rule-source ${type!=='REDIRECT'?'hidden':''}" placeholder="重定向至" value="${source}" style="height:36px;"></div><button class="mx-btn btn-del" style="background:transparent; padding:0 8px; color:var(--mx-text-muted); border:none;">${ICONS.DELETE}</button>`;
     const select = div.querySelector('.rule-type');
     select.value = type;
     select.onchange = (e) => div.querySelector('.rule-source').classList.toggle('hidden', e.target.value !== 'REDIRECT');
@@ -641,7 +636,7 @@ const flushInjectorConf = async () => {
     injectorStates.forEach((state, key) => {
         if (key === 'GLOBAL') return;
         res += `[${key}] ${state}\n`;
-        const inlineRules = injectorRulesMap.get(key) || [];
+        const inlineRules = injectorRulesMap.get(key) ||[];
         if (inlineRules.length > 0) {
             res += inlineRules.join('\n') + '\n';
         }
@@ -660,7 +655,7 @@ window.openAppConfig = (pkg) => {
     
     const tabsContainer = document.getElementById('appUserTabs');
     tabsContainer.innerHTML = activeUsers.map(uid => 
-        `<button class="nav-item ${uid === activeUsers[0] ? 'active' : ''}" data-uid="${uid}" onclick="window.switchAppUser(${uid})">${ICONS.USER} 用户 ${uid}</button>`
+        `<button class="mx-tab ${uid === activeUsers[0] ? 'active' : ''}" data-uid="${uid}" onclick="window.switchAppUser(${uid})">${ICONS.USER} 用户 ${uid}</button>`
     ).join('');
     
     setTimeout(() => {
@@ -671,7 +666,7 @@ window.openAppConfig = (pkg) => {
 
 window.switchAppUser = (uid) => {
     currentBindingUser = uid;
-    document.querySelectorAll('#appUserTabs .nav-item').forEach(btn => {
+    document.querySelectorAll('#appUserTabs .mx-tab').forEach(btn => {
         btn.classList.toggle('active', parseInt(btn.dataset.uid) === uid);
     });
 
@@ -759,7 +754,7 @@ document.getElementById('btnSaveGlobal').onclick = async () => {
 };
 
 window.openModal = (id) => { const el = document.getElementById(id); if (el) { el.classList.remove('hiding'); el.classList.add('show'); } };
-window.closeModal = (id) => { const el = document.getElementById(id); if (el && el.classList.contains('show')) { el.classList.add('hiding'); setTimeout(() => { el.classList.remove('show'); el.classList.remove('hiding'); }, 250); document.getElementById('suggestionBox').style.display = 'none'; } };
+window.closeModal = (id) => { const el = document.getElementById(id); if (el && el.classList.contains('show')) { el.classList.add('hiding'); setTimeout(() => { el.classList.remove('show'); el.classList.remove('hiding'); }, 200); document.getElementById('suggestionBox').style.display = 'none'; } };
 
 const normalizeToDisplay = (path) => { if (!path) return ""; if (path.startsWith(PATH_PREFIX_REAL)) return path.substring(PATH_PREFIX_REAL.length) || "/"; if (path.startsWith(PATH_PREFIX_STORAGE)) return path.substring(PATH_PREFIX_STORAGE.length) || "/"; return path; };
 const normalizeToConfig = (path, isTarget) => { if (!path) return ""; path = path.trim(); if (isTarget) { if (path.startsWith('/')) return path; return (PATH_PREFIX_STORAGE + '/' + path).replace(/\/+/g, '/'); } else { if (path.startsWith('/')) return path; return (PATH_PREFIX_REAL + '/' + path).replace(/\/+/g, '/'); } };
@@ -799,14 +794,14 @@ const updateBoxPosition = (input) => {
             box.style.maxHeight = (rect.top - 10) + 'px'; 
             box.style.borderRadius = '8px 8px 0 0';
             box.style.borderBottom = 'none'; 
-            box.style.borderTop = '1px solid var(--border)';
+            box.style.borderTop = '1px solid var(--mx-s4)';
         } else {
             box.style.top = rect.bottom + 'px'; 
             box.style.bottom = 'auto';
             box.style.maxHeight = (vh - rect.bottom - 10) + 'px'; 
             box.style.borderRadius = '0 0 8px 8px';
             box.style.borderTop = 'none'; 
-            box.style.borderBottom = '1px solid var(--border)';
+            box.style.borderBottom = '1px solid var(--mx-s4)';
         }
     });
 };
@@ -830,7 +825,7 @@ const setupAutocomplete = (input) => {
             const suggestions = res.stdout.split('\n').filter(l => l.startsWith(searchPrefix)).map(line => { const isDir = line.endsWith('/'); return { text: displayBase + (isDir ? line : line) + (isDir ? '' : ''), icon: isDir ? ICONS.FOLDER : ICONS.FILE }; });
             if (suggestions.length === 0) { box.style.display = 'none'; return; }
             
-            box.innerHTML = suggestions.map(s => `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window.applySuggestion('${s.text}')"><div class="s-icon">${s.icon}</div><div class="s-text">${s.text}</div></div>`).join('');
+            box.innerHTML = suggestions.map(s => `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window.applySuggestion('${s.text}')"><div class="s-icon" style="margin-right:10px;display:flex;">${s.icon}</div><div class="s-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.text}</div></div>`).join('');
             box.style.display = 'block'; 
             
             updateBoxPosition(input);
@@ -861,12 +856,12 @@ const handleModeChange = (isVisual, visualId, rawId, alertId, contentId, parseFu
             parseFunc(document.getElementById(contentId).value);
             rawEl.classList.remove('active');
             visualEl.classList.add('active');
-            if (alertBox) alertBox.classList.remove('collapsed');
+            if (alertBox) alertBox.style.display = 'block';
         } else {
             document.getElementById(contentId).value = genFunc();
             visualEl.classList.remove('active');
             rawEl.classList.add('active');
-            if (alertBox) alertBox.classList.add('collapsed');
+            if (alertBox) alertBox.style.display = 'none';
         }
     }, 10);
 };
@@ -884,11 +879,11 @@ const parseIgnoreToVisual = (text) => {
     if (container.children.length === 0) addIgnoreRow('');
 };
 const generateIgnoreFromVisual = () => {
-    let res = ""; document.querySelectorAll('#ignoreBuilderContainer .ignore-row input').forEach(input => { const val = input.value.trim(); if (val) res += `${val}\n`; }); return res.trim();
+    let res = ""; document.querySelectorAll('#ignoreBuilderContainer .rule-row input').forEach(input => { const val = input.value.trim(); if (val) res += `${val}\n`; }); return res.trim();
 };
 const addIgnoreRow = (path) => {
     const div = document.createElement('div'); div.className = 'rule-row ignore-row';
-    div.innerHTML = `<input type="text" class="form-control" placeholder="输入要忽略的路径前缀" value="${path}"><button class="btn btn-icon-sm btn-del">${ICONS.DELETE}</button>`;
+    div.innerHTML = `<input type="text" class="mx-input" placeholder="输入要忽略的路径前缀" value="${path}" style="flex:1; height:36px;"><button class="mx-btn btn-del" style="background:transparent; padding:0 8px; color:var(--mx-text-muted); border:none;">${ICONS.DELETE}</button>`;
     div.querySelector('.btn-del').onclick = () => div.remove(); setupAutocomplete(div.querySelector('input'));
     document.getElementById('ignoreBuilderContainer').appendChild(div);
 };
@@ -896,7 +891,7 @@ const addIgnoreRow = (path) => {
 const openMonitorIgnoreEditor = async () => {
     const content = await run(`cat ${MONITOR_IGNORE_CONF} 2>/dev/null`);
     document.getElementById('monitorIgnoreContent').value = content;
-    parseIgnoreToVisual(content); document.getElementById('alertIgnore').classList.remove('collapsed');
+    parseIgnoreToVisual(content); document.getElementById('alertIgnore').style.display = 'block';
     const visualRadio = document.querySelector('input[name="ignoreMode"][value="visual"]');
     if (visualRadio) { visualRadio.checked = true; visualRadio.dispatchEvent(new Event('change')); }
     openModal('monitorIgnoreModal');
@@ -943,7 +938,7 @@ const fetchIoLogs = async () => {
                 renderIoRows(dataLines);
             } else {
                 if (!ioState.hasMore && ioState.offset === 0) {
-                    document.getElementById('ioLogList').innerHTML = '<div class="empty-state">暂无监控数据</div>';
+                    document.getElementById('ioLogList').innerHTML = '<div style="padding:40px; text-align:center; color:var(--mx-text-muted);">暂无监控数据</div>';
                 }
             }
         }
@@ -994,7 +989,7 @@ const renderIoRows = (lines) => {
                         <div class="io-app text-truncate" title="${pkg}">${appName}</div>
                         <div class="io-op op-${op}">${op}</div>
                     </div>
-                    <div class="io-card-body break-all font-monospace text-muted">${details}</div>
+                    <div class="io-card-body">${details}</div>
                 </div>`;
     }).join('');
     listEl.insertAdjacentHTML('beforeend', html);
@@ -1053,9 +1048,9 @@ const fetchSysLogs = async () => {
     }
 };
 
-document.querySelectorAll('.main-tabs .nav-item').forEach(btn => {
+document.querySelectorAll('.main-tabs .mx-tab').forEach(btn => {
     btn.onclick = () => {
-        document.querySelectorAll('.main-tabs .nav-item').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.main-tabs .mx-tab').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
         const targetId = btn.dataset.target;

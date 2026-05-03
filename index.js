@@ -360,7 +360,8 @@ const loadData = async () => {
 
         const buildAppMap = (src) => {
             appMap.clear();
-            (src || []).forEach(info => {
+            if (!Array.isArray(src)) return;
+            src.forEach(info => {
                 if (!info || !info.packageName) return;
                 let appUsers = {}, isConfiguredAny = false;
                 activeUsers.forEach(uid => {
@@ -377,14 +378,22 @@ const loadData = async () => {
 
         let infos = [];
         let usedFallback = false;
+        let primaryEmpty = false;
         try {
-            const allPkgs = [...new Set([...(await listPackages('user')||[]), ...(await listPackages('system')||[])])];
-            if (allPkgs.length > 0) infos = await getPackagesInfo(allPkgs);
-        } catch (e) {}
+            const userPkgs = await listPackages('user') || [];
+            const sysPkgs = await listPackages('system') || [];
+            const allPkgs = [...new Set([...userPkgs, ...sysPkgs])];
+            if (allPkgs.length > 0) {
+                infos = await getPackagesInfo(allPkgs) || [];
+                if (infos.length === 0) primaryEmpty = true;
+            } else {
+                primaryEmpty = true;
+            }
+        } catch (e) { primaryEmpty = true; }
 
         buildAppMap(infos);
 
-        if (appMap.size === 0) {
+        if (primaryEmpty || appMap.size === 0) {
             const fallbackList = await run(`cat ${LIST_CONFIG} 2>/dev/null`);
             if (fallbackList) {
                 infos = [];
@@ -395,7 +404,7 @@ const loadData = async () => {
                     }
                 });
                 buildAppMap(infos);
-                usedFallback = true;
+                if (appMap.size > 0) usedFallback = true;
             }
         }
 

@@ -8,6 +8,7 @@ import {
 } from "./ui.js";
 import { syncToPlugin } from "./plugin.js";
 import { renderGlobalRules } from "./global.js";
+
 // =============================================
 // Data loading
 // =============================================
@@ -47,6 +48,7 @@ export const loadData = async () => {
   try {
     state.activeMounts = await fetchActiveMounts();
     await fetchInjectedApps();
+    
     // Active users
     const userRes = await run("pm list users");
     state.activeUsers = [];
@@ -55,6 +57,7 @@ export const loadData = async () => {
         state.activeUsers.push(parseInt(m[1]));
     }
     if (state.activeUsers.length === 0) state.activeUsers.push(0);
+    
     // Injector conf
     const injectorConf = await run(`cat ${CONST.INJECTOR_CONF} 2>/dev/null`);
     state.globalConfText = "";
@@ -76,9 +79,9 @@ export const loadData = async () => {
           state.injectorRulesMap.get(currentSection).push(tLine);
         }
       });
-      state.globalConfText =
-        (state.injectorRulesMap.get("GLOBAL") || []).join("\n") || "";
+      state.globalConfText = (state.injectorRulesMap.get("GLOBAL") || []).join("\n") || "";
     }
+    
     // Rule files
     const ruleFilesMap = new Map();
     for (const uid of state.activeUsers) {
@@ -100,6 +103,7 @@ export const loadData = async () => {
         }
       }
     }
+    
     // Build app map
     const buildAppMap = (src) => {
       state.appMap.clear();
@@ -133,6 +137,7 @@ export const loadData = async () => {
         state.appMap.set(info.packageName, { ...info, isConfigured: isConfiguredAny, users: appUsers });
       });
     };
+    
     let infos = [];
     let usedFallback = false;
     let primaryEmpty = false;
@@ -172,21 +177,32 @@ export const loadData = async () => {
     }
     state.usingFallback = usedFallback;
     if (usedFallback) showToast("应用列表为空，已回退至兼容模式");
+    
     renderAppList();
     renderGlobalRules();
     staggerLoadIcons();
+    
+    // 静默预加载前20个系统应用的图标，以便日后查阅更快
+    const sysAppsToPreload = Array.from(state.appMap.values()).filter(a => a.isSystem).slice(0, 20);
+    sysAppsToPreload.forEach((app, index) => {
+        setTimeout(() => {
+            if (!_iconCache.has(app.packageName)) {
+                const img = new Image();
+                img.onload = () => _iconCache.add(app.packageName);
+                img.src = `ksu://icon/${app.packageName}`;
+            }
+        }, 1000 + index * 50); // 1秒后开始分批并发预载，不影响主页面性能
+    });
+    
   } catch (e) {
     showToast("加载异常: " + e.message);
   }
 };
+
 // =============================================
 // Icon cache & staggered loader
 // =============================================
-const _iconCache = new Set(); // pkgs whose icons have finished loading
-/**
- * 优化后的 staggered 资源加载
- * 依次为图片分配 setTimeout 触发请求，依然为并行的异步处理，但发起顺序完全符合从上往下的视觉效果
- */
+const _iconCache = new Set();
 const staggerLoadIcons = () => {
   const imgs = document.querySelectorAll("#appList .app-icon[data-src]");
   if (imgs.length === 0) return;
@@ -196,10 +212,10 @@ const staggerLoadIcons = () => {
     setTimeout(() => {
       img.src = ds;
       img.removeAttribute("data-src");
-    }, index * 20); // 严格由上至下、间隔 20ms 并行派发图片加载请求
+    }, index * 20); // 严格由上至下分配图片请求，保障按顺便呈现出视觉流反馈
   });
 };
-// Track icon completion via capture-phase load events
+
 if (!window.__iconListenerSetup) {
   window.__iconListenerSetup = true;
   document.addEventListener("load", (e) => {
@@ -207,10 +223,11 @@ if (!window.__iconListenerSetup) {
     if (t.tagName === "IMG" && t.classList.contains("app-icon") && t.dataset.pkg) {
       _iconCache.add(t.dataset.pkg);
     }
-  }, true); // useCapture — load events do not bubble
+  }, true);
 }
+
 // =============================================
-// App list rendering
+// App list DOM updates
 // =============================================
 export const renderAppList = () => {
   const listEl = document.getElementById("appList");
@@ -234,11 +251,12 @@ export const renderAppList = () => {
         (!!b.isConfigured - !!a.isConfigured) ||
         (a.appLabel || "").localeCompare(b.appLabel || "")
     );
+    
   if (items.length === 0) {
-    listEl.innerHTML =
-      '<div style="padding:40px;text-align:center;color:var(--mx-t2);">无匹配应用</div>';
+    listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--mx-t2);">无匹配应用</div>';
     return;
   }
+  
   listEl.innerHTML = items
     .map((app, idx) => {
       let badgesHTML = state.activeUsers
@@ -250,23 +268,23 @@ export const renderAppList = () => {
         .join("");
       if (state.activeMounts.has(app.packageName))
         badgesHTML += `<span class="mx-badge mx-badge-success">MOUNTED</span>`;
+        
       let injStr = "";
       const inj = state.injectedApps.get(app.packageName);
       if (inj) {
         const flags = [];
-        if (inj.redirect === "1")
-          flags.push('<span style="color:var(--mx-primary);font-weight:800">R</span>');
-        if (inj.hide === "1")
-          flags.push('<span style="color:var(--mx-amber);font-weight:800">H</span>');
-        if (inj.ro === "1")
-          flags.push('<span style="color:var(--mx-red);font-weight:800">RO</span>');
+        if (inj.redirect === "1") flags.push('<span style="color:var(--mx-primary);font-weight:800">R</span>');
+        if (inj.hide === "1") flags.push('<span style="color:var(--mx-amber);font-weight:800">H</span>');
+        if (inj.ro === "1") flags.push('<span style="color:var(--mx-red);font-weight:800">RO</span>');
         injStr = `<span style="font-size:10px;margin-left:6px;padding:2px 6px;background:var(--mx-s3);border-radius:4px;font-family:var(--mx-font-mono);flex-shrink:0;">PID ${inj.pid} ${flags.join(" ")}</span>`;
       }
-      return `<div class="app-item" style="--item-delay: ${idx * 15}ms" onclick="window.openAppConfig('${app.packageName}')">
+      
+      // --item-delay 控制滑入动画交错延迟，限制最大延迟避免等待过久
+      return `<div class="app-item" data-pkg="${app.packageName}" style="--item-delay: ${Math.min(idx * 30, 800)}ms" onclick="window.openAppConfig('${app.packageName}')">
         <img class="app-icon${_iconCache.has(app.packageName) ? ' icon-loaded' : ''}" src="${_iconCache.has(app.packageName) ? `ksu://icon/${app.packageName}` : ''}" data-src="${_iconCache.has(app.packageName) ? '' : `ksu://icon/${app.packageName}`}" loading="lazy" onerror="this.classList.add('icon-error');this.src=this.dataset.fallback" data-fallback="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2365676b'><path d='M17.6,9.48l1.84-3.18c0.16-0.31,0.04-0.69-0.26-0.85c-0.31-0.16-0.69-0.04-0.85,0.26L16.4,9c-1.35-0.6-2.85-0.95-4.4-0.95S8.95,8.4,7.6,9L5.67,5.71C5.51,5.41,5.13,5.29,4.83,5.45C4.52,5.61,4.4,6,4.56,6.3L6.4,9.48C3.3,11.25,1.28,14.44,1,18.15h22C22.72,14.44,20.7,11.25,17.6,9.48z M7,15.25c-0.69,0-1.25-0.56-1.25-1.25S6.31,12.75,7,12.75s1.25,0.56,1.25,1.25S7.69,15.25,7,15.25z M17,15.25c-0.69,0-1.25-0.56-1.25-1.25s0.56-1.25,1.25-1.25s1.25,0.56,1.25,1.25S17.69,15.25,17,15.25z'/></svg>" onload="this.classList.add('icon-loaded')" data-pkg="${app.packageName}" />
         <div class="app-info">
           <div class="app-name" style="display:flex;align-items:center;">
-            <span style="overflow:hidden;text-overflow:ellipsis;">${app.appLabel}</span>${injStr}
+            <span style="overflow:hidden;text-overflow:ellipsis;">${app.appLabel}</span><span class="inj-str">${injStr}</span>
           </div>
           <div class="app-pkg">${app.packageName}</div>
         </div>
@@ -275,6 +293,41 @@ export const renderAppList = () => {
     })
     .join("");
 };
+
+// 局部精准更新进程PID与应用配置状态标签（消除列表重置闪烁问题）
+export const updateAppListStatus = () => {
+  document.querySelectorAll('#appList .app-item').forEach(item => {
+    const pkg = item.dataset.pkg;
+    const app = state.appMap.get(pkg);
+    if (!app) return;
+    
+    let badgesHTML = state.activeUsers
+      .filter((u) => app.users[u]?.text.trim() || app.users[u]?.hasRules || app.isConfigured)
+      .map((u) => {
+        const c = app.users[u];
+        return `<span class="mx-badge ${c.isEnabled ? "mx-badge-primary" : "mx-badge-gray"}">U${u}${c.isEnabled ? "" : " OFF"}</span>`;
+      })
+      .join("");
+    if (state.activeMounts.has(pkg))
+      badgesHTML += `<span class="mx-badge mx-badge-success">MOUNTED</span>`;
+      
+    const badgeEl = item.querySelector('.app-badges');
+    if (badgeEl && badgeEl.innerHTML !== badgesHTML) badgeEl.innerHTML = badgesHTML;
+    
+    let injStr = "";
+    const inj = state.injectedApps.get(pkg);
+    if (inj) {
+      const flags = [];
+      if (inj.redirect === "1") flags.push('<span style="color:var(--mx-primary);font-weight:800">R</span>');
+      if (inj.hide === "1") flags.push('<span style="color:var(--mx-amber);font-weight:800">H</span>');
+      if (inj.ro === "1") flags.push('<span style="color:var(--mx-red);font-weight:800">RO</span>');
+      injStr = `<span style="font-size:10px;margin-left:6px;padding:2px 6px;background:var(--mx-s3);border-radius:4px;font-family:var(--mx-font-mono);flex-shrink:0;">PID ${inj.pid} ${flags.join(" ")}</span>`;
+    }
+    const injEl = item.querySelector('.inj-str');
+    if (injEl && injEl.innerHTML !== injStr) injEl.innerHTML = injStr;
+  });
+};
+
 // =============================================
 // App config modal
 // =============================================
@@ -307,9 +360,7 @@ export const switchAppUser = (uid) => {
   const visualBtn = document.querySelector('button[name="appModeToggle"][data-mode="visual"]');
   if (visualBtn) visualBtn.click();
 };
-// =============================================
-// Injector conf flush
-// =============================================
+
 export const flushInjectorConf = async () => {
   let r = `[GLOBAL]\n${state.globalConfText.trim() ? state.globalConfText.trim() + "\n" : ""}`;
   state.injectorStates.forEach((s, k) => {
@@ -321,5 +372,6 @@ export const flushInjectorConf = async () => {
   const escaped = r.trim().replace(/'/g, "'\\''");
   await run(`echo '${escaped}' > ${CONST.INJECTOR_CONF}`);
 };
+
 window.openAppConfig = openAppConfig;
 window.switchAppUser = switchAppUser;

@@ -1,6 +1,7 @@
 import { state, CONST } from "./state.js";
 import { run, showToast, ICONS } from "./utils.js";
 import { prepare, layout } from "@chenglou/pretext";
+
 // =============================================
 // Virtual log list (Pretext-powered)
 // =============================================
@@ -12,8 +13,10 @@ class VirtualLogList {
     this.estimatedLineHeight = options.estimatedLineHeight || 20;
     this.font = options.font || '13px monospace';
     this.lineHeight = options.lineHeight || 20;
-    this.gap = options.gap || 0;              // gap between items (px)
-    this.padding = options.padding || 0;       // padding around items (px)
+    this.gap = options.gap || 0;
+    this.padding = options.padding || 0; 
+    this.chromeHeight = options.chromeHeight || 0; 
+    this.textWidthOffset = options.textWidthOffset || 0; 
     this.prepareFn = options.prepareFn || null;
     this.onEmpty = options.onEmpty || "";
     this.entries = [];
@@ -25,56 +28,70 @@ class VirtualLogList {
     this.container.addEventListener("scroll", this._onScroll);
     this.contentEl.style.position = "relative";
   }
-  /** Append one or more log entries */
+
   append(entryList) {
     for (const entry of entryList) {
       let h = this.estimatedLineHeight;
       let prep = null;
+      let cHeight = typeof this.chromeHeight === 'function' ? this.chromeHeight(entry) : this.chromeHeight;
+      
       if (entry.text) {
         try {
           prep = prepare(entry.text, this.font);
-          const availWidth = this.container.clientWidth - this.padding * 2;
+          const availWidth = this.container.clientWidth - (this.padding * 2) - this.textWidthOffset;
           const { height } = layout(prep, Math.max(availWidth, 100), this.lineHeight);
-          h = Math.max(this.estimatedLineHeight, height + 28);
+          h = height + cHeight;
         } catch {
           h = this.estimatedLineHeight;
         }
+      } else {
+        h = cHeight;
       }
       this.entries.push({ height: h, prepared: prep, data: entry });
-      this.totalHeight += h + this.gap;
     }
-    this.totalHeight -= this.gap; // last item doesn't need gap after it
+    this._recalcTotalHeight();
     this.isDirty = true;
     this._render();
   }
-  /** Clear all entries */
+
   clear() {
     this.entries = [];
-    this.totalHeight = 0;
+    this._recalcTotalHeight();
     this.isDirty = true;
     this.container.scrollTop = 0;
     this._render();
   }
-  /** Replace all entries */
+
   replace(entryList) {
     this.clear();
     this.append(entryList);
   }
-  /** Total scrollable height */
+
   get scrollHeight() {
     return this.totalHeight;
   }
+
   destroy() {
     this.container.removeEventListener("scroll", this._onScroll);
   }
-  // ---- Internal ----
+
+  _recalcTotalHeight() {
+    // 初始化外容器首部与底部的内留白边距 (保证完全贴合 8px 像素级间距)
+    this.totalHeight = this.entries.length > 0 ? this.padding * 2 : 0;
+    let th = 0;
+    for (const e of this.entries) th += e.height + this.gap;
+    if (th > 0) th -= this.gap;
+    this.totalHeight += th;
+  }
+
   _onScroll() {
     this._render();
   }
+
   _render() {
     const scrollTop = this.container.scrollTop;
     const viewHeight = this.container.clientHeight;
-    // Update spacer
+    
     this.contentEl.style.height = this.totalHeight + "px";
     if (this.entries.length === 0) {
       if (this.onEmpty && this.contentEl.innerHTML !== this.onEmpty) {
@@ -82,47 +99,56 @@ class VirtualLogList {
       }
       return;
     }
-    // Binary search for visible range
+
     const startIdx = this._findIndex(scrollTop);
-    let acc = 0;
-    for (let i = 0; i < startIdx; i++) acc += this.entries[i].height + this.gap;
-    let topAcc = acc;
+    
+    // y 起点从配置设定的容器顶端边距开始计算
+    let y = this.padding;
+    for (let i = 0; i < startIdx; i++) y += this.entries[i].height + this.gap;
+    
+    let topAcc = y;
     let endIdx = startIdx;
     const maxBottom = scrollTop + viewHeight + this.buffer * this.estimatedLineHeight;
     while (endIdx < this.entries.length && topAcc < maxBottom) {
       topAcc += this.entries[endIdx].height + (endIdx < this.entries.length - 1 ? this.gap : 0);
       endIdx++;
     }
+
     const renderStart = Math.max(0, startIdx - this.buffer);
     const renderEnd = Math.min(this.entries.length, endIdx + this.buffer);
+    
     if (this.visibleStart === renderStart && this.visibleEnd === renderEnd && !this.isDirty) {
-      return; // no change
+      return;
     }
+    
     this.visibleStart = renderStart;
     this.visibleEnd = renderEnd;
     this.isDirty = false;
-    // Build fragment — include gap between items
-    let y = 0;
+
+    // 定位复用
+    y = this.padding;
     for (let i = 0; i < renderStart; i++) y += this.entries[i].height + this.gap;
+    
     let html = "";
     for (let i = renderStart; i < renderEnd; i++) {
       const entry = this.entries[i];
       const content = this.prepareFn ? this.prepareFn(entry.data) : entry.data.text || "";
-      html += `<div class="virtual-log-item" style="position:absolute;top:${y}px;left:${this.padding}px;right:${this.padding}px;">${content}</div>`;
+      // 对其通过样式强行锁定具体计算高度，防内部挤压或溢出
+      html += `<div class="virtual-log-item" style="position:absolute;top:${y}px;left:${this.padding}px;right:${this.padding}px;height:${entry.height}px;">${content}</div>`;
       y += entry.height + this.gap;
     }
     this.contentEl.innerHTML = html;
   }
+
   _findIndex(scrollTop) {
     let lo = 0, hi = this.entries.length;
-    let acc = 0;
+    let acc = this.padding;
     while (lo < hi) {
       const mid = (lo + hi) >>> 1;
-      let midAcc = 0;
-      for (let i = 0; i < mid; i++) midAcc += this.entries[i].height;
+      let midAcc = this.padding;
+      for (let i = 0; i < mid; i++) midAcc += this.entries[i].height + this.gap;
       if (midAcc <= scrollTop) {
         lo = mid + 1;
-        acc = midAcc + this.entries[mid]?.height || 0;
       } else {
         hi = mid;
       }
@@ -130,6 +156,7 @@ class VirtualLogList {
     return Math.max(0, lo - 1);
   }
 }
+
 // =============================================
 // IO log state & functions
 // =============================================
@@ -141,10 +168,11 @@ export const initIoLogs = () => {
   ioVirtualList = new VirtualLogList(container, content, {
     font: "12px monospace",
     lineHeight: 18,
-    estimatedLineHeight: 48,
-    gap: 6, // 调整为 6px，保证日志上下外间隙
-    padding: 5,
-    buffer: 5,
+    estimatedLineHeight: 60,
+    gap: 6, // 上下外边距间隙 6px
+    padding: 8, // 对齐容器左右 8px 与 顶端 8px
+    textWidthOffset: 44, // 文本真实内容容器内凹偏移宽度 (边框与内外边距相加)
+    chromeHeight: 60, // 非内容容器外的固定结构高度
     prepareFn: renderIoEntry,
     onEmpty: '<div style="padding:40px;text-align:center;color:var(--mx-t2);">暂无记录</div>',
   });
@@ -164,8 +192,8 @@ const renderIoEntry = (entry) => {
   const { timeStr, appName, op, details } = entry;
   return `
     <div class="io-item">
-      <div class="io-header" style="display:flex; align-items:center;">
-        <span class="io-time" style="display:flex; align-items:center; gap:4px; flex:1;">
+      <div class="io-header">
+        <span class="io-time">
           ${ICONS.CLOCK}
           <span>${timeStr}</span>
           <span class="io-app">${appName}</span>
@@ -179,9 +207,7 @@ export const fetchIoLogs = async () => {
   if (state.ioState.loading || !state.ioState.hasMore) return;
   state.ioState.loading = true;
   try {
-    const res = await run(
-      `${CONST.LOG_CTL} search-io "${state.ioState.term}" ${CONST.PAGE_LIMIT} ${state.ioState.offset} api`
-    );
+    const res = await run(`${CONST.LOG_CTL} search-io "${state.ioState.term}" ${CONST.PAGE_LIMIT} ${state.ioState.offset} api`);
     if (!res) {
       state.ioState.hasMore = false;
       if (state.ioState.offset === 0) ioVirtualList?.clear();
@@ -201,7 +227,6 @@ export const fetchIoLogs = async () => {
         const entries = parseIoLines(dataLines);
         if (ioVirtualList) ioVirtualList.append(entries);
         else {
-          // Fallback: direct DOM
           const listEl = document.getElementById("ioLogList");
           if (listEl.innerHTML.includes("暂无记录")) listEl.innerHTML = "";
           listEl.insertAdjacentHTML("beforeend", renderIoLegacy(dataLines));
@@ -233,21 +258,14 @@ const parseIoLines = (lines) => {
       } else {
         timeStr = rawTs;
       }
-      let pkg = "未知",
-        op = "INFO",
-        details = parts.slice(1).join("|");
+      let pkg = "未知", op = "INFO", details = parts.slice(1).join("|");
       const m = details.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
-      if (m) {
-        pkg = m[1];
-        op = m[2];
-        details = m[3];
-      }
+      if (m) { pkg = m[1]; op = m[2]; details = m[3]; }
       const appName = state.appMap.has(pkg) ? state.appMap.get(pkg).appLabel : pkg;
       return { text: details, timeStr, appName, op, details };
     })
     .filter(Boolean);
 };
-// Legacy fallback render for IO (when VirtualLogList is not available)
 const renderIoLegacy = (lines) => {
   return lines
     .map((line) => {
@@ -269,19 +287,10 @@ const renderIoLegacy = (lines) => {
       const m = details.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
       if (m) { pkg = m[1]; op = m[2]; details = m[3]; }
       const appName = state.appMap.has(pkg) ? state.appMap.get(pkg).appLabel : pkg;
-      return `<div class="io-item">
-        <div class="io-header" style="display:flex; align-items:center;">
-          <span class="io-time" style="display:flex; align-items:center; gap:4px; flex:1;">
-            ${ICONS.CLOCK}<span>${timeStr}</span>
-            <span class="io-app">${appName}</span>
-          </span>
-          <span class="io-op op-${op}">${op}</span>
-        </div>
-        <div class="io-detail">${details}</div>
-      </div>`;
-    })
-    .join("");
+      return `<div class="io-item"><div class="io-header"><span class="io-time">${ICONS.CLOCK}<span>${timeStr}</span><span class="io-app">${appName}</span></span><span class="io-op op-${op}">${op}</span></div><div class="io-detail">${details}</div></div>`;
+    }).join("");
 };
+
 // =============================================
 // Sys log state & functions
 // =============================================
@@ -289,20 +298,17 @@ let sysVirtualList = null;
 export const initSysLogs = () => {
   const viewer = document.getElementById("logViewer");
   if (!viewer) return;
-  sysVirtualList = new VirtualLogList(
-    viewer,
-    viewer,
-    {
-      font: "12px monospace",
-      lineHeight: 18,
-      estimatedLineHeight: 36,
-      gap: 6, // 调整为 6px，保证日志上下外边隙
-      padding: 8, // 设为 8px，与外容器内边距严格对齐，保证首列首字对齐
-      buffer: 3,
-      prepareFn: renderSysEntry,
-      onEmpty: "",
-    }
-  );
+  sysVirtualList = new VirtualLogList(viewer, viewer, {
+    font: "12px monospace",
+    lineHeight: 18,
+    estimatedLineHeight: 36,
+    gap: 6,
+    padding: 8,
+    textWidthOffset: 26, 
+    chromeHeight: (entry) => (entry.tag || entry.timeStr) ? 36 : 14,
+    prepareFn: renderSysEntry,
+    onEmpty: "",
+  });
 };
 export const resetSysLogs = () => {
   sysVirtualList?.clear();
@@ -345,8 +351,7 @@ export const fetchSysLogs = async () => {
   const source = document.getElementById("logSourceSelect").value;
   const viewer = document.getElementById("logViewer");
   if (source === "zygisk") {
-    viewer.textContent =
-      (await run("logcat -d -s Zygisk_NSProxy NamespaceProxy_Injector")) || "无 Zygisk 日志";
+    viewer.textContent = (await run("logcat -d -s Zygisk_NSProxy NamespaceProxy_Injector")) || "无 Zygisk 日志";
     viewer.scrollTop = viewer.scrollHeight;
     return;
   }
@@ -354,9 +359,7 @@ export const fetchSysLogs = async () => {
   state.sysState.loading = true;
   try {
     const levelArg = state.sysState.level > -1 ? `--level ${state.sysState.level}` : "";
-    const res = await run(
-      `${CONST.LOG_CTL} search-sys ${levelArg} "" ${CONST.PAGE_LIMIT} ${state.sysState.offset} api`
-    );
+    const res = await run(`${CONST.LOG_CTL} search-sys ${levelArg} "" ${CONST.PAGE_LIMIT} ${state.sysState.offset} api`);
     if (!res) {
       state.sysState.hasMore = false;
     } else {
@@ -373,9 +376,7 @@ export const fetchSysLogs = async () => {
       if (dataLines.length > 0) {
         state.sysState.offset += dataLines.length;
         const entries = parseSysLines(dataLines);
-        if (sysVirtualList) {
-          sysVirtualList.append(entries);
-        }
+        if (sysVirtualList) sysVirtualList.append(entries);
       }
     }
   } catch {

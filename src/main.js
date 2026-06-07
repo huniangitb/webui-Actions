@@ -1,32 +1,11 @@
 import { state, CONST } from "./state.js";
 import { run, showToast, ICONS, initIcons, debounce } from "./utils.js";
 import { applyTheme, systemThemeListener, handleManualThemeToggle } from "./theme.js";
-import {
-  setupModeToggle,
-  addRuleRow,
-  parseConfigTextToVisual,
-  generateConfigTextFromVisual,
-} from "./ui.js";
-import {
-  loadData,
-  renderAppList,
-  flushInjectorConf,
-  fetchInjectedApps,
-  fetchActiveMounts,
-} from "./apps.js";
+import { setupModeToggle, addRuleRow, parseConfigTextToVisual, generateConfigTextFromVisual } from "./ui.js";
+import { loadData, renderAppList, updateAppListStatus, flushInjectorConf, fetchInjectedApps, fetchActiveMounts } from "./apps.js";
 import { setupGlobalHandlers } from "./global.js";
-import {
-  initIoLogs,
-  initSysLogs,
-  fetchIoLogs,
-  fetchSysLogs,
-  resetIoLogs,
-  clearIoLogs,
-  resetSysLogs,
-  clearSysLogs,
-} from "./logs.js";
-import { getSettings, saveSettings, checkPluginInstalled } from "./plugin.js";
-import { syncToPlugin } from "./plugin.js";
+import { initIoLogs, initSysLogs, fetchIoLogs, fetchSysLogs, resetIoLogs, clearIoLogs, resetSysLogs, clearSysLogs } from "./logs.js";
+import { getSettings, saveSettings, checkPluginInstalled, syncToPlugin } from "./plugin.js";
 
 // =============================================
 // CSS
@@ -38,7 +17,6 @@ import "../style.css";
 // =============================================
 let statusPolling = null;
 let appStatusPolling = null;
-
 const checkStatus = async () => {
   try {
     let pid = (await run("pidof injector")) || (await run("pgrep -x injector"));
@@ -79,7 +57,8 @@ const refreshAppStatus = async () => {
   try {
     const [mounts] = await Promise.all([fetchActiveMounts(), fetchInjectedApps()]);
     state.activeMounts = mounts;
-    if (document.getElementById("sec-apps")?.classList.contains("active")) renderAppList();
+    // 使用精准更新的方式刷新已挂载徽章与PID，杜绝页面闪动
+    if (document.getElementById("sec-apps")?.classList.contains("active")) updateAppListStatus();
   } catch {}
 };
 
@@ -142,10 +121,7 @@ const switchSection = (sectionId) => {
 // DOMContentLoaded
 // =============================================
 document.addEventListener("DOMContentLoaded", async () => {
-  // Init
   initIcons();
-
-  // Settings
   state.currentSettings = await getSettings();
   document.getElementById("autoThemeToggle").checked = state.currentSettings.autoTheme;
   document.getElementById("pluginSyncToggle").checked = state.currentSettings.syncPlugin;
@@ -154,17 +130,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     applyTheme(mediaQuery.matches);
     mediaQuery.addEventListener("change", systemThemeListener);
   }
-
-  // Theme toggles
+  
   document.getElementById("btnThemeToggleMobile").onclick = handleManualThemeToggle;
   document.getElementById("btnThemeToggleDesktop").onclick = handleManualThemeToggle;
-
-  // Navigation
+  
   document.querySelectorAll(".mx-nav-item, .mx-btm-item").forEach((btn) => {
     btn.onclick = () => switchSection(btn.dataset.section);
   });
-
-  // App filter
+  
   document.querySelectorAll("#appFilterGroup button").forEach((btn) => {
     btn.onclick = () => {
       document.querySelectorAll("#appFilterGroup button").forEach((b) => b.classList.remove("active"));
@@ -173,32 +146,25 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderAppList();
     };
   });
-
-  // App search
+  
   document.getElementById("appSearch")?.addEventListener("input", debounce(renderAppList, 250));
-
-  // IO
+  
   const ioContainer = document.getElementById("ioLogContainer");
   const ioSearch = document.getElementById("ioSearch");
   if (ioSearch) {
-    ioSearch.addEventListener(
-      "input",
-      debounce(() => {
-        state.ioState.term = ioSearch.value.trim();
-        resetIoLogs();
-        fetchIoLogs();
-      }, 500)
-    );
+    ioSearch.addEventListener("input", debounce(() => {
+      state.ioState.term = ioSearch.value.trim();
+      resetIoLogs();
+      fetchIoLogs();
+    }, 500));
   }
   if (ioContainer) {
     ioContainer.addEventListener("scroll", () => {
-      if (ioContainer.scrollTop + ioContainer.clientHeight >= ioContainer.scrollHeight - 50)
-        fetchIoLogs();
+      if (ioContainer.scrollTop + ioContainer.clientHeight >= ioContainer.scrollHeight - 50) fetchIoLogs();
     });
   }
   document.getElementById("btnClearIo").onclick = clearIoLogs;
-
-  // Log
+  
   const logSelect = document.getElementById("logSourceSelect");
   const logLevelSelect = document.getElementById("logLevelSelect");
   const logViewer = document.getElementById("logViewer");
@@ -217,20 +183,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   if (logViewer) {
     logViewer.addEventListener("scroll", () => {
-      if (
-        logSelect?.value === "internal" &&
-        logViewer.scrollTop + logViewer.clientHeight >= logViewer.scrollHeight - 50
-      )
-        fetchSysLogs();
+      if (logSelect?.value === "internal" && logViewer.scrollTop + logViewer.clientHeight >= logViewer.scrollHeight - 50) fetchSysLogs();
     });
   }
   document.getElementById("btnClearLog").onclick = clearSysLogs;
-
-  // Status toggle
+  
   document.getElementById("btnToggleStatusMobile").onclick = toggleStatus;
   document.getElementById("btnToggleStatusDesktop").onclick = toggleStatus;
-
-  // Settings modal
+  
   const openSettings = async () => {
     const isInstalled = await checkPluginInstalled();
     const lbl = document.getElementById("pluginStatusLabel");
@@ -254,8 +214,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("settingsModal")?.classList.remove("open");
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
-
-  // Ignore modal
+  
   document.getElementById("btnMonitorIgnore").onclick = async () => {
     const content = await run(`cat ${CONST.MONITOR_IGNORE_CONF} 2>/dev/null`);
     document.getElementById("monitorIgnoreContent").value = content;
@@ -265,12 +224,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnAddIgnoreRow").onclick = () => addIgnoreRow("");
   document.getElementById("btnSaveIgnore").onclick = async () => {
     try {
-      const isVisual = document
-        .querySelector('button[name="ignoreModeToggle"][data-mode="visual"]')
-        ?.classList.contains("active");
-      const content = isVisual
-        ? generateIgnoreFromVisual()
-        : document.getElementById("monitorIgnoreContent").value;
+      const isVisual = document.querySelector('button[name="ignoreModeToggle"][data-mode="visual"]')?.classList.contains("active");
+      const content = isVisual ? generateIgnoreFromVisual() : document.getElementById("monitorIgnoreContent").value;
       await run(`echo '${content.trim()}' > ${CONST.MONITOR_IGNORE_CONF}`);
       showToast("过滤配置已保存");
       document.getElementById("monitorIgnoreModal")?.classList.remove("open");
@@ -278,61 +233,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("保存失败");
     }
   };
-
-  // Mode toggles
-  setupModeToggle(
-    "globalModeToggle",
-    "globalVisual",
-    "globalRaw",
-    "globalRuleContent",
-    (val) =>
-      parseConfigTextToVisual(val, "globalRuleBuilderContainer", "globalMonitorSelect", "globalSandboxSelect", "globalInjectSelect"),
-    () =>
-      generateConfigTextFromVisual("globalRuleBuilderContainer", "globalMonitorSelect", "globalSandboxSelect", "globalInjectSelect")
+  
+  setupModeToggle("globalModeToggle", "globalVisual", "globalRaw", "globalRuleContent", 
+    (val) => parseConfigTextToVisual(val, "globalRuleBuilderContainer", "globalMonitorSelect", "globalSandboxSelect", "globalInjectSelect"),
+    () => generateConfigTextFromVisual("globalRuleBuilderContainer", "globalMonitorSelect", "globalSandboxSelect", "globalInjectSelect")
   );
-  setupModeToggle(
-    "appModeToggle",
-    "appVisual",
-    "appRaw",
-    "appRuleContent",
-    (val) =>
-      parseConfigTextToVisual(val, "appRuleBuilderContainer", "appMonitorSelect", "appSandboxSelect", null),
-    () =>
-      generateConfigTextFromVisual("appRuleBuilderContainer", "appMonitorSelect", "appSandboxSelect", null)
+  setupModeToggle("appModeToggle", "appVisual", "appRaw", "appRuleContent",
+    (val) => parseConfigTextToVisual(val, "appRuleBuilderContainer", "appMonitorSelect", "appSandboxSelect", null),
+    () => generateConfigTextFromVisual("appRuleBuilderContainer", "appMonitorSelect", "appSandboxSelect", null)
   );
-  setupModeToggle(
-    "ignoreModeToggle",
-    "ignoreVisual",
-    "ignoreRaw",
-    "monitorIgnoreContent",
-    parseIgnoreToVisual,
-    generateIgnoreFromVisual
-  );
-
-  // Global rules
+  setupModeToggle("ignoreModeToggle", "ignoreVisual", "ignoreRaw", "monitorIgnoreContent", parseIgnoreToVisual, generateIgnoreFromVisual);
+  
   setupGlobalHandlers();
-  document.getElementById("btnAppAddRule").onclick = () =>
-    addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
-
-  // App config modal
-  document.getElementById("btnCloseAppModal").onclick = () =>
-    document.getElementById("appConfigModal")?.classList.remove("open");
+  document.getElementById("btnAppAddRule").onclick = () => addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
+  
+  document.getElementById("btnCloseAppModal").onclick = () => document.getElementById("appConfigModal")?.classList.remove("open");
   document.getElementById("btnSaveAppConfig").onclick = async () => {
     try {
-      const isVisual = document
-        .querySelector('button[name="appModeToggle"][data-mode="visual"]')
-        ?.classList.contains("active");
-      const text = isVisual
-        ? generateConfigTextFromVisual("appRuleBuilderContainer", "appMonitorSelect", "appSandboxSelect", null)
-        : document.getElementById("appRuleContent").value;
+      const isVisual = document.querySelector('button[name="appModeToggle"][data-mode="visual"]')?.classList.contains("active");
+      const text = isVisual ? generateConfigTextFromVisual("appRuleBuilderContainer", "appMonitorSelect", "appSandboxSelect", null) : document.getElementById("appRuleContent").value;
       const isEnabled = document.getElementById("appEnableToggle").checked;
       const exactKey = `${state.currentBindingPkg}:${state.currentBindingUser}`;
       if (!isEnabled) state.injectorStates.set(exactKey, "OFF");
       else state.injectorStates.set(exactKey, "ON");
-      const dir =
-        state.currentBindingUser === 0
-          ? `${CONST.BASE_DIR}/App-rules`
-          : `${CONST.BASE_DIR}/App-rules-${state.currentBindingUser}`;
+      
+      const dir = state.currentBindingUser === 0 ? `${CONST.BASE_DIR}/App-rules` : `${CONST.BASE_DIR}/App-rules-${state.currentBindingUser}`;
       await run(`mkdir -p ${dir}`);
       const escaped = text.trim().replace(/'/g, "'\\''");
       if (isEnabled) {
@@ -351,12 +276,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("保存失败");
     }
   };
+  
   document.getElementById("btnDeleteAppConfig").onclick = async () => {
     if (!confirm("确定清除配置吗?")) return;
-    const dir =
-      state.currentBindingUser === 0
-        ? `${CONST.BASE_DIR}/App-rules`
-        : `${CONST.BASE_DIR}/App-rules-${state.currentBindingUser}`;
+    const dir = state.currentBindingUser === 0 ? `${CONST.BASE_DIR}/App-rules` : `${CONST.BASE_DIR}/App-rules-${state.currentBindingUser}`;
     await run(`rm -f ${dir}/${state.currentBindingPkg}.conf ${dir}/${state.currentBindingPkg}.conf.disabled`);
     state.injectorStates.delete(`${state.currentBindingPkg}:${state.currentBindingUser}`);
     await flushInjectorConf();
@@ -365,19 +288,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     showToast("配置已清除");
     document.getElementById("appConfigModal")?.classList.remove("open");
   };
-
-  // Init virtual log lists
+  
   initIoLogs();
   initSysLogs();
-
-  // Initial data load
   loadData();
   checkStatus();
-
-  // Polling
+  
   statusPolling = setInterval(checkStatus, 500);
   appStatusPolling = setInterval(refreshAppStatus, 1000);
-
-  // Close buttons
   document.querySelectorAll(".mx-btn-close").forEach((btn) => (btn.innerHTML = ICONS.CLOSE));
 });

@@ -2,6 +2,11 @@
 # yarn lockfile v1
 
 
+"@chenglou/pretext@^0.0.7":
+  version "0.0.7"
+  resolved "https://registry.yarnpkg.com/@chenglou/pretext/-/pretext-0.0.7.tgz#f31fb73cbf13f381d07e80f1d20c1018e86d2f57"
+  integrity sha512-FV5hj3fGqpBlzbANUbR+s+6XuNRrghVVyuNs33zdH2SzU7MvK+7GlW6xREjDCreixKbexEn7OEkDgAFeWuu5Hg==
+
 "@lezer/common@^1.0.0":
   version "1.2.3"
   resolved "https://registry.npmjs.org/@lezer/common/-/common-1.2.3.tgz"

@@ -44,7 +44,19 @@ export const fetchInjectedApps = async () => {
       });
   } catch {}
 };
+
 export const loadData = async () => {
+  const listEl = document.getElementById("appList");
+  // 注入拥有阻尼感的加载器界面
+  if (listEl) {
+    listEl.innerHTML = `
+      <div class="mx-spinner-container">
+        <div class="mx-spinner"></div>
+        <div style="color:var(--mx-t2); font-size:12px; font-weight:500;">载入应用环境中...</div>
+      </div>
+    `;
+  }
+
   try {
     state.activeMounts = await fetchActiveMounts();
     await fetchInjectedApps();
@@ -174,10 +186,13 @@ export const loadData = async () => {
     state.usingFallback = usedFallback;
     if (usedFallback) showToast("应用列表为空，已回退至兼容模式");
     
-    renderAppList();
-    renderGlobalRules();
+    // 利用 requestAnimationFrame 确保 UI 线程顺滑执行庞大的渲染挂载
+    requestAnimationFrame(() => {
+        renderAppList();
+        renderGlobalRules();
+    });
     
-    // 静默预加载前30个系统应用的图标，通过相同的队列机制执行，防阻断
+    // 静默预加载系统应用
     const sysAppsToPreload = Array.from(state.appMap.values()).filter(a => a.isSystem).slice(0, 30);
     sysAppsToPreload.forEach(app => {
         if (!_iconCache.has(app.packageName)) {
@@ -190,6 +205,7 @@ export const loadData = async () => {
     });
     
   } catch (e) {
+    if (listEl) listEl.innerHTML = `<div style="padding:40px;text-align:center;color:var(--mx-red);">加载失败: ${e.message}</div>`;
     showToast("加载异常: " + e.message);
   }
 };
@@ -212,8 +228,8 @@ const processIconQueue = async () => {
             img.src = img.dataset.src;
             img.removeAttribute('data-src');
         }
-        // 严格延迟 20ms 以确保 1秒最多 50次请求
-        await new Promise(r => setTimeout(r, 20));
+        // 使用 22ms 安全保障限制上限，不会出现请求丢包失败的情况
+        await new Promise(r => setTimeout(r, 22));
     }
     isIconQueueRunning = false;
 };
@@ -228,7 +244,6 @@ if (!window.__iconListenerSetup) {
   window.__iconListenerSetup = true;
   document.addEventListener("load", (e) => {
     const t = e.target;
-    // 不论是正式DOM中的还是预加载虚拟创建的img，成功加载即写入全局缓存池
     if (t.tagName === "IMG" && (t.classList.contains("app-icon") || t.dataset.pkg) && t.dataset.pkg) {
       _iconCache.add(t.dataset.pkg);
     }
@@ -246,31 +261,28 @@ const initListObserver = () => {
   
   listObserver = new IntersectionObserver((entries) => {
     const intersecting = entries.filter(e => e.isIntersecting);
-    // 按 DOM 内高度排序，保证批量进入时交错延迟始终从上往下执行
     intersecting.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
     
     entries.forEach(entry => {
       const el = entry.target;
       if (entry.isIntersecting) {
         const idx = intersecting.indexOf(entry);
-        // 给容器和图片分配流水线交错延迟时间
         el.style.transitionDelay = `${idx * 30}ms`;
         const icon = el.querySelector('.app-icon');
         if (icon) {
             icon.style.transitionDelay = `${idx * 30 + 30}ms`;
-            // 如果图片尚未加载且存在 data-src 属性，则塞入速率限制队列懒加载
             if (icon.dataset.src) enqueueIcon(icon);
         }
-        el.classList.add('show');
+        // 使用 requestAnimationFrame 防止重绘冲突
+        requestAnimationFrame(() => el.classList.add('show'));
       } else {
-        // 移出视野时重置延迟时间与显示状态，允许再次划入时的华丽弹回！
         el.style.transitionDelay = '0ms';
         const icon = el.querySelector('.app-icon');
         if (icon) icon.style.transitionDelay = '0ms';
         el.classList.remove('show');
       }
     });
-  }, { root: rootEl, threshold: 0.01, rootMargin: "20px" });
+  }, { root: rootEl, threshold: 0.01, rootMargin: "30px" }); // Margin扩展预防极速滑动留白
 };
 
 // =============================================
@@ -304,8 +316,8 @@ export const renderAppList = () => {
     return;
   }
   
-  // 彻底移除之前写死的 inline delay，全部交给 Observer 去根据视觉真实位置算！
-  listEl.innerHTML = items
+  // 生成巨量字符串使用数组 Join，现代 JS 引擎最快
+  const finalHTML = items
     .map((app) => {
       let badgesHTML = state.activeUsers
         .filter((u) => app.users[u]?.text.trim() || app.users[u]?.hasRules || app.isConfigured)
@@ -341,12 +353,11 @@ export const renderAppList = () => {
     })
     .join("");
 
-  // DOM 写入完毕后将节点绑定进交叉观察器触发视图生命周期动画
+  listEl.innerHTML = finalHTML;
   initListObserver();
   listEl.querySelectorAll('.app-item').forEach(el => listObserver.observe(el));
 };
 
-// 局部精准更新进程PID与应用配置状态标签
 export const updateAppListStatus = () => {
   document.querySelectorAll('#appList .app-item').forEach(item => {
     const pkg = item.dataset.pkg;

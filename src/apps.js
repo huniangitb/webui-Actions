@@ -9,8 +9,11 @@ import {
 import { syncToPlugin } from "./plugin.js";
 import { renderGlobalRules } from "./global.js";
 
+// 1x1 像素 Base64 透明占位图，用于规避浏览器因空 src 触发 premature onerror 的原生缺陷
+const TRANSPARENT_SPACER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
 // =============================================
-// Rate-limited Icon Queue (Strict 100 requests/sec)
+// Rate-limited Icon Queue (Strict 70 requests/sec)
 // =============================================
 const _iconCache = new Set();
 const iconQueue = new Set();
@@ -27,8 +30,8 @@ const processIconQueue = async () => {
             img.src = img.dataset.src;
             img.removeAttribute('data-src');
         }
-        // 严格设定为 10ms (确保每秒不超过 100 次请求)
-        await new Promise(r => setTimeout(r, 10 ));
+        // 严格设定为 14ms (确保每秒不超过 70 次请求)
+        await new Promise(r => setTimeout(r, 14));
     }
     isIconQueueRunning = false;
 };
@@ -48,12 +51,15 @@ let isTransitioningOut = false;
 
 // 注册至全局，供行内 HTML 的 onload/onerror 触发
 window.onIconLoaded = (img) => {
+  // 严格拦截并忽略透明占位 GIF 的载入事件，确保只对真实的图标加载结果起作用
+  if (img.src.startsWith("data:image/gif;base64,")) return;
   img.classList.add('icon-loaded');
   _iconCache.add(img.dataset.pkg);
   checkBatchLoading();
 };
 
 window.onIconError = (img) => {
+  if (img.src.startsWith("data:image/gif;base64,")) return;
   img.classList.add('icon-error');
   img.src = img.dataset.fallback;
   checkBatchLoading();
@@ -80,7 +86,7 @@ const hideSpinnerOverlay = () => {
   state.isAppListReady = true;
   state.isInitialLoad = false;
   
-  // 此时遮罩褪去，立即激活观察器来执行顺滑的列表弹簧进入动画
+  // 遮罩层隐去，重新调度观察器执行交错式的弹簧缩放动画
   initListObserver();
   const listEl = document.getElementById("appList");
   if (listEl) {
@@ -126,7 +132,6 @@ export const fetchInjectedApps = async () => {
 };
 
 export const loadData = async () => {
-  // 初始化初次加载的状态标记
   if (state.isInitialLoad === undefined) {
     state.isInitialLoad = true;
     state.isAppListReady = false;
@@ -273,7 +278,6 @@ export const loadData = async () => {
         renderGlobalRules();
     });
     
-    // 静默预加载前30个系统应用的图标，通过相同的队列机制执行，防阻断
     const sysAppsToPreload = Array.from(state.appMap.values()).filter(a => a.isSystem).slice(0, 30);
     sysAppsToPreload.forEach(app => {
         if (!_iconCache.has(app.packageName)) {
@@ -308,7 +312,6 @@ const initListObserver = () => {
       if (entry.isIntersecting) {
         const idx = intersecting.indexOf(entry);
         
-        // 只有当加载结束（isAppListReady 为真）时，才播放列表交错动效
         if (state.isAppListReady) {
           el.style.transitionDelay = `${idx * 30}ms`;
           const icon = el.querySelector('.app-icon');
@@ -316,7 +319,6 @@ const initListObserver = () => {
           requestAnimationFrame(() => el.classList.add('show'));
         }
         
-        // 无论是否已经结束 loading，只要进入视口就立即入队发起图标请求（优先级提到最高！）
         const icon = el.querySelector('.app-icon');
         if (icon && icon.dataset.src) {
           enqueueIcon(icon);
@@ -362,7 +364,6 @@ export const renderAppList = () => {
     return;
   }
   
-  // 每次重构重设计数指标，在初次载入时等待最前面 6 个图标载入完毕才结束加载动画
   isTransitioningOut = false;
   loadedIconsInBatch = 0;
   targetIconCount = Math.min(items.length, 6);
@@ -394,8 +395,9 @@ export const renderAppList = () => {
       }
       
       const isCached = _iconCache.has(app.packageName);
+      // 未缓存时 src 使用透明占位 GIF。onerror 和 onload 绑定到全局事件，剔除空 src 引起的逻辑错误。
       return `<div class="app-item" data-pkg="${app.packageName}" onclick="window.openAppConfig('${app.packageName}')">
-        <img class="app-icon${isCached ? ' icon-loaded' : ''}" src="${isCached ? `ksu://icon/${app.packageName}` : ''}" data-src="${isCached ? '' : `ksu://icon/${app.packageName}`}" onerror="window.onIconError(this)" data-fallback="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2365676b'><path d='M17.6,9.48l1.84-3.18c0.16-0.31,0.04-0.69-0.26-0.85c-0.31-0.16-0.69-0.04-0.85,0.26L16.4,9c-1.35-0.6-2.85-0.95-4.4-0.95S8.95,8.4,7.6,9L5.67,5.71C5.51,5.41,5.13,5.29,4.83,5.45C4.52,5.61,4.4,6,4.56,6.3L6.4,9.48C3.3,11.25,1.28,14.44,1,18.15h22C22.72,14.44,20.7,11.25,17.6,9.48z M7,15.25c-0.69,0-1.25-0.56-1.25-1.25S6.31,12.75,7,12.75s1.25,0.56,1.25,1.25S7.69,15.25,7,15.25z M17,15.25c-0.69,0-1.25-0.56-1.25-1.25s0.56-1.25,1.25-1.25s1.25,0.56,1.25,1.25S17.69,15.25,17,15.25z'/></svg>" onload="window.onIconLoaded(this)" data-pkg="${app.packageName}" />
+        <img class="app-icon${isCached ? ' icon-loaded' : ''}" src="${isCached ? `ksu://icon/${app.packageName}` : TRANSPARENT_SPACER}" data-src="${isCached ? '' : `ksu://icon/${app.packageName}`}" onerror="window.onIconError(this)" data-fallback="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2365676b'><path d='M17.6,9.48l1.84-3.18c0.16-0.31,0.04-0.69-0.26-0.85c-0.31-0.16-0.69-0.04-0.85,0.26L16.4,9c-1.35-0.6-2.85-0.95-4.4-0.95S8.95,8.4,7.6,9L5.67,5.71C5.51,5.41,5.13,5.29,4.83,5.45C4.52,5.61,4.4,6,4.56,6.3L6.4,9.48C3.3,11.25,1.28,14.44,1,18.15h22C22.72,14.44,20.7,11.25,17.6,9.48z M7,15.25c-0.69,0-1.25-0.56-1.25-1.25S6.31,12.75,7,12.75s1.25,0.56,1.25,1.25S7.69,15.25,7,15.25z M17,15.25c-0.69,0-1.25-0.56-1.25-1.25s0.56-1.25,1.25-1.25s1.25,0.56,1.25,1.25S17.69,15.25,17,15.25z'/></svg>" onload="window.onIconLoaded(this)" data-pkg="${app.packageName}" />
         <div class="app-info">
           <div class="app-name" style="display:flex;align-items:center;">
             <span style="overflow:hidden;text-overflow:ellipsis;">${app.appLabel}</span><span class="inj-str">${injStr}</span>
@@ -408,8 +410,6 @@ export const renderAppList = () => {
     .join("");
 
   listEl.innerHTML = finalHTML;
-  
-  // 观察器绑定并优先吞入视口内数据
   initListObserver();
   listEl.querySelectorAll('.app-item').forEach(el => listObserver.observe(el));
 };

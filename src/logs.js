@@ -14,6 +14,7 @@ class VirtualLogList {
     this.font = options.font || '13px monospace';
     this.lineHeight = options.lineHeight || 20;
     this.gap = options.gap || 0;              // gap between items (px)
+    this.padding = options.padding || 0;       // padding around items (px)
     this.prepareFn = options.prepareFn || null;
     this.onEmpty = options.onEmpty || "";
 
@@ -37,7 +38,8 @@ class VirtualLogList {
       if (entry.text) {
         try {
           prep = prepare(entry.text, this.font);
-          const { height } = layout(prep, this.container.clientWidth - 32, this.lineHeight);
+          const availWidth = this.container.clientWidth - this.padding * 2;
+          const { height } = layout(prep, Math.max(availWidth, 100), this.lineHeight);
           h = Math.max(this.estimatedLineHeight, height + 28);
         } catch {
           h = this.estimatedLineHeight;
@@ -125,7 +127,7 @@ class VirtualLogList {
     for (let i = renderStart; i < renderEnd; i++) {
       const entry = this.entries[i];
       const content = this.prepareFn ? this.prepareFn(entry.data) : entry.data.text || "";
-      html += `<div class="virtual-log-item" style="position:absolute;top:${y}px;left:0;right:0;">${content}</div>`;
+      html += `<div class="virtual-log-item" style="position:absolute;top:${y}px;left:${this.padding}px;right:${this.padding}px;">${content}</div>`;
       y += entry.height + this.gap;
     }
     this.contentEl.innerHTML = html;
@@ -163,7 +165,8 @@ export const initIoLogs = () => {
     font: "12px monospace",
     lineHeight: 18,
     estimatedLineHeight: 48,
-    gap: 8,
+    gap: 5,
+    padding: 5,
     buffer: 5,
     prepareFn: renderIoEntry,
     onEmpty: '<div style="padding:40px;text-align:center;color:var(--mx-t2);">暂无记录</div>',
@@ -329,7 +332,8 @@ export const initSysLogs = () => {
       font: "12px monospace",
       lineHeight: 18,
       estimatedLineHeight: 36,
-      gap: 8,
+      gap: 5,
+      padding: 5,
       buffer: 3,
       prepareFn: renderSysEntry,
       onEmpty: "",

@@ -49,7 +49,6 @@ export const loadData = async () => {
     state.activeMounts = await fetchActiveMounts();
     await fetchInjectedApps();
     
-    // Active users
     const userRes = await run("pm list users");
     state.activeUsers = [];
     if (userRes) {
@@ -58,7 +57,6 @@ export const loadData = async () => {
     }
     if (state.activeUsers.length === 0) state.activeUsers.push(0);
     
-    // Injector conf
     const injectorConf = await run(`cat ${CONST.INJECTOR_CONF} 2>/dev/null`);
     state.globalConfText = "";
     state.injectorStates.clear();
@@ -82,7 +80,6 @@ export const loadData = async () => {
       state.globalConfText = (state.injectorRulesMap.get("GLOBAL") || []).join("\n") || "";
     }
     
-    // Rule files
     const ruleFilesMap = new Map();
     for (const uid of state.activeUsers) {
       const dir =
@@ -104,7 +101,6 @@ export const loadData = async () => {
       }
     }
     
-    // Build app map
     const buildAppMap = (src) => {
       state.appMap.clear();
       if (!Array.isArray(src)) return;
@@ -191,12 +187,47 @@ export const loadData = async () => {
                 img.onload = () => _iconCache.add(app.packageName);
                 img.src = `ksu://icon/${app.packageName}`;
             }
-        }, 1000 + index * 50); // 1秒后开始分批并发预载，不影响主页面性能
+        }, 1000 + index * 50);
     });
     
   } catch (e) {
     showToast("加载异常: " + e.message);
   }
+};
+
+// =============================================
+// Interaction Observer for dynamic animation
+// =============================================
+let listObserver = null;
+const initListObserver = () => {
+  const rootEl = document.getElementById('appList');
+  if (!rootEl) return;
+  if (listObserver) listObserver.disconnect();
+  
+  // 监听列表中子元素的进出视野事件以完成华丽弹性动画反馈
+  listObserver = new IntersectionObserver((entries) => {
+    const intersecting = entries.filter(e => e.isIntersecting);
+    // 按 DOM 内高度排序，保证多行同时载入时可以交错分配延迟，呈现流水线效果
+    intersecting.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+    
+    entries.forEach(entry => {
+      const el = entry.target;
+      if (entry.isIntersecting) {
+        const idx = intersecting.indexOf(entry);
+        el.style.transitionDelay = `${idx * 25}ms`;
+        const icon = el.querySelector('.app-icon');
+        // 图标稍晚于容器进入，错落有致
+        if (icon) icon.style.transitionDelay = `${idx * 25 + 35}ms`;
+        el.classList.add('show');
+      } else {
+        // 移出视野时，重置类和延迟，以便下一次重新划入时能够再次触发动画！
+        el.style.transitionDelay = '0ms';
+        const icon = el.querySelector('.app-icon');
+        if (icon) icon.style.transitionDelay = '0ms';
+        el.classList.remove('show');
+      }
+    });
+  }, { root: rootEl, threshold: 0.05, rootMargin: "10px" });
 };
 
 // =============================================
@@ -212,7 +243,7 @@ const staggerLoadIcons = () => {
     setTimeout(() => {
       img.src = ds;
       img.removeAttribute("data-src");
-    }, index * 20); // 严格由上至下分配图片请求，保障按顺便呈现出视觉流反馈
+    }, index * 20); // 严格由上至下分配图片请求，保障顺便呈现出视觉流反馈
   });
 };
 
@@ -258,7 +289,7 @@ export const renderAppList = () => {
   }
   
   listEl.innerHTML = items
-    .map((app, idx) => {
+    .map((app) => {
       let badgesHTML = state.activeUsers
         .filter((u) => app.users[u]?.text.trim() || app.users[u]?.hasRules || app.isConfigured)
         .map((u) => {
@@ -279,8 +310,8 @@ export const renderAppList = () => {
         injStr = `<span style="font-size:10px;margin-left:6px;padding:2px 6px;background:var(--mx-s3);border-radius:4px;font-family:var(--mx-font-mono);flex-shrink:0;">PID ${inj.pid} ${flags.join(" ")}</span>`;
       }
       
-      // --item-delay 控制滑入动画交错延迟，限制最大延迟避免等待过久
-      return `<div class="app-item" data-pkg="${app.packageName}" style="--item-delay: ${Math.min(idx * 30, 800)}ms" onclick="window.openAppConfig('${app.packageName}')">
+      // 已缓存图标直接附加 src 与 icon-loaded 状态；结合 observer 实现平滑的重新弹射进入效果
+      return `<div class="app-item" data-pkg="${app.packageName}" onclick="window.openAppConfig('${app.packageName}')">
         <img class="app-icon${_iconCache.has(app.packageName) ? ' icon-loaded' : ''}" src="${_iconCache.has(app.packageName) ? `ksu://icon/${app.packageName}` : ''}" data-src="${_iconCache.has(app.packageName) ? '' : `ksu://icon/${app.packageName}`}" loading="lazy" onerror="this.classList.add('icon-error');this.src=this.dataset.fallback" data-fallback="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2365676b'><path d='M17.6,9.48l1.84-3.18c0.16-0.31,0.04-0.69-0.26-0.85c-0.31-0.16-0.69-0.04-0.85,0.26L16.4,9c-1.35-0.6-2.85-0.95-4.4-0.95S8.95,8.4,7.6,9L5.67,5.71C5.51,5.41,5.13,5.29,4.83,5.45C4.52,5.61,4.4,6,4.56,6.3L6.4,9.48C3.3,11.25,1.28,14.44,1,18.15h22C22.72,14.44,20.7,11.25,17.6,9.48z M7,15.25c-0.69,0-1.25-0.56-1.25-1.25S6.31,12.75,7,12.75s1.25,0.56,1.25,1.25S7.69,15.25,7,15.25z M17,15.25c-0.69,0-1.25-0.56-1.25-1.25s0.56-1.25,1.25-1.25s1.25,0.56,1.25,1.25S17.69,15.25,17,15.25z'/></svg>" onload="this.classList.add('icon-loaded')" data-pkg="${app.packageName}" />
         <div class="app-info">
           <div class="app-name" style="display:flex;align-items:center;">
@@ -292,6 +323,10 @@ export const renderAppList = () => {
       </div>`;
     })
     .join("");
+
+  // 当 DOM 替换完毕后重置与分配交叉观察器，赋予生命力
+  initListObserver();
+  listEl.querySelectorAll('.app-item').forEach(el => listObserver.observe(el));
 };
 
 // 局部精准更新进程PID与应用配置状态标签（消除列表重置闪烁问题）

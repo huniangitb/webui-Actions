@@ -19,7 +19,7 @@ import {
   mdiClockOutline,
 } from "@mdi/js";
 import { exec, toast as ksuToast } from "kernelsu";
-import { CONST } from "./state.js";
+import { state, CONST } from "./state.js";
 
 // ---- Shell helper ----
 export const run = async (cmd) => {
@@ -79,6 +79,15 @@ export const ICONS = {
   IGNORE: getSvg(mdiEyeOffOutline),
   SWEEP: getSvg(mdiDeleteSweepOutline),
   CLOCK: getSvg(mdiClockOutline, 14, "var(--mx-t2)"),
+};
+
+// ---- Theme icons ----
+export const updateThemeIcons = () => {
+  const icon = state.isDarkMode ? ICONS.SUN : ICONS.MOON;
+  const mobile = document.getElementById("btnThemeToggleMobile");
+  const desktop = document.getElementById("btnThemeToggleDesktop");
+  if (mobile) mobile.innerHTML = icon;
+  if (desktop) desktop.innerHTML = icon;
 };
 
 // ---- Icon init ----

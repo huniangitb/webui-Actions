@@ -168,6 +168,19 @@ export const initIoLogs = () => {
   });
 };
 
+export const resetIoLogs = () => {
+  ioVirtualList?.clear();
+  state.ioState.offset = 0;
+  state.ioState.hasMore = true;
+};
+
+export const clearIoLogs = async () => {
+  await run(`${CONST.LOG_CTL} clear-io`);
+  showToast("监控记录已清理");
+  resetIoLogs();
+  fetchIoLogs();
+};
+
 const renderIoEntry = (entry) => {
   const { timeStr, appName, op, details } = entry;
   return `
@@ -225,7 +238,7 @@ export const fetchIoLogs = async () => {
   } finally {
     state.ioState.loading = false;
   }
-}, 50);
+}
 
 const parseIoLines = (lines) => {
   return lines
@@ -307,7 +320,6 @@ export const initSysLogs = () => {
   const viewer = document.getElementById("logViewer");
   if (!viewer) return;
 
-  // We repurpose the logViewer as both container and content
   sysVirtualList = new VirtualLogList(
     viewer,
     viewer,
@@ -320,6 +332,24 @@ export const initSysLogs = () => {
       onEmpty: "",
     }
   );
+};
+
+export const resetSysLogs = () => {
+  sysVirtualList?.clear();
+  state.sysState.offset = 0;
+  state.sysState.hasMore = true;
+};
+
+export const clearSysLogs = async () => {
+  const source = document.getElementById("logSourceSelect")?.value;
+  if (source === "zygisk") {
+    await run("logcat -c");
+  } else {
+    await run(`${CONST.LOG_CTL} clear-sys`);
+  }
+  showToast("日志已清空");
+  if (source === "internal") resetSysLogs();
+  fetchSysLogs();
 };
 
 const renderSysEntry = (entry) => {

@@ -10,22 +10,20 @@ import {
 import {
   loadData,
   renderAppList,
-  openAppConfig,
-  switchAppUser,
   flushInjectorConf,
   fetchInjectedApps,
   fetchActiveMounts,
-  refreshAppStatus,
 } from "./apps.js";
-import {
-  renderGlobalRules,
-  setupGlobalHandlers,
-} from "./global.js";
+import { setupGlobalHandlers } from "./global.js";
 import {
   initIoLogs,
   initSysLogs,
   fetchIoLogs,
   fetchSysLogs,
+  resetIoLogs,
+  clearIoLogs,
+  resetSysLogs,
+  clearSysLogs,
 } from "./logs.js";
 import { getSettings, saveSettings, checkPluginInstalled } from "./plugin.js";
 import { syncToPlugin } from "./plugin.js";
@@ -129,16 +127,12 @@ const switchSection = (sectionId) => {
   const breadcrumb = document.getElementById("breadcrumbTitle");
   if (breadcrumb) breadcrumb.textContent = titles[sectionId];
   if (sectionId === "io") {
-    state.ioState.offset = 0;
-    state.ioState.hasMore = true;
-    document.getElementById("ioLogList").innerHTML = "";
+    resetIoLogs();
     fetchIoLogs();
   }
   if (sectionId === "log") {
     if (document.getElementById("logSourceSelect")?.value === "internal") {
-      state.sysState.offset = 0;
-      state.sysState.hasMore = true;
-      document.getElementById("logViewer").innerHTML = "";
+      resetSysLogs();
     }
     fetchSysLogs();
   }
@@ -190,10 +184,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     ioSearch.addEventListener(
       "input",
       debounce(() => {
-        state.ioState.offset = 0;
-        state.ioState.hasMore = true;
         state.ioState.term = ioSearch.value.trim();
-        document.getElementById("ioLogList").innerHTML = "";
+        resetIoLogs();
         fetchIoLogs();
       }, 500)
     );
@@ -204,14 +196,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         fetchIoLogs();
     });
   }
-  document.getElementById("btnClearIo").onclick = async () => {
-    await run(`${CONST.LOG_CTL} clear-io`);
-    showToast("监控记录已清理");
-    state.ioState.offset = 0;
-    state.ioState.hasMore = true;
-    document.getElementById("ioLogList").innerHTML = "";
-    fetchIoLogs();
-  };
+  document.getElementById("btnClearIo").onclick = clearIoLogs;
 
   // Log
   const logSelect = document.getElementById("logSourceSelect");
@@ -219,18 +204,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   const logViewer = document.getElementById("logViewer");
   if (logSelect) {
     logSelect.addEventListener("change", () => {
-      state.sysState.offset = 0;
-      state.sysState.hasMore = true;
-      if (logViewer) logViewer.innerHTML = "";
+      if (logSelect.value === "internal") resetSysLogs();
       fetchSysLogs();
     });
   }
   if (logLevelSelect) {
     logLevelSelect.addEventListener("change", () => {
       state.sysState.level = parseInt(logLevelSelect.value);
-      state.sysState.offset = 0;
-      state.sysState.hasMore = true;
-      if (logViewer) logViewer.innerHTML = "";
+      resetSysLogs();
       fetchSysLogs();
     });
   }
@@ -243,17 +224,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         fetchSysLogs();
     });
   }
-  document.getElementById("btnClearLog").onclick = async () => {
-    if (logSelect?.value === "zygisk") await run("logcat -c");
-    else await run(`${CONST.LOG_CTL} clear-sys`);
-    showToast("日志已清空");
-    if (logSelect?.value === "internal") {
-      state.sysState.offset = 0;
-      state.sysState.hasMore = true;
-      if (logViewer) logViewer.innerHTML = "";
-    }
-    fetchSysLogs();
-  };
+  document.getElementById("btnClearLog").onclick = clearSysLogs;
 
   // Status toggle
   document.getElementById("btnToggleStatusMobile").onclick = toggleStatus;

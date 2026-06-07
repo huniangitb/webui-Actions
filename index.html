@@ -186,9 +186,16 @@
 
                 <div class="mx-card mx-anim-card-in flex-col-full" style="max-height: calc(100vh - 180px);">
                     <div class="mx-card-head" style="padding-bottom:10px;border-bottom: 1px solid var(--mx-border);">
-                        <select id="logSourceSelect" class="mx-select" style="width: 160px;">
+                        <select id="logSourceSelect" class="mx-select" style="width: 140px;">
                             <option value="internal">注入日志</option>
                             <option value="zygisk">Zygisk (Logcat)</option>
+                        </select>
+                        <select id="logLevelSelect" class="mx-select" style="width: 100px;">
+                            <option value="-1">全部</option>
+                            <option value="0">DEBUG</option>
+                            <option value="1">INFO</option>
+                            <option value="2">WARN</option>
+                            <option value="3">ERROR</option>
                         </select>
                         <button class="mx-btn mx-btn-danger mx-btn-sm" id="btnClearLog">清空日志</button>
                     </div>

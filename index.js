@@ -30,6 +30,7 @@ let activeUsers = [0];
 let activeMounts = new Set();
 let injectedApps = new Map();
 let statusPolling = null;
+let appStatusPolling = null;
 let currentAppFilter = 'filterUser';
 let usingFallback = false;
 let currentPid = null;
@@ -38,7 +39,7 @@ let currentBindingUser = 0;
 
 const PAGE_LIMIT = 50;
 let ioState = { offset: 0, loading: false, hasMore: true, term: '' };
-let sysState = { offset: 0, loading: false, hasMore: true, term: '' };
+let sysState = { offset: 0, loading: false, hasMore: true, term: '', level: -1 };
 
 let isDarkMode = true;
 const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -199,8 +200,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Log
     const logSelect = document.getElementById('logSourceSelect');
+    const logLevelSelect = document.getElementById('logLevelSelect');
     const logViewer = document.getElementById('logViewer');
     logSelect.addEventListener('change', () => {
+        sysState.offset = 0; sysState.hasMore = true; logViewer.innerHTML = ''; fetchSysLogs();
+    });
+    logLevelSelect.addEventListener('change', () => {
+        sysState.level = parseInt(logLevelSelect.value);
         sysState.offset = 0; sysState.hasMore = true; logViewer.innerHTML = ''; fetchSysLogs();
     });
     logViewer.addEventListener('scroll', () => {
@@ -301,7 +307,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showToast("配置已清除"); document.getElementById('appConfigModal').classList.remove('open');
     };
 
-    loadData(); checkStatus(); statusPolling = setInterval(checkStatus, 2000);
+    loadData(); checkStatus(); statusPolling = setInterval(checkStatus, 500); appStatusPolling = setInterval(refreshAppStatus, 1000);
     const closeBtns = document.querySelectorAll('.mx-btn-close');
     closeBtns.forEach(btn => btn.innerHTML = ICONS.CLOSE);
 });
@@ -582,7 +588,8 @@ const fetchSysLogs = async () => {
     if (source === 'zygisk') { viewer.textContent = await run("logcat -d -s Zygisk_NSProxy NamespaceProxy_Injector") || "无 Zygisk 日志"; viewer.scrollTop = viewer.scrollHeight; return; }
     if (sysState.loading || !sysState.hasMore) return; sysState.loading = true;
     try {
-        const res = await run(`${LOG_CTL} search-sys "" ${PAGE_LIMIT} ${sysState.offset} api`);
+        const levelArg = sysState.level > -1 ? `--level ${sysState.level}` : '';
+        const res = await run(`${LOG_CTL} search-sys ${levelArg} "" ${PAGE_LIMIT} ${sysState.offset} api`);
         if (!res) sysState.hasMore = false;
         else {
             const lines = res.split('\n'); let dataLines = lines; const lastLine = lines[lines.length - 1];
@@ -628,6 +635,14 @@ const checkStatus = async () => {
             if(b && btn) { if (currentPid) { b.className="mx-badge mx-badge-success"; b.textContent="RUNNING"; btn.innerHTML=ICONS.STOP; } else { b.className="mx-badge mx-badge-gray"; b.textContent="STOPPED"; btn.innerHTML=ICONS.PLAY; } }
         });
         const info = document.getElementById('statusInfo'); if(info) info.textContent = currentPid ? `PID ${currentPid}` : "OFFLINE";
+    } catch (e) {}
+};
+
+const refreshAppStatus = async () => {
+    try {
+        const [mounts] = await Promise.all([fetchActiveMounts(), fetchInjectedApps()]);
+        activeMounts = mounts;
+        if (document.getElementById('sec-apps').classList.contains('active')) renderAppList();
     } catch (e) {}
 };
 

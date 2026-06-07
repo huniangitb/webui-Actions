@@ -85,7 +85,15 @@
                             <button data-filter="filterBound">已配置App</button>
                         </div>
                     </div>
-                    <div class="mx-card-body p-0 list-scrollable" id="appList"></div>
+                    <!-- 优化后的应用卡片容器层 -->
+                    <div class="mx-card-body p-0 list-scrollable relative" id="appListContainer">
+                        <!-- 初始阻尼加载转圈动画 -->
+                        <div id="appLoadingOverlay" class="mx-spinner-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--mx-bg); z-index: 15; display: flex;">
+                            <div class="mx-spinner"></div>
+                            <div style="color:var(--mx-t2); font-size:12px; font-weight:500;">载入应用环境中...</div>
+                        </div>
+                        <div id="appList" class="h-full overflow-y-auto"></div>
+                    </div>
                 </div>
             </div>
             <!-- 2. 全局规则 -->

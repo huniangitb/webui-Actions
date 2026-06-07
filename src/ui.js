@@ -140,17 +140,28 @@ const setupAutocomplete = (input) => {
           box.style.display = "none";
           return;
         }
+        // Only show directories (those ending with /), exclude files
         const sugs = res.stdout
           .split("\n")
-          .filter((l) => l.startsWith(sPre))
-          .map((l) => {
-            const isD = l.endsWith("/");
-            return { t: dBase + l, i: isD ? ICONS.FOLDER : ICONS.FILE };
-          });
+          .filter((l) => l.endsWith("/") && l.startsWith(sPre))
+          .map((l) => ({ t: dBase + l, i: ICONS.FOLDER }));
         if (sugs.length === 0) {
           box.style.display = "none";
           return;
         }
+        // Check if the user-entered path (full real path) exists as a directory
+        let inputPathExists = false;
+        if (val.trim()) {
+          const fullPath = val.startsWith("/")
+            ? CONST.PATH_PREFIX_REAL + val
+            : CONST.PATH_PREFIX_REAL + "/" + val;
+          try {
+            const checkRes = await exec(`test -d "${fullPath.replace(/\/+/g, '/')}" 2>/dev/null && echo yes`);
+            inputPathExists = checkRes.stdout?.trim() === "yes";
+          } catch {}
+        }
+        input.classList.toggle("path-exists", inputPathExists);
+
         box.innerHTML = sugs
           .map(
             (s) =>
@@ -161,15 +172,16 @@ const setupAutocomplete = (input) => {
         const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         box.style.width = rect.width + "px";
         box.style.left = rect.left + "px";
+        // Show with animation — the CSS animation plays on display:block
         box.style.display = "block";
         if (rect.bottom > vh / 2) {
           box.style.top = "auto";
           box.style.bottom = window.innerHeight - rect.top + 4 + "px";
-          box.style.maxHeight = rect.top - 10 + "px";
+          box.style.maxHeight = Math.min(rect.top - 10, 320) + "px";
         } else {
           box.style.bottom = "auto";
           box.style.top = rect.bottom + 4 + "px";
-          box.style.maxHeight = vh - rect.bottom - 10 + "px";
+          box.style.maxHeight = Math.min(vh - rect.bottom - 10, 320) + "px";
         }
       } catch {
         box.style.display = "none";

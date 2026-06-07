@@ -126,7 +126,7 @@ class VirtualLogList {
       const entry = this.entries[i];
       const content = this.prepareFn ? this.prepareFn(entry.data) : entry.data.text || "";
       html += `<div class="virtual-log-item" style="position:absolute;top:${y}px;left:0;right:0;">${content}</div>`;
-      y += entry.height;
+      y += entry.height + this.gap;
     }
     this.contentEl.innerHTML = html;
   }

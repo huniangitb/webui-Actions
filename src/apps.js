@@ -185,10 +185,49 @@ export const loadData = async () => {
 
     renderAppList();
     renderGlobalRules();
+    // Preload icons for all apps in batches
+    const allApps = Array.from(state.appMap.values());
+    if (allApps.length > 0) preloadIconsInChunks(allApps, 10, 50);
   } catch (e) {
     showToast("加载异常: " + e.message);
   }
 };
+
+// =============================================
+// Icon preloader & cache
+// =============================================
+const _iconCache = new Set();    // pkgs that have been loaded
+const _iconLoading = new Set();  // pkgs currently being preloaded
+
+/** Preload a single app icon into browser cache */
+const preloadIcon = (pkg) => {
+  if (!pkg || _iconCache.has(pkg) || _iconLoading.has(pkg)) return;
+  _iconLoading.add(pkg);
+  const img = new Image();
+  img.onload = () => { _iconCache.add(pkg); _iconLoading.delete(pkg); };
+  img.onerror = () => _iconLoading.delete(pkg);
+  img.src = `ksu://icon/${pkg}`;
+};
+
+/** Preload icons in batches to avoid flooding the WebView */
+const preloadIconsInChunks = (apps, chunkSize = 10, delay = 50) => {
+  let idx = 0;
+  const next = () => {
+    const end = Math.min(idx + chunkSize, apps.length);
+    for (; idx < end; idx++) {
+      if (apps[idx]?.packageName) preloadIcon(apps[idx].packageName);
+    }
+    if (idx < apps.length) setTimeout(next, delay);
+  };
+  next();
+};
+
+/**
+ * Get the best available icon src.
+ * If preloaded returns the ksu:// url (browser cache will serve it instantly),
+ * otherwise same URL — the browser will fetch it.
+ */
+const getIconSrc = (pkg) => `ksu://icon/${pkg}`;
 
 // =============================================
 // App list rendering
@@ -249,7 +288,7 @@ export const renderAppList = () => {
       }
 
       return `<div class="app-item" onclick="window.openAppConfig('${app.packageName}')">
-        <img class="app-icon" src="ksu://icon/${app.packageName}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 24 24\\' fill=\\'%2365676b\\'><path d=\\'M17.6,9.48l1.84-3.18c0.16-0.31,0.04-0.69-0.26-0.85c-0.31-0.16-0.69-0.04-0.85,0.26L16.4,9c-1.35-0.6-2.85-0.95-4.4-0.95S8.95,8.4,7.6,9L5.67,5.71C5.51,5.41,5.13,5.29,4.83,5.45C4.52,5.61,4.4,6,4.56,6.3L6.4,9.48C3.3,11.25,1.28,14.44,1,18.15h22C22.72,14.44,20.7,11.25,17.6,9.48z M7,15.25c-0.69,0-1.25-0.56-1.25-1.25S6.31,12.75,7,12.75s1.25,0.56,1.25,1.25S7.69,15.25,7,15.25z M17,15.25c-0.69,0-1.25-0.56-1.25-1.25s0.56-1.25,1.25-1.25s1.25,0.56,1.25,1.25S17.69,15.25,17,15.25z\\'/></svg>"' />
+        <img class="app-icon${_iconCache.has(app.packageName) ? ' icon-loaded' : ''}" src="ksu://icon/${app.packageName}" loading="lazy" onerror="this.classList.add('icon-error');this.src=this.dataset.fallback" data-fallback="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2365676b'><path d='M17.6,9.48l1.84-3.18c0.16-0.31,0.04-0.69-0.26-0.85c-0.31-0.16-0.69-0.04-0.85,0.26L16.4,9c-1.35-0.6-2.85-0.95-4.4-0.95S8.95,8.4,7.6,9L5.67,5.71C5.51,5.41,5.13,5.29,4.83,5.45C4.52,5.61,4.4,6,4.56,6.3L6.4,9.48C3.3,11.25,1.28,14.44,1,18.15h22C22.72,14.44,20.7,11.25,17.6,9.48z M7,15.25c-0.69,0-1.25-0.56-1.25-1.25S6.31,12.75,7,12.75s1.25,0.56,1.25,1.25S7.69,15.25,7,15.25z M17,15.25c-0.69,0-1.25-0.56-1.25-1.25s0.56-1.25,1.25-1.25s1.25,0.56,1.25,1.25S17.69,15.25,17,15.25z'/></svg>" onload="this.classList.add('icon-loaded')" />
         <div class="app-info">
           <div class="app-name" style="display:flex;align-items:center;">
             <span style="overflow:hidden;text-overflow:ellipsis;">${app.appLabel}</span>${injStr}

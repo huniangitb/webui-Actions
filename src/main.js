@@ -27,8 +27,8 @@ import {
   fetchIoLogs,
   fetchSysLogs,
 } from "./logs.js";
-import { getSettings, saveSettings, checkPluginInstalled } from "../plugin.js";
-import { syncToPlugin } from "../plugin.js";
+import { getSettings, saveSettings, checkPluginInstalled } from "./plugin.js";
+import { syncToPlugin } from "./plugin.js";
 
 // =============================================
 // CSS

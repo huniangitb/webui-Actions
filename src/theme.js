@@ -1,6 +1,6 @@
 import { state } from "./state.js";
 import { ICONS, updateThemeIcons } from "./utils.js";
-import { saveSettings } from "../plugin.js";
+import { saveSettings } from "./plugin.js";
 
 export const applyTheme = (isDark) => {
   state.isDarkMode = isDark;

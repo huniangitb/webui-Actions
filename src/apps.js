@@ -6,7 +6,7 @@ import {
   generateConfigTextFromVisual,
   setupModeToggle,
 } from "./ui.js";
-import { syncToPlugin } from "../plugin.js";
+import { syncToPlugin } from "./plugin.js";
 
 // =============================================
 // Data loading

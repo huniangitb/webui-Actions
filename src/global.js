@@ -6,7 +6,7 @@ import {
   generateConfigTextFromVisual,
 } from "./ui.js";
 import { loadData, flushInjectorConf } from "./apps.js";
-import { syncToPlugin } from "../plugin.js";
+import { syncToPlugin } from "./plugin.js";
 
 export const renderGlobalRules = () => {
   const contentEl = document.getElementById("globalRuleContent");

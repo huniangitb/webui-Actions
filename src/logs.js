@@ -50,10 +50,6 @@ class VirtualLogList {
     this.isDirty = true;
     this._render();
   }
-    }
-    this.isDirty = true;
-    this._render();
-  }
 
   /** Clear all entries */
   clear() {

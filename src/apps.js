@@ -7,7 +7,7 @@ import {
   setupModeToggle,
 } from "./ui.js";
 import { syncToPlugin } from "./plugin.js";
-
+import { renderGlobalRules } from "./global.js";
 // =============================================
 // Data loading
 // =============================================

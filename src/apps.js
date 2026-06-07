@@ -190,6 +190,7 @@ export const loadData = async () => {
   } catch (e) {
     showToast("加载异常: " + e.message);
   }
+};
 
 // =============================================
 // Icon cache & staggered loader

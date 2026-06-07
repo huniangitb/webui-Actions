@@ -13,10 +13,11 @@ class VirtualLogList {
     this.estimatedLineHeight = options.estimatedLineHeight || 20;
     this.font = options.font || '13px monospace';
     this.lineHeight = options.lineHeight || 20;
-    this.prepareFn = options.prepareFn || null; // (entry) => innerHTML
+    this.gap = options.gap || 0;              // gap between items (px)
+    this.prepareFn = options.prepareFn || null;
     this.onEmpty = options.onEmpty || "";
 
-    this.entries = [];        // { height, prepared, data }
+    this.entries = [];
     this.totalHeight = 0;
     this.visibleStart = 0;
     this.visibleEnd = 0;
@@ -25,7 +26,6 @@ class VirtualLogList {
     this._onScroll = this._onScroll.bind(this);
     this.container.addEventListener("scroll", this._onScroll);
 
-    // Initial empty state
     this.contentEl.style.position = "relative";
   }
 
@@ -38,13 +38,18 @@ class VirtualLogList {
         try {
           prep = prepare(entry.text, this.font);
           const { height } = layout(prep, this.container.clientWidth - 32, this.lineHeight);
-          h = Math.max(this.estimatedLineHeight, height + 28); // header (~28px) + text
+          h = Math.max(this.estimatedLineHeight, height + 28);
         } catch {
           h = this.estimatedLineHeight;
         }
       }
       this.entries.push({ height: h, prepared: prep, data: entry });
-      this.totalHeight += h;
+      this.totalHeight += h + this.gap;
+    }
+    this.totalHeight -= this.gap; // last item doesn't need gap after it
+    this.isDirty = true;
+    this._render();
+  }
     }
     this.isDirty = true;
     this._render();
@@ -96,13 +101,13 @@ class VirtualLogList {
     // Binary search for visible range
     const startIdx = this._findIndex(scrollTop);
     let acc = 0;
-    for (let i = 0; i < startIdx; i++) acc += this.entries[i].height;
+    for (let i = 0; i < startIdx; i++) acc += this.entries[i].height + this.gap;
 
     let topAcc = acc;
     let endIdx = startIdx;
     const maxBottom = scrollTop + viewHeight + this.buffer * this.estimatedLineHeight;
     while (endIdx < this.entries.length && topAcc < maxBottom) {
-      topAcc += this.entries[endIdx].height;
+      topAcc += this.entries[endIdx].height + (endIdx < this.entries.length - 1 ? this.gap : 0);
       endIdx++;
     }
 
@@ -116,9 +121,9 @@ class VirtualLogList {
     this.visibleEnd = renderEnd;
     this.isDirty = false;
 
-    // Build fragment
+    // Build fragment — include gap between items
     let y = 0;
-    for (let i = 0; i < renderStart; i++) y += this.entries[i].height;
+    for (let i = 0; i < renderStart; i++) y += this.entries[i].height + this.gap;
 
     let html = "";
     for (let i = renderStart; i < renderEnd; i++) {
@@ -162,6 +167,7 @@ export const initIoLogs = () => {
     font: "12px monospace",
     lineHeight: 18,
     estimatedLineHeight: 48,
+    gap: 8,
     buffer: 5,
     prepareFn: renderIoEntry,
     onEmpty: '<div style="padding:40px;text-align:center;color:var(--mx-t2);">暂无记录</div>',
@@ -327,6 +333,7 @@ export const initSysLogs = () => {
       font: "12px monospace",
       lineHeight: 18,
       estimatedLineHeight: 36,
+      gap: 8,
       buffer: 3,
       prepareFn: renderSysEntry,
       onEmpty: "",

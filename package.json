@@ -8,6 +8,7 @@
     "build": "parcel build index.html --no-source-maps --public-url ./ --no-cache"
   },
   "dependencies": {
+    "@chenglou/pretext": "^0.0.7",
     "@popperjs/core": "^2.11.8",
     "kernelsu": "^3.0.2",
     "mdb-ui-kit": "^7.3.0"

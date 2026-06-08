@@ -214,6 +214,10 @@ const setupAutocomplete = (input) => {
   );
   input.addEventListener("focus", () => {
     window._currentInput = input;
+    // 聚焦时，通过流畅的原生 scrollIntoView 使输入框居中，确保它绝不会被键盘挡住
+    window.requestAnimationFrame(() => {
+      input.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));

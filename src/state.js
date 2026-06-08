@@ -17,7 +17,7 @@ export const state = {
   sysState: { offset: 0, loading: false, hasMore: true, term: "", level: -1 },
   isDarkMode: true,
   currentSuggestions: [], // Pretext-driven autocomplete height measurement cache
-  isViewportResizing: false, // Prevents full-screen layout thrashing during keyboard transitions
+  isViewportResizing: false,
 };
 export const CONST = {
   BASE_DIR: "/data/Namespace-Proxy",

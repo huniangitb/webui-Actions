@@ -139,17 +139,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
   
   // Real-time Visual Viewport & Keyboard Resizer
-  // 采用锁定机制：在键盘位移动画过渡期间阻断样式变动（不写入 --visual-vh）以彻底消减剧烈抖动；
-  // 同时保持 Autocomplete 本身的 3D Transform 随动计算。过渡结束后单帧沉降。
-  let resizeTimeout = null;
+  // 在键盘弹起期间，容器高度不再执行任何重绘更新。仅渲染补全框自身的跟手平移。
   const updateViewportHeight = () => {
-    if (resizeTimeout) {
-      clearTimeout(resizeTimeout);
-    } else {
-      state.isViewportResizing = true;
-    }
-    
-    // 滑动动画期间继续保障提示框精确跟手，由于用的是 translate3d 转换，此时不发生主体回流
     if (window._currentInput && document.activeElement === window._currentInput) {
       window.requestAnimationFrame(() => {
         import("./ui.js").then(({ updateSuggestionBoxPosition }) => {
@@ -157,23 +148,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
       });
     }
-    
-    // 防抖单次触发写入，让 modal 的高度仅在动画终点进行单帧沉降
-    resizeTimeout = setTimeout(() => {
-      state.isViewportResizing = false;
-      resizeTimeout = null;
-      
-      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-      document.documentElement.style.setProperty('--visual-vh', `${vh}px`);
-      
-      if (window._currentInput && document.activeElement === window._currentInput) {
-        window.requestAnimationFrame(() => {
-          import("./ui.js").then(({ updateSuggestionBoxPosition }) => {
-            updateSuggestionBoxPosition(window._currentInput);
-          });
-        });
-      }
-    }, 150);
   };
   
   if (window.visualViewport) {
@@ -334,7 +308,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         : document.getElementById("monitorIgnoreContent").value;
       await run(`echo '${content.trim()}' > ${CONST.MONITOR_IGNORE_CONF}`);
       showToast("过滤配置已保存");
-      document.getElementById("monitorIgnoreModal")?.classList.remove("open");
+      document.getElementById("monitorIgnoreModal")?.classList.open && document.getElementById("monitorIgnoreModal").classList.remove("open");
     } catch {
       showToast("保存失败");
     }

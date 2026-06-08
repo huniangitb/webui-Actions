@@ -214,15 +214,16 @@ const setupAutocomplete = (input) => {
   );
   input.addEventListener("focus", () => {
     window._currentInput = input;
-    // 聚焦时，通过流畅的原生 scrollIntoView 使输入框居中，确保它绝不会被键盘挡住
-    window.requestAnimationFrame(() => {
-      input.scrollIntoView({ block: "center", behavior: "smooth" });
-    });
-    setTimeout(() => {
-      if (document.activeElement === input) {
-        input.dispatchEvent(new Event("input"));
-      }
-    }, 320);
+    // 聚焦时：如果不支持 visualViewport（如桌面端），执行传统平滑滚动与测算
+    // 若支持（如移动端），则完全将交互动作移交 main.js 的过渡结束时统一处理，键盘弹出期间保持静止
+    if (!window.visualViewport) {
+      setTimeout(() => {
+        if (document.activeElement === input) {
+          input.scrollIntoView({ block: "center", behavior: "smooth" });
+          input.dispatchEvent(new Event("input"));
+        }
+      }, 150);
+    }
   });
   input.addEventListener("blur", () => {
     setTimeout(() => {

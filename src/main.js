@@ -139,15 +139,40 @@ document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
   
   // Real-time Visual Viewport & Keyboard Resizer
-  // 在键盘弹起期间，容器高度不再执行任何重绘更新。仅渲染补全框自身的跟手平移。
+  // 在键盘弹起/降下动画滑行期间完全冻结。待 200ms 无高度改变后（完全弹窗结束），单帧沉降并更新样式，
+  // 然后平滑滚动定位焦点输入框，完全规避冲突回弹，并且绝对不被软键盘遮挡。
+  let resizeTimeout = null;
   const updateViewportHeight = () => {
-    if (window._currentInput && document.activeElement === window._currentInput) {
-      window.requestAnimationFrame(() => {
-        import("./ui.js").then(({ updateSuggestionBoxPosition }) => {
-          updateSuggestionBoxPosition(window._currentInput);
-        });
-      });
+    if (resizeTimeout) {
+      clearTimeout(resizeTimeout);
+    } else {
+      state.isViewportResizing = true;
     }
+    
+    resizeTimeout = setTimeout(() => {
+      state.isViewportResizing = false;
+      resizeTimeout = null;
+      
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      
+      // 1. 弹出过程彻底结束后，单帧修改 css 容器高度变量（触发模态框缩窄适配）
+      document.documentElement.style.setProperty('--visual-vh', `${vh}px`);
+      
+      // 2. 高度适配完毕后，下一帧执行原生 smooth 滚动与提示框渲染
+      window.requestAnimationFrame(() => {
+        if (window._currentInput && document.activeElement === window._currentInput) {
+          // 精准将目标行滚动至折叠后的容器正中，彻底规避遮挡
+          window._currentInput.scrollIntoView({ block: "center", behavior: "smooth" });
+          
+          // 延迟触发 input 检索内容
+          window._currentInput.dispatchEvent(new Event("input"));
+          
+          import("./ui.js").then(({ updateSuggestionBoxPosition }) => {
+            updateSuggestionBoxPosition(window._currentInput);
+          });
+        }
+      });
+    }, 200); // 200ms 的防抖过滤确保能精准承接虚拟键盘动画终点
   };
   
   if (window.visualViewport) {

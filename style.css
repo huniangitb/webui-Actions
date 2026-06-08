@@ -45,9 +45,8 @@ body {
     background: var(--mx-bg);
     color: var(--mx-t1);
     font-size: 14px;
-    /* 外围大层级结构高锁定，保证键盘拉起时主页面保持完全静态、不作位移 */
-    height: 100vh;
-    height: 100dvh;
+    /* 采用页面首次载入时计算完毕的初始静态物理高度锁死，确保主界面不受移动端 vh/dvh 重绘收缩的影响 */
+    height: var(--initial-vh, 100vh);
     overflow: hidden;
     /* 初始化不可见，带有微弱缩小 */
     opacity: 0;
@@ -71,7 +70,7 @@ body.loaded {
 }
 .mx-sidebar { display: none; }
 .mx-desktop-shell { display: none; }
-.mx-app { display: flex; height: 100vh; height: 100dvh; width: 100vw; flex-direction: column; }
+.mx-app { display: flex; height: var(--initial-vh, 100vh); width: 100vw; flex-direction: column; }
 .mx-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
 .mx-topbar-right { display: flex; align-items: center; gap: 8px; }
 .mx-desktop-main { flex: 1; overflow: hidden; position: relative; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }

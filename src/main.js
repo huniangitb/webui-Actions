@@ -33,6 +33,16 @@ import { syncToPlugin } from "./plugin.js";
 // =============================================
 import "../style.css";
 // =============================================
+// Lock Layout Viewport Height
+// =============================================
+// 测算并保存初始物理视口高度（锁死），供 CSS 变量继承。
+// 彻底阻断软键盘弹出时移动端浏览器因 layout viewport/dvh 动态变化而导致的主界面拉伸与移动
+const lockInitialHeight = () => {
+  const initialH = window.innerHeight;
+  document.documentElement.style.setProperty('--initial-vh', `${initialH}px`);
+};
+lockInitialHeight();
+// =============================================
 // Status polling
 // =============================================
 let statusPolling = null;

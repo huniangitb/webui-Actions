@@ -242,9 +242,33 @@ const setupAutocomplete = (input) => {
   );
   input.addEventListener("focus", () => {
     window._currentInput = input;
-    // 聚焦时：将输入框滚动至正中，防止遮挡。之后调度 input 检索内容
+    // 聚焦定位：使输入行在局部滚动区内居中。若其下方还有后续行，将自动执行额外偏移量滚动
     window.requestAnimationFrame(() => {
-      input.scrollIntoView({ block: "center", behavior: "smooth" });
+      const container = input.closest(".overflow-y-auto");
+      const row = input.closest(".rule-row") || input;
+      if (container && row) {
+        row.scrollIntoView({ block: "center", behavior: "smooth" });
+        // 检测下方是否还有更多的规则输入行
+        let nextRowsCount = 0;
+        let nextNode = row.nextElementSibling;
+        while (nextNode) {
+          if (nextNode.classList.contains("rule-row")) {
+            nextRowsCount++;
+          }
+          nextNode = nextNode.nextElementSibling;
+        }
+        // 如果下方存在多行，自动向下额外平滑滚动偏移，把聚焦项进一步向上推起，从而完整露出下方未填项
+        if (nextRowsCount > 0) {
+          const extraScroll = Math.min(nextRowsCount * 45, 120); // 每多一行追加 45px，封顶 120px
+          setTimeout(() => {
+            if (document.activeElement === input) {
+              container.scrollBy({ top: extraScroll, behavior: "smooth" });
+            }
+          }, 180); // 180ms 延时，确保原生 scrollIntoView 轨迹大致结束
+        }
+      } else {
+        input.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
     });
     setTimeout(() => {
       if (document.activeElement === input) {

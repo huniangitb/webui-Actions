@@ -45,7 +45,10 @@ body {
     background: var(--mx-bg);
     color: var(--mx-t1);
     font-size: 14px;
-    height: var(--visual-vh, 100vh); overflow: hidden;
+    /* 采用 100dvh 固定，使框架高度在此期间保持完全锁死，断绝整个视图层的高频缩放与上下剧烈震颤 */
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
     /* 初始化不可见，带有微弱缩小 */
     opacity: 0;
     transform: scale(0.98);
@@ -68,7 +71,7 @@ body.loaded {
 }
 .mx-sidebar { display: none; }
 .mx-desktop-shell { display: none; }
-.mx-app { display: flex; height: var(--visual-vh, 100vh); width: 100vw; flex-direction: column; }
+.mx-app { display: flex; height: 100vh; height: 100dvh; width: 100vw; flex-direction: column; }
 .mx-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
 .mx-topbar-right { display: flex; align-items: center; gap: 8px; }
 .mx-desktop-main { flex: 1; overflow: hidden; position: relative; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
@@ -91,6 +94,7 @@ body.loaded {
 }
 .mx-btm-item:active { transform: scale(0.9); }
 .mx-btm-item.active { color: var(--mx-primary); font-weight: 600; }
+.btm-icon { width: 22px; height: 22px; display: block; }
 .btm-icon { width: 22px; height: 22px; display: block; }
 .btm-label { font-size: 11px; }
 .demo-section { display: none; height: 100%; flex-direction: column; padding: 16px; overflow: hidden; }

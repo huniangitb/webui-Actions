@@ -5,23 +5,19 @@ export const state = {
   injectorStates: new Map(),
   injectorRulesMap: new Map(),
   currentSettings: { autoTheme: true, syncPlugin: false },
-
   activeUsers: [0],
   activeMounts: new Set(),
   injectedApps: new Map(),
   currentAppFilter: "filterUser",
   usingFallback: false,
-
   currentPid: null,
   currentBindingPkg: null,
   currentBindingUser: 0,
-
   ioState: { offset: 0, loading: false, hasMore: true, term: "" },
   sysState: { offset: 0, loading: false, hasMore: true, term: "", level: -1 },
-
   isDarkMode: true,
+  currentSuggestions: [], // Pretext-driven autocomplete height measurement cache
 };
-
 export const CONST = {
   BASE_DIR: "/data/Namespace-Proxy",
   INJECTOR_CONF: "/data/Namespace-Proxy/injector.conf",

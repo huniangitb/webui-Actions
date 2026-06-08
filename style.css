@@ -310,7 +310,7 @@ body.loaded {
 @keyframes toastIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .io-time svg { display: flex; align-items: center; flex-shrink: 0; color: var(--mx-t2); }
 .suggestion-box { position: fixed; background: var(--mx-s3); border: 1px solid var(--mx-border); border-radius: 12px; box-shadow: var(--mx-shadow); z-index: 3000; overflow-y: auto; display: none; transform: translate3d(0,0,0); transform-origin: top left; transition: transform 0.1s linear, max-height 0.1s linear; will-change: transform, opacity; }
-.suggestion-item { padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--mx-border); display: flex; align-items: center; gap: 8px; }
+.suggestion-item { padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--mx-border); display: flex; align-items: flex-start; gap: 8px; }
 .suggestion-item:last-child { border-bottom: none; }
 .virtual-log-item { will-change: transform; backface-visibility: hidden; }
 @media (hover: hover) { .suggestion-item:hover { background: var(--mx-s4); } }

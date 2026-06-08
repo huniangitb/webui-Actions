@@ -1,6 +1,7 @@
 import { state, CONST } from "./state.js";
 import { run, showToast, ICONS, normalizeToDisplay, normalizeToConfig, debounce } from "./utils.js";
 import { exec } from "kernelsu";
+import { prepare, layout } from "@chenglou/pretext";
 // =============================================
 // Rule row builder
 // =============================================
@@ -102,7 +103,7 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
   });
 };
 // =============================================
-// Autocomplete Positioner (With hardware acceleration)
+// Autocomplete Positioner (With Pretext optimization)
 // =============================================
 export const updateSuggestionBoxPosition = (input) => {
   const box = document.getElementById("suggestionBox");
@@ -113,16 +114,34 @@ export const updateSuggestionBoxPosition = (input) => {
   box.style.left = "0px";
   box.style.top = "0px";
   box.style.bottom = "auto";
+  // 使用 Pretext 代数运算计算补全框的精确内容高度，完全规避触发浏览器 Reflow
+  let totalBoxHeight = 2; // 上下边框像素
+  const fontStyle = "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  const horizontalPadding = 24; // 左右各 12px
+  const iconAndGap = 16 + 8; // 图标宽度及间距
+  const availTextWidth = rect.width - horizontalPadding - iconAndGap;
+  (state.currentSuggestions || []).forEach((s) => {
+    try {
+      const prepared = prepare(s.t, fontStyle);
+      const { height } = layout(prepared, Math.max(availTextWidth, 50), 18);
+      // 项高度 = 测算文本换行后高度 + 垂直 padding (20px) + 下边框 (1px)
+      totalBoxHeight += height + 20 + 1;
+    } catch {
+      totalBoxHeight += 39;
+    }
+  });
   let computedTop = 0;
   if (rect.bottom > vh / 2) {
-    const boxHeight = box.offsetHeight || 160;
+    const maxHeight = Math.min(rect.top - 10, 240);
+    const boxHeight = Math.min(totalBoxHeight, maxHeight);
     computedTop = rect.top - boxHeight - 4;
-    box.style.maxHeight = Math.min(rect.top - 10, 240) + "px";
+    box.style.maxHeight = maxHeight + "px";
   } else {
+    const maxHeight = Math.min(vh - rect.bottom - 10, 240);
     computedTop = rect.bottom + 4;
-    box.style.maxHeight = Math.min(vh - rect.bottom - 10, 240) + "px";
+    box.style.maxHeight = maxHeight + "px";
   }
-  // 使用 translate3d 开启硬件合成层，不触发布局树重构
+  // 使用 3D 转换紧贴定位
   box.style.transform = `translate3d(${rect.left}px, ${computedTop}px, 0)`;
 };
 // =============================================
@@ -153,6 +172,7 @@ const setupAutocomplete = (input) => {
         const res = await exec(`ls -F -1 "${pDir.replace(/\/+/g, "/")}" 2>/dev/null | head -n 30`);
         if (!res || !res.stdout) {
           box.style.display = "none";
+          state.currentSuggestions = [];
           return;
         }
         const sugs = res.stdout
@@ -161,6 +181,7 @@ const setupAutocomplete = (input) => {
           .map((l) => ({ t: dBase + l, i: ICONS.FOLDER }));
         if (sugs.length === 0) {
           box.style.display = "none";
+          state.currentSuggestions = [];
           return;
         }
         let inputPathExists = false;
@@ -174,10 +195,11 @@ const setupAutocomplete = (input) => {
           } catch {}
         }
         input.classList.toggle("path-exists", inputPathExists);
+        state.currentSuggestions = sugs; // 缓存供 Pretext 测量高度
         box.innerHTML = sugs
           .map(
             (s) =>
-              `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window._currentInput.value='${s.t}';window._currentInput.dispatchEvent(new Event('input'))"><span style="display:flex">${s.i}</span><span style="overflow:hidden;text-overflow:ellipsis;flex:1;">${s.t}</span></div>`
+              `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window._currentInput.value='${s.t}';window._currentInput.dispatchEvent(new Event('input'))"><span style="display:flex">${s.i}</span><span style="word-break:break-all;flex:1;line-height:18px;">${s.t}</span></div>`
           )
           .join("");
         box.style.display = "block";
@@ -186,17 +208,24 @@ const setupAutocomplete = (input) => {
         });
       } catch {
         box.style.display = "none";
+        state.currentSuggestions = [];
       }
     }, 250)
   );
   input.addEventListener("focus", () => {
     window._currentInput = input;
-    // 延时 320ms。给输入法拉起动画预留缓冲时间，避开动画期的高负载渲染
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));
       }
     }, 320);
   });
-  input.addEventListener("blur", () => setTimeout(() => (box.style.display = "none"), 200));
+  input.addEventListener("blur", () => {
+    setTimeout(() => {
+      if (document.activeElement !== input) {
+        box.style.display = "none";
+        state.currentSuggestions = [];
+      }
+    }, 120);
+  });
 };

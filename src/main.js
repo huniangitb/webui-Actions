@@ -160,6 +160,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.requestAnimationFrame(updateViewportHeight);
   });
   window.requestAnimationFrame(updateViewportHeight);
+  // 全局滚动捕获监听：当页面任意滚动发生时，若是输入框焦点态，实时对补全框重定位，若已失焦则即刻收回
+  window.addEventListener("scroll", (e) => {
+    if (window._currentInput && document.activeElement === window._currentInput) {
+      window.requestAnimationFrame(() => {
+        import("./ui.js").then(({ updateSuggestionBoxPosition }) => {
+          updateSuggestionBoxPosition(window._currentInput);
+        });
+      });
+    } else {
+      const box = document.getElementById("suggestionBox");
+      if (box && box.style.display !== "none") {
+        box.style.display = "none";
+        state.currentSuggestions = [];
+      }
+    }
+  }, true); // capture 设为 true 从而穿透任意滚动层
+  // 全局点击判定：若点击落在补全框及对应输入框以外的区域，立刻收回补全菜单
+  document.addEventListener("click", (e) => {
+    const box = document.getElementById("suggestionBox");
+    if (!box || box.style.display === "none") return;
+    const isInput = e.target.classList.contains("rule-target") || e.target.classList.contains("rule-source");
+    const isInsideBox = box.contains(e.target);
+    if (!isInput && !isInsideBox) {
+      box.style.display = "none";
+      state.currentSuggestions = [];
+    }
+  });
   // Settings
   state.currentSettings = await getSettings();
   document.getElementById("autoThemeToggle").checked = state.currentSettings.autoTheme;
@@ -279,7 +306,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         : document.getElementById("monitorIgnoreContent").value;
       await run(`echo '${content.trim()}' > ${CONST.MONITOR_IGNORE_CONF}`);
       showToast("过滤配置已保存");
-      document.getElementById("monitorIgnoreModal")?.classList.remove("open");
+      document.getElementById("monitorIgnoreModal")?.classList.add("open");
     } catch {
       showToast("保存失败");
     }

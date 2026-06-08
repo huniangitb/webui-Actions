@@ -139,8 +139,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
   
   // Real-time Visual Viewport & Keyboard Resizer
-  // 在键盘弹起/降下动画滑行期间完全冻结。待 200ms 无高度改变后（完全弹窗结束），单帧沉降并更新样式，
-  // 然后平滑滚动定位焦点输入框，完全规避冲突回弹，并且绝对不被软键盘遮挡。
+  // 在键盘弹起期间：主界面和子模态框高度锁定不作改变。
+  // 待键盘完成弹出（稳定 150ms 之后）直接计算视口遮挡，通过硬件加速平移 modal 整体视图（允许溢出屏幕上方），并同步校准提示框位置
   let resizeTimeout = null;
   const updateViewportHeight = () => {
     if (resizeTimeout) {
@@ -153,26 +153,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       state.isViewportResizing = false;
       resizeTimeout = null;
       
-      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      // 1. 过渡结束后，单帧内代数计算重叠并整体平移模态框视图位置
+      import("./ui.js").then(({ updateModalShift }) => {
+        updateModalShift();
+      });
       
-      // 1. 弹出过程彻底结束后，单帧修改 css 容器高度变量（触发模态框缩窄适配）
-      document.documentElement.style.setProperty('--visual-vh', `${vh}px`);
-      
-      // 2. 高度适配完毕后，下一帧执行原生 smooth 滚动与提示框渲染
+      // 2. 将输入框滚动至正中并同步重构提示框定位
       window.requestAnimationFrame(() => {
         if (window._currentInput && document.activeElement === window._currentInput) {
-          // 精准将目标行滚动至折叠后的容器正中，彻底规避遮挡
           window._currentInput.scrollIntoView({ block: "center", behavior: "smooth" });
-          
-          // 延迟触发 input 检索内容
           window._currentInput.dispatchEvent(new Event("input"));
-          
           import("./ui.js").then(({ updateSuggestionBoxPosition }) => {
             updateSuggestionBoxPosition(window._currentInput);
           });
         }
       });
-    }, 200); // 200ms 的防抖过滤确保能精准承接虚拟键盘动画终点
+    }, 150);
   };
   
   if (window.visualViewport) {
@@ -203,16 +199,26 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
   }, true); // capture 设为 true 从而穿透任意滚动层
-  // 全局点击判定：若点击落在补全框及对应输入框以外的区域，立刻收回补全菜单
+  // 全局点击判定：若点击落在补全框及对应输入框以外的区域，立刻收回补全菜单，并在完全失焦时重置模态框视图位置
   document.addEventListener("click", (e) => {
     const box = document.getElementById("suggestionBox");
-    if (!box || box.style.display === "none") return;
-    const isInput = e.target.classList.contains("rule-target") || e.target.classList.contains("rule-source");
-    const isInsideBox = box.contains(e.target);
-    if (!isInput && !isInsideBox) {
-      box.style.display = "none";
-      state.currentSuggestions = [];
+    if (box && box.style.display !== "none") {
+      const isInput = e.target.classList.contains("rule-target") || e.target.classList.contains("rule-source");
+      const isInsideBox = box.contains(e.target);
+      if (!isInput && !isInsideBox) {
+        box.style.display = "none";
+        state.currentSuggestions = [];
+      }
     }
+    // 延迟检查焦点。若不再聚焦任何输入框，一键重置模态框归位
+    setTimeout(() => {
+      if (!document.activeElement || !document.activeElement.classList.contains("mx-input")) {
+        const modal = document.querySelector(".mx-modal-overlay.open .mx-modal");
+        if (modal) {
+          modal.style.transform = "scale(1) translate3d(0, 0, 0)";
+        }
+      }
+    }, 150);
   });
   // Settings
   state.currentSettings = await getSettings();

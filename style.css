@@ -45,7 +45,7 @@ body {
     background: var(--mx-bg);
     color: var(--mx-t1);
     font-size: 14px;
-    /* 外围大层级结构固定，保证键盘滑动期间的物理架构静止 */
+    /* 外围大层级结构高锁定，保证键盘拉起时主页面保持完全静态、不作位移 */
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
@@ -221,8 +221,8 @@ body.loaded {
     opacity: 0; pointer-events: none; transition: opacity 0.25s var(--mx-ease);
 }
 .mx-modal-overlay.open { opacity: 1; pointer-events: auto; }
-.mx-modal { background: var(--mx-bg); width: 92%; max-width: 420px; border-radius: 24px; display: flex; flex-direction: column; max-height: calc(var(--visual-vh, 100vh) * 0.85); border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); transform: scale(0.95); opacity: 0; /* 采用 0.3s ease 过渡动画平滑调整模态框在软键盘拉起后的 max-height，避开带有回弹的 spring 动画 */ transition: max-height 0.3s var(--mx-ease), height 0.3s var(--mx-ease), opacity 0.25s var(--mx-ease), transform 0.25s var(--mx-spring); }
-.mx-modal.large { max-width: 800px; height: calc(var(--visual-vh, 100vh) * 0.8); }
+.mx-modal { background: var(--mx-bg); width: 92%; max-width: 420px; border-radius: 24px; display: flex; flex-direction: column; max-height: 85vh; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); transform: scale(0.95); opacity: 0; /* 将 transform 的过渡调整为平滑的 mx-ease，消除在键盘弹出进行 3D translate3d 重定位时的回弹和振荡震颤 */ transition: opacity 0.25s var(--mx-ease), transform 0.25s var(--mx-ease); }
+.mx-modal.large { max-width: 800px; height: 80vh; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1); opacity: 1; }
 .mx-modal-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mx-border); flex-shrink: 0;}
 .mx-modal-title { font-size: 18px; font-weight: 700; margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }

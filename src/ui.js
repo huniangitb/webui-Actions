@@ -103,6 +103,34 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
   });
 };
 // =============================================
+// Modal Shifter (Allows overflowing above screen)
+// =============================================
+export const updateModalShift = () => {
+  const modal = document.querySelector(".mx-modal-overlay.open .mx-modal");
+  if (!modal) return;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const totalH = window.innerHeight;
+  // 键盘未弹出或已收回，归位
+  if (vh >= totalH - 60) {
+    modal.style.transform = "scale(1) translate3d(0, 0, 0)";
+    return;
+  }
+  // 暂存当前平移，复位并重构一个不受当前 transform 干扰的基础位置，用于精准测算
+  const prevTransform = modal.style.transform;
+  modal.style.transform = "scale(1) translate3d(0, 0, 0)";
+  const rect = modal.getBoundingClientRect();
+  // 测算完毕，先迅速恢复平移，防止重排画面闪烁
+  modal.style.transform = prevTransform;
+  // 测算在自然状态下，模态框底部有多少像素被键盘盖住
+  const overlap = rect.bottom - vh + 16; // 16px 安全外边距
+  if (overlap > 0) {
+    // 整体上移 modal 视图位置（允许向上超出屏幕）
+    modal.style.transform = `scale(1) translate3d(0, -${overlap}px, 0)`;
+  } else {
+    modal.style.transform = "scale(1) translate3d(0, 0, 0)";
+  }
+};
+// =============================================
 // Autocomplete Positioner (With Pretext optimization)
 // =============================================
 export const updateSuggestionBoxPosition = (input) => {
@@ -214,16 +242,15 @@ const setupAutocomplete = (input) => {
   );
   input.addEventListener("focus", () => {
     window._currentInput = input;
-    // 聚焦时：如果不支持 visualViewport（如桌面端），执行传统平滑滚动与测算
-    // 若支持（如移动端），则完全将交互动作移交 main.js 的过渡结束时统一处理，键盘弹出期间保持静止
-    if (!window.visualViewport) {
-      setTimeout(() => {
-        if (document.activeElement === input) {
-          input.scrollIntoView({ block: "center", behavior: "smooth" });
-          input.dispatchEvent(new Event("input"));
-        }
-      }, 150);
-    }
+    // 聚焦时：将输入框滚动至正中，防止遮挡。之后调度 input 检索内容
+    window.requestAnimationFrame(() => {
+      input.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+    setTimeout(() => {
+      if (document.activeElement === input) {
+        input.dispatchEvent(new Event("input"));
+      }
+    }, 320);
   });
   input.addEventListener("blur", () => {
     setTimeout(() => {

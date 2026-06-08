@@ -150,7 +150,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   // Real-time Visual Viewport & Keyboard Resizer
   // 在键盘弹起期间：主界面和子模态框高度锁定不作改变。
-  // 待键盘完成弹出（稳定 150ms 之后）直接计算视口遮挡，通过硬件加速平移 modal 整体视图（允许溢出屏幕上方），并同步校准提示框位置
+  // 缩短虚拟键盘延迟：将防抖重计延迟从 150ms 压缩至 50ms。
+  // 待键盘完成弹出直接计算视口遮挡并平移视图位置，同时判别软键盘弹出状态挂载类，以防止底栏被键盘顶起
   let resizeTimeout = null;
   const updateViewportHeight = () => {
     if (resizeTimeout) {
@@ -163,7 +164,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       state.isViewportResizing = false;
       resizeTimeout = null;
       
-      // 1. 过渡结束后，单帧内代数计算重叠并整体平移模态框视图位置
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      const totalH = window.innerHeight;
+      
+      // 检测键盘开启状态并挂载到 body 上
+      const isKeyboardOpen = vh < totalH - 80;
+      document.body.classList.toggle("keyboard-open", isKeyboardOpen);
+      
+      // 1. 代数计算重叠并整体平移模态框视图位置
       import("./ui.js").then(({ updateModalShift }) => {
         updateModalShift();
       });
@@ -178,7 +186,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           });
         }
       });
-    }, 150);
+    }, 50); // 压缩防抖延迟，显著提升跟手与键盘弹出反馈速度
   };
   
   if (window.visualViewport) {
@@ -220,13 +228,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         state.currentSuggestions = [];
       }
     }
-    // 延迟检查焦点。若不再聚焦任何输入框，一键重置模态框归位
+    // 延迟检查焦点。若不再聚焦任何输入框，一键重置模态框归位，并移去键盘弹出类
     setTimeout(() => {
       if (!document.activeElement || !document.activeElement.classList.contains("mx-input")) {
         const modal = document.querySelector(".mx-modal-overlay.open .mx-modal");
         if (modal) {
           modal.style.transform = "scale(1) translate3d(0, 0, 0)";
         }
+        document.body.classList.remove("keyboard-open");
       }
     }, 150);
   });

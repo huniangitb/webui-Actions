@@ -84,6 +84,14 @@ body.loaded {
     z-index: 100;
     /* 硬件加速以确保底部导航独立图层 */
     transform: translateZ(0);
+    transition: transform 0.25s var(--mx-ease), opacity 0.2s var(--mx-ease);
+}
+/* 当输入法弹出时，底部导航栏（原本固定定位）通常会被浏览器强行往上推起 */
+/* 挂载 keyboard-open 类将导航栏顺滑地移出视口，完全避免其位置变化及多余遮挡 */
+body.keyboard-open .mx-bottom-nav {
+    transform: translate3d(0, 100%, 0);
+    opacity: 0;
+    pointer-events: none;
 }
 .mx-bottom-nav-items { display: flex; list-style: none; margin: 0; padding: 0; height: 64px; }
 .mx-btm-item {
@@ -220,8 +228,8 @@ body.loaded {
     opacity: 0; pointer-events: none; transition: opacity 0.25s var(--mx-ease);
 }
 .mx-modal-overlay.open { opacity: 1; pointer-events: auto; }
-.mx-modal { background: var(--mx-bg); width: 92%; max-width: 420px; border-radius: 24px; display: flex; flex-direction: column; max-height: 85vh; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); transform: scale(0.95); opacity: 0; /* 将 transform 的过渡调整为平滑的 mx-ease，消除在键盘弹出进行 3D translate3d 重定位时的回弹和振荡震颤 */ transition: opacity 0.25s var(--mx-ease), transform 0.25s var(--mx-ease); }
-.mx-modal.large { max-width: 800px; height: 80vh; }
+.mx-modal { background: var(--mx-bg); width: 92%; max-width: 420px; border-radius: 24px; display: flex; flex-direction: column; /* 彻底去除任何 vh 几何单位，转用相对于父级遮罩层的百分比大小，保证高度绝对静止，规避抖动 */ max-height: 90%; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); transform: scale(0.95); opacity: 0; transition: opacity 0.25s var(--mx-ease), transform 0.25s var(--mx-ease); }
+.mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1); opacity: 1; }
 .mx-modal-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mx-border); flex-shrink: 0;}
 .mx-modal-title { font-size: 18px; font-weight: 700; margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }

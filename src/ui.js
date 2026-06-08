@@ -137,7 +137,15 @@ export const updateSuggestionBoxPosition = (input) => {
   const box = document.getElementById("suggestionBox");
   if (!box || !input || box.style.display === "none") return;
   const rect = input.getBoundingClientRect();
-  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  // 移动端核心校准：减去视觉视口本身的滚动平移量 offsetTop / offsetLeft
+  // 确保当输入法将网页顶起、视觉视口发生位移时，定位框仍能毫厘不差地紧贴输入框，不发生任何偏移
+  const vv = window.visualViewport;
+  const vh = vv ? vv.height : window.innerHeight;
+  const scrollY = vv ? vv.offsetTop : 0;
+  const scrollX = vv ? vv.offsetLeft : 0;
+  const inputLeft = rect.left - scrollX;
+  const inputTop = rect.top - scrollY;
+  const inputBottom = rect.bottom - scrollY;
   box.style.width = rect.width + "px";
   box.style.left = "0px";
   box.style.top = "0px";
@@ -159,18 +167,18 @@ export const updateSuggestionBoxPosition = (input) => {
     }
   });
   let computedTop = 0;
-  if (rect.bottom > vh / 2) {
-    const maxHeight = Math.min(rect.top - 10, 240);
+  if (inputBottom > vh / 2) {
+    const maxHeight = Math.min(inputTop - 10, 240);
     const boxHeight = Math.min(totalBoxHeight, maxHeight);
-    computedTop = rect.top - boxHeight - 4;
+    computedTop = inputTop - boxHeight - 4;
     box.style.maxHeight = maxHeight + "px";
   } else {
-    const maxHeight = Math.min(vh - rect.bottom - 10, 240);
-    computedTop = rect.bottom + 4;
+    const maxHeight = Math.min(vh - inputBottom - 10, 240);
+    computedTop = inputBottom + 4;
     box.style.maxHeight = maxHeight + "px";
   }
   // 使用 3D 转换紧贴定位
-  box.style.transform = `translate3d(${rect.left}px, ${computedTop}px, 0)`;
+  box.style.transform = `translate3d(${inputLeft}px, ${computedTop}px, 0)`;
 };
 // =============================================
 // Autocomplete (file path)
@@ -270,11 +278,12 @@ const setupAutocomplete = (input) => {
         input.scrollIntoView({ block: "center", behavior: "smooth" });
       }
     });
+    // 大幅缩减键盘弹窗反馈动画延迟：从 320ms 降至 80ms，使体验极其敏捷 snappy
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));
       }
-    }, 320);
+    }, 80);
   });
   input.addEventListener("blur", () => {
     setTimeout(() => {

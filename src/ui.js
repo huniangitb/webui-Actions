@@ -1,7 +1,6 @@
 import { state, CONST } from "./state.js";
 import { run, showToast, ICONS, normalizeToDisplay, normalizeToConfig, debounce } from "./utils.js";
 import { exec } from "kernelsu";
-
 // =============================================
 // Rule row builder
 // =============================================
@@ -21,7 +20,6 @@ export const addRuleRow = (type, target, source, containerId) => {
     <input type="text" class="mx-input rule-source ${type !== "REDIRECT" ? "hidden" : ""}" style="padding:6px; background:var(--mx-s1); border-radius:6px; font-size:12px;" placeholder="重定向至" value="${source.replace(/"/g, "&quot;")}">
   </div>
   <button class="mx-btn-icon btn-del flex-shrink-0">${ICONS.DELETE}</button>`;
-
   const select = div.querySelector(".rule-type");
   select.value = type;
   select.onchange = (e) =>
@@ -31,7 +29,6 @@ export const addRuleRow = (type, target, source, containerId) => {
   setupAutocomplete(div.querySelector(".rule-source"));
   container.appendChild(div);
 };
-
 // =============================================
 // Config text ↔ visual builders
 // =============================================
@@ -50,7 +47,6 @@ export const parseConfigTextToVisual = (
   if (selSandbox) selSandbox.value = "";
   const selInject = document.getElementById(injectSelectId);
   if (selInject) selInject.value = "";
-
   if (text) {
     text.split("\n").forEach((line) => {
       const parts = line.trim().split(/\s+/);
@@ -64,7 +60,6 @@ export const parseConfigTextToVisual = (
     });
   }
 };
-
 export const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelectId, injectSelectId) => {
   let res = "";
   const selInject = document.getElementById(injectSelectId);
@@ -73,7 +68,6 @@ export const generateConfigTextFromVisual = (containerId, monitorSelectId, sandb
   if (selMonitor && selMonitor.value) res += `MONITOR ${selMonitor.value}\n`;
   const selSandbox = document.getElementById(sandboxSelectId);
   if (selSandbox && selSandbox.value) res += `SANDBOX ${selSandbox.value}\n`;
-
   document.querySelectorAll(`#${containerId} .rule-row`).forEach((row) => {
     const type = row.querySelector(".rule-type").value;
     const target = row.querySelector(".rule-target").value.trim();
@@ -87,7 +81,6 @@ export const generateConfigTextFromVisual = (containerId, monitorSelectId, sandb
   });
   return res.trim();
 };
-
 // =============================================
 // Mode toggle helper
 // =============================================
@@ -108,7 +101,30 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
     };
   });
 };
-
+// =============================================
+// Autocomplete Positioner (With hardware acceleration)
+// =============================================
+export const updateSuggestionBoxPosition = (input) => {
+  const box = document.getElementById("suggestionBox");
+  if (!box || !input || box.style.display === "none") return;
+  const rect = input.getBoundingClientRect();
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  box.style.width = rect.width + "px";
+  box.style.left = "0px";
+  box.style.top = "0px";
+  box.style.bottom = "auto";
+  let computedTop = 0;
+  if (rect.bottom > vh / 2) {
+    const boxHeight = box.offsetHeight || 160;
+    computedTop = rect.top - boxHeight - 4;
+    box.style.maxHeight = Math.min(rect.top - 10, 240) + "px";
+  } else {
+    computedTop = rect.bottom + 4;
+    box.style.maxHeight = Math.min(vh - rect.bottom - 10, 240) + "px";
+  }
+  // 使用 translate3d 开启硬件合成层，不触发布局树重构
+  box.style.transform = `translate3d(${rect.left}px, ${computedTop}px, 0)`;
+};
 // =============================================
 // Autocomplete (file path)
 // =============================================
@@ -116,7 +132,6 @@ const setupAutocomplete = (input) => {
   if (!input) return;
   const box = document.getElementById("suggestionBox");
   if (!box) return;
-
   input.addEventListener(
     "input",
     debounce(async (e) => {
@@ -140,7 +155,6 @@ const setupAutocomplete = (input) => {
           box.style.display = "none";
           return;
         }
-        // Only show directories (those ending with /), exclude files
         const sugs = res.stdout
           .split("\n")
           .filter((l) => l.endsWith("/") && l.startsWith(sPre))
@@ -149,7 +163,6 @@ const setupAutocomplete = (input) => {
           box.style.display = "none";
           return;
         }
-        // Check if the user-entered path (full real path) exists as a directory
         let inputPathExists = false;
         if (val.trim()) {
           const fullPath = val.startsWith("/")
@@ -161,28 +174,16 @@ const setupAutocomplete = (input) => {
           } catch {}
         }
         input.classList.toggle("path-exists", inputPathExists);
-
         box.innerHTML = sugs
           .map(
             (s) =>
               `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window._currentInput.value='${s.t}';window._currentInput.dispatchEvent(new Event('input'))"><span style="display:flex">${s.i}</span><span style="overflow:hidden;text-overflow:ellipsis;flex:1;">${s.t}</span></div>`
           )
           .join("");
-        const rect = input.getBoundingClientRect();
-        const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        box.style.width = rect.width + "px";
-        box.style.left = rect.left + "px";
-        // Show with animation — the CSS animation plays on display:block
         box.style.display = "block";
-        if (rect.bottom > vh / 2) {
-          box.style.top = "auto";
-          box.style.bottom = window.innerHeight - rect.top + 4 + "px";
-          box.style.maxHeight = Math.min(rect.top - 10, 320) + "px";
-        } else {
-          box.style.bottom = "auto";
-          box.style.top = rect.bottom + 4 + "px";
-          box.style.maxHeight = Math.min(vh - rect.bottom - 10, 320) + "px";
-        }
+        window.requestAnimationFrame(() => {
+          updateSuggestionBoxPosition(input);
+        });
       } catch {
         box.style.display = "none";
       }
@@ -190,7 +191,12 @@ const setupAutocomplete = (input) => {
   );
   input.addEventListener("focus", () => {
     window._currentInput = input;
-    setTimeout(() => input.dispatchEvent(new Event("input")), 300);
+    // 延时 320ms。给输入法拉起动画预留缓冲时间，避开动画期的高负载渲染
+    setTimeout(() => {
+      if (document.activeElement === input) {
+        input.dispatchEvent(new Event("input"));
+      }
+    }, 320);
   });
   input.addEventListener("blur", () => setTimeout(() => (box.style.display = "none"), 200));
 };

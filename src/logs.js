@@ -1,7 +1,6 @@
 import { state, CONST } from "./state.js";
 import { run, showToast, ICONS } from "./utils.js";
 import { prepare, layout } from "@chenglou/pretext";
-
 // =============================================
 // Virtual log list (Pretext-powered)
 // =============================================
@@ -20,26 +19,28 @@ class VirtualLogList {
     this.prepareFn = options.prepareFn || null;
     this.onEmpty = options.onEmpty || "";
     this.entries = [];
+    this.prefixHeights = []; // 存储累积高度以实现极速检索
     this.totalHeight = 0;
     this.visibleStart = 0;
     this.visibleEnd = 0;
     this.isDirty = true;
+    this._ticking = false;
     this._onScroll = this._onScroll.bind(this);
     this.container.addEventListener("scroll", this._onScroll);
     this.contentEl.style.position = "relative";
   }
-
   append(entryList) {
+    // 缓存容器宽度，避免循环内部重复读取引发强制同步布局
+    const availWidth = this.container.clientWidth - (this.padding * 2) - this.textWidthOffset;
+    const safeAvailWidth = Math.max(availWidth, 100);
     for (const entry of entryList) {
       let h = this.estimatedLineHeight;
       let prep = null;
       let cHeight = typeof this.chromeHeight === 'function' ? this.chromeHeight(entry) : this.chromeHeight;
-      
       if (entry.text) {
         try {
           prep = prepare(entry.text, this.font);
-          const availWidth = this.container.clientWidth - (this.padding * 2) - this.textWidthOffset;
-          const { height } = layout(prep, Math.max(availWidth, 100), this.lineHeight);
+          const { height } = layout(prep, safeAvailWidth, this.lineHeight);
           h = height + cHeight;
         } catch {
           h = this.estimatedLineHeight;
@@ -53,45 +54,49 @@ class VirtualLogList {
     this.isDirty = true;
     this._render();
   }
-
   clear() {
     this.entries = [];
+    this.prefixHeights = [];
     this._recalcTotalHeight();
     this.isDirty = true;
     this.container.scrollTop = 0;
     this._render();
   }
-
   replace(entryList) {
     this.clear();
     this.append(entryList);
   }
-
   get scrollHeight() {
     return this.totalHeight;
   }
-
   destroy() {
     this.container.removeEventListener("scroll", this._onScroll);
   }
-
   _recalcTotalHeight() {
-    // 初始化外容器首部与底部的内留白边距 (保证完全贴合 8px 像素级间距)
-    this.totalHeight = this.entries.length > 0 ? this.padding * 2 : 0;
-    let th = 0;
-    for (const e of this.entries) th += e.height + this.gap;
-    if (th > 0) th -= this.gap;
-    this.totalHeight += th;
+    this.prefixHeights = [];
+    let currentY = this.padding;
+    for (let i = 0; i < this.entries.length; i++) {
+      this.prefixHeights.push(currentY);
+      currentY += this.entries[i].height + this.gap;
+    }
+    if (this.entries.length > 0) {
+      this.totalHeight = currentY - this.gap + this.padding;
+    } else {
+      this.totalHeight = 0;
+    }
   }
-
   _onScroll() {
-    this._render();
+    if (!this._ticking) {
+      window.requestAnimationFrame(() => {
+        this._render();
+        this._ticking = false;
+      });
+      this._ticking = true;
+    }
   }
-
   _render() {
     const scrollTop = this.container.scrollTop;
     const viewHeight = this.container.clientHeight;
-    
     this.contentEl.style.height = this.totalHeight + "px";
     if (this.entries.length === 0) {
       if (this.onEmpty && this.contentEl.innerHTML !== this.onEmpty) {
@@ -99,64 +104,45 @@ class VirtualLogList {
       }
       return;
     }
-
     const startIdx = this._findIndex(scrollTop);
+    const renderStart = Math.max(0, startIdx - this.buffer);
     
-    // y 起点从配置设定的容器顶端边距开始计算
-    let y = this.padding;
-    for (let i = 0; i < startIdx; i++) y += this.entries[i].height + this.gap;
-    
-    let topAcc = y;
+    // 快速利用 precomputed 累积高度寻找可视尾部索引
     let endIdx = startIdx;
     const maxBottom = scrollTop + viewHeight + this.buffer * this.estimatedLineHeight;
-    while (endIdx < this.entries.length && topAcc < maxBottom) {
-      topAcc += this.entries[endIdx].height + (endIdx < this.entries.length - 1 ? this.gap : 0);
+    while (endIdx < this.entries.length && this.prefixHeights[endIdx] < maxBottom) {
       endIdx++;
     }
-
-    const renderStart = Math.max(0, startIdx - this.buffer);
     const renderEnd = Math.min(this.entries.length, endIdx + this.buffer);
-    
     if (this.visibleStart === renderStart && this.visibleEnd === renderEnd && !this.isDirty) {
       return;
     }
-    
     this.visibleStart = renderStart;
     this.visibleEnd = renderEnd;
     this.isDirty = false;
-
-    // 定位复用
-    y = this.padding;
-    for (let i = 0; i < renderStart; i++) y += this.entries[i].height + this.gap;
-    
+    let y = this.prefixHeights[renderStart];
     let html = "";
     for (let i = renderStart; i < renderEnd; i++) {
       const entry = this.entries[i];
       const content = this.prepareFn ? this.prepareFn(entry.data) : entry.data.text || "";
-      // 对其通过样式强行锁定具体计算高度，防内部挤压或溢出
       html += `<div class="virtual-log-item" style="position:absolute;top:${y}px;left:${this.padding}px;right:${this.padding}px;height:${entry.height}px;">${content}</div>`;
       y += entry.height + this.gap;
     }
     this.contentEl.innerHTML = html;
   }
-
   _findIndex(scrollTop) {
-    let lo = 0, hi = this.entries.length;
-    let acc = this.padding;
-    while (lo < hi) {
+    let lo = 0, hi = this.prefixHeights.length - 1;
+    while (lo <= hi) {
       const mid = (lo + hi) >>> 1;
-      let midAcc = this.padding;
-      for (let i = 0; i < mid; i++) midAcc += this.entries[i].height + this.gap;
-      if (midAcc <= scrollTop) {
+      if (this.prefixHeights[mid] <= scrollTop) {
         lo = mid + 1;
       } else {
-        hi = mid;
+        hi = mid - 1;
       }
     }
     return Math.max(0, lo - 1);
   }
 }
-
 // =============================================
 // IO log state & functions
 // =============================================
@@ -169,10 +155,10 @@ export const initIoLogs = () => {
     font: "12px monospace",
     lineHeight: 18,
     estimatedLineHeight: 60,
-    gap: 6, // 上下外边距间隙 6px
-    padding: 8, // 对齐容器左右 8px 与 顶端 8px
-    textWidthOffset: 44, // 文本真实内容容器内凹偏移宽度 (边框与内外边距相加)
-    chromeHeight: 60, // 非内容容器外的固定结构高度
+    gap: 6, 
+    padding: 8, 
+    textWidthOffset: 44, 
+    chromeHeight: 60, 
     prepareFn: renderIoEntry,
     onEmpty: '<div style="padding:40px;text-align:center;color:var(--mx-t2);">暂无记录</div>',
   });
@@ -290,7 +276,6 @@ const renderIoLegacy = (lines) => {
       return `<div class="io-item"><div class="io-header"><span class="io-time">${ICONS.CLOCK}<span>${timeStr}</span><span class="io-app">${appName}</span></span><span class="io-op op-${op}">${op}</span></div><div class="io-detail">${details}</div></div>`;
     }).join("");
 };
-
 // =============================================
 // Sys log state & functions
 // =============================================

@@ -28,18 +28,15 @@ import {
 } from "./logs.js";
 import { getSettings, saveSettings, checkPluginInstalled } from "./plugin.js";
 import { syncToPlugin } from "./plugin.js";
-
 // =============================================
 // CSS
 // =============================================
 import "../style.css";
-
 // =============================================
 // Status polling
 // =============================================
 let statusPolling = null;
 let appStatusPolling = null;
-
 const checkStatus = async () => {
   try {
     let pid = (await run("pidof injector")) || (await run("pgrep -x injector"));
@@ -63,7 +60,6 @@ const checkStatus = async () => {
     if (info) info.textContent = state.currentPid ? `PID ${state.currentPid}` : "OFFLINE";
   } catch {}
 };
-
 const toggleStatus = async () => {
   if (state.currentPid) {
     await run(`kill -15 ${state.currentPid}`);
@@ -75,7 +71,6 @@ const toggleStatus = async () => {
   }
   setTimeout(checkStatus, 500);
 };
-
 const refreshAppStatus = async () => {
   try {
     const [mounts] = await Promise.all([fetchActiveMounts(), fetchInjectedApps()]);
@@ -85,7 +80,6 @@ const refreshAppStatus = async () => {
     }
   } catch {}
 };
-
 // =============================================
 // Ignore config helpers
 // =============================================
@@ -100,7 +94,6 @@ const parseIgnoreToVisual = (t) => {
     });
   if (c.children.length === 0) addIgnoreRow("");
 };
-
 const generateIgnoreFromVisual = () => {
   let r = "";
   document.querySelectorAll("#ignoreBuilderContainer input").forEach((i) => {
@@ -109,7 +102,6 @@ const generateIgnoreFromVisual = () => {
   });
   return r.trim();
 };
-
 const addIgnoreRow = (p) => {
   const div = document.createElement("div");
   div.className = "rule-row flex-shrink-0";
@@ -117,7 +109,6 @@ const addIgnoreRow = (p) => {
   div.querySelector(".btn-del").onclick = () => div.remove();
   document.getElementById("ignoreBuilderContainer")?.appendChild(div);
 };
-
 // =============================================
 // Navigation
 // =============================================
@@ -140,7 +131,6 @@ const switchSection = (sectionId) => {
     fetchSysLogs();
   }
 };
-
 // =============================================
 // DOMContentLoaded
 // =============================================
@@ -148,6 +138,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Init
   initIcons();
   
+  // Real-time Visual Viewport & Keyboard Resizer
+  const updateViewportHeight = () => {
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    document.documentElement.style.setProperty('--visual-vh', `${vh}px`);
+    if (window._currentInput && document.activeElement === window._currentInput) {
+      import("./ui.js").then(({ updateSuggestionBoxPosition }) => {
+        updateSuggestionBoxPosition(window._currentInput);
+      });
+    }
+  };
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", () => {
+      window.requestAnimationFrame(updateViewportHeight);
+    });
+    window.visualViewport.addEventListener("scroll", () => {
+      window.requestAnimationFrame(updateViewportHeight);
+    });
+  }
+  window.addEventListener("resize", () => {
+    window.requestAnimationFrame(updateViewportHeight);
+  });
+  window.requestAnimationFrame(updateViewportHeight);
   // Settings
   state.currentSettings = await getSettings();
   document.getElementById("autoThemeToggle").checked = state.currentSettings.autoTheme;
@@ -157,16 +169,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     applyTheme(mediaQuery.matches);
     mediaQuery.addEventListener("change", systemThemeListener);
   }
-  
   // Theme toggles
   document.getElementById("btnThemeToggleMobile").onclick = handleManualThemeToggle;
   document.getElementById("btnThemeToggleDesktop").onclick = handleManualThemeToggle;
-  
   // Navigation
   document.querySelectorAll(".mx-nav-item, .mx-btm-item").forEach((btn) => {
     btn.onclick = () => switchSection(btn.dataset.section);
   });
-  
   // App filter
   document.querySelectorAll("#appFilterGroup button").forEach((btn) => {
     btn.onclick = () => {
@@ -176,10 +185,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderAppList();
     };
   });
-  
   // App search
   document.getElementById("appSearch")?.addEventListener("input", debounce(renderAppList, 250));
-  
   // IO
   const ioContainer = document.getElementById("ioLogContainer");
   const ioSearch = document.getElementById("ioSearch");
@@ -200,7 +207,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   document.getElementById("btnClearIo").onclick = clearIoLogs;
-  
   // Log
   const logSelect = document.getElementById("logSourceSelect");
   const logLevelSelect = document.getElementById("logLevelSelect");
@@ -228,11 +234,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   document.getElementById("btnClearLog").onclick = clearSysLogs;
-  
   // Status toggle
   document.getElementById("btnToggleStatusMobile").onclick = toggleStatus;
   document.getElementById("btnToggleStatusDesktop").onclick = toggleStatus;
-  
   // Settings modal
   const openSettings = async () => {
     const isInstalled = await checkPluginInstalled();
@@ -257,7 +261,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("settingsModal")?.classList.remove("open");
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
-  
   // Ignore modal
   document.getElementById("btnMonitorIgnore").onclick = async () => {
     const content = await run(`cat ${CONST.MONITOR_IGNORE_CONF} 2>/dev/null`);
@@ -281,7 +284,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("保存失败");
     }
   };
-  
   // Mode toggles
   setupModeToggle(
     "globalModeToggle",
@@ -311,12 +313,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     parseIgnoreToVisual,
     generateIgnoreFromVisual
   );
-  
   // Global rules
   setupGlobalHandlers();
   document.getElementById("btnAppAddRule").onclick = () =>
     addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
-    
   // App config modal
   document.getElementById("btnCloseAppModal").onclick = () =>
     document.getElementById("appConfigModal")?.classList.remove("open");
@@ -368,22 +368,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     showToast("配置已清除");
     document.getElementById("appConfigModal")?.classList.remove("open");
   };
-  
   // Init virtual log lists
   initIoLogs();
   initSysLogs();
-  
   // Initial data load
   loadData();
   checkStatus();
-  
   // Polling
   statusPolling = setInterval(checkStatus, 500);
   appStatusPolling = setInterval(refreshAppStatus, 1000);
-  
   // Close buttons
   document.querySelectorAll(".mx-btn-close").forEach((btn) => (btn.innerHTML = ICONS.CLOSE));
-
   // 挂载淡入样式，触发渐隐式优雅切入
   requestAnimationFrame(() => {
     document.body.classList.add("loaded");

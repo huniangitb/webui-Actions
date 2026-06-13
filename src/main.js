@@ -5,8 +5,7 @@ import { setupModeToggle, addRuleRow, parseConfigTextToVisual, generateConfigTex
 import { loadData, renderAppList, updateAppListStatus, flushInjectorConf, fetchInjectedApps, fetchActiveMounts } from "./apps.js";
 import { setupGlobalHandlers } from "./global.js";
 import { initIoLogs, initSysLogs, fetchIoLogs, fetchSysLogs, resetIoLogs, clearIoLogs, resetSysLogs, clearSysLogs } from "./logs.js";
-import { getSettings, saveSettings, checkPluginInstalled } from "./plugin.js";
-import { syncToPlugin } from "./plugin.js";
+import { getSettings, saveSettings, checkPluginInstalled, syncToPlugin } from "./plugin.js";
 import "../style.css";
 const lockInitialHeight = () => {
   const initialH = window.innerHeight;
@@ -153,18 +152,14 @@ const closeModalCleanup = () => {
 };
 document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
-  const subpageBody = document.querySelector(".mx-subpage-body");
-  if (subpageBody && window.ResizeObserver) {
-    const ro = new ResizeObserver(() => {
-      const activeEl = document.activeElement;
-      if (activeEl && activeEl.classList.contains("mx-input") && subpageBody.contains(activeEl)) {
-        import("./ui.js").then(({ centerActiveInput }) => {
-          centerActiveInput(activeEl);
-        });
-      }
-    });
-    ro.observe(subpageBody);
-  }
+  const ro = new ResizeObserver(() => {
+    if (document.body.classList.contains("keyboard-open") && window._currentInput && document.activeElement === window._currentInput) {
+       import("./ui.js").then(({ debouncedCenterActive }) => {
+          debouncedCenterActive(window._currentInput);
+       });
+    }
+  });
+  document.querySelectorAll('.mx-subpage-body, .editor-scroll, .overflow-y-auto').forEach(el => ro.observe(el));
   if (navigator.virtualKeyboard) {
     navigator.virtualKeyboard.overlaysContent = true;
     navigator.virtualKeyboard.addEventListener("geometrychange", (e) => {
@@ -172,20 +167,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isKeyboardOpen = height > 0;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
       document.documentElement.style.setProperty('--keyboard-h', `${height}px`);
-      if (document.body.classList.contains("modal-open")) {
-        if (isKeyboardOpen && window._currentInput && document.activeElement === window._currentInput) {
-          import("./ui.js").then(({ centerActiveInput, updateSuggestionBoxPosition }) => {
-            centerActiveInput(window._currentInput);
-            updateSuggestionBoxPosition(window._currentInput);
-          });
-        }
-        return; 
-      }
-      if (isKeyboardOpen && window._currentInput && document.activeElement === window._currentInput) {
-        import("./ui.js").then(({ centerActiveInput }) => {
-          centerActiveInput(window._currentInput);
-        });
-      }
     });
   } else {
     let isFrameBlocked = false;
@@ -200,21 +181,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         const isKeyboardOpen = keyboardHeight > 80;
         document.body.classList.toggle("keyboard-open", isKeyboardOpen);
         document.documentElement.style.setProperty('--keyboard-h', `${isKeyboardOpen ? keyboardHeight : 0}px`);
-        if (document.body.classList.contains("modal-open")) {
-          if (window._currentInput && document.activeElement === window._currentInput) {
-            import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
-              debouncedCenterActive(window._currentInput);
-              updateSuggestionBoxPosition(window._currentInput);
-            });
-          }
-          return; 
-        }
-        import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
-          if (window._currentInput && document.activeElement === window._currentInput) {
-            debouncedCenterActive(window._currentInput);
-            updateSuggestionBoxPosition(window._currentInput);
-          }
-        });
       });
     };
     if (window.visualViewport) {
@@ -258,7 +224,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setTimeout(() => {
       if (!document.activeElement || !document.activeElement.classList.contains("mx-input")) {
         const subpage = document.getElementById("appConfigSubpage");
-        if (subpage) {
+        if (subpage && !subpage.classList.contains("open")) {
           subpage.style.transform = "translate3d(0, 0, 0)";
         }
         document.body.classList.remove("keyboard-open");
@@ -480,7 +446,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   initSysLogs();
   loadData();
   startPolling();
-  document.querySelectorAll(".mx-btn-close").forEach((btn) => (btn.innerHTML = ICONS.CLOSE));
   requestAnimationFrame(() => {
     document.body.classList.add("loaded");
   });

@@ -35,13 +35,7 @@ export const addRuleRow = (type, target, source, containerId) => {
   setupAutocomplete(div.querySelectorAll(".mx-input")[1]);
   container.appendChild(div);
 };
-export const parseConfigTextToVisual = (
-  text,
-  containerId,
-  monitorSelectId,
-  sandboxSelectId,
-  injectSelectId
-) => {
+export const parseConfigTextToVisual = (text, containerId, monitorSelectId, sandboxSelectId, injectSelectId) => {
   const container = document.getElementById(containerId);
   if (container) container.innerHTML = "";
   const selMonitor = document.getElementById(monitorSelectId);
@@ -132,24 +126,15 @@ export const updateSuggestionBoxPosition = (input) => {
 };
 export const centerActiveInput = (input) => {
   if (!input) return;
-  const row = input.closest(".rule-row") || input;
+  const row = input.closest(".rule-row") || input.closest(".mx-form-group") || input;
   const container = input.closest(".editor-scroll") || input.closest(".mx-subpage-body") || input.closest(".overflow-y-auto");
   if (!row || !container) return;
   const performAlign = () => {
-    const containerRect = container.getBoundingClientRect();
-    const rowRect = row.getBoundingClientRect();
-    const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
-    const targetScrollTop = relativeTop - (containerRect.height / 2) + (rowRect.height / 2);
-    const maxScroll = container.scrollHeight - container.clientHeight;
-    const safeScrollTop = Math.max(0, Math.min(targetScrollTop, maxScroll));
-    container.scrollTo({
-      top: safeScrollTop,
-      behavior: "smooth"
-    });
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
   };
   requestAnimationFrame(performAlign);
-  setTimeout(performAlign, 80);
-  setTimeout(performAlign, 180);
+  setTimeout(performAlign, 100);
+  setTimeout(performAlign, 200);
 };
 export const debouncedCenterActive = debounce((input) => {
   centerActiveInput(input);
@@ -162,9 +147,7 @@ const setupAutocomplete = (input) => {
     "input",
     debounce(async (e) => {
       const val = e.target.value;
-      let pDir = CONST.PATH_PREFIX_REAL + "/",
-        sPre = "",
-        dBase = "/";
+      let pDir = CONST.PATH_PREFIX_REAL + "/", sPre = "", dBase = "/";
       const cVal = val ? val.replace(/^\/+/, "") : "";
       if (cVal) {
         const ls = cVal.lastIndexOf("/");

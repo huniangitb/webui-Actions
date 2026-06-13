@@ -38,11 +38,7 @@
     --mx-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
-/* 网页背景覆盖到 HTML，确保完全融于系统状态栏 */
-html {
-    background-color: var(--mx-bg);
-    transition: background-color 0.3s var(--mx-ease);
-}
+html { background-color: var(--mx-bg); transition: background-color 0.3s var(--mx-ease); }
 body {
     margin: 0; padding: 0;
     font-family: var(--mx-font-sans);
@@ -74,7 +70,7 @@ body.loaded {
 .mx-desktop-shell { display: none; }
 .mx-app { 
     display: flex; 
-    height: 100dvh; 
+    height: var(--initial-vh, 100dvh); 
     width: 100vw; 
     flex-direction: column; 
     will-change: transform, opacity;
@@ -107,21 +103,9 @@ body.loaded {
     transform: translateZ(0);
     transition: transform 0.25s var(--mx-ease), opacity 0.2s var(--mx-ease);
 }
-/* 主页面导航栏跟随虚拟键盘，仅在非应用配置（非 .modal-open）页面生效 */
 body.keyboard-open:not(.modal-open) .mx-bottom-nav {
     transform: translateY(calc(-1 * var(--keyboard-h, 0px)));
     transition: none !important;
-}
-/* 应用配置页面下，强行隔离与锁定底部导航栏，使其完全固定在最底部不发生任何位移 */
-body.modal-open .mx-bottom-nav {
-    transform: none !important;
-    transition: none !important;
-    position: fixed !important;
-    bottom: 0 !important;
-}
-body.modal-open .mx-app {
-    height: 100dvh !important;
-    overflow: hidden !important;
 }
 .mx-bottom-nav-items { display: flex; list-style: none; margin: 0; padding: 0; height: 56px; }
 .mx-btm-item {
@@ -132,6 +116,7 @@ body.modal-open .mx-app {
 .mx-btm-item:active { transform: scale(0.9); }
 .mx-btm-item.active { color: var(--mx-primary); font-weight: 600; }
 .btm-icon { width: 22px; height: 22px; display: block; }
+.btm-icon svg { width: 100%; height: 100%; display: block; }
 .btm-label { font-size: 11px; }
 .demo-section { display: none; height: 100%; flex-direction: column; padding: 16px; overflow: hidden; flex: 1; }
 .demo-section.active { display: flex; }
@@ -290,30 +275,46 @@ body.modal-open .mx-app {
 }
 .mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1) translate3d(0, 0, 0); opacity: 1; }
+
 /* =============================================
-   应用配置页面：移动端虚拟键盘唤起适配
+   应用配置页面：全新移动端全屏滑动底纸 (解决结构闪烁关键)
    ============================================= */
 @media (max-width: 767px) {
+    /* 移动端的大模态框默认直接进入全屏页形态，保持静态结构不跳变 */
+    .mx-modal.large {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        box-shadow: none;
+        transform: translate3d(0, 100%, 0) !important; /* 原生向上划入感 */
+        transition: transform 0.35s var(--mx-ease), height 0.15s ease-out !important;
+    }
+    
+    .mx-modal-overlay.open .mx-modal.large {
+        transform: translate3d(0, 0, 0) !important;
+    }
+
     body.keyboard-open.modal-open .mx-modal-overlay {
-        align-items: flex-end; /* 键盘弹出时靠底对齐 */
+        align-items: flex-start !important;
     }
-    body.keyboard-open.modal-open .mx-modal {
-        border-bottom-left-radius: 0;
-        border-bottom-right-radius: 0;
-        width: 100vw;
-        max-width: 100vw;
-        height: 100%;
-        max-height: 100%;
-        margin-bottom: 0 !important;
-        transform: none !important;
-        transition: none !important; /* 彻底去除尺寸变动导致的闪烁，顺应系统视口缩放 */
+
+    /* 当键盘调起时，全屏页由于不涉及宽度、边距或圆角的转换，仅平滑缩减可用高度，实现 0 闪烁 */
+    body.keyboard-open.modal-open .mx-modal.large {
+        height: calc(var(--initial-vh, 100dvh) - var(--keyboard-h, 0px)) !important;
+        max-height: calc(var(--initial-vh, 100dvh) - var(--keyboard-h, 0px)) !important;
+        transform: translate3d(0, 0, 0) !important;
     }
+
     body.keyboard-open.modal-open .mx-modal-body {
         max-height: none !important;
         flex: 1;
         overflow-y: auto !important;
     }
 }
+
 .mx-modal-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mx-border); flex-shrink: 0;}
 .mx-modal-title { font-size: 18px; font-weight: 700; margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 .mx-modal-body { padding: 20px; overflow-y: auto; flex: 1; min-height:0; }
@@ -380,24 +381,11 @@ body.modal-open .mx-app {
     height: 32px !important;
     flex-shrink: 0;
 }
-/* 限制：非应用配置弹窗状态下，全局规则编辑面板才随键盘高度变动容器高度 */
 body.keyboard-open:not(.modal-open) .overflow-y-auto.editor-scroll {
     max-height: calc(100% - var(--keyboard-h, 0px));
 }
 .editor-scroll {
     position: relative;
-}
-/* 默认底距 */
-.editor-scroll::after {
-    content: "";
-    display: block;
-    height: 120px;
-    flex-shrink: 0;
-    transition: height 0.2s var(--mx-ease);
-}
-/* 当检测到软键盘升起时，注入一个非常充裕的空白高度占位，确保最后一项配置能够安全滚动到视口最上方 */
-body.keyboard-open .editor-scroll::after {
-    height: 320px !important;
 }
 .mx-spinner-container {
     display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -417,6 +405,7 @@ body.keyboard-open .editor-scroll::after {
 .io-item { background: var(--mx-s2); border: 1px solid var(--mx-border); border-radius: 12px; padding: 6px 12px; flex-shrink: 0; box-sizing: border-box; }
 .io-header { display: flex; align-items: center; gap: 8px; height: 20px; margin-bottom: 8px; overflow: hidden; }
 .io-time { font-size: 11px; color: var(--mx-t2); font-family: var(--mx-font-mono); flex-shrink:0; white-space: nowrap; }
+.io-time svg { width: 14px; height: 14px; display: inline-block; vertical-align: middle; }
 .io-app { font-weight: 600; font-size: 13px; color: var(--mx-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;min-width: 0;}
 .io-op { flex-shrink: 0;padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; color: #fff; font-family: var(--mx-font-mono); flex-shrink:0; background: var(--mx-gray); }
 .io-detail { background: var(--mx-s1); padding: 8px; border-radius: 8px; font-size: 12px; line-height: 18px; font-family: var(--mx-font-mono); color: var(--mx-t1); word-break: break-all; border: 1px solid var(--mx-border); box-sizing: border-box; }
@@ -467,7 +456,6 @@ body.keyboard-open .editor-scroll::after {
     pointer-events: auto;
     will-change: transform, opacity;
 }
-.io-time svg { display: flex; align-items: center; flex-shrink: 0; color: var(--mx-t2); }
 .suggestion-box { 
     position: absolute; 
     background: var(--mx-s3); 

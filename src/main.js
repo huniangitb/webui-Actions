@@ -28,20 +28,24 @@ import {
 } from "./logs.js";
 import { getSettings, saveSettings, checkPluginInstalled } from "./plugin.js";
 import { syncToPlugin } from "./plugin.js";
+
 // =============================================
 // CSS
 // =============================================
 import "../style.css";
+
 // =============================================
-// Lock Layout Viewport Height (用于主视口绝对防线)
+// Lock Layout Viewport Height
 // =============================================
 const lockInitialHeight = () => {
   const initialH = window.innerHeight;
   document.documentElement.style.setProperty('--initial-vh', `${initialH}px`);
 };
 lockInitialHeight();
+window.addEventListener("orientationchange", () => setTimeout(lockInitialHeight, 200));
+
 // =============================================
-// Status Polling Manager (支持后台挂起避让)
+// Status Polling Manager
 // =============================================
 let statusPolling = null;
 let appStatusPolling = null;
@@ -110,6 +114,7 @@ const refreshAppStatus = async () => {
     }
   } catch {}
 };
+
 // =============================================
 // Ignore config helpers
 // =============================================
@@ -142,6 +147,7 @@ const addIgnoreRow = (p) => {
   div.querySelector(".btn-del").onclick = () => div.remove();
   document.getElementById("ignoreBuilderContainer")?.appendChild(div);
 };
+
 // =============================================
 // Navigation
 // =============================================
@@ -171,13 +177,28 @@ const switchSection = (sectionId) => {
     triggerSwitch();
   }
 };
+
+// =============================================
+// Modal Destructor Cleanups
+// =============================================
+const closeModalCleanup = () => {
+  document.getElementById("appConfigModal")?.classList.remove("open");
+  document.querySelector(".mx-app").classList.remove("frozen");
+  document.body.classList.remove("modal-open");
+  document.body.classList.remove("keyboard-open");
+  // 复位全局 CSS 键盘高度，杜绝多余的主视图偏移干扰
+  document.documentElement.style.setProperty('--keyboard-h', '0px');
+  startPolling();
+};
+
 // =============================================
 // DOMContentLoaded
 // =============================================
 document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
+
   // =============================================
-  // 原生高精度视口变化硬关联：使用 Overlay 原生方案，只改变变量，不触及 Layout
+  // 原生高精度视口变化拦截控制
   // =============================================
   if (navigator.virtualKeyboard) {
     navigator.virtualKeyboard.overlaysContent = true;
@@ -186,6 +207,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isKeyboardOpen = height > 0;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
       document.documentElement.style.setProperty('--keyboard-h', `${height}px`);
+      
+      // 关键性能防护：仅当模态框未打开时，才对主界面底部导航栏做对应位置抬升
+      // 模态框打开时，避开对主页面任何布局计算
+      if (document.body.classList.contains("modal-open")) {
+        if (isKeyboardOpen && window._currentInput && document.activeElement === window._currentInput) {
+          import("./ui.js").then(({ centerActiveInput, updateSuggestionBoxPosition }) => {
+            centerActiveInput(window._currentInput);
+            updateSuggestionBoxPosition(window._currentInput);
+          });
+        }
+        return; 
+      }
+
       if (isKeyboardOpen && window._currentInput && document.activeElement === window._currentInput) {
         import("./ui.js").then(({ centerActiveInput }) => {
           centerActiveInput(window._currentInput);
@@ -205,6 +239,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         const isKeyboardOpen = keyboardHeight > 80;
         document.body.classList.toggle("keyboard-open", isKeyboardOpen);
         document.documentElement.style.setProperty('--keyboard-h', `${isKeyboardOpen ? keyboardHeight : 0}px`);
+        
+        // 性能防御：模态框呈递时，不触碰主页面冗余的排版流、导航提升计算
+        if (document.body.classList.contains("modal-open")) {
+          if (window._currentInput && document.activeElement === window._currentInput) {
+            import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
+              debouncedCenterActive(window._currentInput);
+              updateSuggestionBoxPosition(window._currentInput);
+            });
+          }
+          return; 
+        }
+
         import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
           if (window._currentInput && document.activeElement === window._currentInput) {
             debouncedCenterActive(window._currentInput);
@@ -220,6 +266,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.addEventListener("resize", updateViewportHeight);
     updateViewportHeight();
   }
+
   document.addEventListener("touchstart", () => {
     state.isUserTouching = true;
   }, { passive: true });
@@ -229,6 +276,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.addEventListener("touchcancel", () => {
     state.isUserTouching = false;
   }, { passive: true });
+
   window.addEventListener("scroll", (e) => {
     if (state.isUserTouching) {
       const box = document.getElementById("suggestionBox");
@@ -241,6 +289,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.scrollTo(0, 0);
     }
   }, true);
+
   document.addEventListener("click", (e) => {
     const box = document.getElementById("suggestionBox");
     if (box && box.style.display !== "none") {
@@ -261,6 +310,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }, 150);
   });
+
   // Settings
   state.currentSettings = await getSettings();
   document.getElementById("autoThemeToggle").checked = state.currentSettings.autoTheme;
@@ -269,14 +319,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     applyTheme(mediaQuery.matches);
     mediaQuery.addEventListener("change", systemThemeListener);
+  } else {
+    applyTheme(state.isDarkMode);
   }
+
   // Theme toggles
   document.getElementById("btnThemeToggleMobile").onclick = handleManualThemeToggle;
   document.getElementById("btnThemeToggleDesktop").onclick = handleManualThemeToggle;
+
   // Navigation
   document.querySelectorAll(".mx-nav-item, .mx-btm-item").forEach((btn) => {
     btn.onclick = () => switchSection(btn.dataset.section);
   });
+
   // App filter
   document.querySelectorAll("#appFilterGroup button").forEach((btn) => {
     btn.onclick = () => {
@@ -286,8 +341,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderAppList();
     };
   });
+
   // App search
   document.getElementById("appSearch")?.addEventListener("input", debounce(renderAppList, 250));
+
   // IO
   const ioContainer = document.getElementById("ioLogContainer");
   const ioSearch = document.getElementById("ioSearch");
@@ -308,6 +365,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   document.getElementById("btnClearIo").onclick = clearIoLogs;
+
   // Log
   const logSelect = document.getElementById("logSourceSelect");
   const logLevelSelect = document.getElementById("logLevelSelect");
@@ -335,9 +393,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   document.getElementById("btnClearLog").onclick = clearSysLogs;
+
   // Status toggle
   document.getElementById("btnToggleStatusMobile").onclick = toggleStatus;
   document.getElementById("btnToggleStatusDesktop").onclick = toggleStatus;
+
   // Settings modal
   const openSettings = async () => {
     const isInstalled = await checkPluginInstalled();
@@ -362,6 +422,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("settingsModal")?.classList.remove("open");
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
+
   // Ignore modal
   document.getElementById("btnMonitorIgnore").onclick = async () => {
     const content = await run(`cat ${CONST.MONITOR_IGNORE_CONF} 2>/dev/null`);
@@ -385,6 +446,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("保存失败");
     }
   };
+
   // Mode toggles
   setupModeToggle(
     "globalModeToggle",
@@ -414,17 +476,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     parseIgnoreToVisual,
     generateIgnoreFromVisual
   );
+
   // Global rules
   setupGlobalHandlers();
   document.getElementById("btnAppAddRule").onclick = () =>
     addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
-  // App config modal
-  document.getElementById("btnCloseAppModal").onclick = () => {
-    document.getElementById("appConfigModal")?.classList.remove("open");
-    document.querySelector(".mx-app").classList.remove("frozen");
-    document.body.classList.remove("modal-open");
-    startPolling();
-  };
+
+  // App config modal interactions
+  document.getElementById("btnCloseAppModal").onclick = closeModalCleanup;
+
   document.getElementById("btnSaveAppConfig").onclick = async () => {
     try {
       const isVisual = document
@@ -452,16 +512,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       await flushInjectorConf();
       showToast("配置已保存");
-      document.getElementById("appConfigModal")?.classList.remove("open");
-      document.querySelector(".mx-app").classList.remove("frozen");
-      document.body.classList.remove("modal-open");
-      startPolling();
+      closeModalCleanup();
       await loadData();
       await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     } catch {
       showToast("保存失败");
     }
   };
+
   document.getElementById("btnDeleteAppConfig").onclick = async () => {
     if (!confirm("确定清除配置吗?")) return;
     const dir =
@@ -471,14 +529,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     await run(`rm -f ${dir}/${state.currentBindingPkg}.conf ${dir}/${state.currentBindingPkg}.conf.disabled`);
     state.injectorStates.delete(`${state.currentBindingPkg}:${state.currentBindingUser}`);
     await flushInjectorConf();
-    document.getElementById("appConfigModal")?.classList.remove("open");
-    document.querySelector(".mx-app").classList.remove("frozen");
-    document.body.classList.remove("modal-open");
-    startPolling();
+    closeModalCleanup();
     await loadData();
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     showToast("配置已清除");
   };
+
   const originalOpenAppConfig = window.openAppConfig;
   window.openAppConfig = (pkg) => {
     stopPolling();
@@ -486,6 +542,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.body.classList.add("modal-open");
     originalOpenAppConfig(pkg);
   };
+
   initIoLogs();
   initSysLogs();
   loadData();

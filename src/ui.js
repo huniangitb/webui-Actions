@@ -2,8 +2,9 @@ import { state, CONST } from "./state.js";
 import { run, showToast, ICONS, normalizeToDisplay, normalizeToConfig, debounce } from "./utils.js";
 import { exec } from "kernelsu";
 import { prepare, layout } from "@chenglou/pretext";
+
 // =============================================
-// Rule row builder (强制单行并列结构)
+// Rule row builder
 // =============================================
 export const addRuleRow = (type, target, source, containerId) => {
   const container = document.getElementById(containerId);
@@ -38,6 +39,7 @@ export const addRuleRow = (type, target, source, containerId) => {
   setupAutocomplete(div.querySelectorAll(".mx-input")[1]);
   container.appendChild(div);
 };
+
 // =============================================
 // Config text ↔ visual builders
 // =============================================
@@ -69,6 +71,7 @@ export const parseConfigTextToVisual = (
     });
   }
 };
+
 export const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelectId, injectSelectId) => {
   let res = "";
   const selInject = document.getElementById(injectSelectId);
@@ -90,6 +93,7 @@ export const generateConfigTextFromVisual = (containerId, monitorSelectId, sandb
   });
   return res.trim();
 };
+
 // =============================================
 // Mode toggle helper
 // =============================================
@@ -110,6 +114,7 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
     };
   });
 };
+
 // =============================================
 // Autocomplete Positioner
 // =============================================
@@ -142,31 +147,45 @@ export const updateSuggestionBoxPosition = (input) => {
     }
   }
 };
+
 // =============================================
-// 智能自适应居中对焦滚动
+// 高精度数学对焦逻辑 (替换不稳定 scrollIntoView)
 // =============================================
 export const centerActiveInput = (input) => {
-  const container = input.closest(".overflow-y-auto");
+  if (!input) return;
   const row = input.closest(".rule-row") || input;
-  if (!container || !row) return;
+  const container = input.closest(".editor-scroll") || input.closest(".overflow-y-auto");
+  if (!row || !container) return;
 
-  // 使用 getBoundingClientRect 计算输入框行元素相对于滚动容器可见视口的精确物理偏移，
-  // 结合当前滚动高度计算得出绝对 scrollTop，完全排除 offsetParent 带来的累积高度偏差。
-  const containerRect = container.getBoundingClientRect();
-  const rowRect = row.getBoundingClientRect();
-  const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
-  
-  // 定位于视口顶部下方 24px，给予编辑状态下最充裕的可见上下文
-  const targetScroll = Math.max(0, relativeTop - 24);
-  
-  container.scrollTo({
-    top: targetScroll,
-    behavior: "smooth"
-  });
+  const performAlign = () => {
+    const containerRect = container.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+
+    // 计算当前行在滚动容器内部的高精度相对坐标
+    const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
+    
+    // 计算居中对准的目标偏移量
+    const targetScrollTop = relativeTop - (containerRect.height / 2) + (rowRect.height / 2);
+    
+    const maxScroll = container.scrollHeight - container.clientHeight;
+    const safeScrollTop = Math.max(0, Math.min(targetScrollTop, maxScroll));
+
+    container.scrollTo({
+      top: safeScrollTop,
+      behavior: "smooth"
+    });
+  };
+
+  // 配合虚拟键盘滑入动效分频级对齐，保障定位最终收敛到正中
+  requestAnimationFrame(performAlign);
+  setTimeout(performAlign, 80);
+  setTimeout(performAlign, 180);
 };
+
 export const debouncedCenterActive = debounce((input) => {
   centerActiveInput(input);
 }, 120);
+
 // =============================================
 // Autocomplete
 // =============================================
@@ -271,15 +290,11 @@ const setupAutocomplete = (input) => {
   });
   input.addEventListener("focus", () => {
     window._currentInput = input;
-    // 采用阶梯梯度延时对焦，保证在键盘升起和视口尺寸收缩的整个动画周期（50ms, 150ms, 350ms, 500ms）内进行高频对焦修正，
-    // 确保任何配置（特别是底部最后几个配置）在收缩完毕后依然完美对齐到最上方。
-    [50, 150, 350, 500].forEach((delay) => {
-      setTimeout(() => {
-        if (document.activeElement === input) {
-          centerActiveInput(input);
-        }
-      }, delay);
-    });
+    setTimeout(() => {
+      if (document.activeElement === input) {
+        centerActiveInput(input);
+      }
+    }, 120);
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));

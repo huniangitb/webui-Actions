@@ -2,7 +2,6 @@ import { state, CONST } from "./state.js";
 import { run, showToast, ICONS, normalizeToDisplay, normalizeToConfig, debounce } from "./utils.js";
 import { exec } from "kernelsu";
 import { prepare, layout } from "@chenglou/pretext";
-
 // =============================================
 // Rule row builder (强制单行并列结构)
 // =============================================
@@ -26,7 +25,6 @@ export const addRuleRow = (type, target, source, containerId) => {
     </div>
   </div>
   <button class="mx-btn-icon btn-del flex-shrink-0">${ICONS.DELETE}</button>`;
-  
   const select = div.querySelector(".rule-type");
   select.value = type;
   select.onchange = (e) => {
@@ -40,7 +38,6 @@ export const addRuleRow = (type, target, source, containerId) => {
   setupAutocomplete(div.querySelectorAll(".mx-input")[1]);
   container.appendChild(div);
 };
-
 // =============================================
 // Config text ↔ visual builders
 // =============================================
@@ -72,7 +69,6 @@ export const parseConfigTextToVisual = (
     });
   }
 };
-
 export const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelectId, injectSelectId) => {
   let res = "";
   const selInject = document.getElementById(injectSelectId);
@@ -94,17 +90,14 @@ export const generateConfigTextFromVisual = (containerId, monitorSelectId, sandb
   });
   return res.trim();
 };
-
 // =============================================
-// Mode toggle helper (精简剥离 ViewTransition 杜绝局部切换时的全局抖动)
+// Mode toggle helper
 // =============================================
 export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc, genFunc) => {
   document.querySelectorAll(`button[name="${groupName}"]`).forEach((btn) => {
     btn.onclick = () => {
       document.querySelectorAll(`button[name="${groupName}"]`).forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      
-      // 局部图形/源码切换属于高频轻量交互，直接操作 DOM Class，坚决不启用任何 ViewTransition 过渡
       if (btn.dataset.mode === "visual") {
         parseFunc(document.getElementById(contentId).value);
         document.getElementById(rawId).classList.remove("active");
@@ -117,7 +110,6 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
     };
   });
 };
-
 // =============================================
 // Modal Shifter (With Layout cache optimization)
 // =============================================
@@ -143,7 +135,6 @@ export const updateModalShift = () => {
     modal.style.transform = "scale(1) translate3d(0, 0, 0)";
   }
 };
-
 // =============================================
 // Autocomplete Positioner
 // =============================================
@@ -176,26 +167,27 @@ export const updateSuggestionBoxPosition = (input) => {
     }
   }
 };
-
 // =============================================
-// 对焦定位引擎 (高版本原生 VirtualKeyboard 标准对接)
+// 精准对焦定位：避免无意义微小偏移动作
 // =============================================
 export const centerActiveInput = (input) => {
   const container = input.closest(".overflow-y-auto");
   const row = input.closest(".rule-row") || input;
   if (!container || !row) return;
-
   const elementRelativeTop = row.offsetTop;
-  container.scrollTo({
-    top: elementRelativeTop - 40,
-    behavior: "smooth"
-  });
+  const currentScroll = container.scrollTop;
+  const targetScroll = Math.max(0, elementRelativeTop - 12);
+  // 仅在偏移幅度大于 12 像素时才介入滚动，杜绝因微小抖动引起的屏幕闪烁
+  if (Math.abs(currentScroll - targetScroll) > 12) {
+    container.scrollTo({
+      top: targetScroll,
+      behavior: "smooth"
+    });
+  }
 };
-
 export const debouncedCenterActive = debounce((input) => {
   centerActiveInput(input);
 }, 120);
-
 // =============================================
 // Autocomplete
 // =============================================
@@ -250,7 +242,6 @@ const setupAutocomplete = (input) => {
         }
         input.classList.toggle("path-exists", inputPathExists);
         state.currentSuggestions = sugs;
-        
         let totalBoxHeight = 2; 
         const fontStyle = "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
         const horizontalPadding = 24; 
@@ -284,7 +275,6 @@ const setupAutocomplete = (input) => {
       }
     }, 250)
   );
-
   input.addEventListener("keydown", (e) => {
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       const inputs = Array.from(document.querySelectorAll(".mx-modal-overlay.open .mx-input:not([readonly])"));
@@ -300,7 +290,6 @@ const setupAutocomplete = (input) => {
       }
     }
   });
-
   input.addEventListener("focus", () => {
     window._currentInput = input;
     setTimeout(() => {
@@ -314,7 +303,6 @@ const setupAutocomplete = (input) => {
       }
     }, 150);
   });
-
   input.addEventListener("blur", () => {
     setTimeout(() => {
       const activeEl = document.activeElement;

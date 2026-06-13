@@ -28,12 +28,10 @@ import {
 } from "./logs.js";
 import { getSettings, saveSettings, checkPluginInstalled } from "./plugin.js";
 import { syncToPlugin } from "./plugin.js";
-
 // =============================================
 // CSS
 // =============================================
 import "../style.css";
-
 // =============================================
 // Lock Layout Viewport Height
 // =============================================
@@ -42,18 +40,19 @@ const lockInitialHeight = () => {
   document.documentElement.style.setProperty('--initial-vh', `${initialH}px`);
 };
 lockInitialHeight();
-
 // =============================================
 // OffscreenCanvas Background Renderer
 // =============================================
 const initOffscreenCanvas = () => {
   const canvas = document.getElementById("ioPerformanceCanvas");
   if (!canvas || !canvas.transferControlToOffscreen) return;
-  
   try {
     const offscreen = canvas.transferControlToOffscreen();
+    // 采用更贴合文件监控语义的多轨道 IO 总线与发光数据粒子传输流动画
     const workerCode = `
-      let width = 0, height = 0, ctx = null, offset = 0;
+      let width = 0, height = 0, ctx = null;
+      let particles = [];
+      const maxParticles = 45;
       self.onmessage = function(e) {
         if (e.data.canvas) {
           const canvas = e.data.canvas;
@@ -70,25 +69,64 @@ const initOffscreenCanvas = () => {
       function draw() {
         if (!ctx) return;
         ctx.clearRect(0, 0, width, height);
-        
-        ctx.strokeStyle = "rgba(39, 122, 247, 0.22)";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        for (let x = 0; x < width; x++) {
-          const y = (height / 2) + Math.sin((x * 0.015) + offset) * 18;
-          if (x === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+        // 1. 绘制多通道虚拟 FUSE 数据总线背景 (虚线)
+        const channels = [height * 0.25, height * 0.5, height * 0.75];
+        ctx.strokeStyle = "rgba(39, 122, 247, 0.06)";
+        ctx.lineWidth = 1;
+        channels.forEach(y => {
+          ctx.beginPath();
+          ctx.setLineDash([8, 14]);
+          ctx.moveTo(0, y);
+          ctx.lineTo(width, y);
+          ctx.stroke();
+        });
+        // 2. 规律性并发喷射 IO 操作数据包粒子 (Read 代表绿色，Write 代表橙色)
+        if (particles.length < maxParticles && Math.random() < 0.15) {
+          const isRead = Math.random() > 0.45;
+          particles.push({
+            x: 0,
+            y: channels[Math.floor(Math.random() * channels.length)],
+            speed: 1.5 + Math.random() * 3.0,
+            size: 2.5 + Math.random() * 3.5,
+            color: isRead ? "rgba(52, 211, 153, " : "rgba(251, 191, 36, ",
+            alpha: 0.15 + Math.random() * 0.55
+          });
         }
-        ctx.stroke();
-        
-        offset += 0.04;
+        // 3. 实时步进绘制粒子流
+        ctx.setLineDash([]);
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.speed;
+          let alpha = p.alpha;
+          if (p.x > width * 0.75) {
+            alpha *= (width - p.x) / (width * 0.25);
+          }
+          if (p.x > width || alpha <= 0) {
+            particles.splice(i, 1);
+            continue;
+          }
+          // 渲染流式发光拖尾
+          const gradient = ctx.createLinearGradient(p.x - 24, p.y, p.x, p.y);
+          gradient.addColorStop(0, "transparent");
+          gradient.addColorStop(1, p.color + alpha + ")");
+          ctx.strokeStyle = gradient;
+          ctx.lineWidth = p.size;
+          ctx.beginPath();
+          ctx.moveTo(p.x - 24, p.y);
+          ctx.lineTo(p.x, p.y);
+          ctx.stroke();
+          // 核心光点头部亮斑
+          ctx.fillStyle = p.color + Math.min(1, alpha * 1.5) + ")";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size / 2 + 0.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
         requestAnimationFrame(draw);
       }
     `;
     const blob = new Blob([workerCode], { type: "application/javascript" });
     const worker = new Worker(URL.createObjectURL(blob));
     worker.postMessage({ canvas: offscreen }, [offscreen]);
-    
     const resizeObserver = new ResizeObserver((entries) => {
       for (let entry of entries) {
         const { width, height } = entry.contentRect;
@@ -102,13 +140,11 @@ const initOffscreenCanvas = () => {
     console.warn("OffscreenCanvas failed to spawn:", e);
   }
 };
-
 // =============================================
 // Status Polling Manager (高能效设计)
 // =============================================
 let statusPolling = null;
 let appStatusPolling = null;
-
 export const startPolling = () => {
   if (!statusPolling) {
     checkStatus();
@@ -119,7 +155,6 @@ export const startPolling = () => {
     appStatusPolling = setInterval(refreshAppStatus, 2000);
   }
 };
-
 export const stopPolling = () => {
   if (statusPolling) {
     clearInterval(statusPolling);
@@ -130,7 +165,6 @@ export const stopPolling = () => {
     appStatusPolling = null;
   }
 };
-
 const checkStatus = async () => {
   try {
     let pid = (await run("pidof injector")) || (await run("pgrep -x injector"));
@@ -154,7 +188,6 @@ const checkStatus = async () => {
     if (info) info.textContent = state.currentPid ? `PID ${state.currentPid}` : "OFFLINE";
   } catch {}
 };
-
 const toggleStatus = async () => {
   if (state.currentPid) {
     await run(`kill -15 ${state.currentPid}`);
@@ -166,7 +199,6 @@ const toggleStatus = async () => {
   }
   setTimeout(checkStatus, 500);
 };
-
 const refreshAppStatus = async () => {
   try {
     const [mounts] = await Promise.all([fetchActiveMounts(), fetchInjectedApps()]);
@@ -176,7 +208,6 @@ const refreshAppStatus = async () => {
     }
   } catch {}
 };
-
 // =============================================
 // Ignore config helpers
 // =============================================
@@ -191,7 +222,6 @@ const parseIgnoreToVisual = (t) => {
     });
   if (c.children.length === 0) addIgnoreRow("");
 };
-
 const generateIgnoreFromVisual = () => {
   let r = "";
   document.querySelectorAll("#ignoreBuilderContainer input").forEach((i) => {
@@ -200,7 +230,6 @@ const generateIgnoreFromVisual = () => {
   });
   return r.trim();
 };
-
 const addIgnoreRow = (p) => {
   const div = document.createElement("div");
   div.className = "rule-row flex-shrink-0";
@@ -211,9 +240,8 @@ const addIgnoreRow = (p) => {
   div.querySelector(".btn-del").onclick = () => div.remove();
   document.getElementById("ignoreBuilderContainer")?.appendChild(div);
 };
-
 // =============================================
-// Navigation (只在真正的页面级 Section 切换时采用 ViewTransition)
+// Navigation
 // =============================================
 const switchSection = (sectionId) => {
   const triggerSwitch = () => {
@@ -235,23 +263,20 @@ const switchSection = (sectionId) => {
       fetchSysLogs();
     }
   };
-
   if (document.startViewTransition) {
     document.startViewTransition(() => triggerSwitch());
   } else {
     triggerSwitch();
   }
 };
-
 // =============================================
 // DOMContentLoaded
 // =============================================
 document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
   initOffscreenCanvas();
-  
   // =============================================
-  // 原生标准：初始化并监听浏览器原生的 VirtualKeyboard API
+  // 原生高精度视口变化硬关联：通过 CSS 全局变量直接挂载
   // =============================================
   if (navigator.virtualKeyboard) {
     navigator.virtualKeyboard.overlaysContent = true;
@@ -259,7 +284,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const { height } = e.target.boundingRect;
       const isKeyboardOpen = height > 0;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
-      
+      document.documentElement.style.setProperty('--keyboard-h', `${height}px`);
       if (isKeyboardOpen && window._currentInput && document.activeElement === window._currentInput) {
         import("./ui.js").then(({ centerActiveInput }) => {
           centerActiveInput(window._currentInput);
@@ -275,9 +300,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         isFrameBlocked = false;
         const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         const totalH = window.innerHeight;
-        const isKeyboardOpen = vh < totalH - 80;
+        const keyboardHeight = totalH - vh;
+        const isKeyboardOpen = keyboardHeight > 80;
         document.body.classList.toggle("keyboard-open", isKeyboardOpen);
-        
+        document.documentElement.style.setProperty('--keyboard-h', `${isKeyboardOpen ? keyboardHeight : 0}px`);
         import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
           if (window._currentInput && document.activeElement === window._currentInput) {
             debouncedCenterActive(window._currentInput);
@@ -293,20 +319,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.addEventListener("resize", updateViewportHeight);
     updateViewportHeight();
   }
-
-  // 物理触控感知
   document.addEventListener("touchstart", () => {
     state.isUserTouching = true;
   }, { passive: true });
-  
   document.addEventListener("touchend", () => {
     state.isUserTouching = false;
   }, { passive: true });
-  
   document.addEventListener("touchcancel", () => {
     state.isUserTouching = false;
   }, { passive: true });
-
   window.addEventListener("scroll", (e) => {
     if (state.isUserTouching) {
       const box = document.getElementById("suggestionBox");
@@ -319,7 +340,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.scrollTo(0, 0);
     }
   }, true);
-
   document.addEventListener("click", (e) => {
     const box = document.getElementById("suggestionBox");
     if (box && box.style.display !== "none") {
@@ -340,7 +360,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }, 150);
   });
-
   // Settings
   state.currentSettings = await getSettings();
   document.getElementById("autoThemeToggle").checked = state.currentSettings.autoTheme;
@@ -350,16 +369,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     applyTheme(mediaQuery.matches);
     mediaQuery.addEventListener("change", systemThemeListener);
   }
-
   // Theme toggles
   document.getElementById("btnThemeToggleMobile").onclick = handleManualThemeToggle;
   document.getElementById("btnThemeToggleDesktop").onclick = handleManualThemeToggle;
-
   // Navigation
   document.querySelectorAll(".mx-nav-item, .mx-btm-item").forEach((btn) => {
     btn.onclick = () => switchSection(btn.dataset.section);
   });
-
   // App filter
   document.querySelectorAll("#appFilterGroup button").forEach((btn) => {
     btn.onclick = () => {
@@ -369,10 +385,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderAppList();
     };
   });
-
   // App search
   document.getElementById("appSearch")?.addEventListener("input", debounce(renderAppList, 250));
-
   // IO
   const ioContainer = document.getElementById("ioLogContainer");
   const ioSearch = document.getElementById("ioSearch");
@@ -393,7 +407,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   document.getElementById("btnClearIo").onclick = clearIoLogs;
-
   // Log
   const logSelect = document.getElementById("logSourceSelect");
   const logLevelSelect = document.getElementById("logLevelSelect");
@@ -421,11 +434,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   document.getElementById("btnClearLog").onclick = clearSysLogs;
-
   // Status toggle
   document.getElementById("btnToggleStatusMobile").onclick = toggleStatus;
   document.getElementById("btnToggleStatusDesktop").onclick = toggleStatus;
-
   // Settings modal
   const openSettings = async () => {
     const isInstalled = await checkPluginInstalled();
@@ -434,7 +445,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       lbl.textContent = isInstalled ? "状态: 发现清理插件 (已就绪)" : "状态: 未发现清理插件";
       lbl.style.color = isInstalled ? "var(--mx-green)" : "var(--mx-red)";
     }
-    // 模态框显隐直接处理 Class 类，绝不调用会导致全局抖动的 ViewTransition
     document.getElementById("settingsModal")?.classList.add("open");
   };
   document.getElementById("btnSettingsMobile").onclick = openSettings;
@@ -451,7 +461,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("settingsModal")?.classList.remove("open");
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
-
   // Ignore modal
   document.getElementById("btnMonitorIgnore").onclick = async () => {
     const content = await run(`cat ${CONST.MONITOR_IGNORE_CONF} 2>/dev/null`);
@@ -475,7 +484,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("保存失败");
     }
   };
-
   // Mode toggles
   setupModeToggle(
     "globalModeToggle",
@@ -505,19 +513,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     parseIgnoreToVisual,
     generateIgnoreFromVisual
   );
-
   // Global rules
   setupGlobalHandlers();
   document.getElementById("btnAppAddRule").onclick = () =>
     addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
-
-  // App config modal (冻结主界面轮询与交互)
+  // App config modal
   document.getElementById("btnCloseAppModal").onclick = () => {
     document.getElementById("appConfigModal")?.classList.remove("open");
     document.querySelector(".mx-app").classList.remove("frozen");
-    startPolling(); // 恢复轮询
+    startPolling();
   };
-
   document.getElementById("btnSaveAppConfig").onclick = async () => {
     try {
       const isVisual = document
@@ -530,7 +535,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       const exactKey = `${state.currentBindingPkg}:${state.currentBindingUser}`;
       if (!isEnabled) state.injectorStates.set(exactKey, "OFF");
       else state.injectorStates.set(exactKey, "ON");
-      
       const dir =
         state.currentBindingUser === 0
           ? `${CONST.BASE_DIR}/App-rules`
@@ -546,17 +550,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       await flushInjectorConf();
       showToast("配置已保存");
-      
       document.getElementById("appConfigModal")?.classList.remove("open");
       document.querySelector(".mx-app").classList.remove("frozen");
-      startPolling(); // 重置并拉起轮询
+      startPolling();
       await loadData();
       await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     } catch {
       showToast("保存失败");
     }
   };
-
   document.getElementById("btnDeleteAppConfig").onclick = async () => {
     if (!confirm("确定清除配置吗?")) return;
     const dir =
@@ -566,7 +568,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await run(`rm -f ${dir}/${state.currentBindingPkg}.conf ${dir}/${state.currentBindingPkg}.conf.disabled`);
     state.injectorStates.delete(`${state.currentBindingPkg}:${state.currentBindingUser}`);
     await flushInjectorConf();
-    
     document.getElementById("appConfigModal")?.classList.remove("open");
     document.querySelector(".mx-app").classList.remove("frozen");
     startPolling();
@@ -574,20 +575,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     showToast("配置已清除");
   };
-
-  // 挂载拦截，让应用打开配置详情时停止轮询，并给主界面锁定 frozen 标记
   const originalOpenAppConfig = window.openAppConfig;
   window.openAppConfig = (pkg) => {
-    stopPolling(); // 挂载详情时立刻静默轮询
+    stopPolling();
     document.querySelector(".mx-app").classList.add("frozen");
     originalOpenAppConfig(pkg);
   };
-
   initIoLogs();
   initSysLogs();
   loadData();
-  startPolling(); // 初始常态轮询启动
-  
+  startPolling();
   document.querySelectorAll(".mx-btn-close").forEach((btn) => (btn.innerHTML = ICONS.CLOSE));
   requestAnimationFrame(() => {
     document.body.classList.add("loaded");

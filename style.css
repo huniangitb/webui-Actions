@@ -38,6 +38,11 @@
     --mx-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+/* 网页背景覆盖到 HTML，确保完全融于系统状态栏 */
+html {
+    background-color: var(--mx-bg);
+    transition: background-color 0.3s var(--mx-ease);
+}
 body {
     margin: 0; padding: 0;
     font-family: var(--mx-font-sans);
@@ -102,10 +107,21 @@ body.loaded {
     transform: translateZ(0);
     transition: transform 0.25s var(--mx-ease), opacity 0.2s var(--mx-ease);
 }
-/* 限制：只有在非模态框打开（未激活 .modal-open）的状态下，底部导航栏才跟随键盘高度平移 */
+/* 主页面导航栏跟随虚拟键盘，仅在非应用配置（非 .modal-open）页面生效 */
 body.keyboard-open:not(.modal-open) .mx-bottom-nav {
     transform: translateY(calc(-1 * var(--keyboard-h, 0px)));
     transition: none !important;
+}
+/* 应用配置页面下，强行隔离与锁定底部导航栏，使其完全固定在最底部不发生任何位移 */
+body.modal-open .mx-bottom-nav {
+    transform: none !important;
+    transition: none !important;
+    position: fixed !important;
+    bottom: 0 !important;
+}
+body.modal-open .mx-app {
+    height: 100dvh !important;
+    overflow: hidden !important;
 }
 .mx-bottom-nav-items { display: flex; list-style: none; margin: 0; padding: 0; height: 56px; }
 .mx-btm-item {
@@ -379,7 +395,7 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto.editor-scroll {
     flex-shrink: 0;
     transition: height 0.2s var(--mx-ease);
 }
-/* 当检测到软键盘升起时，注入一个充足的空白高度占位，确保最后一项配置能够安全滚到键盘上方 */
+/* 当检测到软键盘升起时，注入一个非常充裕的空白高度占位，确保最后一项配置能够安全滚动到视口最上方 */
 body.keyboard-open .editor-scroll::after {
     height: 320px !important;
 }

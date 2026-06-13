@@ -149,10 +149,18 @@ export const centerActiveInput = (input) => {
   const container = input.closest(".overflow-y-auto");
   const row = input.closest(".rule-row") || input;
   if (!container || !row) return;
-  // 确保输入框平滑滚动到滚动容器顶部附近（留出 40px 的缓冲空隙），彻底避免被底部软键盘遮挡
-  const elementRelativeTop = row.offsetTop;
+
+  // 使用 getBoundingClientRect 计算输入框行元素相对于滚动容器可见视口的精确物理偏移，
+  // 结合当前滚动高度计算得出绝对 scrollTop，完全排除 offsetParent 带来的累积高度偏差。
+  const containerRect = container.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
+  
+  // 定位于视口顶部下方 24px，给予编辑状态下最充裕的可见上下文
+  const targetScroll = Math.max(0, relativeTop - 24);
+  
   container.scrollTo({
-    top: Math.max(0, elementRelativeTop - 40),
+    top: targetScroll,
     behavior: "smooth"
   });
 };
@@ -263,11 +271,15 @@ const setupAutocomplete = (input) => {
   });
   input.addEventListener("focus", () => {
     window._currentInput = input;
-    setTimeout(() => {
-      if (document.activeElement === input) {
-        centerActiveInput(input);
-      }
-    }, 120);
+    // 采用阶梯梯度延时对焦，保证在键盘升起和视口尺寸收缩的整个动画周期（50ms, 150ms, 350ms, 500ms）内进行高频对焦修正，
+    // 确保任何配置（特别是底部最后几个配置）在收缩完毕后依然完美对齐到最上方。
+    [50, 150, 350, 500].forEach((delay) => {
+      setTimeout(() => {
+        if (document.activeElement === input) {
+          centerActiveInput(input);
+        }
+      }, delay);
+    });
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));

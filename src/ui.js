@@ -166,18 +166,16 @@ export const updateSuggestionBoxPosition = (input) => {
   }
 };
 // =============================================
-// 【核心新增：高阶视口居中引擎】
-// 精准计算键盘上缘的可视物理空间，使目标输入框在键盘上方完美居中
+// 【高阶视口居中引擎】
+// 精准计算键盘上缘的可视物理空间，使目标输入框在键盘上方平滑居中
 // =============================================
 export const centerActiveInput = (input) => {
   const container = input.closest(".overflow-y-auto");
   const row = input.closest(".rule-row") || input;
   if (!container || !row) return;
-
   const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
   const containerRect = container.getBoundingClientRect();
   const rowRect = row.getBoundingClientRect();
-
   // 1. 动态测算键盘上缘以上的容器有效可视高度
   const visibleHeight = vh - containerRect.top;
   // 2. 测算可视区域的纵向几何中线
@@ -185,11 +183,9 @@ export const centerActiveInput = (input) => {
   // 3. 计算输入行相对滚动视口顶缘的绝对投影偏移
   const currentRelativeTop = rowRect.top - containerRect.top;
   const offset = currentRelativeTop - visibleCenter + (rowRect.height / 2);
-
   // 4. 临时将平滑过渡禁用，使像素定位在单帧中无迟滞完成，完美规避动画冲突
   container.style.scrollBehavior = "auto";
   container.scrollTop += offset;
-  
   window.requestAnimationFrame(() => {
     container.style.scrollBehavior = "";
   });
@@ -285,20 +281,21 @@ const setupAutocomplete = (input) => {
     window._currentInput = input;
     const container = input.closest(".overflow-y-auto");
     if (container) {
-      // 开启富余缓冲跑道
-      container.style.paddingBottom = "280px";
+      // 开启超长冗余滚动跑道，确保最后一个输入框在虚拟键盘滑起时，也可以被无阻碍往上推拉并处于可视区中央
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      container.style.paddingBottom = `${Math.max(450, vh * 0.9)}px`;
     }
-    // 延迟 50ms 等待系统软键盘滑起，随后执行精准视口居中
+    // 延迟 120ms，待多数平台软键盘完整展开、布局高度稳定完毕后，执行像素级精准居中
     setTimeout(() => {
       if (document.activeElement === input) {
         centerActiveInput(input);
       }
-    }, 50);
+    }, 120);
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));
       }
-    }, 80);
+    }, 150);
   });
   input.addEventListener("blur", () => {
     setTimeout(() => {

@@ -221,22 +221,7 @@ body.loaded {
 .mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1); opacity: 1; }
 body.keyboard-open .mx-modal {
-    transition: opacity 0.25s var(--mx-ease), transform 0s !important;
-}
-/* 当键盘升起时，强制限制模态框的最大高度为键盘上方可视区物理高度，避免模态框底部被遮挡剪裁，保证最后几个输入框聚焦时可以自动滚动并接受键盘方向键操作 */
-body.keyboard-open .mx-modal {
-    max-height: calc(var(--keyboard-vh, 100vh) - 16px) !important;
-    height: auto !important;
-}
-body.keyboard-open .mx-modal.large {
-    height: calc(var(--keyboard-vh, 100vh) - 16px) !important;
-    max-height: calc(var(--keyboard-vh, 100vh) - 16px) !important;
-}
-/* 键盘激活时强制使外层弹性遮罩变为靠顶对齐，配合高度自适应，使整个模态框在可视物理空间中完全处于键盘上方 */
-body.keyboard-open .mx-modal-overlay {
-    align-items: flex-start !important;
-    justify-content: center !important;
-    padding-top: calc(env(safe-area-inset-top, 0px) + 8px) !important;
+    transition: opacity 0.25s var(--mx-ease), transform 0.3s ease-out !important;
 }
 .mx-modal-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mx-border); flex-shrink: 0;}
 .mx-modal-title { font-size: 18px; font-weight: 700; margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }

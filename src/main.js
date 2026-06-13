@@ -158,14 +158,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isKeyboardOpen = vh < totalH - 80;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
       
-      // 动态向页面根元素写入当前虚拟键盘上方的真实可视区域高度变量
-      document.documentElement.style.setProperty('--keyboard-vh', `${vh}px`);
-
-      import("./ui.js").then(({ updateModalShift, updateSuggestionBoxPosition, centerActiveInput }) => {
+      import("./ui.js").then(({ updateModalShift, updateSuggestionBoxPosition }) => {
         updateModalShift();
         if (window._currentInput && document.activeElement === window._currentInput) {
-          // 【核心解决：视口变动同步居中】键盘伸缩过程中，实时锁定输入框物理高度，使其一直稳固居中在剩余视口中
-          centerActiveInput(window._currentInput);
+          // 仅同步自动完成提示框的动态相对定位，彻底将 scrollTop 滚动逻辑交还给原生的 smooth transition，解除抖动
           updateSuggestionBoxPosition(window._currentInput);
         }
       });

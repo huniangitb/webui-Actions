@@ -116,12 +116,6 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
 export const updateModalShift = () => {
   const modal = document.querySelector(".mx-modal-overlay.open .mx-modal");
   if (!modal) return;
-  
-  // 当虚拟键盘处于打开状态时，取消 transform 位移偏移，让真实的 CSS 视口置顶高度约束生效
-  if (document.body.classList.contains("keyboard-open")) {
-    modal.style.transform = "scale(1) translate3d(0, 0, 0)";
-    return;
-  }
   const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
   const totalH = window.innerHeight;
   if (vh >= totalH - 60) {
@@ -136,6 +130,7 @@ export const updateModalShift = () => {
   const naturalBottom = naturalTop + state.cachedModalHeight;
   const overlap = naturalBottom - vh + 16;
   if (overlap > 0) {
+    // 采用性能极佳的 3D GPU 加速偏移上推遮罩，绝不触碰和修改 DOM 的物理高度，防止发生重排断档
     modal.style.transform = `scale(1) translate3d(0, -${overlap}px, 0)`;
   } else {
     modal.style.transform = "scale(1) translate3d(0, 0, 0)";
@@ -172,29 +167,29 @@ export const updateSuggestionBoxPosition = (input) => {
   }
 };
 // =============================================
-// 【高阶视口居中引擎】
-// 精准计算键盘上缘的可视物理空间，使目标输入框在键盘上方平滑居中
+// 【高阶流畅对齐引擎】
+// 运用浏览器原生 Compositor 线程平滑滚动，使目标输入框平稳过渡定位在屏幕键盘上方的最佳视线区内
 // =============================================
 export const centerActiveInput = (input) => {
   const container = input.closest(".overflow-y-auto");
   const row = input.closest(".rule-row") || input;
   if (!container || !row) return;
-  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
   const containerRect = container.getBoundingClientRect();
   const rowRect = row.getBoundingClientRect();
-  // 1. 动态测算键盘上缘以上的容器有效可视高度
-  const visibleHeight = vh - containerRect.top;
-  // 2. 测算可视区域的纵向几何中线
-  const visibleCenter = visibleHeight / 2;
-  // 3. 计算输入行相对滚动视口顶缘的绝对投影偏移
-  const currentRelativeTop = rowRect.top - containerRect.top;
-  const offset = currentRelativeTop - visibleCenter + (rowRect.height / 2);
-  // 4. 临时将平滑过渡禁用，让滚动操作直接应用在配置容器的 scrollTop 上，极速精确定位
-  container.style.scrollBehavior = "auto";
-  container.scrollTop += offset;
-  window.requestAnimationFrame(() => {
-    container.style.scrollBehavior = "";
-  });
+  
+  // 将输入行对齐到配置容器中线偏上 35% 的黄金可视高度，完全避开下方键盘，绝不发生画面颤抖
+  const targetY = containerRect.top + (containerRect.height * 0.35);
+  const diff = rowRect.top - targetY;
+  
+  // 采用浏览器原生高性能 smooth compositor 机制滚动
+  container.style.scrollBehavior = "smooth";
+  container.scrollTop += diff;
+  
+  // 过渡完毕后重置滚动行为设定
+  setTimeout(() => {
+    if (container) container.style.scrollBehavior = "";
+  }, 300);
 };
 // =============================================
 // Autocomplete
@@ -287,16 +282,21 @@ const setupAutocomplete = (input) => {
     window._currentInput = input;
     const container = input.closest(".overflow-y-auto");
     if (container) {
-      // 开启超长冗余滚动跑道，确保最后一个输入框在虚拟键盘滑起时，也可以被无阻碍往上推拉并处于可视区中央
-      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-      container.style.paddingBottom = `${Math.max(450, vh * 0.9)}px`;
+      // 开启超长冗余滚动跑道，确保最后一个输入框聚焦时，也可以无打断地完成平滑的滚动居中操作
+      container.style.paddingBottom = "380px";
     }
-    // 延迟 120ms，待多数平台软键盘完整展开、布局高度稳定完毕后，执行像素级精准居中
+    // 延迟 100ms 进行单次流畅居中过渡，绝对不介入系统的 resize 事件监听循环，彻底解决动画抖动和打断
     setTimeout(() => {
       if (document.activeElement === input) {
         centerActiveInput(input);
       }
-    }, 120);
+    }, 100);
+    // 在键盘完全伸展完毕后（约 300ms），进行一次安静微调对准，以防发生浏览器本身的滚动抢夺
+    setTimeout(() => {
+      if (document.activeElement === input) {
+        centerActiveInput(input);
+      }
+    }, 320);
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));
@@ -306,7 +306,6 @@ const setupAutocomplete = (input) => {
   input.addEventListener("blur", () => {
     setTimeout(() => {
       const activeEl = document.activeElement;
-      // 关键防御：如果失焦后，新获得焦点的活动元素依然是一个 mx-input，决不能提前清理缓冲高度，避免高度复位导致回弹遮挡
       if (!activeEl || !activeEl.classList.contains("mx-input")) {
         box.style.display = "none";
         state.currentSuggestions = [];
@@ -316,6 +315,6 @@ const setupAutocomplete = (input) => {
           container.style.scrollBehavior = "";
         }
       }
-    }, 150); // 150ms 延迟可确保新输入框的 focus 阶段已被完全处理，能准确捕获 activeElement 状态
+    }, 150);
   });
 };

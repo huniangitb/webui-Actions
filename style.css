@@ -214,21 +214,13 @@ body.loaded {
     flex-direction: column; 
     overflow: hidden; 
     transform: translateZ(0); 
-    container-type: inline-size; /* 声明为 inline-size 容器 */
+    container-type: inline-size;
 }
 
 /* =============================================
-   CSS Container Queries (容器查询自适应重排)
+   CSS Container Queries (只针对卡片与局部宽度重排布局，坚决不触碰 .rule-row)
    ============================================= */
 @container (max-width: 440px) {
-    .rule-row {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 12px;
-    }
-    .rule-type {
-        width: 100% !important;
-    }
     .grid-2 {
         grid-template-columns: 1fr;
     }
@@ -297,14 +289,12 @@ body.loaded {
     transform: scale(0.95); 
     opacity: 0; 
     transition: opacity 0.25s var(--mx-ease), transform 0.25s var(--mx-ease);
-    will-change: transform, opacity; /* GPU 硬件加速 */
+    will-change: transform, opacity;
 }
 .mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1); opacity: 1; }
 
-/* =============================================
-   移动端键盘打开时的刚性布局自适应 (dvh 结合物理隐藏底栏)
-   ============================================= */
+/* 移动端键盘打开时的刚性布局自适应 (dvh 结合物理隐藏底栏) */
 body.keyboard-open .mx-modal {
     max-height: 90% !important;
 }
@@ -336,7 +326,7 @@ body.keyboard-open .mx-desktop-main {
     backface-visibility: hidden;
     opacity: 0; transform: scale(0.94) translateY(12px);
     transition: opacity 0.35s var(--mx-ease), transform 0.6s var(--mx-spring), background 0.2s;
-    will-change: transform, opacity; /* 声明硬件加速 */
+    will-change: transform, opacity;
 }
 .app-item.show {
     opacity: 1; transform: scale(1) translateY(0);
@@ -355,11 +345,44 @@ body.keyboard-open .mx-desktop-main {
 .app-name { font-size: 15px; font-weight: 600; color: var(--mx-t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;}
 .app-pkg { font-size: 11px; color: var(--mx-t2); font-family: var(--mx-font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; max-width: 120px; }
-.rule-row { display: flex; gap: 8px; align-items: center; padding: 8px; background: var(--mx-s3); border: 1px solid var(--mx-border); border-radius: 8px; margin-bottom: 8px; flex-shrink: 0;}
-.rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+
+/* =============================================
+   专为规则编辑设计的刚性单行弹性布局
+   第一列：选择下拉(90px) ； 第二列：输入区(并排平分) ； 第三列：删除(32px)
+   ============================================= */
+.rule-row { 
+    display: flex; 
+    flex-direction: row; 
+    align-items: center; 
+    gap: 8px; 
+    padding: 8px; 
+    background: var(--mx-s3); 
+    border: 1px solid var(--mx-border); 
+    border-radius: 8px; 
+    margin-bottom: 8px; 
+    flex-shrink: 0;
+    width: 100%;
+}
+.rule-type {
+    width: 90px !important;
+    flex-shrink: 0;
+}
+.rule-inputs { 
+    flex: 1; 
+    display: flex; 
+    flex-direction: row; /* 强制输入框在横向同一行并排 */
+    gap: 6px; 
+    min-width: 0;
+}
 .mx-input-wrapper {
     position: relative;
-    width: 100%;
+    flex: 1; /* 自动撑满或各平分一半宽度 */
+    min-width: 0;
+}
+.btn-del {
+    width: 32px !important;
+    height: 32px !important;
+    flex-shrink: 0;
 }
 
 /* =============================================
@@ -452,7 +475,7 @@ body.keyboard-open .mx-desktop-main {
     border: 1px solid var(--mx-border); 
     box-shadow: var(--mx-shadow); 
     pointer-events: auto;
-    will-change: transform, opacity; /* 声明硬件加速 */
+    will-change: transform, opacity;
 }
 .io-time svg { display: flex; align-items: center; flex-shrink: 0; color: var(--mx-t2); }
 .suggestion-box { 
@@ -478,19 +501,19 @@ body.keyboard-open .mx-desktop-main {
 @keyframes cardIn { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
 /* =============================================
-   View Transitions API 原生过渡动效定义
+   View Transitions API (限制在页面级，精简掉 slide 平移动画，彻底打消页面拉扯抖动)
    ============================================= */
 ::view-transition-old(root) {
-    animation: 100ms cubic-bezier(0.4, 0, 1, 1) both fade-out;
+    animation: 80ms ease-out both fade-out;
 }
 ::view-transition-new(root) {
-    animation: 220ms cubic-bezier(0, 0, 0.2, 1) both slide-in;
+    animation: 120ms ease-in both fade-in;
 }
 @keyframes fade-out {
     from { opacity: 1; }
     to { opacity: 0; }
 }
-@keyframes slide-in {
-    from { transform: translateY(16px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }

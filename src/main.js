@@ -52,8 +52,6 @@ const initOffscreenCanvas = () => {
   
   try {
     const offscreen = canvas.transferControlToOffscreen();
-    
-    // 利用 Blob 动态构建原生独立 Worker 线程，彻底不拖累主线程
     const workerCode = `
       let width = 0, height = 0, ctx = null, offset = 0;
       self.onmessage = function(e) {
@@ -73,7 +71,6 @@ const initOffscreenCanvas = () => {
         if (!ctx) return;
         ctx.clearRect(0, 0, width, height);
         
-        // 绘制高阶科技感动态流光波形背景
         ctx.strokeStyle = "rgba(39, 122, 247, 0.22)";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -92,7 +89,6 @@ const initOffscreenCanvas = () => {
     const worker = new Worker(URL.createObjectURL(blob));
     worker.postMessage({ canvas: offscreen }, [offscreen]);
     
-    // 自适应监听
     const resizeObserver = new ResizeObserver((entries) => {
       for (let entry of entries) {
         const { width, height } = entry.contentRect;
@@ -217,7 +213,7 @@ const addIgnoreRow = (p) => {
 };
 
 // =============================================
-// Navigation
+// Navigation (只在真正的页面级 Section 切换时采用 ViewTransition)
 // =============================================
 const switchSection = (sectionId) => {
   const triggerSwitch = () => {
@@ -240,7 +236,6 @@ const switchSection = (sectionId) => {
     }
   };
 
-  // 引入原生 View Transitions API 驱动
   if (document.startViewTransition) {
     document.startViewTransition(() => triggerSwitch());
   } else {
@@ -439,14 +434,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       lbl.textContent = isInstalled ? "状态: 发现清理插件 (已就绪)" : "状态: 未发现清理插件";
       lbl.style.color = isInstalled ? "var(--mx-green)" : "var(--mx-red)";
     }
-    
-    if (document.startViewTransition) {
-      document.startViewTransition(() => {
-        document.getElementById("settingsModal")?.classList.add("open");
-      });
-    } else {
-      document.getElementById("settingsModal")?.classList.add("open");
-    }
+    // 模态框显隐直接处理 Class 类，绝不调用会导致全局抖动的 ViewTransition
+    document.getElementById("settingsModal")?.classList.add("open");
   };
   document.getElementById("btnSettingsMobile").onclick = openSettings;
   document.getElementById("btnSettingsDesktop").onclick = openSettings;
@@ -459,15 +448,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       applyTheme(mediaQuery.matches);
     }
     showToast("设置已保存");
-    
-    const closeSettings = () => {
-      document.getElementById("settingsModal")?.classList.remove("open");
-    };
-    if (document.startViewTransition) {
-      document.startViewTransition(() => closeSettings());
-    } else {
-      closeSettings();
-    }
+    document.getElementById("settingsModal")?.classList.remove("open");
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
 
@@ -476,14 +457,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const content = await run(`cat ${CONST.MONITOR_IGNORE_CONF} 2>/dev/null`);
     document.getElementById("monitorIgnoreContent").value = content;
     parseIgnoreToVisual(content);
-    
-    if (document.startViewTransition) {
-      document.startViewTransition(() => {
-        document.getElementById("monitorIgnoreModal")?.classList.add("open");
-      });
-    } else {
-      document.getElementById("monitorIgnoreModal")?.classList.add("open");
-    }
+    document.getElementById("monitorIgnoreModal")?.classList.add("open");
   };
   document.getElementById("btnAddIgnoreRow").onclick = () => addIgnoreRow("");
   document.getElementById("btnSaveIgnore").onclick = async () => {
@@ -496,15 +470,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         : document.getElementById("monitorIgnoreContent").value;
       await run(`echo '${content.trim()}' > ${CONST.MONITOR_IGNORE_CONF}`);
       showToast("过滤配置已保存");
-      
-      const closeIgnore = () => {
-        document.getElementById("monitorIgnoreModal")?.classList.remove("open");
-      };
-      if (document.startViewTransition) {
-        document.startViewTransition(() => closeIgnore());
-      } else {
-        closeIgnore();
-      }
+      document.getElementById("monitorIgnoreModal")?.classList.remove("open");
     } catch {
       showToast("保存失败");
     }
@@ -547,15 +513,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // App config modal (冻结主界面轮询与交互)
   document.getElementById("btnCloseAppModal").onclick = () => {
-    const closeModal = () => {
-      document.getElementById("appConfigModal")?.classList.remove("open");
-      document.querySelector(".mx-app").classList.remove("frozen");
-    };
-    if (document.startViewTransition) {
-      document.startViewTransition(() => closeModal());
-    } else {
-      closeModal();
-    }
+    document.getElementById("appConfigModal")?.classList.remove("open");
+    document.querySelector(".mx-app").classList.remove("frozen");
     startPolling(); // 恢复轮询
   };
 
@@ -588,15 +547,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       await flushInjectorConf();
       showToast("配置已保存");
       
-      const closeModal = () => {
-        document.getElementById("appConfigModal")?.classList.remove("open");
-        document.querySelector(".mx-app").classList.remove("frozen");
-      };
-      if (document.startViewTransition) {
-        document.startViewTransition(() => closeModal());
-      } else {
-        closeModal();
-      }
+      document.getElementById("appConfigModal")?.classList.remove("open");
+      document.querySelector(".mx-app").classList.remove("frozen");
       startPolling(); // 重置并拉起轮询
       await loadData();
       await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
@@ -615,15 +567,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.injectorStates.delete(`${state.currentBindingPkg}:${state.currentBindingUser}`);
     await flushInjectorConf();
     
-    const closeModal = () => {
-      document.getElementById("appConfigModal")?.classList.remove("open");
-      document.querySelector(".mx-app").classList.remove("frozen");
-    };
-    if (document.startViewTransition) {
-      document.startViewTransition(() => closeModal());
-    } else {
-      closeModal();
-    }
+    document.getElementById("appConfigModal")?.classList.remove("open");
+    document.querySelector(".mx-app").classList.remove("frozen");
     startPolling();
     await loadData();
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
@@ -634,17 +579,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const originalOpenAppConfig = window.openAppConfig;
   window.openAppConfig = (pkg) => {
     stopPolling(); // 挂载详情时立刻静默轮询
-    
-    const triggerOpen = () => {
-      document.querySelector(".mx-app").classList.add("frozen");
-      originalOpenAppConfig(pkg);
-    };
-
-    if (document.startViewTransition) {
-      document.startViewTransition(() => triggerOpen());
-    } else {
-      triggerOpen();
-    }
+    document.querySelector(".mx-app").classList.add("frozen");
+    originalOpenAppConfig(pkg);
   };
 
   initIoLogs();

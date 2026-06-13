@@ -4,7 +4,7 @@ import { exec } from "kernelsu";
 import { prepare, layout } from "@chenglou/pretext";
 
 // =============================================
-// Rule row builder
+// Rule row builder (强制单行并列结构)
 // =============================================
 export const addRuleRow = (type, target, source, containerId) => {
   const container = document.getElementById(containerId);
@@ -96,7 +96,7 @@ export const generateConfigTextFromVisual = (containerId, monitorSelectId, sandb
 };
 
 // =============================================
-// Mode toggle helper
+// Mode toggle helper (精简剥离 ViewTransition 杜绝局部切换时的全局抖动)
 // =============================================
 export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc, genFunc) => {
   document.querySelectorAll(`button[name="${groupName}"]`).forEach((btn) => {
@@ -104,23 +104,15 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
       document.querySelectorAll(`button[name="${groupName}"]`).forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       
-      const applyToggle = () => {
-        if (btn.dataset.mode === "visual") {
-          parseFunc(document.getElementById(contentId).value);
-          document.getElementById(rawId).classList.remove("active");
-          document.getElementById(visualId).classList.add("active");
-        } else {
-          document.getElementById(contentId).value = genFunc();
-          document.getElementById(visualId).classList.remove("active");
-          document.getElementById(rawId).classList.add("active");
-        }
-      };
-
-      // 引入原生 View Transitions 渲染过渡
-      if (document.startViewTransition) {
-        document.startViewTransition(() => applyToggle());
+      // 局部图形/源码切换属于高频轻量交互，直接操作 DOM Class，坚决不启用任何 ViewTransition 过渡
+      if (btn.dataset.mode === "visual") {
+        parseFunc(document.getElementById(contentId).value);
+        document.getElementById(rawId).classList.remove("active");
+        document.getElementById(visualId).classList.add("active");
       } else {
-        applyToggle();
+        document.getElementById(contentId).value = genFunc();
+        document.getElementById(visualId).classList.remove("active");
+        document.getElementById(rawId).classList.add("active");
       }
     };
   });

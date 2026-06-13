@@ -28,10 +28,12 @@ import {
 } from "./logs.js";
 import { getSettings, saveSettings, checkPluginInstalled } from "./plugin.js";
 import { syncToPlugin } from "./plugin.js";
+
 // =============================================
 // CSS
 // =============================================
 import "../style.css";
+
 // =============================================
 // Lock Layout Viewport Height
 // =============================================
@@ -40,11 +42,35 @@ const lockInitialHeight = () => {
   document.documentElement.style.setProperty('--initial-vh', `${initialH}px`);
 };
 lockInitialHeight();
+
 // =============================================
-// Status polling
+// Status Polling Manager (极佳能效设计)
 // =============================================
 let statusPolling = null;
 let appStatusPolling = null;
+
+export const startPolling = () => {
+  if (!statusPolling) {
+    checkStatus();
+    statusPolling = setInterval(checkStatus, 1500);
+  }
+  if (!appStatusPolling) {
+    refreshAppStatus();
+    appStatusPolling = setInterval(refreshAppStatus, 2000);
+  }
+};
+
+export const stopPolling = () => {
+  if (statusPolling) {
+    clearInterval(statusPolling);
+    statusPolling = null;
+  }
+  if (appStatusPolling) {
+    clearInterval(appStatusPolling);
+    appStatusPolling = null;
+  }
+};
+
 const checkStatus = async () => {
   try {
     let pid = (await run("pidof injector")) || (await run("pgrep -x injector"));
@@ -68,6 +94,7 @@ const checkStatus = async () => {
     if (info) info.textContent = state.currentPid ? `PID ${state.currentPid}` : "OFFLINE";
   } catch {}
 };
+
 const toggleStatus = async () => {
   if (state.currentPid) {
     await run(`kill -15 ${state.currentPid}`);
@@ -79,6 +106,7 @@ const toggleStatus = async () => {
   }
   setTimeout(checkStatus, 500);
 };
+
 const refreshAppStatus = async () => {
   try {
     const [mounts] = await Promise.all([fetchActiveMounts(), fetchInjectedApps()]);
@@ -88,6 +116,7 @@ const refreshAppStatus = async () => {
     }
   } catch {}
 };
+
 // =============================================
 // Ignore config helpers
 // =============================================
@@ -102,6 +131,7 @@ const parseIgnoreToVisual = (t) => {
     });
   if (c.children.length === 0) addIgnoreRow("");
 };
+
 const generateIgnoreFromVisual = () => {
   let r = "";
   document.querySelectorAll("#ignoreBuilderContainer input").forEach((i) => {
@@ -110,6 +140,7 @@ const generateIgnoreFromVisual = () => {
   });
   return r.trim();
 };
+
 const addIgnoreRow = (p) => {
   const div = document.createElement("div");
   div.className = "rule-row flex-shrink-0";
@@ -120,6 +151,7 @@ const addIgnoreRow = (p) => {
   div.querySelector(".btn-del").onclick = () => div.remove();
   document.getElementById("ignoreBuilderContainer")?.appendChild(div);
 };
+
 // =============================================
 // Navigation
 // =============================================
@@ -142,12 +174,14 @@ const switchSection = (sectionId) => {
     fetchSysLogs();
   }
 };
+
 // =============================================
 // DOMContentLoaded
 // =============================================
 document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
   let isFrameBlocked = false;
+  
   const updateViewportHeight = () => {
     if (isFrameBlocked) return;
     isFrameBlocked = true;
@@ -160,34 +194,47 @@ document.addEventListener("DOMContentLoaded", async () => {
       
       import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
         if (window._currentInput && document.activeElement === window._currentInput) {
-          // 采用防抖重新对齐算法。当键盘滑动时、或用户在九键/全键盘/表情等各种键盘布局间高频切换时，避免重绘重排抢夺，直到布局完全静止后再平滑微调对准
           debouncedCenterActive(window._currentInput);
           updateSuggestionBoxPosition(window._currentInput);
         }
       });
     });
   };
+
   if (window.visualViewport) {
     window.visualViewport.addEventListener("resize", updateViewportHeight);
     window.visualViewport.addEventListener("scroll", updateViewportHeight);
   }
   window.addEventListener("resize", updateViewportHeight);
   updateViewportHeight();
+
+  // 引入全局触控感知逻辑
+  document.addEventListener("touchstart", () => {
+    state.isUserTouching = true;
+  }, { passive: true });
   
-  // 阻止 Android WebView 原生在焦点选中时对 window / body 进行不当滚动移位（防止固定遮罩层被推上去产生白底空隙）
+  document.addEventListener("touchend", () => {
+    state.isUserTouching = false;
+  }, { passive: true });
+  
+  document.addEventListener("touchcancel", () => {
+    state.isUserTouching = false;
+  }, { passive: true });
+
   window.addEventListener("scroll", (e) => {
+    // 仅在用户物理触控滑动时，收起自动补全
+    if (state.isUserTouching) {
+      const box = document.getElementById("suggestionBox");
+      if (box && box.style.display !== "none") {
+        box.style.display = "none";
+        state.currentSuggestions = [];
+      }
+    }
     if (window.scrollY !== 0) {
       window.scrollTo(0, 0);
     }
-    
-    // 只要用户开始滚动任何页面容器（配置列表等），立刻主动收起隐藏自动补全建议框
-    const box = document.getElementById("suggestionBox");
-    if (box && box.style.display !== "none") {
-      box.style.display = "none";
-      state.currentSuggestions = [];
-    }
   }, true);
-  
+
   document.addEventListener("click", (e) => {
     const box = document.getElementById("suggestionBox");
     if (box && box.style.display !== "none") {
@@ -208,6 +255,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }, 150);
   });
+
   // Settings
   state.currentSettings = await getSettings();
   document.getElementById("autoThemeToggle").checked = state.currentSettings.autoTheme;
@@ -217,13 +265,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     applyTheme(mediaQuery.matches);
     mediaQuery.addEventListener("change", systemThemeListener);
   }
+
   // Theme toggles
   document.getElementById("btnThemeToggleMobile").onclick = handleManualThemeToggle;
   document.getElementById("btnThemeToggleDesktop").onclick = handleManualThemeToggle;
+
   // Navigation
   document.querySelectorAll(".mx-nav-item, .mx-btm-item").forEach((btn) => {
     btn.onclick = () => switchSection(btn.dataset.section);
   });
+
   // App filter
   document.querySelectorAll("#appFilterGroup button").forEach((btn) => {
     btn.onclick = () => {
@@ -233,8 +284,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderAppList();
     };
   });
+
   // App search
   document.getElementById("appSearch")?.addEventListener("input", debounce(renderAppList, 250));
+
   // IO
   const ioContainer = document.getElementById("ioLogContainer");
   const ioSearch = document.getElementById("ioSearch");
@@ -255,6 +308,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   document.getElementById("btnClearIo").onclick = clearIoLogs;
+
   // Log
   const logSelect = document.getElementById("logSourceSelect");
   const logLevelSelect = document.getElementById("logLevelSelect");
@@ -282,9 +336,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   document.getElementById("btnClearLog").onclick = clearSysLogs;
+
   // Status toggle
   document.getElementById("btnToggleStatusMobile").onclick = toggleStatus;
   document.getElementById("btnToggleStatusDesktop").onclick = toggleStatus;
+
   // Settings modal
   const openSettings = async () => {
     const isInstalled = await checkPluginInstalled();
@@ -309,6 +365,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("settingsModal")?.classList.remove("open");
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
+
   // Ignore modal
   document.getElementById("btnMonitorIgnore").onclick = async () => {
     const content = await run(`cat ${CONST.MONITOR_IGNORE_CONF} 2>/dev/null`);
@@ -327,11 +384,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         : document.getElementById("monitorIgnoreContent").value;
       await run(`echo '${content.trim()}' > ${CONST.MONITOR_IGNORE_CONF}`);
       showToast("过滤配置已保存");
-      document.getElementById("monitorIgnoreModal")?.classList.open && document.getElementById("monitorIgnoreModal").classList.remove("open");
+      document.getElementById("monitorIgnoreModal")?.classList.remove("open");
     } catch {
       showToast("保存失败");
     }
   };
+
   // Mode toggles
   setupModeToggle(
     "globalModeToggle",
@@ -361,13 +419,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     parseIgnoreToVisual,
     generateIgnoreFromVisual
   );
+
   // Global rules
   setupGlobalHandlers();
   document.getElementById("btnAppAddRule").onclick = () =>
     addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
-  // App config modal
-  document.getElementById("btnCloseAppModal").onclick = () =>
+
+  // App config modal (冻结主界面轮询与交互)
+  document.getElementById("btnCloseAppModal").onclick = () => {
     document.getElementById("appConfigModal")?.classList.remove("open");
+    document.querySelector(".mx-app").classList.remove("frozen");
+    startPolling(); // 恢复轮询
+  };
+
   document.getElementById("btnSaveAppConfig").onclick = async () => {
     try {
       const isVisual = document
@@ -380,6 +444,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const exactKey = `${state.currentBindingPkg}:${state.currentBindingUser}`;
       if (!isEnabled) state.injectorStates.set(exactKey, "OFF");
       else state.injectorStates.set(exactKey, "ON");
+      
       const dir =
         state.currentBindingUser === 0
           ? `${CONST.BASE_DIR}/App-rules`
@@ -395,13 +460,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       await flushInjectorConf();
       showToast("配置已保存");
+      
       document.getElementById("appConfigModal")?.classList.remove("open");
+      document.querySelector(".mx-app").classList.remove("frozen");
+      startPolling(); // 重置并拉起轮询
       await loadData();
       await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     } catch {
       showToast("保存失败");
     }
   };
+
   document.getElementById("btnDeleteAppConfig").onclick = async () => {
     if (!confirm("确定清除配置吗?")) return;
     const dir =
@@ -411,17 +480,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     await run(`rm -f ${dir}/${state.currentBindingPkg}.conf ${dir}/${state.currentBindingPkg}.conf.disabled`);
     state.injectorStates.delete(`${state.currentBindingPkg}:${state.currentBindingUser}`);
     await flushInjectorConf();
+    
+    document.getElementById("appConfigModal")?.classList.remove("open");
+    document.querySelector(".mx-app").classList.remove("frozen");
+    startPolling();
     await loadData();
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     showToast("配置已清除");
-    document.getElementById("appConfigModal")?.classList.remove("open");
   };
+
+  // 挂载拦截，让应用打开配置详情时停止轮询，并给主界面锁定 frozen 标记
+  const originalOpenAppConfig = window.openAppConfig;
+  window.openAppConfig = (pkg) => {
+    stopPolling(); // 挂载详情时立刻静默轮询
+    document.querySelector(".mx-app").classList.add("frozen");
+    originalOpenAppConfig(pkg);
+  };
+
   initIoLogs();
   initSysLogs();
   loadData();
-  checkStatus();
-  statusPolling = setInterval(checkStatus, 500);
-  appStatusPolling = setInterval(refreshAppStatus, 1000);
+  startPolling(); // 初始常态轮询启动
+  
   document.querySelectorAll(".mx-btn-close").forEach((btn) => (btn.innerHTML = ICONS.CLOSE));
   requestAnimationFrame(() => {
     document.body.classList.add("loaded");

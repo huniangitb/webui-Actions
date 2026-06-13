@@ -112,7 +112,7 @@
                     </div>
                     <div class="mx-card-body flex-col-full overflow-hidden p-0">
                         <div class="editor-pane active" id="globalVisual">
-                            <div class="p-4 flex-col gap-4 overflow-y-auto" style="height:100%">
+                            <div class="p-4 flex-col gap-4 overflow-y-auto editor-scroll" style="height:100%">
                                 <div class="mx-form-group flex-shrink-0">
                                     <label class="mx-label">全局应用注入</label>
                                     <select id="globalInjectSelect" class="mx-select">
@@ -242,7 +242,7 @@
             </div>
             <div class="mx-modal-body p-0 flex-col-full overflow-hidden">
                 <div class="editor-pane active" id="appVisual">
-                    <div class="p-4 flex-col gap-4 overflow-y-auto" style="height:100%">
+                    <div class="p-4 flex-col gap-4 overflow-y-auto editor-scroll" style="height:100%">
                         <label class="mx-switch-row mx-card flex-shrink-0" style="padding:12px; border:1px solid var(--mx-border); box-shadow:none; border-radius:12px; cursor:pointer;">
                             <div>
                                 <div style="font-weight:600; font-size:14px;">允许注入 (当前用户)</div>
@@ -308,7 +308,7 @@
             </div>
             <div class="mx-modal-body p-0 flex-col-full overflow-hidden">
                 <div class="editor-pane active" id="ignoreVisual">
-                    <div class="p-4 flex-col gap-4 overflow-y-auto">
+                    <div class="p-4 flex-col gap-4 overflow-y-auto editor-scroll">
                         <div style="background:rgba(52, 130, 255, 0.1); color:var(--mx-primary); padding:8px 12px; border-radius:8px; font-size:12px;">匹配规则：<b>前缀匹配</b></div>
                         <div id="ignoreBuilderContainer" class="flex-col gap-2 flex-grow"></div>
                         <button class="mx-btn mx-btn-secondary mx-btn-sm" style="align-self:flex-start" id="btnAddIgnoreRow">添加路径</button>

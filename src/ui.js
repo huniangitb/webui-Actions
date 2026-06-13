@@ -2,6 +2,7 @@ import { state, CONST } from "./state.js";
 import { run, showToast, ICONS, normalizeToDisplay, normalizeToConfig, debounce } from "./utils.js";
 import { exec } from "kernelsu";
 import { prepare, layout } from "@chenglou/pretext";
+
 // =============================================
 // Rule row builder
 // =============================================
@@ -25,6 +26,7 @@ export const addRuleRow = (type, target, source, containerId) => {
     </div>
   </div>
   <button class="mx-btn-icon btn-del flex-shrink-0">${ICONS.DELETE}</button>`;
+  
   const select = div.querySelector(".rule-type");
   select.value = type;
   select.onchange = (e) => {
@@ -38,6 +40,7 @@ export const addRuleRow = (type, target, source, containerId) => {
   setupAutocomplete(div.querySelectorAll(".mx-input")[1]);
   container.appendChild(div);
 };
+
 // =============================================
 // Config text ↔ visual builders
 // =============================================
@@ -69,6 +72,7 @@ export const parseConfigTextToVisual = (
     });
   }
 };
+
 export const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelectId, injectSelectId) => {
   let res = "";
   const selInject = document.getElementById(injectSelectId);
@@ -90,6 +94,7 @@ export const generateConfigTextFromVisual = (containerId, monitorSelectId, sandb
   });
   return res.trim();
 };
+
 // =============================================
 // Mode toggle helper
 // =============================================
@@ -110,6 +115,7 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
     };
   });
 };
+
 // =============================================
 // Modal Shifter (With Layout cache optimization)
 // =============================================
@@ -130,12 +136,12 @@ export const updateModalShift = () => {
   const naturalBottom = naturalTop + state.cachedModalHeight;
   const overlap = naturalBottom - vh + 16;
   if (overlap > 0) {
-    // 采用性能极佳的 3D GPU 加速偏移上推遮罩，绝不触碰和修改 DOM 的物理高度，防止发生重排断档
     modal.style.transform = `scale(1) translate3d(0, -${overlap}px, 0)`;
   } else {
     modal.style.transform = "scale(1) translate3d(0, 0, 0)";
   }
 };
+
 // =============================================
 // Autocomplete Positioner
 // =============================================
@@ -151,17 +157,10 @@ export const updateSuggestionBoxPosition = (input) => {
   if (container) {
     const containerRect = container.getBoundingClientRect();
     const inputRect = input.getBoundingClientRect();
-    
-    // 获取当前的 visualViewport 物理底边界（智能规避并计算各种键盘布局产生的遮挡区域）
     const vvHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    
-    // 可用高度阈值为当前滚动配置容器底界和虚拟键盘顶缘的较小值
     const effectiveBottom = Math.min(containerRect.bottom, vvHeight);
-    
     const spaceBelow = effectiveBottom - inputRect.bottom;
     const spaceAbove = inputRect.top - containerRect.top;
-    
-    // 如果因键盘挤压导致下方空隙小于 180px 且上方剩余空间比下方更宽裕，则提示框往上溢出弹出
     if (spaceBelow < 180 && spaceAbove > spaceBelow) {
       box.style.top = "auto";
       box.style.bottom = "100%";
@@ -175,41 +174,26 @@ export const updateSuggestionBoxPosition = (input) => {
     }
   }
 };
+
 // =============================================
-// 【高阶流畅对齐引擎】
-// 运用浏览器原生 Compositor 线程平滑滚动，使目标输入框平稳过渡定位在屏幕键盘上方的最佳视线区内
+// 对焦定位引擎 (彻底摒弃 padding-bottom 改写, 依靠弹性伪元素撑起)
 // =============================================
 export const centerActiveInput = (input) => {
   const container = input.closest(".overflow-y-auto");
   const row = input.closest(".rule-row") || input;
   if (!container || !row) return;
-
-  const containerRect = container.getBoundingClientRect();
-  const rowRect = row.getBoundingClientRect();
   
-  // 动态读取当前真实的可视高度（随九键、全键盘、表情等键盘布局切换自适应判定）
-  const vvHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  
-  // 测算当前滚动容器在键盘上缘以上的真实露空区高度
-  const visibleContainerHeight = Math.max(120, vvHeight - containerRect.top);
-  
-  // 黄金中线偏上对齐算法：完美将当前聚焦行对齐到露出区 35% 偏上位置，彻底避开任何高度的键盘遮挡
-  const targetY = containerRect.top + (visibleContainerHeight * 0.35);
-  const diff = rowRect.top - targetY;
-  
-  // 采用浏览器原生高性能 smooth compositor 机制进行无损平稳定位
-  container.style.scrollBehavior = "smooth";
-  container.scrollTop += diff;
-  
-  setTimeout(() => {
-    if (container) container.style.scrollBehavior = "";
-  }, 300);
+  // 保持滚动平滑度，原生计算并对齐滚动条位置
+  const targetScrollTop = row.offsetTop - 16;
+  container.scrollTo({
+    top: targetScrollTop,
+    behavior: "smooth"
+  });
 };
 
-// 键盘高度频繁改变时的定位重测防抖函数，避免键盘升起动画过程中发生渲染冲突导致画面剧烈抖动
 export const debouncedCenterActive = debounce((input) => {
   centerActiveInput(input);
-}, 150);
+}, 120);
 
 // =============================================
 // Autocomplete
@@ -265,6 +249,7 @@ const setupAutocomplete = (input) => {
         }
         input.classList.toggle("path-exists", inputPathExists);
         state.currentSuggestions = sugs;
+        
         let totalBoxHeight = 2; 
         const fontStyle = "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
         const horizontalPadding = 24; 
@@ -298,8 +283,7 @@ const setupAutocomplete = (input) => {
       }
     }, 250)
   );
-  
-  // 在 mx-input 输入框上注入键盘方向键 (ArrowUp/ArrowDown) 物理对焦导航引擎，解除 DOM 裁剪限制
+
   input.addEventListener("keydown", (e) => {
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       const inputs = Array.from(document.querySelectorAll(".mx-modal-overlay.open .mx-input:not([readonly])"));
@@ -320,31 +304,22 @@ const setupAutocomplete = (input) => {
     window._currentInput = input;
     const container = input.closest(".overflow-y-auto");
     if (container) {
-      // 开启大缓冲跑道，确保滚动流畅无截断
-      container.style.paddingBottom = "550px";
-      
-      // 双阶滚动控制 - 阶段一：在 focus 瞬间(0ms)直接将输入行瞬移至容器最顶部（完全处于任何高度键盘的上方），消除起跳打断风险
-      const row = input.closest(".rule-row") || input;
-      container.style.scrollBehavior = "auto";
-      container.scrollTop = row.offsetTop - 16;
+      // 触发底垫展开，避免繁琐 JS 重新计算重排
+      container.classList.add("input-focused");
     }
-    // 双阶滚动控制 - 阶段二：在 80ms 后及 280ms 键盘彻底升起稳定后，以 compositor-smooth 机制微调缓动滑行到最佳中视线
+    // compositor-smooth 机制对焦，彻底避开由于软键盘弹起造成的强制重绘抖动
     setTimeout(() => {
       if (document.activeElement === input) {
         centerActiveInput(input);
       }
-    }, 80);
-    setTimeout(() => {
-      if (document.activeElement === input) {
-        centerActiveInput(input);
-      }
-    }, 280);
+    }, 120);
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));
       }
     }, 150);
   });
+
   input.addEventListener("blur", () => {
     setTimeout(() => {
       const activeEl = document.activeElement;
@@ -353,8 +328,7 @@ const setupAutocomplete = (input) => {
         state.currentSuggestions = [];
         const container = input.closest(".overflow-y-auto");
         if (container) {
-          container.style.paddingBottom = "";
-          container.style.scrollBehavior = "";
+          container.classList.remove("input-focused");
         }
       }
     }, 150);

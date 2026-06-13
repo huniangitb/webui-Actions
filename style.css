@@ -67,6 +67,14 @@ body.loaded {
 .mx-sidebar { display: none; }
 .mx-desktop-shell { display: none; }
 .mx-app { display: flex; height: var(--initial-vh, 100vh); width: 100vw; flex-direction: column; }
+
+/* 冻结主界面样式：用于进入配置列表详情时大幅降低 GPU/CPU 渲染和响应负担 */
+.mx-app.frozen {
+    pointer-events: none;
+    filter: grayscale(0.4) opacity(0.85);
+    user-select: none;
+}
+
 .mx-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
 .mx-topbar-right { display: flex; align-items: center; gap: 8px; }
 .mx-desktop-main {
@@ -220,7 +228,7 @@ body.loaded {
 .mx-modal { background: var(--mx-bg); width: 92%; max-width: 420px; border-radius: 24px; display: flex; flex-direction: column; max-height: 90%; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); transform: scale(0.95); opacity: 0; transition: opacity 0.25s var(--mx-ease), transform 0.25s var(--mx-ease); }
 .mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1); opacity: 1; }
-/* 键盘打开时，保持模态框物理尺寸刚性稳定，不重排，不发生闪烁抖动 */
+
 body.keyboard-open .mx-modal {
     max-height: 90% !important;
 }
@@ -265,6 +273,26 @@ body.keyboard-open .mx-modal.large {
     position: relative;
     width: 100%;
 }
+
+/* =============================================
+   高性能底面占位垫片 (CSS Transition 控制)
+   ============================================= */
+.editor-scroll {
+    position: relative;
+}
+.editor-scroll::after {
+    content: "";
+    display: block;
+    height: 0;
+    flex-shrink: 0;
+    transition: height 0.28s var(--mx-ease);
+    will-change: height;
+}
+/* 处于输入聚焦状态下，自动在容器最下方平滑地撑起 380px 的透明安全间距，无需触碰 JS 导致强制重排 */
+.editor-scroll.input-focused::after {
+    height: 380px;
+}
+
 .mx-spinner-container {
     display: flex; flex-direction: column; justify-content: center; align-items: center;
     padding: 60px 20px; height: 100%; width: 100%; gap: 16px;

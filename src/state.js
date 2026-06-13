@@ -21,7 +21,9 @@ export const state = {
   cachedModalHeight: null, // Cached open modal height for keyboard offset calculations
   lastActiveModal: null,  // Track which modal is currently measured
   isViewportResizing: false,
+  isUserTouching: false,  // 追踪用户真实物理触控
 };
+
 export const CONST = {
   BASE_DIR: "/data/Namespace-Proxy",
   INJECTOR_CONF: "/data/Namespace-Proxy/injector.conf",

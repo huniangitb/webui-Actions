@@ -299,7 +299,9 @@ const setupAutocomplete = (input) => {
   });
   input.addEventListener("blur", () => {
     setTimeout(() => {
-      if (document.activeElement !== input) {
+      const activeEl = document.activeElement;
+      // 关键防御：如果失焦后，新获得焦点的活动元素依然是一个 mx-input，决不能提前清理缓冲高度，避免高度复位导致回弹遮挡
+      if (!activeEl || !activeEl.classList.contains("mx-input")) {
         box.style.display = "none";
         state.currentSuggestions = [];
         const container = input.closest(".overflow-y-auto");
@@ -308,6 +310,6 @@ const setupAutocomplete = (input) => {
           container.style.scrollBehavior = "";
         }
       }
-    }, 120);
+    }, 150); // 150ms 延迟可确保新输入框的 focus 阶段已被完全处理，能准确捕获 activeElement 状态
   });
 };

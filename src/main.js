@@ -33,7 +33,7 @@ import { syncToPlugin } from "./plugin.js";
 // =============================================
 import "../style.css";
 // =============================================
-// Lock Layout Viewport Height
+// Lock Layout Viewport Height (用于主视口绝对防线)
 // =============================================
 const lockInitialHeight = () => {
   const initialH = window.innerHeight;
@@ -41,7 +41,7 @@ const lockInitialHeight = () => {
 };
 lockInitialHeight();
 // =============================================
-// OffscreenCanvas Background Renderer
+// OffscreenCanvas Background Renderer (支持主页面休眠挂起)
 // =============================================
 let canvasWorker = null;
 const initOffscreenCanvas = () => {
@@ -146,7 +146,7 @@ const initOffscreenCanvas = () => {
   }
 };
 // =============================================
-// Status Polling Manager
+// Status Polling Manager (支持后台挂起避让)
 // =============================================
 let statusPolling = null;
 let appStatusPolling = null;
@@ -283,7 +283,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
   initOffscreenCanvas();
   // =============================================
-  // 浏览器原生标准：VirtualKeyboard 核心监听
+  // 原生高精度视口变化硬关联：使用 Overlay 原生方案，只改变变量，不触及 Layout
   // =============================================
   if (navigator.virtualKeyboard) {
     navigator.virtualKeyboard.overlaysContent = true;
@@ -292,11 +292,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isKeyboardOpen = height > 0;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
       document.documentElement.style.setProperty('--keyboard-h', `${height}px`);
-      
-      const isAppFrozen = document.querySelector(".mx-app")?.classList.contains("frozen");
       if (isKeyboardOpen && window._currentInput && document.activeElement === window._currentInput) {
-        const isInsideModal = window._currentInput.closest(".mx-modal-overlay.open");
-        if (isAppFrozen && !isInsideModal) return; // 物理屏蔽隔离
         import("./ui.js").then(({ centerActiveInput }) => {
           centerActiveInput(window._currentInput);
         });
@@ -315,17 +311,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         const isKeyboardOpen = keyboardHeight > 80;
         document.body.classList.toggle("keyboard-open", isKeyboardOpen);
         document.documentElement.style.setProperty('--keyboard-h', `${isKeyboardOpen ? keyboardHeight : 0}px`);
-        
-        // 物理安全机制：主页面冻结时隔离任何不属于 active modal 的提示及定位事件
-        const isAppFrozen = document.querySelector(".mx-app")?.classList.contains("frozen");
-        if (window._currentInput && document.activeElement === window._currentInput) {
-          const isInsideModal = window._currentInput.closest(".mx-modal-overlay.open");
-          if (isAppFrozen && !isInsideModal) return; // 物理阻断
-          import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
+        import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
+          if (window._currentInput && document.activeElement === window._currentInput) {
             debouncedCenterActive(window._currentInput);
             updateSuggestionBoxPosition(window._currentInput);
-          });
-        }
+          }
+        });
       });
     };
     if (window.visualViewport) {

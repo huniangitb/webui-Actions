@@ -1,4 +1,4 @@
-@import "https://https.kernelsu.org/internal/insets.css";
+@import "https://mui.kernelsu.org/internal/insets.css";
 :root {
     --mx-primary: #277AF7;
     --mx-primary-hover: #4599ff;
@@ -79,6 +79,12 @@ body.loaded {
     filter: grayscale(0.4) opacity(0.85);
     user-select: none;
 }
+/* 核心资源隔离防线：配置页面开启时，强制锁定主视口内容的高度，使其完全忽略虚拟键盘可能引起的 Resize 级联重算，保障后台虚拟列表等组件 0 消耗休眠 */
+.mx-app.frozen .mx-desktop-main {
+    height: var(--initial-vh);
+    max-height: var(--initial-vh);
+    overflow: hidden !important;
+}
 .mx-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
 .mx-topbar-right { display: flex; align-items: center; gap: 8px; }
 .mx-desktop-main {
@@ -99,18 +105,10 @@ body.loaded {
     backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
     border-top: 1px solid var(--mx-border);
     z-index: 100;
-    transform: translateZ(0);
-    transition: transform 0.25s var(--mx-ease), opacity 0.2s var(--mx-ease);
 }
-/* =============================================
-   导航栏隔离机制：仅在未冻结（主页面视图中）时实时跟随键盘
-   ============================================= */
-body.keyboard-open .mx-app:not(.frozen) .mx-bottom-nav {
-    transform: translateY(calc(-1 * var(--keyboard-h, 0px)));
-    transition: none !important;
-}
-/* 在应用配置模态框打开（主视图已冻结）时，直接剔除底部导航栏，屏蔽任何重绘和无意义物理偏移 */
-body.keyboard-open .mx-app.frozen .mx-bottom-nav {
+/* 键盘打开时，直接销毁顶部与底部导航栏渲染，避免跟随错位与资源浪费 */
+body.keyboard-open .mx-bottom-nav,
+body.keyboard-open .mx-topbar {
     display: none !important;
 }
 .mx-bottom-nav-items { display: flex; list-style: none; margin: 0; padding: 0; height: 56px; }
@@ -283,6 +281,9 @@ body.keyboard-open .mx-app.frozen .mx-bottom-nav {
 }
 .mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1) translate3d(0, 0, 0); opacity: 1; }
+/* =============================================
+   应用配置页面：移动端虚拟键盘唤起适配 (绝对高度贴合计算，不使用挤压流)
+   ============================================= */
 @media (max-width: 767px) {
     body.keyboard-open .mx-modal-overlay {
         align-items: flex-end; 
@@ -292,11 +293,12 @@ body.keyboard-open .mx-app.frozen .mx-bottom-nav {
         border-bottom-right-radius: 0;
         width: 100vw;
         max-width: 100vw;
-        height: calc(100dvh - var(--keyboard-h, 0px) - env(safe-area-inset-top, 0px));
-        max-height: calc(100dvh - var(--keyboard-h, 0px) - env(safe-area-inset-top, 0px));
-        margin-bottom: var(--keyboard-h, 0px); 
+        /* 利用初始物理高度减去键盘高度，实现底边无缝贴合 */
+        height: calc(var(--initial-vh, 100vh) - var(--keyboard-h, 0px));
+        max-height: calc(var(--initial-vh, 100vh) - var(--keyboard-h, 0px));
+        margin-bottom: var(--keyboard-h, 0px);
         transform: scale(1) translate3d(0, 0, 0) !important;
-        transition: none !important; 
+        transition: none !important; /* 强制关闭 Transition，确保键盘升降每帧物理硬同步 */
     }
     body.keyboard-open .mx-modal-body {
         max-height: none !important;

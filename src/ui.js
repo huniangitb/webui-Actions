@@ -149,7 +149,7 @@ export const centerActiveInput = (input) => {
   const container = input.closest(".overflow-y-auto");
   const row = input.closest(".rule-row") || input;
   if (!container || !row) return;
-  // 精确计算编辑行，使其保持在弹出的虚拟键盘视窗正中央
+  // 计算此时输入框距离容器顶部的距离，滚动至可见高度中段，确保不被下方键盘遮挡
   const elementRelativeTop = row.offsetTop;
   const targetScroll = Math.max(0, elementRelativeTop - (container.clientHeight / 2) + (row.offsetHeight / 2));
   if (Math.abs(container.scrollTop - targetScroll) > 10) {

@@ -130,7 +130,6 @@ export const updateModalShift = () => {
   const naturalBottom = naturalTop + state.cachedModalHeight;
   const overlap = naturalBottom - vh + 16;
   if (overlap > 0) {
-    // 采用性能极佳的 3D GPU 加速偏移上推遮罩，绝不触碰和修改 DOM 的物理高度，防止发生重排断档
     modal.style.transform = `scale(1) translate3d(0, -${overlap}px, 0)`;
   } else {
     modal.style.transform = "scale(1) translate3d(0, 0, 0)";
@@ -178,19 +177,30 @@ export const centerActiveInput = (input) => {
   const containerRect = container.getBoundingClientRect();
   const rowRect = row.getBoundingClientRect();
   
-  // 将输入行对齐到配置容器中线偏上 35% 的黄金可视高度，完全避开下方键盘，绝不发生画面颤抖
-  const targetY = containerRect.top + (containerRect.height * 0.35);
+  // 动态读取当前真实的可视高度（随九键、全键盘、表情等键盘布局切换自适应判定）
+  const vvHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  
+  // 测算当前滚动容器在键盘上缘以上的真实露空区高度
+  const visibleContainerHeight = Math.max(120, vvHeight - containerRect.top);
+  
+  // 黄金中线偏上对齐算法：完美将当前聚焦行对齐到露出区 35% 偏上位置，彻底避开任何高度的键盘遮挡
+  const targetY = containerRect.top + (visibleContainerHeight * 0.35);
   const diff = rowRect.top - targetY;
   
-  // 采用浏览器原生高性能 smooth compositor 机制滚动
+  // 采用浏览器原生高性能 smooth compositor 机制进行无损平稳定位
   container.style.scrollBehavior = "smooth";
   container.scrollTop += diff;
   
-  // 过渡完毕后重置滚动行为设定
   setTimeout(() => {
     if (container) container.style.scrollBehavior = "";
   }, 300);
 };
+
+// 键盘高度频繁改变时的定位重测防抖函数，避免键盘升起动画过程中发生渲染冲突导致画面剧烈抖动
+export const debouncedCenterActive = debounce((input) => {
+  centerActiveInput(input);
+}, 150);
+
 // =============================================
 // Autocomplete
 // =============================================
@@ -283,7 +293,7 @@ const setupAutocomplete = (input) => {
     const container = input.closest(".overflow-y-auto");
     if (container) {
       // 开启超长冗余滚动跑道，确保最后一个输入框聚焦时，也可以无打断地完成平滑的滚动居中操作
-      container.style.paddingBottom = "380px";
+      container.style.paddingBottom = "550px";
     }
     // 延迟 100ms 进行单次流畅居中过渡，绝对不介入系统的 resize 事件监听循环，彻底解决动画抖动和打断
     setTimeout(() => {

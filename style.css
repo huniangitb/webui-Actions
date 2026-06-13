@@ -220,8 +220,12 @@ body.loaded {
 .mx-modal { background: var(--mx-bg); width: 92%; max-width: 420px; border-radius: 24px; display: flex; flex-direction: column; max-height: 90%; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); transform: scale(0.95); opacity: 0; transition: opacity 0.25s var(--mx-ease), transform 0.25s var(--mx-ease); }
 .mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1); opacity: 1; }
+/* 键盘打开时，保持模态框物理尺寸刚性稳定，不重排，不发生闪烁抖动 */
 body.keyboard-open .mx-modal {
-    transition: opacity 0.25s var(--mx-ease), transform 0.3s ease-out !important;
+    max-height: 90% !important;
+}
+body.keyboard-open .mx-modal.large {
+    height: 85% !important;
 }
 .mx-modal-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mx-border); flex-shrink: 0;}
 .mx-modal-title { font-size: 18px; font-weight: 700; margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }

@@ -158,10 +158,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isKeyboardOpen = vh < totalH - 80;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
       
-      import("./ui.js").then(({ updateModalShift, updateSuggestionBoxPosition }) => {
-        updateModalShift();
+      import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
         if (window._currentInput && document.activeElement === window._currentInput) {
-          // 仅同步自动完成提示框的动态相对定位，彻底将 scrollTop 滚动逻辑交还给原生的 smooth transition，解除抖动
+          // 采用防抖重新对齐算法。当键盘滑动时、或用户在九键/全键盘/表情等各种键盘布局间高频切换时，避免重绘重排抢夺，直到布局完全静止后再平滑微调对准
+          debouncedCenterActive(window._currentInput);
           updateSuggestionBoxPosition(window._currentInput);
         }
       });

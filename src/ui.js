@@ -176,15 +176,22 @@ export const updateSuggestionBoxPosition = (input) => {
 };
 
 // =============================================
-// 对焦定位引擎 (彻底摒弃 padding-bottom 改写, 依靠弹性伪元素撑起)
+// 对焦定位引擎 (结合真实虚拟键盘边界与 CSS 弹性垫片进行对焦)
 // =============================================
 export const centerActiveInput = (input) => {
   const container = input.closest(".overflow-y-auto");
   const row = input.closest(".rule-row") || input;
   if (!container || !row) return;
-  
-  // 保持滚动平滑度，原生计算并对齐滚动条位置
-  const targetScrollTop = row.offsetTop - 16;
+
+  // 刚性激活 input-focused 样式（在 CSS 中通过高度占位提供滚动溢出裕量）
+  container.classList.add("input-focused");
+
+  // 计算当前聚焦行相对于滚动区顶部的偏移位置
+  const elementRelativeTop = row.offsetTop;
+
+  // 滚动黄金视区：确保输入行平滑靠置在滚动区顶部下方 40px 的位置（极佳的可视区域）
+  const targetScrollTop = elementRelativeTop - 40;
+
   container.scrollTo({
     top: targetScrollTop,
     behavior: "smooth"
@@ -304,10 +311,8 @@ const setupAutocomplete = (input) => {
     window._currentInput = input;
     const container = input.closest(".overflow-y-auto");
     if (container) {
-      // 触发底垫展开，避免繁琐 JS 重新计算重排
       container.classList.add("input-focused");
     }
-    // compositor-smooth 机制对焦，彻底避开由于软键盘弹起造成的强制重绘抖动
     setTimeout(() => {
       if (document.activeElement === input) {
         centerActiveInput(input);

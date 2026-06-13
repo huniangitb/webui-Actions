@@ -84,7 +84,9 @@ body.loaded {
     min-height: 0;
     overflow: hidden;
     position: relative;
+    /* 正常状态下紧密无缝为底部导航留边 */
     padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    transition: padding-bottom 0.2s var(--mx-ease), padding-top 0.2s var(--mx-ease);
 }
 .mx-bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0;
@@ -229,12 +231,26 @@ body.loaded {
 .mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1); opacity: 1; }
 
+/* =============================================
+   移动端键盘打开时的刚性布局自适应 (杜绝导航栏白带悬空)
+   ============================================= */
 body.keyboard-open .mx-modal {
     max-height: 90% !important;
 }
 body.keyboard-open .mx-modal.large {
     height: 85% !important;
 }
+body.keyboard-open .mx-bottom-nav {
+    display: none !important; /* 物理擦除底栏，完全腾出显示纵深 */
+}
+body.keyboard-open .mx-topbar {
+    display: none !important; /* 隐藏顶栏，使编辑器拥有更开阔的可视空间 */
+}
+body.keyboard-open .mx-desktop-main {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important; /* 主内容下边距归零，紧密贴合键盘上缘 */
+}
+
 .mx-modal-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mx-border); flex-shrink: 0;}
 .mx-modal-title { font-size: 18px; font-weight: 700; margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 .mx-modal-body { padding: 20px; overflow-y: auto; flex: 1; min-height:0; }
@@ -275,7 +291,7 @@ body.keyboard-open .mx-modal.large {
 }
 
 /* =============================================
-   高性能底面占位垫片 (CSS Transition 控制)
+   高性能底面刚性垫片 (提供五个输入框以上的滚动留白空间)
    ============================================= */
 .editor-scroll {
     position: relative;
@@ -283,14 +299,14 @@ body.keyboard-open .mx-modal.large {
 .editor-scroll::after {
     content: "";
     display: block;
-    height: 0;
+    height: 120px; /* 常态下预留一定的底距空隙 */
     flex-shrink: 0;
     transition: height 0.28s var(--mx-ease);
     will-change: height;
 }
-/* 处于输入聚焦状态下，自动在容器最下方平滑地撑起 380px 的透明安全间距，无需触碰 JS 导致强制重排 */
+/* 对焦后撑开约 320px 的刚性底垫，保证最末尾行能无阻碍上推至键盘上方可视区 */
 .editor-scroll.input-focused::after {
-    height: 380px;
+    height: 320px !important;
 }
 
 .mx-spinner-container {

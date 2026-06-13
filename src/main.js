@@ -44,7 +44,7 @@ const lockInitialHeight = () => {
 lockInitialHeight();
 
 // =============================================
-// Status Polling Manager (极佳能效设计)
+// Status Polling Manager (高能效设计)
 // =============================================
 let statusPolling = null;
 let appStatusPolling = null;
@@ -190,6 +190,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
       const totalH = window.innerHeight;
       const isKeyboardOpen = vh < totalH - 80;
+      
+      // 控制 keyboard-open 的类，决定导航栏与顶栏的物理隐藏，杜绝黑白带
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
       
       import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
@@ -208,7 +210,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.addEventListener("resize", updateViewportHeight);
   updateViewportHeight();
 
-  // 引入全局触控感知逻辑
+  // 引入全局物理触控感知逻辑
   document.addEventListener("touchstart", () => {
     state.isUserTouching = true;
   }, { passive: true });
@@ -222,7 +224,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }, { passive: true });
 
   window.addEventListener("scroll", (e) => {
-    // 仅在用户物理触控滑动时，收起自动补全
+    // 仅在用户物理触控滑动时，才收起自动补全
     if (state.isUserTouching) {
       const box = document.getElementById("suggestionBox");
       if (box && box.style.display !== "none") {

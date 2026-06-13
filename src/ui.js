@@ -117,7 +117,7 @@ export const updateModalShift = () => {
   const modal = document.querySelector(".mx-modal-overlay.open .mx-modal");
   if (!modal) return;
   
-  // 当虚拟键盘处于打开状态时，取消 transform 位移偏移，让真实的 CSS 视口自适应高度约束生效
+  // 当虚拟键盘处于打开状态时，取消 transform 位移偏移，让真实的 CSS 视口置顶高度约束生效
   if (document.body.classList.contains("keyboard-open")) {
     modal.style.transform = "scale(1) translate3d(0, 0, 0)";
     return;
@@ -189,7 +189,7 @@ export const centerActiveInput = (input) => {
   // 3. 计算输入行相对滚动视口顶缘的绝对投影偏移
   const currentRelativeTop = rowRect.top - containerRect.top;
   const offset = currentRelativeTop - visibleCenter + (rowRect.height / 2);
-  // 4. 临时将平滑过渡禁用，使像素定位在单帧中无迟滞完成，完美规避动画冲突
+  // 4. 临时将平滑过渡禁用，让滚动操作直接应用在配置容器的 scrollTop 上，极速精确定位
   container.style.scrollBehavior = "auto";
   container.scrollTop += offset;
   window.requestAnimationFrame(() => {

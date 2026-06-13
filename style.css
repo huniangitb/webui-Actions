@@ -232,6 +232,12 @@ body.keyboard-open .mx-modal.large {
     height: calc(var(--keyboard-vh, 100vh) - 16px) !important;
     max-height: calc(var(--keyboard-vh, 100vh) - 16px) !important;
 }
+/* 键盘激活时强制使外层弹性遮罩变为靠顶对齐，配合高度自适应，使整个模态框在可视物理空间中完全处于键盘上方 */
+body.keyboard-open .mx-modal-overlay {
+    align-items: flex-start !important;
+    justify-content: center !important;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 8px) !important;
+}
 .mx-modal-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mx-border); flex-shrink: 0;}
 .mx-modal-title { font-size: 18px; font-weight: 700; margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 .mx-modal-body { padding: 20px; overflow-y: auto; flex: 1; min-height:0; }

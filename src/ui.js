@@ -130,6 +130,7 @@ export const updateModalShift = () => {
   const naturalBottom = naturalTop + state.cachedModalHeight;
   const overlap = naturalBottom - vh + 16;
   if (overlap > 0) {
+    // 采用性能极佳的 3D GPU 加速偏移上推遮罩，绝不触碰和修改 DOM 的物理高度，防止发生重排断档
     modal.style.transform = `scale(1) translate3d(0, -${overlap}px, 0)`;
   } else {
     modal.style.transform = "scale(1) translate3d(0, 0, 0)";
@@ -150,8 +151,17 @@ export const updateSuggestionBoxPosition = (input) => {
   if (container) {
     const containerRect = container.getBoundingClientRect();
     const inputRect = input.getBoundingClientRect();
-    const spaceBelow = containerRect.bottom - inputRect.bottom;
+    
+    // 获取当前的 visualViewport 物理底边界（智能规避并计算各种键盘布局产生的遮挡区域）
+    const vvHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    
+    // 可用高度阈值为当前滚动配置容器底界和虚拟键盘顶缘的较小值
+    const effectiveBottom = Math.min(containerRect.bottom, vvHeight);
+    
+    const spaceBelow = effectiveBottom - inputRect.bottom;
     const spaceAbove = inputRect.top - containerRect.top;
+    
+    // 如果因键盘挤压导致下方空隙小于 180px 且上方剩余空间比下方更宽裕，则提示框往上溢出弹出
     if (spaceBelow < 180 && spaceAbove > spaceBelow) {
       box.style.top = "auto";
       box.style.bottom = "100%";
@@ -288,25 +298,47 @@ const setupAutocomplete = (input) => {
       }
     }, 250)
   );
+  
+  // 在 mx-input 输入框上注入键盘方向键 (ArrowUp/ArrowDown) 物理对焦导航引擎，解除 DOM 裁剪限制
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      const inputs = Array.from(document.querySelectorAll(".mx-modal-overlay.open .mx-input:not([readonly])"));
+      const idx = inputs.indexOf(input);
+      if (idx !== -1) {
+        if (e.key === "ArrowUp" && idx > 0) {
+          e.preventDefault();
+          inputs[idx - 1].focus();
+        } else if (e.key === "ArrowDown" && idx < inputs.length - 1) {
+          e.preventDefault();
+          inputs[idx + 1].focus();
+        }
+      }
+    }
+  });
+
   input.addEventListener("focus", () => {
     window._currentInput = input;
     const container = input.closest(".overflow-y-auto");
     if (container) {
-      // 开启超长冗余滚动跑道，确保最后一个输入框聚焦时，也可以无打断地完成平滑的滚动居中操作
+      // 开启大缓冲跑道，确保滚动流畅无截断
       container.style.paddingBottom = "550px";
+      
+      // 双阶滚动控制 - 阶段一：在 focus 瞬间(0ms)直接将输入行瞬移至容器最顶部（完全处于任何高度键盘的上方），消除起跳打断风险
+      const row = input.closest(".rule-row") || input;
+      container.style.scrollBehavior = "auto";
+      container.scrollTop = row.offsetTop - 16;
     }
-    // 延迟 100ms 进行单次流畅居中过渡，绝对不介入系统的 resize 事件监听循环，彻底解决动画抖动和打断
+    // 双阶滚动控制 - 阶段二：在 80ms 后及 280ms 键盘彻底升起稳定后，以 compositor-smooth 机制微调缓动滑行到最佳中视线
     setTimeout(() => {
       if (document.activeElement === input) {
         centerActiveInput(input);
       }
-    }, 100);
-    // 在键盘完全伸展完毕后（约 300ms），进行一次安静微调对准，以防发生浏览器本身的滚动抢夺
+    }, 80);
     setTimeout(() => {
       if (document.activeElement === input) {
         centerActiveInput(input);
       }
-    }, 320);
+    }, 280);
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));

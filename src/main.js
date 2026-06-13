@@ -173,21 +173,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   window.addEventListener("resize", updateViewportHeight);
   updateViewportHeight();
+  
+  // 阻止 Android WebView 原生在焦点选中时对 window / body 进行不当滚动移位（防止固定遮罩层被推上去产生白底空隙）
   window.addEventListener("scroll", (e) => {
-    if (window._currentInput && document.activeElement === window._currentInput) {
-      window.requestAnimationFrame(() => {
-        import("./ui.js").then(({ updateSuggestionBoxPosition }) => {
-          updateSuggestionBoxPosition(window._currentInput);
-        });
-      });
-    } else {
-      const box = document.getElementById("suggestionBox");
-      if (box && box.style.display !== "none") {
-        box.style.display = "none";
-        state.currentSuggestions = [];
-      }
+    if (window.scrollY !== 0) {
+      window.scrollTo(0, 0);
+    }
+    
+    // 只要用户开始滚动任何页面容器（配置列表等），立刻主动收起隐藏自动补全建议框
+    const box = document.getElementById("suggestionBox");
+    if (box && box.style.display !== "none") {
+      box.style.display = "none";
+      state.currentSuggestions = [];
     }
   }, true);
+  
   document.addEventListener("click", (e) => {
     const box = document.getElementById("suggestionBox");
     if (box && box.style.display !== "none") {

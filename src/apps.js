@@ -1,14 +1,9 @@
 import { state, CONST } from "./state.js";
 import { run, showToast, ICONS } from "./utils.js";
 import { listPackages, getPackagesInfo } from "kernelsu";
-import {
-  parseConfigTextToVisual,
-  generateConfigTextFromVisual,
-  setupModeToggle,
-} from "./ui.js";
+import { parseConfigTextToVisual, generateConfigTextFromVisual, setupModeToggle } from "./ui.js";
 import { syncToPlugin } from "./plugin.js";
 import { renderGlobalRules } from "./global.js";
-// 1x1 像素 Base64 透明占位图，用于规避浏览器因空 src 触发 premature onerror 的原生缺陷
 const TRANSPARENT_SPACER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 const _iconCache = new Set();
 const iconQueue = new Set();
@@ -32,15 +27,10 @@ const enqueueIcon = (img) => {
     iconQueue.add(img);
     processIconQueue();
 };
-// =============================================
-// Loading Spinner Transition Control
-// =============================================
 let loadedIconsInBatch = 0;
 let targetIconCount = 0;
 let isTransitioningOut = false;
-// 注册至全局，供行内 HTML 的 onload/onerror 触发
 window.onIconLoaded = (img) => {
-  // 严格拦截并忽略透明占位 GIF 的载入事件，确保只对真实的图标加载结果起作用
   if (img.src.startsWith("data:image/gif;base64,")) return;
   img.classList.add('icon-loaded');
   _iconCache.add(img.dataset.pkg);
@@ -71,16 +61,12 @@ const hideSpinnerOverlay = () => {
   }
   state.isAppListReady = true;
   state.isInitialLoad = false;
-  // 遮罩层隐去，重新调度观察器执行交错式的弹簧缩放动画
   initListObserver();
   const listEl = document.getElementById("appList");
   if (listEl) {
     listEl.querySelectorAll('.app-item').forEach(el => listObserver.observe(el));
   }
 };
-// =============================================
-// Data loading
-// =============================================
 export const fetchActiveMounts = async () => {
   const m = new Set();
   try {
@@ -265,9 +251,6 @@ export const loadData = async () => {
     showToast("加载异常: " + e.message);
   }
 };
-// =============================================
-// Interaction Observer for dynamic animation & lazy loading
-// =============================================
 let listObserver = null;
 const initListObserver = () => {
   const rootEl = document.getElementById('appList');
@@ -299,9 +282,6 @@ const initListObserver = () => {
     });
   }, { root: rootEl, threshold: 0.01, rootMargin: "30px" });
 };
-// =============================================
-// App list DOM updates
-// =============================================
 export const renderAppList = () => {
   const listEl = document.getElementById("appList");
   if (!listEl) return;
@@ -355,7 +335,6 @@ export const renderAppList = () => {
         injStr = `<span style="font-size:10px;margin-left:6px;padding:2px 6px;background:var(--mx-s3);border-radius:4px;font-family:var(--mx-font-mono);flex-shrink:0;">PID ${inj.pid} ${flags.join(" ")}</span>`;
       }
       const isCached = _iconCache.has(app.packageName);
-      // 未缓存时 src 使用透明占位 GIF。onerror 和 onload 绑定到全局事件，剔除空 src 引起的逻辑错误。
       return `<div class="app-item" data-pkg="${app.packageName}" onclick="window.openAppConfig('${app.packageName}')">
         <img class="app-icon${isCached ? ' icon-loaded' : ''}" src="${isCached ? `ksu://icon/${app.packageName}` : TRANSPARENT_SPACER}" data-src="${isCached ? '' : `ksu://icon/${app.packageName}`}" onerror="window.onIconError(this)" data-fallback="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2365676b'><path d='M17.6,9.48l1.84-3.18c0.16-0.31,0.04-0.69-0.26-0.85c-0.31-0.16-0.69-0.04-0.85,0.26L16.4,9c-1.35-0.6-2.85-0.95-4.4-0.95S8.95,8.4,7.6,9L5.67,5.71C5.51,5.41,5.13,5.29,4.83,5.45C4.52,5.61,4.4,6,4.56,6.3L6.4,9.48C3.3,11.25,1.28,14.44,1,18.15h22C22.72,14.44,20.7,11.25,17.6,9.48z M7,15.25c-0.69,0-1.25-0.56-1.25-1.25S6.31,12.75,7,12.75s1.25,0.56,1.25,1.25S7.69,15.25,7,15.25z M17,15.25c-0.69,0-1.25-0.56-1.25-1.25s0.56-1.25,1.25-1.25s1.25,0.56,1.25,1.25S17.69,15.25,17,15.25z'/></svg>" onload="window.onIconLoaded(this)" data-pkg="${app.packageName}" />
         <div class="app-info">
@@ -401,18 +380,13 @@ export const updateAppListStatus = () => {
     if (injEl && injEl.innerHTML !== injStr) injEl.innerHTML = injStr;
   });
 };
-// =============================================
-// App config modal
-// =============================================
 export const openAppConfig = (pkg) => {
   state.currentBindingPkg = pkg;
   const app = state.appMap.get(pkg);
   if (!app) return;
   document.getElementById("bindAppName").textContent = app.appLabel;
   document.getElementById("bindAppPkg").textContent = pkg;
-  
   const tabs = document.getElementById("appUserTabs");
-  // 当系统中仅存在 1 个或更少用户时，直接隐藏多用户切换栏
   if (state.activeUsers.length <= 1) {
     tabs.style.display = "none";
   } else {
@@ -424,9 +398,8 @@ export const openAppConfig = (pkg) => {
       )
       .join("");
   }
-  
   window.switchAppUser(state.activeUsers[0]);
-  document.getElementById("appConfigModal").classList.add("open");
+  document.getElementById("appConfigSubpage").classList.add("open");
 };
 export const switchAppUser = (uid) => {
   state.currentBindingUser = uid;

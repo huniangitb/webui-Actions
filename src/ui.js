@@ -2,10 +2,6 @@ import { state, CONST } from "./state.js";
 import { run, showToast, ICONS, normalizeToDisplay, normalizeToConfig, debounce } from "./utils.js";
 import { exec } from "kernelsu";
 import { prepare, layout } from "@chenglou/pretext";
-
-// =============================================
-// Rule row builder
-// =============================================
 export const addRuleRow = (type, target, source, containerId) => {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -39,10 +35,6 @@ export const addRuleRow = (type, target, source, containerId) => {
   setupAutocomplete(div.querySelectorAll(".mx-input")[1]);
   container.appendChild(div);
 };
-
-// =============================================
-// Config text ↔ visual builders
-// =============================================
 export const parseConfigTextToVisual = (
   text,
   containerId,
@@ -71,7 +63,6 @@ export const parseConfigTextToVisual = (
     });
   }
 };
-
 export const generateConfigTextFromVisual = (containerId, monitorSelectId, sandboxSelectId, injectSelectId) => {
   let res = "";
   const selInject = document.getElementById(injectSelectId);
@@ -93,10 +84,6 @@ export const generateConfigTextFromVisual = (containerId, monitorSelectId, sandb
   });
   return res.trim();
 };
-
-// =============================================
-// Mode toggle helper
-// =============================================
 export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc, genFunc) => {
   document.querySelectorAll(`button[name="${groupName}"]`).forEach((btn) => {
     btn.onclick = () => {
@@ -114,10 +101,6 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
     };
   });
 };
-
-// =============================================
-// Autocomplete Positioner
-// =============================================
 export const updateSuggestionBoxPosition = (input) => {
   const box = document.getElementById("suggestionBox");
   if (!box || !input || box.style.display === "none") return;
@@ -126,7 +109,7 @@ export const updateSuggestionBoxPosition = (input) => {
   if (box.parentNode !== wrapper) {
     wrapper.appendChild(box);
   }
-  const container = input.closest(".overflow-y-auto");
+  const container = input.closest(".overflow-y-auto") || input.closest(".mx-subpage-body") || input.closest(".editor-scroll");
   if (container) {
     const containerRect = container.getBoundingClientRect();
     const inputRect = input.getBoundingClientRect();
@@ -147,48 +130,30 @@ export const updateSuggestionBoxPosition = (input) => {
     }
   }
 };
-
-// =============================================
-// 高精度数学对焦逻辑 (替换不稳定 scrollIntoView)
-// =============================================
 export const centerActiveInput = (input) => {
   if (!input) return;
   const row = input.closest(".rule-row") || input;
-  const container = input.closest(".editor-scroll") || input.closest(".overflow-y-auto");
+  const container = input.closest(".editor-scroll") || input.closest(".mx-subpage-body") || input.closest(".overflow-y-auto");
   if (!row || !container) return;
-
   const performAlign = () => {
     const containerRect = container.getBoundingClientRect();
     const rowRect = row.getBoundingClientRect();
-
-    // 计算当前行在滚动容器内部的高精度相对坐标
     const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
-    
-    // 计算居中对准的目标偏移量
     const targetScrollTop = relativeTop - (containerRect.height / 2) + (rowRect.height / 2);
-    
     const maxScroll = container.scrollHeight - container.clientHeight;
     const safeScrollTop = Math.max(0, Math.min(targetScrollTop, maxScroll));
-
     container.scrollTo({
       top: safeScrollTop,
       behavior: "smooth"
     });
   };
-
-  // 配合虚拟键盘滑入动效分频级对齐，保障定位最终收敛到正中
   requestAnimationFrame(performAlign);
   setTimeout(performAlign, 80);
   setTimeout(performAlign, 180);
 };
-
 export const debouncedCenterActive = debounce((input) => {
   centerActiveInput(input);
 }, 120);
-
-// =============================================
-// Autocomplete
-// =============================================
 const setupAutocomplete = (input) => {
   if (!input) return;
   const box = document.getElementById("suggestionBox");
@@ -275,7 +240,7 @@ const setupAutocomplete = (input) => {
   );
   input.addEventListener("keydown", (e) => {
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      const inputs = Array.from(document.querySelectorAll(".mx-modal-overlay.open .mx-input:not([readonly])"));
+      const inputs = Array.from(document.querySelectorAll(".mx-subpage-container.open .mx-input:not([readonly])"));
       const idx = inputs.indexOf(input);
       if (idx !== -1) {
         if (e.key === "ArrowUp" && idx > 0) {

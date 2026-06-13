@@ -1,52 +1,19 @@
 import { state, CONST } from "./state.js";
 import { run, showToast, ICONS, initIcons, debounce } from "./utils.js";
 import { applyTheme, systemThemeListener, handleManualThemeToggle } from "./theme.js";
-import {
-  setupModeToggle,
-  addRuleRow,
-  parseConfigTextToVisual,
-  generateConfigTextFromVisual,
-} from "./ui.js";
-import {
-  loadData,
-  renderAppList,
-  updateAppListStatus,
-  flushInjectorConf,
-  fetchInjectedApps,
-  fetchActiveMounts,
-} from "./apps.js";
+import { setupModeToggle, addRuleRow, parseConfigTextToVisual, generateConfigTextFromVisual } from "./ui.js";
+import { loadData, renderAppList, updateAppListStatus, flushInjectorConf, fetchInjectedApps, fetchActiveMounts } from "./apps.js";
 import { setupGlobalHandlers } from "./global.js";
-import {
-  initIoLogs,
-  initSysLogs,
-  fetchIoLogs,
-  fetchSysLogs,
-  resetIoLogs,
-  clearIoLogs,
-  resetSysLogs,
-  clearSysLogs,
-} from "./logs.js";
+import { initIoLogs, initSysLogs, fetchIoLogs, fetchSysLogs, resetIoLogs, clearIoLogs, resetSysLogs, clearSysLogs } from "./logs.js";
 import { getSettings, saveSettings, checkPluginInstalled } from "./plugin.js";
 import { syncToPlugin } from "./plugin.js";
-
-// =============================================
-// CSS
-// =============================================
 import "../style.css";
-
-// =============================================
-// Lock Layout Viewport Height
-// =============================================
 const lockInitialHeight = () => {
   const initialH = window.innerHeight;
   document.documentElement.style.setProperty('--initial-vh', `${initialH}px`);
 };
 lockInitialHeight();
 window.addEventListener("orientationchange", () => setTimeout(lockInitialHeight, 200));
-
-// =============================================
-// Status Polling Manager
-// =============================================
 let statusPolling = null;
 let appStatusPolling = null;
 export const startPolling = () => {
@@ -114,10 +81,6 @@ const refreshAppStatus = async () => {
     }
   } catch {}
 };
-
-// =============================================
-// Ignore config helpers
-// =============================================
 const parseIgnoreToVisual = (t) => {
   const c = document.getElementById("ignoreBuilderContainer");
   if (!c) return;
@@ -147,10 +110,6 @@ const addIgnoreRow = (p) => {
   div.querySelector(".btn-del").onclick = () => div.remove();
   document.getElementById("ignoreBuilderContainer")?.appendChild(div);
 };
-
-// =============================================
-// Navigation
-// =============================================
 const switchSection = (sectionId) => {
   const triggerSwitch = () => {
     document.querySelectorAll(".demo-section").forEach((el) => el.classList.remove("active"));
@@ -177,29 +136,23 @@ const switchSection = (sectionId) => {
     triggerSwitch();
   }
 };
-
-// =============================================
-// Modal Destructor Cleanups
-// =============================================
 const closeModalCleanup = () => {
-  document.getElementById("appConfigModal")?.classList.remove("open");
-  document.querySelector(".mx-app").classList.remove("frozen");
-  document.body.classList.remove("modal-open");
-  document.body.classList.remove("keyboard-open");
-  // 复位全局 CSS 键盘高度，杜绝多余的主视图偏移干扰
-  document.documentElement.style.setProperty('--keyboard-h', '0px');
-  startPolling();
+  const closeActions = () => {
+    document.getElementById("appConfigSubpage")?.classList.remove("open");
+    document.querySelector(".mx-app").classList.remove("frozen");
+    document.body.classList.remove("modal-open");
+    document.body.classList.remove("keyboard-open");
+    document.documentElement.style.setProperty('--keyboard-h', '0px');
+    startPolling();
+  };
+  if (document.startViewTransition) {
+    document.startViewTransition(() => closeActions());
+  } else {
+    closeActions();
+  }
 };
-
-// =============================================
-// DOMContentLoaded
-// =============================================
 document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
-
-  // =============================================
-  // 原生高精度视口变化拦截控制
-  // =============================================
   if (navigator.virtualKeyboard) {
     navigator.virtualKeyboard.overlaysContent = true;
     navigator.virtualKeyboard.addEventListener("geometrychange", (e) => {
@@ -207,9 +160,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isKeyboardOpen = height > 0;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
       document.documentElement.style.setProperty('--keyboard-h', `${height}px`);
-      
-      // 关键性能防护：仅当模态框未打开时，才对主界面底部导航栏做对应位置抬升
-      // 模态框打开时，避开对主页面任何布局计算
       if (document.body.classList.contains("modal-open")) {
         if (isKeyboardOpen && window._currentInput && document.activeElement === window._currentInput) {
           import("./ui.js").then(({ centerActiveInput, updateSuggestionBoxPosition }) => {
@@ -219,7 +169,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         return; 
       }
-
       if (isKeyboardOpen && window._currentInput && document.activeElement === window._currentInput) {
         import("./ui.js").then(({ centerActiveInput }) => {
           centerActiveInput(window._currentInput);
@@ -239,8 +188,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         const isKeyboardOpen = keyboardHeight > 80;
         document.body.classList.toggle("keyboard-open", isKeyboardOpen);
         document.documentElement.style.setProperty('--keyboard-h', `${isKeyboardOpen ? keyboardHeight : 0}px`);
-        
-        // 性能防御：模态框呈递时，不触碰主页面冗余的排版流、导航提升计算
         if (document.body.classList.contains("modal-open")) {
           if (window._currentInput && document.activeElement === window._currentInput) {
             import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
@@ -250,7 +197,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           }
           return; 
         }
-
         import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
           if (window._currentInput && document.activeElement === window._currentInput) {
             debouncedCenterActive(window._currentInput);
@@ -266,7 +212,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.addEventListener("resize", updateViewportHeight);
     updateViewportHeight();
   }
-
   document.addEventListener("touchstart", () => {
     state.isUserTouching = true;
   }, { passive: true });
@@ -276,7 +221,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.addEventListener("touchcancel", () => {
     state.isUserTouching = false;
   }, { passive: true });
-
   window.addEventListener("scroll", (e) => {
     if (state.isUserTouching) {
       const box = document.getElementById("suggestionBox");
@@ -289,7 +233,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.scrollTo(0, 0);
     }
   }, true);
-
   document.addEventListener("click", (e) => {
     const box = document.getElementById("suggestionBox");
     if (box && box.style.display !== "none") {
@@ -302,16 +245,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     setTimeout(() => {
       if (!document.activeElement || !document.activeElement.classList.contains("mx-input")) {
-        const modal = document.querySelector(".mx-modal-overlay.open .mx-modal");
-        if (modal) {
-          modal.style.transform = "scale(1) translate3d(0, 0, 0)";
+        const subpage = document.getElementById("appConfigSubpage");
+        if (subpage) {
+          subpage.style.transform = "translate3d(0, 0, 0)";
         }
         document.body.classList.remove("keyboard-open");
       }
     }, 150);
   });
-
-  // Settings
   state.currentSettings = await getSettings();
   document.getElementById("autoThemeToggle").checked = state.currentSettings.autoTheme;
   document.getElementById("pluginSyncToggle").checked = state.currentSettings.syncPlugin;
@@ -322,17 +263,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   } else {
     applyTheme(state.isDarkMode);
   }
-
-  // Theme toggles
   document.getElementById("btnThemeToggleMobile").onclick = handleManualThemeToggle;
   document.getElementById("btnThemeToggleDesktop").onclick = handleManualThemeToggle;
-
-  // Navigation
   document.querySelectorAll(".mx-nav-item, .mx-btm-item").forEach((btn) => {
     btn.onclick = () => switchSection(btn.dataset.section);
   });
-
-  // App filter
   document.querySelectorAll("#appFilterGroup button").forEach((btn) => {
     btn.onclick = () => {
       document.querySelectorAll("#appFilterGroup button").forEach((b) => b.classList.remove("active"));
@@ -341,11 +276,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderAppList();
     };
   });
-
-  // App search
   document.getElementById("appSearch")?.addEventListener("input", debounce(renderAppList, 250));
-
-  // IO
   const ioContainer = document.getElementById("ioLogContainer");
   const ioSearch = document.getElementById("ioSearch");
   if (ioSearch) {
@@ -365,8 +296,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   document.getElementById("btnClearIo").onclick = clearIoLogs;
-
-  // Log
   const logSelect = document.getElementById("logSourceSelect");
   const logLevelSelect = document.getElementById("logLevelSelect");
   const logViewer = document.getElementById("logViewer");
@@ -393,12 +322,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   document.getElementById("btnClearLog").onclick = clearSysLogs;
-
-  // Status toggle
   document.getElementById("btnToggleStatusMobile").onclick = toggleStatus;
   document.getElementById("btnToggleStatusDesktop").onclick = toggleStatus;
-
-  // Settings modal
   const openSettings = async () => {
     const isInstalled = await checkPluginInstalled();
     const lbl = document.getElementById("pluginStatusLabel");
@@ -422,8 +347,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("settingsModal")?.classList.remove("open");
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
-
-  // Ignore modal
   document.getElementById("btnMonitorIgnore").onclick = async () => {
     const content = await run(`cat ${CONST.MONITOR_IGNORE_CONF} 2>/dev/null`);
     document.getElementById("monitorIgnoreContent").value = content;
@@ -446,8 +369,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("保存失败");
     }
   };
-
-  // Mode toggles
   setupModeToggle(
     "globalModeToggle",
     "globalVisual",
@@ -476,15 +397,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     parseIgnoreToVisual,
     generateIgnoreFromVisual
   );
-
-  // Global rules
   setupGlobalHandlers();
   document.getElementById("btnAppAddRule").onclick = () =>
     addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
-
-  // App config modal interactions
   document.getElementById("btnCloseAppModal").onclick = closeModalCleanup;
-
   document.getElementById("btnSaveAppConfig").onclick = async () => {
     try {
       const isVisual = document
@@ -519,7 +435,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("保存失败");
     }
   };
-
   document.getElementById("btnDeleteAppConfig").onclick = async () => {
     if (!confirm("确定清除配置吗?")) return;
     const dir =
@@ -534,15 +449,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     showToast("配置已清除");
   };
-
   const originalOpenAppConfig = window.openAppConfig;
   window.openAppConfig = (pkg) => {
     stopPolling();
     document.querySelector(".mx-app").classList.add("frozen");
     document.body.classList.add("modal-open");
-    originalOpenAppConfig(pkg);
+    const openActions = () => {
+        document.getElementById("appConfigSubpage")?.classList.add("open");
+        originalOpenAppConfig(pkg);
+    };
+    if (document.startViewTransition) {
+        document.startViewTransition(() => openActions());
+    } else {
+        openActions();
+    }
   };
-
   initIoLogs();
   initSysLogs();
   loadData();

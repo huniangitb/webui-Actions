@@ -103,14 +103,24 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
     btn.onclick = () => {
       document.querySelectorAll(`button[name="${groupName}"]`).forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      if (btn.dataset.mode === "visual") {
-        parseFunc(document.getElementById(contentId).value);
-        document.getElementById(rawId).classList.remove("active");
-        document.getElementById(visualId).classList.add("active");
+      
+      const applyToggle = () => {
+        if (btn.dataset.mode === "visual") {
+          parseFunc(document.getElementById(contentId).value);
+          document.getElementById(rawId).classList.remove("active");
+          document.getElementById(visualId).classList.add("active");
+        } else {
+          document.getElementById(contentId).value = genFunc();
+          document.getElementById(visualId).classList.remove("active");
+          document.getElementById(rawId).classList.add("active");
+        }
+      };
+
+      // 引入原生 View Transitions 渲染过渡
+      if (document.startViewTransition) {
+        document.startViewTransition(() => applyToggle());
       } else {
-        document.getElementById(contentId).value = genFunc();
-        document.getElementById(visualId).classList.remove("active");
-        document.getElementById(rawId).classList.add("active");
+        applyToggle();
       }
     };
   });
@@ -176,24 +186,16 @@ export const updateSuggestionBoxPosition = (input) => {
 };
 
 // =============================================
-// 对焦定位引擎 (结合真实虚拟键盘边界与 CSS 弹性垫片进行对焦)
+// 对焦定位引擎 (高版本原生 VirtualKeyboard 标准对接)
 // =============================================
 export const centerActiveInput = (input) => {
   const container = input.closest(".overflow-y-auto");
   const row = input.closest(".rule-row") || input;
   if (!container || !row) return;
 
-  // 刚性激活 input-focused 样式（在 CSS 中通过高度占位提供滚动溢出裕量）
-  container.classList.add("input-focused");
-
-  // 计算当前聚焦行相对于滚动区顶部的偏移位置
   const elementRelativeTop = row.offsetTop;
-
-  // 滚动黄金视区：确保输入行平滑靠置在滚动区顶部下方 40px 的位置（极佳的可视区域）
-  const targetScrollTop = elementRelativeTop - 40;
-
   container.scrollTo({
-    top: targetScrollTop,
+    top: elementRelativeTop - 40,
     behavior: "smooth"
   });
 };
@@ -309,10 +311,6 @@ const setupAutocomplete = (input) => {
 
   input.addEventListener("focus", () => {
     window._currentInput = input;
-    const container = input.closest(".overflow-y-auto");
-    if (container) {
-      container.classList.add("input-focused");
-    }
     setTimeout(() => {
       if (document.activeElement === input) {
         centerActiveInput(input);
@@ -331,10 +329,6 @@ const setupAutocomplete = (input) => {
       if (!activeEl || !activeEl.classList.contains("mx-input")) {
         box.style.display = "none";
         state.currentSuggestions = [];
-        const container = input.closest(".overflow-y-auto");
-        if (container) {
-          container.classList.remove("input-focused");
-        }
       }
     }, 150);
   });

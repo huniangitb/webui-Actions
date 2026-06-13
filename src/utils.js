@@ -40,26 +40,47 @@ export const debounce = (func, wait) => {
   };
 };
 
-// ---- Toast ----
+// ---- Toast (采用现代 Web Animations API 高性能合成层动画) ----
 export const showToast = (msg) => {
   try {
     ksuToast(msg);
   } catch {}
+  
   const c = document.getElementById("toastContainer");
   const t = document.createElement("div");
   t.className = "mx-toast";
   t.textContent = msg;
+  
+  // 提前通知浏览器内核准备渲染流水线硬件加速
+  t.style.willChange = "transform, opacity";
   c.appendChild(t);
+
+  // 利用浏览器原生的 Web Animations API (WAAPI) 驱动 spring 阻尼淡入，完全不拖累主线程
+  t.animate([
+    { transform: 'translateY(16px) scale(0.95)', opacity: 0 },
+    { transform: 'translateY(0) scale(1)', opacity: 1 }
+  ], {
+    duration: 250,
+    easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+    fill: 'forwards'
+  });
+
   setTimeout(() => {
-    t.style.opacity = "0";
-    setTimeout(() => t.remove(), 300);
-  }, 3000);
+    const animOut = t.animate([
+      { transform: 'translateY(0) scale(1)', opacity: 1 },
+      { transform: 'translateY(-12px) scale(0.95)', opacity: 0 }
+    ], {
+      duration: 200,
+      easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      fill: 'forwards'
+    });
+    animOut.onfinish = () => t.remove();
+  }, 2500);
 };
 
 // ---- SVG icon helper ----
 const getSvg = (path, size = 24, color = "currentColor") =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="${size}" height="${size}"><path d="${path}" fill="${color}" stroke="none"/></svg>`;
-
 export const ICONS = {
   APPS: getSvg(mdiViewGridOutline),
   GLOBAL: getSvg(mdiWrench),

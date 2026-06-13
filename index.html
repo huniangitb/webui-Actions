@@ -85,7 +85,7 @@
                             <button data-filter="filterBound">已配置App</button>
                         </div>
                     </div>
-                    <!-- 优化后的应用卡片容器层 -->
+                    <!-- 应用卡片容器层 -->
                     <div class="mx-card-body p-0 list-scrollable relative" id="appListContainer">
                         <!-- 初始阻尼加载转圈动画 -->
                         <div id="appLoadingOverlay" class="mx-spinner-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--mx-bg); z-index: 15; display: flex;">
@@ -102,7 +102,7 @@
                     <h1 class="mx-page-title">全局规则</h1>
                     <p class="mx-page-sub">对所有应用默认生效的基础配置</p>
                 </div>
-                <div class="mx-card mx-anim-card-in flex-col-full" style="max-height: calc(100vh - 180px);">
+                <div class="mx-card mx-anim-card-in flex-col-full" style="max-height: calc(100dvh - 180px);">
                     <div class="mx-card-head">
                         <span class="mx-card-title">基础设置</span>
                         <div class="mx-pill-group">
@@ -161,8 +161,11 @@
                 <div class="mx-page-head mx-anim-slide-up">
                     <h1 class="mx-page-title">文件监控</h1>
                 </div>
-                <div class="mx-card mx-anim-card-in flex-col-full">
-                    <div class="mx-card-head gap-2" style="padding-bottom: 12px; border-bottom: 1px solid var(--mx-border);">
+                <div class="mx-card mx-anim-card-in flex-col-full relative">
+                    <!-- OffscreenCanvas 独立线程流光图层 -->
+                    <canvas id="ioPerformanceCanvas" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 1;"></canvas>
+                    
+                    <div class="mx-card-head gap-2" style="padding-bottom: 12px; border-bottom: 1px solid var(--mx-border); z-index: 2;">
                         <div class="mx-input-wrap" style="flex:1;">
                             <span class="mx-input-icon" id="iconIoSearch"></span>
                             <input type="text" id="ioSearch" class="mx-input" placeholder="搜索操作或路径..." />
@@ -170,7 +173,7 @@
                         <button class="mx-btn mx-btn-secondary mx-btn-icon mx-tooltip" id="btnMonitorIgnore"></button>
                         <button class="mx-btn mx-btn-danger mx-btn-icon mx-tooltip" id="btnClearIo"></button>
                     </div>
-                    <div class="mx-card-body p-0 list-scrollable" id="ioLogContainer" style="background: var(--mx-bg);">
+                    <div class="mx-card-body p-0 list-scrollable" id="ioLogContainer" style="background: transparent; z-index: 2;">
                         <div id="ioLogList" class="flex-col p-0"></div>
                         <div id="ioLoadingIndicator" class="text-center text-muted p-2 hidden" style="font-size:12px;">加载中...</div>
                     </div>
@@ -181,7 +184,7 @@
                 <div class="mx-page-head mx-anim-slide-up">
                     <h1 class="mx-page-title">运行日志</h1>
                 </div>
-                <div class="mx-card mx-anim-card-in flex-col-full" style="max-height: calc(100vh - 180px);">
+                <div class="mx-card mx-anim-card-in flex-col-full" style="max-height: calc(100dvh - 180px);">
                     <div class="mx-card-head" style="padding-bottom:10px;border-bottom: 1px solid var(--mx-border);">
                         <select id="logSourceSelect" class="mx-select" style="width: 140px;">
                             <option value="internal">注入日志</option>

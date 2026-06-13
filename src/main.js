@@ -44,6 +44,70 @@ const lockInitialHeight = () => {
 lockInitialHeight();
 
 // =============================================
+// OffscreenCanvas Background Renderer
+// =============================================
+const initOffscreenCanvas = () => {
+  const canvas = document.getElementById("ioPerformanceCanvas");
+  if (!canvas || !canvas.transferControlToOffscreen) return;
+  
+  try {
+    const offscreen = canvas.transferControlToOffscreen();
+    
+    // 利用 Blob 动态构建原生独立 Worker 线程，彻底不拖累主线程
+    const workerCode = `
+      let width = 0, height = 0, ctx = null, offset = 0;
+      self.onmessage = function(e) {
+        if (e.data.canvas) {
+          const canvas = e.data.canvas;
+          ctx = canvas.getContext('2d');
+          width = canvas.width;
+          height = canvas.height;
+          requestAnimationFrame(draw);
+        }
+        if (e.data.resize) {
+          width = e.data.resize.width;
+          height = e.data.resize.height;
+        }
+      };
+      function draw() {
+        if (!ctx) return;
+        ctx.clearRect(0, 0, width, height);
+        
+        // 绘制高阶科技感动态流光波形背景
+        ctx.strokeStyle = "rgba(39, 122, 247, 0.22)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let x = 0; x < width; x++) {
+          const y = (height / 2) + Math.sin((x * 0.015) + offset) * 18;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        
+        offset += 0.04;
+        requestAnimationFrame(draw);
+      }
+    `;
+    const blob = new Blob([workerCode], { type: "application/javascript" });
+    const worker = new Worker(URL.createObjectURL(blob));
+    worker.postMessage({ canvas: offscreen }, [offscreen]);
+    
+    // 自适应监听
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        canvas.width = width;
+        canvas.height = height;
+        worker.postMessage({ resize: { width, height } });
+      }
+    });
+    resizeObserver.observe(canvas.parentElement);
+  } catch (e) {
+    console.warn("OffscreenCanvas failed to spawn:", e);
+  }
+};
+
+// =============================================
 // Status Polling Manager (高能效设计)
 // =============================================
 let statusPolling = null;
@@ -156,22 +220,31 @@ const addIgnoreRow = (p) => {
 // Navigation
 // =============================================
 const switchSection = (sectionId) => {
-  document.querySelectorAll(".demo-section").forEach((el) => el.classList.remove("active"));
-  document.getElementById(`sec-${sectionId}`)?.classList.add("active");
-  document.querySelectorAll(".mx-nav-item").forEach((el) => el.classList.toggle("active", el.dataset.section === sectionId));
-  document.querySelectorAll(".mx-btm-item").forEach((el) => el.classList.toggle("active", el.dataset.section === sectionId));
-  const titles = { apps: "应用配置", global: "全局规则", io: "系统监控", log: "运行日志" };
-  const breadcrumb = document.getElementById("breadcrumbTitle");
-  if (breadcrumb) breadcrumb.textContent = titles[sectionId];
-  if (sectionId === "io") {
-    resetIoLogs();
-    fetchIoLogs();
-  }
-  if (sectionId === "log") {
-    if (document.getElementById("logSourceSelect")?.value === "internal") {
-      resetSysLogs();
+  const triggerSwitch = () => {
+    document.querySelectorAll(".demo-section").forEach((el) => el.classList.remove("active"));
+    document.getElementById(`sec-${sectionId}`)?.classList.add("active");
+    document.querySelectorAll(".mx-nav-item").forEach((el) => el.classList.toggle("active", el.dataset.section === sectionId));
+    document.querySelectorAll(".mx-btm-item").forEach((el) => el.classList.toggle("active", el.dataset.section === sectionId));
+    const titles = { apps: "应用配置", global: "全局规则", io: "系统监控", log: "运行日志" };
+    const breadcrumb = document.getElementById("breadcrumbTitle");
+    if (breadcrumb) breadcrumb.textContent = titles[sectionId];
+    if (sectionId === "io") {
+      resetIoLogs();
+      fetchIoLogs();
     }
-    fetchSysLogs();
+    if (sectionId === "log") {
+      if (document.getElementById("logSourceSelect")?.value === "internal") {
+        resetSysLogs();
+      }
+      fetchSysLogs();
+    }
+  };
+
+  // 引入原生 View Transitions API 驱动
+  if (document.startViewTransition) {
+    document.startViewTransition(() => triggerSwitch());
+  } else {
+    triggerSwitch();
   }
 };
 
@@ -180,37 +253,53 @@ const switchSection = (sectionId) => {
 // =============================================
 document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
-  let isFrameBlocked = false;
+  initOffscreenCanvas();
   
-  const updateViewportHeight = () => {
-    if (isFrameBlocked) return;
-    isFrameBlocked = true;
-    window.requestAnimationFrame(() => {
-      isFrameBlocked = false;
-      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-      const totalH = window.innerHeight;
-      const isKeyboardOpen = vh < totalH - 80;
-      
-      // 控制 keyboard-open 的类，决定导航栏与顶栏的物理隐藏，杜绝黑白带
+  // =============================================
+  // 原生标准：初始化并监听浏览器原生的 VirtualKeyboard API
+  // =============================================
+  if (navigator.virtualKeyboard) {
+    navigator.virtualKeyboard.overlaysContent = true;
+    navigator.virtualKeyboard.addEventListener("geometrychange", (e) => {
+      const { height } = e.target.boundingRect;
+      const isKeyboardOpen = height > 0;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
       
-      import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
-        if (window._currentInput && document.activeElement === window._currentInput) {
-          debouncedCenterActive(window._currentInput);
-          updateSuggestionBoxPosition(window._currentInput);
-        }
-      });
+      if (isKeyboardOpen && window._currentInput && document.activeElement === window._currentInput) {
+        import("./ui.js").then(({ centerActiveInput }) => {
+          centerActiveInput(window._currentInput);
+        });
+      }
     });
-  };
-
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener("resize", updateViewportHeight);
-    window.visualViewport.addEventListener("scroll", updateViewportHeight);
+  } else {
+    let isFrameBlocked = false;
+    const updateViewportHeight = () => {
+      if (isFrameBlocked) return;
+      isFrameBlocked = true;
+      window.requestAnimationFrame(() => {
+        isFrameBlocked = false;
+        const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        const totalH = window.innerHeight;
+        const isKeyboardOpen = vh < totalH - 80;
+        document.body.classList.toggle("keyboard-open", isKeyboardOpen);
+        
+        import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
+          if (window._currentInput && document.activeElement === window._currentInput) {
+            debouncedCenterActive(window._currentInput);
+            updateSuggestionBoxPosition(window._currentInput);
+          }
+        });
+      });
+    };
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", updateViewportHeight);
+      window.visualViewport.addEventListener("scroll", updateViewportHeight);
+    }
+    window.addEventListener("resize", updateViewportHeight);
+    updateViewportHeight();
   }
-  window.addEventListener("resize", updateViewportHeight);
-  updateViewportHeight();
 
-  // 引入全局物理触控感知逻辑
+  // 物理触控感知
   document.addEventListener("touchstart", () => {
     state.isUserTouching = true;
   }, { passive: true });
@@ -224,7 +313,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }, { passive: true });
 
   window.addEventListener("scroll", (e) => {
-    // 仅在用户物理触控滑动时，才收起自动补全
     if (state.isUserTouching) {
       const box = document.getElementById("suggestionBox");
       if (box && box.style.display !== "none") {
@@ -351,7 +439,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       lbl.textContent = isInstalled ? "状态: 发现清理插件 (已就绪)" : "状态: 未发现清理插件";
       lbl.style.color = isInstalled ? "var(--mx-green)" : "var(--mx-red)";
     }
-    document.getElementById("settingsModal")?.classList.add("open");
+    
+    if (document.startViewTransition) {
+      document.startViewTransition(() => {
+        document.getElementById("settingsModal")?.classList.add("open");
+      });
+    } else {
+      document.getElementById("settingsModal")?.classList.add("open");
+    }
   };
   document.getElementById("btnSettingsMobile").onclick = openSettings;
   document.getElementById("btnSettingsDesktop").onclick = openSettings;
@@ -364,7 +459,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       applyTheme(mediaQuery.matches);
     }
     showToast("设置已保存");
-    document.getElementById("settingsModal")?.classList.remove("open");
+    
+    const closeSettings = () => {
+      document.getElementById("settingsModal")?.classList.remove("open");
+    };
+    if (document.startViewTransition) {
+      document.startViewTransition(() => closeSettings());
+    } else {
+      closeSettings();
+    }
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
 
@@ -373,7 +476,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     const content = await run(`cat ${CONST.MONITOR_IGNORE_CONF} 2>/dev/null`);
     document.getElementById("monitorIgnoreContent").value = content;
     parseIgnoreToVisual(content);
-    document.getElementById("monitorIgnoreModal")?.classList.add("open");
+    
+    if (document.startViewTransition) {
+      document.startViewTransition(() => {
+        document.getElementById("monitorIgnoreModal")?.classList.add("open");
+      });
+    } else {
+      document.getElementById("monitorIgnoreModal")?.classList.add("open");
+    }
   };
   document.getElementById("btnAddIgnoreRow").onclick = () => addIgnoreRow("");
   document.getElementById("btnSaveIgnore").onclick = async () => {
@@ -386,7 +496,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         : document.getElementById("monitorIgnoreContent").value;
       await run(`echo '${content.trim()}' > ${CONST.MONITOR_IGNORE_CONF}`);
       showToast("过滤配置已保存");
-      document.getElementById("monitorIgnoreModal")?.classList.remove("open");
+      
+      const closeIgnore = () => {
+        document.getElementById("monitorIgnoreModal")?.classList.remove("open");
+      };
+      if (document.startViewTransition) {
+        document.startViewTransition(() => closeIgnore());
+      } else {
+        closeIgnore();
+      }
     } catch {
       showToast("保存失败");
     }
@@ -429,8 +547,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // App config modal (冻结主界面轮询与交互)
   document.getElementById("btnCloseAppModal").onclick = () => {
-    document.getElementById("appConfigModal")?.classList.remove("open");
-    document.querySelector(".mx-app").classList.remove("frozen");
+    const closeModal = () => {
+      document.getElementById("appConfigModal")?.classList.remove("open");
+      document.querySelector(".mx-app").classList.remove("frozen");
+    };
+    if (document.startViewTransition) {
+      document.startViewTransition(() => closeModal());
+    } else {
+      closeModal();
+    }
     startPolling(); // 恢复轮询
   };
 
@@ -463,8 +588,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       await flushInjectorConf();
       showToast("配置已保存");
       
-      document.getElementById("appConfigModal")?.classList.remove("open");
-      document.querySelector(".mx-app").classList.remove("frozen");
+      const closeModal = () => {
+        document.getElementById("appConfigModal")?.classList.remove("open");
+        document.querySelector(".mx-app").classList.remove("frozen");
+      };
+      if (document.startViewTransition) {
+        document.startViewTransition(() => closeModal());
+      } else {
+        closeModal();
+      }
       startPolling(); // 重置并拉起轮询
       await loadData();
       await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
@@ -483,8 +615,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.injectorStates.delete(`${state.currentBindingPkg}:${state.currentBindingUser}`);
     await flushInjectorConf();
     
-    document.getElementById("appConfigModal")?.classList.remove("open");
-    document.querySelector(".mx-app").classList.remove("frozen");
+    const closeModal = () => {
+      document.getElementById("appConfigModal")?.classList.remove("open");
+      document.querySelector(".mx-app").classList.remove("frozen");
+    };
+    if (document.startViewTransition) {
+      document.startViewTransition(() => closeModal());
+    } else {
+      closeModal();
+    }
     startPolling();
     await loadData();
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
@@ -495,8 +634,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   const originalOpenAppConfig = window.openAppConfig;
   window.openAppConfig = (pkg) => {
     stopPolling(); // 挂载详情时立刻静默轮询
-    document.querySelector(".mx-app").classList.add("frozen");
-    originalOpenAppConfig(pkg);
+    
+    const triggerOpen = () => {
+      document.querySelector(".mx-app").classList.add("frozen");
+      originalOpenAppConfig(pkg);
+    };
+
+    if (document.startViewTransition) {
+      document.startViewTransition(() => triggerOpen());
+    } else {
+      triggerOpen();
+    }
   };
 
   initIoLogs();

@@ -41,7 +41,7 @@ const lockInitialHeight = () => {
 };
 lockInitialHeight();
 // =============================================
-// OffscreenCanvas Background Renderer (支持主页面休眠挂起)
+// OffscreenCanvas Background Renderer
 // =============================================
 let canvasWorker = null;
 const initOffscreenCanvas = () => {
@@ -146,7 +146,7 @@ const initOffscreenCanvas = () => {
   }
 };
 // =============================================
-// Status Polling Manager (支持后台挂起避让)
+// Status Polling Manager
 // =============================================
 let statusPolling = null;
 let appStatusPolling = null;
@@ -171,7 +171,6 @@ export const stopPolling = () => {
   }
 };
 const checkStatus = async () => {
-  // 当主页面配置冻结时，拦截底层 Shell 调用，避免主线程资源抢占
   if (document.querySelector(".mx-app")?.classList.contains("frozen")) return;
   try {
     let pid = (await run("pidof injector")) || (await run("pgrep -x injector"));
@@ -284,7 +283,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
   initOffscreenCanvas();
   // =============================================
-  // 浏览器原生标准：初始化并监听 VirtualKeyboard API
+  // 浏览器原生标准：VirtualKeyboard 核心监听
   // =============================================
   if (navigator.virtualKeyboard) {
     navigator.virtualKeyboard.overlaysContent = true;
@@ -293,7 +292,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isKeyboardOpen = height > 0;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
       document.documentElement.style.setProperty('--keyboard-h', `${height}px`);
+      
+      const isAppFrozen = document.querySelector(".mx-app")?.classList.contains("frozen");
       if (isKeyboardOpen && window._currentInput && document.activeElement === window._currentInput) {
+        const isInsideModal = window._currentInput.closest(".mx-modal-overlay.open");
+        if (isAppFrozen && !isInsideModal) return; // 物理屏蔽隔离
         import("./ui.js").then(({ centerActiveInput }) => {
           centerActiveInput(window._currentInput);
         });
@@ -312,12 +315,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         const isKeyboardOpen = keyboardHeight > 80;
         document.body.classList.toggle("keyboard-open", isKeyboardOpen);
         document.documentElement.style.setProperty('--keyboard-h', `${isKeyboardOpen ? keyboardHeight : 0}px`);
-        import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
-          if (window._currentInput && document.activeElement === window._currentInput) {
+        
+        // 物理安全机制：主页面冻结时隔离任何不属于 active modal 的提示及定位事件
+        const isAppFrozen = document.querySelector(".mx-app")?.classList.contains("frozen");
+        if (window._currentInput && document.activeElement === window._currentInput) {
+          const isInsideModal = window._currentInput.closest(".mx-modal-overlay.open");
+          if (isAppFrozen && !isInsideModal) return; // 物理阻断
+          import("./ui.js").then(({ updateSuggestionBoxPosition, debouncedCenterActive }) => {
             debouncedCenterActive(window._currentInput);
             updateSuggestionBoxPosition(window._currentInput);
-          }
-        });
+          });
+        }
       });
     };
     if (window.visualViewport) {
@@ -529,7 +537,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnCloseAppModal").onclick = () => {
     document.getElementById("appConfigModal")?.classList.remove("open");
     document.querySelector(".mx-app").classList.remove("frozen");
-    // 恢复主页 Canvas Background 动画渲染与常态定时器轮询
     if (canvasWorker) canvasWorker.postMessage({ resume: true });
     startPolling();
   };
@@ -562,7 +569,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("配置已保存");
       document.getElementById("appConfigModal")?.classList.remove("open");
       document.querySelector(".mx-app").classList.remove("frozen");
-      // 唤醒主页面资源
       if (canvasWorker) canvasWorker.postMessage({ resume: true });
       startPolling();
       await loadData();
@@ -590,9 +596,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
   const originalOpenAppConfig = window.openAppConfig;
   window.openAppConfig = (pkg) => {
-    // 彻底停止轮询以停止主页的 Shell 背景查询
     stopPolling();
-    // 暂停 Canvas 绘制工作流，让设备硬件资源向配置编辑倾斜
     if (canvasWorker) canvasWorker.postMessage({ pause: true });
     document.querySelector(".mx-app").classList.add("frozen");
     originalOpenAppConfig(pkg);

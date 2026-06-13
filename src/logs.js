@@ -86,6 +86,10 @@ class VirtualLogList {
     }
   }
   _onScroll() {
+    // 物理隔离：若主视图已被冻结，完全屏蔽背景虚拟列表的任何逻辑及重绘
+    if (document.querySelector(".mx-app")?.classList.contains("frozen")) {
+      return;
+    }
     if (!this._ticking) {
       window.requestAnimationFrame(() => {
         this._render();
@@ -95,6 +99,10 @@ class VirtualLogList {
     }
   }
   _render() {
+    // 物理隔离：冻结保护
+    if (document.querySelector(".mx-app")?.classList.contains("frozen")) {
+      return;
+    }
     const scrollTop = this.container.scrollTop;
     const viewHeight = this.container.clientHeight;
     this.contentEl.style.height = this.totalHeight + "px";
@@ -106,8 +114,6 @@ class VirtualLogList {
     }
     const startIdx = this._findIndex(scrollTop);
     const renderStart = Math.max(0, startIdx - this.buffer);
-    
-    // 快速利用 precomputed 累积高度寻找可视尾部索引
     let endIdx = startIdx;
     const maxBottom = scrollTop + viewHeight + this.buffer * this.estimatedLineHeight;
     while (endIdx < this.entries.length && this.prefixHeights[endIdx] < maxBottom) {

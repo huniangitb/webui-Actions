@@ -102,10 +102,16 @@ body.loaded {
     transform: translateZ(0);
     transition: transform 0.25s var(--mx-ease), opacity 0.2s var(--mx-ease);
 }
-/* 主页面导航栏实时跟随虚拟键盘（利用 CSS 变量硬关联） */
-body.keyboard-open .mx-bottom-nav {
+/* =============================================
+   导航栏隔离机制：仅在未冻结（主页面视图中）时实时跟随键盘
+   ============================================= */
+body.keyboard-open .mx-app:not(.frozen) .mx-bottom-nav {
     transform: translateY(calc(-1 * var(--keyboard-h, 0px)));
     transition: none !important;
+}
+/* 在应用配置模态框打开（主视图已冻结）时，直接剔除底部导航栏，屏蔽任何重绘和无意义物理偏移 */
+body.keyboard-open .mx-app.frozen .mx-bottom-nav {
+    display: none !important;
 }
 .mx-bottom-nav-items { display: flex; list-style: none; margin: 0; padding: 0; height: 56px; }
 .mx-btm-item {
@@ -277,12 +283,9 @@ body.keyboard-open .mx-bottom-nav {
 }
 .mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1) translate3d(0, 0, 0); opacity: 1; }
-/* =============================================
-   应用配置页面：移动端虚拟键盘唤起适配 (零延迟自适应底部面板)
-   ============================================= */
 @media (max-width: 767px) {
     body.keyboard-open .mx-modal-overlay {
-        align-items: flex-end; /* 键盘弹出时靠底对齐 */
+        align-items: flex-end; 
     }
     body.keyboard-open .mx-modal {
         border-bottom-left-radius: 0;
@@ -291,9 +294,9 @@ body.keyboard-open .mx-bottom-nav {
         max-width: 100vw;
         height: calc(100dvh - var(--keyboard-h, 0px) - env(safe-area-inset-top, 0px));
         max-height: calc(100dvh - var(--keyboard-h, 0px) - env(safe-area-inset-top, 0px));
-        margin-bottom: var(--keyboard-h, 0px); /* 1:1 精准对齐键盘高度 */
+        margin-bottom: var(--keyboard-h, 0px); 
         transform: scale(1) translate3d(0, 0, 0) !important;
-        transition: none !important; /* 关键：坚决不使用 transition，与键盘运动轨迹物理硬同步 */
+        transition: none !important; 
     }
     body.keyboard-open .mx-modal-body {
         max-height: none !important;

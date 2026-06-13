@@ -1,4 +1,4 @@
-@import "https://mui.kernelsu.org/internal/insets.css";
+@import "https://https.kernelsu.org/internal/insets.css";
 :root {
     --mx-primary: #277AF7;
     --mx-primary-hover: #4599ff;
@@ -101,6 +101,11 @@ body.loaded {
     z-index: 100;
     transform: translateZ(0);
     transition: transform 0.25s var(--mx-ease), opacity 0.2s var(--mx-ease);
+}
+/* 主页面导航栏实时跟随虚拟键盘（利用 CSS 变量硬关联） */
+body.keyboard-open .mx-bottom-nav {
+    transform: translateY(calc(-1 * var(--keyboard-h, 0px)));
+    transition: none !important;
 }
 .mx-bottom-nav-items { display: flex; list-style: none; margin: 0; padding: 0; height: 56px; }
 .mx-btm-item {
@@ -250,9 +255,9 @@ body.loaded {
 .mx-switch input:checked + .mx-switch-track .mx-switch-thumb { transform: translateX(20px); }
 .mx-modal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 2000;
+    background: rgba(0,0,0,0.65); z-index: 2000;
     display: flex; align-items: center; justify-content: center;
-    opacity: 0; pointer-events: none; transition: opacity 0.25s var(--mx-ease);
+    opacity: 0; pointer-events: none; transition: opacity 0.2s var(--mx-ease);
 }
 .mx-modal-overlay.open { opacity: 1; pointer-events: auto; }
 .mx-modal { 
@@ -262,31 +267,39 @@ body.loaded {
     border-radius: 24px; 
     display: flex; 
     flex-direction: column; 
-    max-height: 90%; 
+    max-height: 85%; 
     border: 1px solid var(--mx-border); 
     box-shadow: var(--mx-shadow); 
-    transform: scale(0.95); 
+    transform: scale(0.96) translate3d(0, 16px, 0); 
     opacity: 0; 
-    transition: opacity 0.25s var(--mx-ease), transform 0.25s var(--mx-ease);
+    transition: opacity 0.2s var(--mx-ease), transform 0.2s var(--mx-ease);
     will-change: transform, opacity;
 }
 .mx-modal.large { max-width: 800px; height: 85%; }
-.mx-modal-overlay.open .mx-modal { transform: scale(1); opacity: 1; }
-body.keyboard-open .mx-modal {
-    max-height: 94% !important;
-}
-body.keyboard-open .mx-modal.large {
-    height: 92% !important;
-}
-body.keyboard-open .mx-bottom-nav {
-    display: none !important;
-}
-body.keyboard-open .mx-topbar {
-    display: none !important;
-}
-body.keyboard-open .mx-desktop-main {
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
+.mx-modal-overlay.open .mx-modal { transform: scale(1) translate3d(0, 0, 0); opacity: 1; }
+/* =============================================
+   应用配置页面：移动端虚拟键盘唤起适配 (零延迟自适应底部面板)
+   ============================================= */
+@media (max-width: 767px) {
+    body.keyboard-open .mx-modal-overlay {
+        align-items: flex-end; /* 键盘弹出时靠底对齐 */
+    }
+    body.keyboard-open .mx-modal {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        width: 100vw;
+        max-width: 100vw;
+        height: calc(100dvh - var(--keyboard-h, 0px) - env(safe-area-inset-top, 0px));
+        max-height: calc(100dvh - var(--keyboard-h, 0px) - env(safe-area-inset-top, 0px));
+        margin-bottom: var(--keyboard-h, 0px); /* 1:1 精准对齐键盘高度 */
+        transform: scale(1) translate3d(0, 0, 0) !important;
+        transition: none !important; /* 关键：坚决不使用 transition，与键盘运动轨迹物理硬同步 */
+    }
+    body.keyboard-open .mx-modal-body {
+        max-height: none !important;
+        flex: 1;
+        overflow-y: auto !important;
+    }
 }
 .mx-modal-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mx-border); flex-shrink: 0;}
 .mx-modal-title { font-size: 18px; font-weight: 700; margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
@@ -320,9 +333,6 @@ body.keyboard-open .mx-desktop-main {
 .app-name { font-size: 15px; font-weight: 600; color: var(--mx-t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;}
 .app-pkg { font-size: 11px; color: var(--mx-t2); font-family: var(--mx-font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; max-width: 120px; }
-/* =============================================
-   专属路径规则样式重构：并列换行，且保持两端同行对齐
-   ============================================= */
 .rule-row { 
     display: flex; 
     flex-direction: row; 
@@ -343,7 +353,7 @@ body.keyboard-open .mx-desktop-main {
 .rule-inputs { 
     flex: 1; 
     display: flex; 
-    flex-direction: column; /* 纵向堆叠输入框，实现行内并列换行效果 */
+    flex-direction: column; 
     gap: 6px; 
     min-width: 0;
 }
@@ -357,9 +367,6 @@ body.keyboard-open .mx-desktop-main {
     height: 32px !important;
     flex-shrink: 0;
 }
-/* =============================================
-   彻底移除高度缓动（Transition），利用 CSS 变量实现与键盘绝对硬同步
-   ============================================= */
 .overflow-y-auto.editor-scroll {
     max-height: calc(100% - var(--keyboard-h, 0px));
 }

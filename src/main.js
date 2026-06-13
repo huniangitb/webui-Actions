@@ -41,17 +41,18 @@ const lockInitialHeight = () => {
 };
 lockInitialHeight();
 // =============================================
-// OffscreenCanvas Background Renderer
+// OffscreenCanvas Background Renderer (支持主页面休眠挂起)
 // =============================================
+let canvasWorker = null;
 const initOffscreenCanvas = () => {
   const canvas = document.getElementById("ioPerformanceCanvas");
   if (!canvas || !canvas.transferControlToOffscreen) return;
   try {
     const offscreen = canvas.transferControlToOffscreen();
-    // 采用更贴合文件监控语义的多轨道 IO 总线与发光数据粒子传输流动画
     const workerCode = `
       let width = 0, height = 0, ctx = null;
       let particles = [];
+      let isPaused = false;
       const maxParticles = 45;
       self.onmessage = function(e) {
         if (e.data.canvas) {
@@ -65,11 +66,19 @@ const initOffscreenCanvas = () => {
           width = e.data.resize.width;
           height = e.data.resize.height;
         }
+        if (e.data.pause) {
+          isPaused = true;
+        }
+        if (e.data.resume) {
+          if (isPaused) {
+            isPaused = false;
+            requestAnimationFrame(draw);
+          }
+        }
       };
       function draw() {
-        if (!ctx) return;
+        if (!ctx || isPaused) return;
         ctx.clearRect(0, 0, width, height);
-        // 1. 绘制多通道虚拟 FUSE 数据总线背景 (虚线)
         const channels = [height * 0.25, height * 0.5, height * 0.75];
         ctx.strokeStyle = "rgba(39, 122, 247, 0.06)";
         ctx.lineWidth = 1;
@@ -80,7 +89,6 @@ const initOffscreenCanvas = () => {
           ctx.lineTo(width, y);
           ctx.stroke();
         });
-        // 2. 规律性并发喷射 IO 操作数据包粒子 (Read 代表绿色，Write 代表橙色)
         if (particles.length < maxParticles && Math.random() < 0.15) {
           const isRead = Math.random() > 0.45;
           particles.push({
@@ -92,7 +100,6 @@ const initOffscreenCanvas = () => {
             alpha: 0.15 + Math.random() * 0.55
           });
         }
-        // 3. 实时步进绘制粒子流
         ctx.setLineDash([]);
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
@@ -105,7 +112,6 @@ const initOffscreenCanvas = () => {
             particles.splice(i, 1);
             continue;
           }
-          // 渲染流式发光拖尾
           const gradient = ctx.createLinearGradient(p.x - 24, p.y, p.x, p.y);
           gradient.addColorStop(0, "transparent");
           gradient.addColorStop(1, p.color + alpha + ")");
@@ -115,7 +121,6 @@ const initOffscreenCanvas = () => {
           ctx.moveTo(p.x - 24, p.y);
           ctx.lineTo(p.x, p.y);
           ctx.stroke();
-          // 核心光点头部亮斑
           ctx.fillStyle = p.color + Math.min(1, alpha * 1.5) + ")";
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size / 2 + 0.5, 0, Math.PI * 2);
@@ -125,14 +130,14 @@ const initOffscreenCanvas = () => {
       }
     `;
     const blob = new Blob([workerCode], { type: "application/javascript" });
-    const worker = new Worker(URL.createObjectURL(blob));
-    worker.postMessage({ canvas: offscreen }, [offscreen]);
+    canvasWorker = new Worker(URL.createObjectURL(blob));
+    canvasWorker.postMessage({ canvas: offscreen }, [offscreen]);
     const resizeObserver = new ResizeObserver((entries) => {
       for (let entry of entries) {
         const { width, height } = entry.contentRect;
         canvas.width = width;
         canvas.height = height;
-        worker.postMessage({ resize: { width, height } });
+        canvasWorker.postMessage({ resize: { width, height } });
       }
     });
     resizeObserver.observe(canvas.parentElement);
@@ -141,7 +146,7 @@ const initOffscreenCanvas = () => {
   }
 };
 // =============================================
-// Status Polling Manager (高能效设计)
+// Status Polling Manager (支持后台挂起避让)
 // =============================================
 let statusPolling = null;
 let appStatusPolling = null;
@@ -166,6 +171,8 @@ export const stopPolling = () => {
   }
 };
 const checkStatus = async () => {
+  // 当主页面配置冻结时，拦截底层 Shell 调用，避免主线程资源抢占
+  if (document.querySelector(".mx-app")?.classList.contains("frozen")) return;
   try {
     let pid = (await run("pidof injector")) || (await run("pgrep -x injector"));
     state.currentPid = pid ? pid.split(" ")[0] : null;
@@ -200,6 +207,7 @@ const toggleStatus = async () => {
   setTimeout(checkStatus, 500);
 };
 const refreshAppStatus = async () => {
+  if (document.querySelector(".mx-app")?.classList.contains("frozen")) return;
   try {
     const [mounts] = await Promise.all([fetchActiveMounts(), fetchInjectedApps()]);
     state.activeMounts = mounts;
@@ -276,7 +284,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
   initOffscreenCanvas();
   // =============================================
-  // 原生高精度视口变化硬关联：通过 CSS 全局变量直接挂载
+  // 浏览器原生标准：初始化并监听 VirtualKeyboard API
   // =============================================
   if (navigator.virtualKeyboard) {
     navigator.virtualKeyboard.overlaysContent = true;
@@ -521,6 +529,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnCloseAppModal").onclick = () => {
     document.getElementById("appConfigModal")?.classList.remove("open");
     document.querySelector(".mx-app").classList.remove("frozen");
+    // 恢复主页 Canvas Background 动画渲染与常态定时器轮询
+    if (canvasWorker) canvasWorker.postMessage({ resume: true });
     startPolling();
   };
   document.getElementById("btnSaveAppConfig").onclick = async () => {
@@ -552,6 +562,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("配置已保存");
       document.getElementById("appConfigModal")?.classList.remove("open");
       document.querySelector(".mx-app").classList.remove("frozen");
+      // 唤醒主页面资源
+      if (canvasWorker) canvasWorker.postMessage({ resume: true });
       startPolling();
       await loadData();
       await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
@@ -570,6 +582,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await flushInjectorConf();
     document.getElementById("appConfigModal")?.classList.remove("open");
     document.querySelector(".mx-app").classList.remove("frozen");
+    if (canvasWorker) canvasWorker.postMessage({ resume: true });
     startPolling();
     await loadData();
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
@@ -577,7 +590,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
   const originalOpenAppConfig = window.openAppConfig;
   window.openAppConfig = (pkg) => {
+    // 彻底停止轮询以停止主页的 Shell 背景查询
     stopPolling();
+    // 暂停 Canvas 绘制工作流，让设备硬件资源向配置编辑倾斜
+    if (canvasWorker) canvasWorker.postMessage({ pause: true });
     document.querySelector(".mx-app").classList.add("frozen");
     originalOpenAppConfig(pkg);
   };

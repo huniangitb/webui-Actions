@@ -111,31 +111,6 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
   });
 };
 // =============================================
-// Modal Shifter (With Layout cache optimization)
-// =============================================
-export const updateModalShift = () => {
-  const modal = document.querySelector(".mx-modal-overlay.open .mx-modal");
-  if (!modal) return;
-  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  const totalH = window.innerHeight;
-  if (vh >= totalH - 60) {
-    modal.style.transform = "scale(1) translate3d(0, 0, 0)";
-    return;
-  }
-  if (!state.cachedModalHeight || state.lastActiveModal !== modal) {
-    state.cachedModalHeight = modal.offsetHeight;
-    state.lastActiveModal = modal;
-  }
-  const naturalTop = (totalH - state.cachedModalHeight) / 2;
-  const naturalBottom = naturalTop + state.cachedModalHeight;
-  const overlap = naturalBottom - vh + 16;
-  if (overlap > 0) {
-    modal.style.transform = `scale(1) translate3d(0, -${overlap}px, 0)`;
-  } else {
-    modal.style.transform = "scale(1) translate3d(0, 0, 0)";
-  }
-};
-// =============================================
 // Autocomplete Positioner
 // =============================================
 export const updateSuggestionBoxPosition = (input) => {
@@ -168,17 +143,16 @@ export const updateSuggestionBoxPosition = (input) => {
   }
 };
 // =============================================
-// 精准对焦定位：避免无意义微小偏移动作
+// 智能自适应居中对焦滚动
 // =============================================
 export const centerActiveInput = (input) => {
   const container = input.closest(".overflow-y-auto");
   const row = input.closest(".rule-row") || input;
   if (!container || !row) return;
+  // 精确计算编辑行，使其保持在弹出的虚拟键盘视窗正中央
   const elementRelativeTop = row.offsetTop;
-  const currentScroll = container.scrollTop;
-  const targetScroll = Math.max(0, elementRelativeTop - 12);
-  // 仅在偏移幅度大于 12 像素时才介入滚动，杜绝因微小抖动引起的屏幕闪烁
-  if (Math.abs(currentScroll - targetScroll) > 12) {
+  const targetScroll = Math.max(0, elementRelativeTop - (container.clientHeight / 2) + (row.offsetHeight / 2));
+  if (Math.abs(container.scrollTop - targetScroll) > 10) {
     container.scrollTo({
       top: targetScroll,
       behavior: "smooth"

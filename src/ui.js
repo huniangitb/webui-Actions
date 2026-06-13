@@ -149,15 +149,12 @@ export const centerActiveInput = (input) => {
   const container = input.closest(".overflow-y-auto");
   const row = input.closest(".rule-row") || input;
   if (!container || !row) return;
-  // 计算此时输入框距离容器顶部的距离，滚动至可见高度中段，确保不被下方键盘遮挡
+  // 确保输入框平滑滚动到滚动容器顶部附近（留出 40px 的缓冲空隙），彻底避免被底部软键盘遮挡
   const elementRelativeTop = row.offsetTop;
-  const targetScroll = Math.max(0, elementRelativeTop - (container.clientHeight / 2) + (row.offsetHeight / 2));
-  if (Math.abs(container.scrollTop - targetScroll) > 10) {
-    container.scrollTo({
-      top: targetScroll,
-      behavior: "smooth"
-    });
-  }
+  container.scrollTo({
+    top: Math.max(0, elementRelativeTop - 40),
+    behavior: "smooth"
+  });
 };
 export const debouncedCenterActive = debounce((input) => {
   centerActiveInput(input);

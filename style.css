@@ -1,4 +1,4 @@
-@import "https://mui.kernelsu.org/internal/insets.css";
+@import "https://https.kernelsu.org/internal/insets.css";
 :root {
     --mx-primary: #277AF7;
     --mx-primary-hover: #4599ff;
@@ -79,12 +79,6 @@ body.loaded {
     filter: grayscale(0.4) opacity(0.85);
     user-select: none;
 }
-/* 核心资源隔离防线：配置页面开启时，强制锁定主视口内容的高度，使其完全忽略虚拟键盘可能引起的 Resize 级联重算，保障后台虚拟列表等组件 0 消耗休眠 */
-.mx-app.frozen .mx-desktop-main {
-    height: var(--initial-vh);
-    max-height: var(--initial-vh);
-    overflow: hidden !important;
-}
 .mx-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
 .mx-topbar-right { display: flex; align-items: center; gap: 8px; }
 .mx-desktop-main {
@@ -105,11 +99,13 @@ body.loaded {
     backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
     border-top: 1px solid var(--mx-border);
     z-index: 100;
+    transform: translateZ(0);
+    transition: transform 0.25s var(--mx-ease), opacity 0.2s var(--mx-ease);
 }
-/* 键盘打开时，直接销毁顶部与底部导航栏渲染，避免跟随错位与资源浪费 */
-body.keyboard-open .mx-bottom-nav,
-body.keyboard-open .mx-topbar {
-    display: none !important;
+/* 限制：只有在非模态框打开（未激活 .modal-open）的状态下，底部导航栏才跟随键盘高度平移 */
+body.keyboard-open:not(.modal-open) .mx-bottom-nav {
+    transform: translateY(calc(-1 * var(--keyboard-h, 0px)));
+    transition: none !important;
 }
 .mx-bottom-nav-items { display: flex; list-style: none; margin: 0; padding: 0; height: 56px; }
 .mx-btm-item {
@@ -167,9 +163,6 @@ body.keyboard-open .mx-topbar {
 .p-2 { padding: 8px !important; }
 .p-3 { padding: 12px; }
 .p-4 { padding: 16px; }
-.gap-2 { gap: 8px; }
-.gap-3 { gap: 12px; }
-.gap-4 { gap: 16px; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .overflow-y-auto, .list-scrollable { 
     overflow-y: auto; 
@@ -282,25 +275,24 @@ body.keyboard-open .mx-topbar {
 .mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1) translate3d(0, 0, 0); opacity: 1; }
 /* =============================================
-   应用配置页面：移动端虚拟键盘唤起适配 (绝对高度贴合计算，不使用挤压流)
+   应用配置页面：移动端虚拟键盘唤起适配
    ============================================= */
 @media (max-width: 767px) {
-    body.keyboard-open .mx-modal-overlay {
-        align-items: flex-end; 
+    body.keyboard-open.modal-open .mx-modal-overlay {
+        align-items: flex-end; /* 键盘弹出时靠底对齐 */
     }
-    body.keyboard-open .mx-modal {
+    body.keyboard-open.modal-open .mx-modal {
         border-bottom-left-radius: 0;
         border-bottom-right-radius: 0;
         width: 100vw;
         max-width: 100vw;
-        /* 利用初始物理高度减去键盘高度，实现底边无缝贴合 */
-        height: calc(var(--initial-vh, 100vh) - var(--keyboard-h, 0px));
-        max-height: calc(var(--initial-vh, 100vh) - var(--keyboard-h, 0px));
-        margin-bottom: var(--keyboard-h, 0px);
-        transform: scale(1) translate3d(0, 0, 0) !important;
-        transition: none !important; /* 强制关闭 Transition，确保键盘升降每帧物理硬同步 */
+        height: 100%;
+        max-height: 100%;
+        margin-bottom: 0 !important;
+        transform: none !important;
+        transition: none !important; /* 彻底去除尺寸变动导致的闪烁，顺应系统视口缩放 */
     }
-    body.keyboard-open .mx-modal-body {
+    body.keyboard-open.modal-open .mx-modal-body {
         max-height: none !important;
         flex: 1;
         overflow-y: auto !important;
@@ -372,18 +364,24 @@ body.keyboard-open .mx-topbar {
     height: 32px !important;
     flex-shrink: 0;
 }
-.overflow-y-auto.editor-scroll {
+/* 限制：非应用配置弹窗状态下，全局规则编辑面板才随键盘高度变动容器高度 */
+body.keyboard-open:not(.modal-open) .overflow-y-auto.editor-scroll {
     max-height: calc(100% - var(--keyboard-h, 0px));
 }
 .editor-scroll {
     position: relative;
 }
+/* 默认底距 */
 .editor-scroll::after {
     content: "";
     display: block;
-    height: calc(120px + var(--keyboard-h, 0px));
+    height: 120px;
     flex-shrink: 0;
-    will-change: height;
+    transition: height 0.2s var(--mx-ease);
+}
+/* 当检测到软键盘升起时，注入一个充足的空白高度占位，确保最后一项配置能够安全滚到键盘上方 */
+body.keyboard-open .editor-scroll::after {
+    height: 320px !important;
 }
 .mx-spinner-container {
     display: flex; flex-direction: column; justify-content: center; align-items: center;

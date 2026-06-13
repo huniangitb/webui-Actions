@@ -41,111 +41,6 @@ const lockInitialHeight = () => {
 };
 lockInitialHeight();
 // =============================================
-// OffscreenCanvas Background Renderer (支持主页面休眠挂起)
-// =============================================
-let canvasWorker = null;
-const initOffscreenCanvas = () => {
-  const canvas = document.getElementById("ioPerformanceCanvas");
-  if (!canvas || !canvas.transferControlToOffscreen) return;
-  try {
-    const offscreen = canvas.transferControlToOffscreen();
-    const workerCode = `
-      let width = 0, height = 0, ctx = null;
-      let particles = [];
-      let isPaused = false;
-      const maxParticles = 45;
-      self.onmessage = function(e) {
-        if (e.data.canvas) {
-          const canvas = e.data.canvas;
-          ctx = canvas.getContext('2d');
-          width = canvas.width;
-          height = canvas.height;
-          requestAnimationFrame(draw);
-        }
-        if (e.data.resize) {
-          width = e.data.resize.width;
-          height = e.data.resize.height;
-        }
-        if (e.data.pause) {
-          isPaused = true;
-        }
-        if (e.data.resume) {
-          if (isPaused) {
-            isPaused = false;
-            requestAnimationFrame(draw);
-          }
-        }
-      };
-      function draw() {
-        if (!ctx || isPaused) return;
-        ctx.clearRect(0, 0, width, height);
-        const channels = [height * 0.25, height * 0.5, height * 0.75];
-        ctx.strokeStyle = "rgba(39, 122, 247, 0.06)";
-        ctx.lineWidth = 1;
-        channels.forEach(y => {
-          ctx.beginPath();
-          ctx.setLineDash([8, 14]);
-          ctx.moveTo(0, y);
-          ctx.lineTo(width, y);
-          ctx.stroke();
-        });
-        if (particles.length < maxParticles && Math.random() < 0.15) {
-          const isRead = Math.random() > 0.45;
-          particles.push({
-            x: 0,
-            y: channels[Math.floor(Math.random() * channels.length)],
-            speed: 1.5 + Math.random() * 3.0,
-            size: 2.5 + Math.random() * 3.5,
-            color: isRead ? "rgba(52, 211, 153, " : "rgba(251, 191, 36, ",
-            alpha: 0.15 + Math.random() * 0.55
-          });
-        }
-        ctx.setLineDash([]);
-        for (let i = particles.length - 1; i >= 0; i--) {
-          const p = particles[i];
-          p.x += p.speed;
-          let alpha = p.alpha;
-          if (p.x > width * 0.75) {
-            alpha *= (width - p.x) / (width * 0.25);
-          }
-          if (p.x > width || alpha <= 0) {
-            particles.splice(i, 1);
-            continue;
-          }
-          const gradient = ctx.createLinearGradient(p.x - 24, p.y, p.x, p.y);
-          gradient.addColorStop(0, "transparent");
-          gradient.addColorStop(1, p.color + alpha + ")");
-          ctx.strokeStyle = gradient;
-          ctx.lineWidth = p.size;
-          ctx.beginPath();
-          ctx.moveTo(p.x - 24, p.y);
-          ctx.lineTo(p.x, p.y);
-          ctx.stroke();
-          ctx.fillStyle = p.color + Math.min(1, alpha * 1.5) + ")";
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size / 2 + 0.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        requestAnimationFrame(draw);
-      }
-    `;
-    const blob = new Blob([workerCode], { type: "application/javascript" });
-    canvasWorker = new Worker(URL.createObjectURL(blob));
-    canvasWorker.postMessage({ canvas: offscreen }, [offscreen]);
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        const { width, height } = entry.contentRect;
-        canvas.width = width;
-        canvas.height = height;
-        canvasWorker.postMessage({ resize: { width, height } });
-      }
-    });
-    resizeObserver.observe(canvas.parentElement);
-  } catch (e) {
-    console.warn("OffscreenCanvas failed to spawn:", e);
-  }
-};
-// =============================================
 // Status Polling Manager (支持后台挂起避让)
 // =============================================
 let statusPolling = null;
@@ -281,7 +176,6 @@ const switchSection = (sectionId) => {
 // =============================================
 document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
-  initOffscreenCanvas();
   // =============================================
   // 原生高精度视口变化硬关联：使用 Overlay 原生方案，只改变变量，不触及 Layout
   // =============================================
@@ -528,7 +422,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnCloseAppModal").onclick = () => {
     document.getElementById("appConfigModal")?.classList.remove("open");
     document.querySelector(".mx-app").classList.remove("frozen");
-    if (canvasWorker) canvasWorker.postMessage({ resume: true });
+    document.body.classList.remove("modal-open");
     startPolling();
   };
   document.getElementById("btnSaveAppConfig").onclick = async () => {
@@ -560,7 +454,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("配置已保存");
       document.getElementById("appConfigModal")?.classList.remove("open");
       document.querySelector(".mx-app").classList.remove("frozen");
-      if (canvasWorker) canvasWorker.postMessage({ resume: true });
+      document.body.classList.remove("modal-open");
       startPolling();
       await loadData();
       await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
@@ -579,7 +473,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await flushInjectorConf();
     document.getElementById("appConfigModal")?.classList.remove("open");
     document.querySelector(".mx-app").classList.remove("frozen");
-    if (canvasWorker) canvasWorker.postMessage({ resume: true });
+    document.body.classList.remove("modal-open");
     startPolling();
     await loadData();
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
@@ -588,8 +482,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const originalOpenAppConfig = window.openAppConfig;
   window.openAppConfig = (pkg) => {
     stopPolling();
-    if (canvasWorker) canvasWorker.postMessage({ pause: true });
     document.querySelector(".mx-app").classList.add("frozen");
+    document.body.classList.add("modal-open");
     originalOpenAppConfig(pkg);
   };
   initIoLogs();

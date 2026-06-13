@@ -8,21 +8,17 @@ import {
 } from "./ui.js";
 import { syncToPlugin } from "./plugin.js";
 import { renderGlobalRules } from "./global.js";
-
 // 1x1 像素 Base64 透明占位图，用于规避浏览器因空 src 触发 premature onerror 的原生缺陷
 const TRANSPARENT_SPACER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-
 const _iconCache = new Set();
 const iconQueue = new Set();
 let isIconQueueRunning = false;
-
 const processIconQueue = async () => {
     if (isIconQueueRunning) return;
     isIconQueueRunning = true;
     while (iconQueue.size > 0) {
         const img = iconQueue.values().next().value;
         iconQueue.delete(img);
-        
         if (img && img.dataset.src) {
             img.src = img.dataset.src;
             img.removeAttribute('data-src');
@@ -31,20 +27,17 @@ const processIconQueue = async () => {
     }
     isIconQueueRunning = false;
 };
-
 const enqueueIcon = (img) => {
     if (!img || !img.dataset.src) return;
     iconQueue.add(img);
     processIconQueue();
 };
-
 // =============================================
 // Loading Spinner Transition Control
 // =============================================
 let loadedIconsInBatch = 0;
 let targetIconCount = 0;
 let isTransitioningOut = false;
-
 // 注册至全局，供行内 HTML 的 onload/onerror 触发
 window.onIconLoaded = (img) => {
   // 严格拦截并忽略透明占位 GIF 的载入事件，确保只对真实的图标加载结果起作用
@@ -53,14 +46,12 @@ window.onIconLoaded = (img) => {
   _iconCache.add(img.dataset.pkg);
   checkBatchLoading();
 };
-
 window.onIconError = (img) => {
   if (img.src.startsWith("data:image/gif;base64,")) return;
   img.classList.add('icon-error');
   img.src = img.dataset.fallback;
   checkBatchLoading();
 };
-
 const checkBatchLoading = () => {
   if (isTransitioningOut || !state.isInitialLoad) return;
   loadedIconsInBatch++;
@@ -69,7 +60,6 @@ const checkBatchLoading = () => {
     hideSpinnerOverlay();
   }
 };
-
 const hideSpinnerOverlay = () => {
   const overlay = document.getElementById("appLoadingOverlay");
   if (overlay) {
@@ -81,7 +71,6 @@ const hideSpinnerOverlay = () => {
   }
   state.isAppListReady = true;
   state.isInitialLoad = false;
-  
   // 遮罩层隐去，重新调度观察器执行交错式的弹簧缩放动画
   initListObserver();
   const listEl = document.getElementById("appList");
@@ -89,7 +78,6 @@ const hideSpinnerOverlay = () => {
     listEl.querySelectorAll('.app-item').forEach(el => listObserver.observe(el));
   }
 };
-
 // =============================================
 // Data loading
 // =============================================
@@ -105,7 +93,6 @@ export const fetchActiveMounts = async () => {
   } catch {}
   return m;
 };
-
 export const fetchInjectedApps = async () => {
   try {
     state.injectedApps.clear();
@@ -126,24 +113,20 @@ export const fetchInjectedApps = async () => {
       });
   } catch {}
 };
-
 export const loadData = async () => {
   if (state.isInitialLoad === undefined) {
     state.isInitialLoad = true;
     state.isAppListReady = false;
   }
-
   const overlay = document.getElementById("appLoadingOverlay");
   if (overlay && state.isInitialLoad) {
     overlay.style.display = "flex";
     overlay.style.opacity = "1";
     overlay.style.pointerEvents = "auto";
   }
-
   try {
     state.activeMounts = await fetchActiveMounts();
     await fetchInjectedApps();
-    
     const userRes = await run("pm list users");
     state.activeUsers = [];
     if (userRes) {
@@ -151,7 +134,6 @@ export const loadData = async () => {
         state.activeUsers.push(parseInt(m[1]));
     }
     if (state.activeUsers.length === 0) state.activeUsers.push(0);
-    
     const injectorConf = await run(`cat ${CONST.INJECTOR_CONF} 2>/dev/null`);
     state.globalConfText = "";
     state.injectorStates.clear();
@@ -174,7 +156,6 @@ export const loadData = async () => {
       });
       state.globalConfText = (state.injectorRulesMap.get("GLOBAL") || []).join("\n") || "";
     }
-    
     const ruleFilesMap = new Map();
     for (const uid of state.activeUsers) {
       const dir =
@@ -195,7 +176,6 @@ export const loadData = async () => {
         }
       }
     }
-    
     const buildAppMap = (src) => {
       state.appMap.clear();
       if (!Array.isArray(src)) return;
@@ -228,7 +208,6 @@ export const loadData = async () => {
         state.appMap.set(info.packageName, { ...info, isConfigured: isConfiguredAny, users: appUsers });
       });
     };
-    
     let infos = [];
     let usedFallback = false;
     let primaryEmpty = false;
@@ -268,12 +247,10 @@ export const loadData = async () => {
     }
     state.usingFallback = usedFallback;
     if (usedFallback) showToast("应用列表为空，已回退至兼容模式");
-    
     requestAnimationFrame(() => {
         renderAppList();
         renderGlobalRules();
     });
-    
     const sysAppsToPreload = Array.from(state.appMap.values()).filter(a => a.isSystem).slice(0, 30);
     sysAppsToPreload.forEach(app => {
         if (!_iconCache.has(app.packageName)) {
@@ -284,12 +261,10 @@ export const loadData = async () => {
             enqueueIcon(dummyImg);
         }
     });
-    
   } catch (e) {
     showToast("加载异常: " + e.message);
   }
 };
-
 // =============================================
 // Interaction Observer for dynamic animation & lazy loading
 // =============================================
@@ -298,23 +273,19 @@ const initListObserver = () => {
   const rootEl = document.getElementById('appList');
   if (!rootEl) return;
   if (listObserver) listObserver.disconnect();
-  
   listObserver = new IntersectionObserver((entries) => {
     const intersecting = entries.filter(e => e.isIntersecting);
     intersecting.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-    
     entries.forEach(entry => {
       const el = entry.target;
       if (entry.isIntersecting) {
         const idx = intersecting.indexOf(entry);
-        
         if (state.isAppListReady) {
           el.style.transitionDelay = `${idx * 30}ms`;
           const icon = el.querySelector('.app-icon');
           if (icon) icon.style.transitionDelay = `${idx * 30 + 30}ms`;
           requestAnimationFrame(() => el.classList.add('show'));
         }
-        
         const icon = el.querySelector('.app-icon');
         if (icon && icon.dataset.src) {
           enqueueIcon(icon);
@@ -328,7 +299,6 @@ const initListObserver = () => {
     });
   }, { root: rootEl, threshold: 0.01, rootMargin: "30px" });
 };
-
 // =============================================
 // App list DOM updates
 // =============================================
@@ -354,20 +324,16 @@ export const renderAppList = () => {
         (!!b.isConfigured - !!a.isConfigured) ||
         (a.appLabel || "").localeCompare(b.appLabel || "")
     );
-    
   if (items.length === 0) {
     listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--mx-t2);">无匹配应用</div>';
     return;
   }
-  
   isTransitioningOut = false;
   loadedIconsInBatch = 0;
   targetIconCount = Math.min(items.length, 6);
-  
   if (targetIconCount === 0) {
     hideSpinnerOverlay();
   }
-
   const finalHTML = items
     .map((app) => {
       let badgesHTML = state.activeUsers
@@ -379,7 +345,6 @@ export const renderAppList = () => {
         .join("");
       if (state.activeMounts.has(app.packageName))
         badgesHTML += `<span class="mx-badge mx-badge-success">MOUNTED</span>`;
-        
       let injStr = "";
       const inj = state.injectedApps.get(app.packageName);
       if (inj) {
@@ -389,7 +354,6 @@ export const renderAppList = () => {
         if (inj.ro === "1") flags.push('<span style="color:var(--mx-red);font-weight:800">RO</span>');
         injStr = `<span style="font-size:10px;margin-left:6px;padding:2px 6px;background:var(--mx-s3);border-radius:4px;font-family:var(--mx-font-mono);flex-shrink:0;">PID ${inj.pid} ${flags.join(" ")}</span>`;
       }
-      
       const isCached = _iconCache.has(app.packageName);
       // 未缓存时 src 使用透明占位 GIF。onerror 和 onload 绑定到全局事件，剔除空 src 引起的逻辑错误。
       return `<div class="app-item" data-pkg="${app.packageName}" onclick="window.openAppConfig('${app.packageName}')">
@@ -404,18 +368,15 @@ export const renderAppList = () => {
       </div>`;
     })
     .join("");
-
   listEl.innerHTML = finalHTML;
   initListObserver();
   listEl.querySelectorAll('.app-item').forEach(el => listObserver.observe(el));
 };
-
 export const updateAppListStatus = () => {
   document.querySelectorAll('#appList .app-item').forEach(item => {
     const pkg = item.dataset.pkg;
     const app = state.appMap.get(pkg);
     if (!app) return;
-    
     let badgesHTML = state.activeUsers
       .filter((u) => app.users[u]?.text.trim() || app.users[u]?.hasRules || app.isConfigured)
       .map((u) => {
@@ -425,10 +386,8 @@ export const updateAppListStatus = () => {
       .join("");
     if (state.activeMounts.has(pkg))
       badgesHTML += `<span class="mx-badge mx-badge-success">MOUNTED</span>`;
-      
     const badgeEl = item.querySelector('.app-badges');
     if (badgeEl && badgeEl.innerHTML !== badgesHTML) badgeEl.innerHTML = badgesHTML;
-    
     let injStr = "";
     const inj = state.injectedApps.get(pkg);
     if (inj) {
@@ -442,7 +401,6 @@ export const updateAppListStatus = () => {
     if (injEl && injEl.innerHTML !== injStr) injEl.innerHTML = injStr;
   });
 };
-
 // =============================================
 // App config modal
 // =============================================
@@ -452,13 +410,21 @@ export const openAppConfig = (pkg) => {
   if (!app) return;
   document.getElementById("bindAppName").textContent = app.appLabel;
   document.getElementById("bindAppPkg").textContent = pkg;
+  
   const tabs = document.getElementById("appUserTabs");
-  tabs.innerHTML = state.activeUsers
-    .map(
-      (uid) =>
-        `<button class="${uid === state.activeUsers[0] ? "active" : ""}" data-uid="${uid}" onclick="window.switchAppUser(${uid})">User ${uid}</button>`
-    )
-    .join("");
+  // 当系统中仅存在 1 个或更少用户时，直接隐藏多用户切换栏
+  if (state.activeUsers.length <= 1) {
+    tabs.style.display = "none";
+  } else {
+    tabs.style.display = "flex";
+    tabs.innerHTML = state.activeUsers
+      .map(
+        (uid) =>
+          `<button class="${uid === state.activeUsers[0] ? "active" : ""}" data-uid="${uid}" onclick="window.switchAppUser(${uid})">User ${uid}</button>`
+      )
+      .join("");
+  }
+  
   window.switchAppUser(state.activeUsers[0]);
   document.getElementById("appConfigModal").classList.add("open");
 };
@@ -475,7 +441,6 @@ export const switchAppUser = (uid) => {
   const visualBtn = document.querySelector('button[name="appModeToggle"][data-mode="visual"]');
   if (visualBtn) visualBtn.click();
 };
-
 export const flushInjectorConf = async () => {
   let r = `[GLOBAL]\n${state.globalConfText.trim() ? state.globalConfText.trim() + "\n" : ""}`;
   state.injectorStates.forEach((s, k) => {
@@ -487,6 +452,5 @@ export const flushInjectorConf = async () => {
   const escaped = r.trim().replace(/'/g, "'\\''");
   await run(`echo '${escaped}' > ${CONST.INJECTOR_CONF}`);
 };
-
 window.openAppConfig = openAppConfig;
 window.switchAppUser = switchAppUser;

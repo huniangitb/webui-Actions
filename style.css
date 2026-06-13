@@ -223,6 +223,15 @@ body.loaded {
 body.keyboard-open .mx-modal {
     transition: opacity 0.25s var(--mx-ease), transform 0s !important;
 }
+/* 当键盘升起时，强制限制模态框的最大高度为键盘上方可视区物理高度，避免模态框底部被遮挡剪裁，保证最后几个输入框聚焦时可以自动滚动并接受键盘方向键操作 */
+body.keyboard-open .mx-modal {
+    max-height: calc(var(--keyboard-vh, 100vh) - 16px) !important;
+    height: auto !important;
+}
+body.keyboard-open .mx-modal.large {
+    height: calc(var(--keyboard-vh, 100vh) - 16px) !important;
+    max-height: calc(var(--keyboard-vh, 100vh) - 16px) !important;
+}
 .mx-modal-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mx-border); flex-shrink: 0;}
 .mx-modal-title { font-size: 18px; font-weight: 700; margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 .mx-modal-body { padding: 20px; overflow-y: auto; flex: 1; min-height:0; }

@@ -158,6 +158,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isKeyboardOpen = vh < totalH - 80;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
       
+      // 动态向页面根元素写入当前虚拟键盘上方的真实可视区域高度变量
+      document.documentElement.style.setProperty('--keyboard-vh', `${vh}px`);
+
       import("./ui.js").then(({ updateModalShift, updateSuggestionBoxPosition, centerActiveInput }) => {
         updateModalShift();
         if (window._currentInput && document.activeElement === window._currentInput) {

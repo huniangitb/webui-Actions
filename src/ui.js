@@ -116,6 +116,12 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
 export const updateModalShift = () => {
   const modal = document.querySelector(".mx-modal-overlay.open .mx-modal");
   if (!modal) return;
+  
+  // 当虚拟键盘处于打开状态时，取消 transform 位移偏移，让真实的 CSS 视口自适应高度约束生效
+  if (document.body.classList.contains("keyboard-open")) {
+    modal.style.transform = "scale(1) translate3d(0, 0, 0)";
+    return;
+  }
   const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
   const totalH = window.innerHeight;
   if (vh >= totalH - 60) {

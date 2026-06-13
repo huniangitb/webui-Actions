@@ -35,8 +35,6 @@ import "../style.css";
 // =============================================
 // Lock Layout Viewport Height
 // =============================================
-// 测算并保存初始物理视口高度（锁死），供 CSS 变量继承。
-// 彻底阻断软键盘弹出时移动端浏览器因 layout viewport/dvh 动态变化而导致的主界面拉伸与移动
 const lockInitialHeight = () => {
   const initialH = window.innerHeight;
   document.documentElement.style.setProperty('--initial-vh', `${initialH}px`);
@@ -115,7 +113,11 @@ const generateIgnoreFromVisual = () => {
 const addIgnoreRow = (p) => {
   const div = document.createElement("div");
   div.className = "rule-row flex-shrink-0";
-  div.innerHTML = `<input type="text" class="mx-input" style="background:var(--mx-s1); border-radius:6px; font-size:12px; padding:6px;" placeholder="要忽略的路径前缀" value="${p}"><button class="mx-btn-icon btn-del flex-shrink-0">${ICONS.DELETE}</button>`;
+  // 注入同样的包裹层 mx-input-wrapper，以使样式和结构保持统一
+  div.innerHTML = `<div class="mx-input-wrapper" style="position: relative; width: 100%;">
+    <input type="text" class="mx-input" style="background:var(--mx-s1); border-radius:6px; font-size:12px; padding:6px;" placeholder="要忽略的路径前缀" value="${p}">
+  </div>
+  <button class="mx-btn-icon btn-del flex-shrink-0">${ICONS.DELETE}</button>`;
   div.querySelector(".btn-del").onclick = () => div.remove();
   document.getElementById("ignoreBuilderContainer")?.appendChild(div);
 };
@@ -145,65 +147,35 @@ const switchSection = (sectionId) => {
 // DOMContentLoaded
 // =============================================
 document.addEventListener("DOMContentLoaded", async () => {
-  // Init
   initIcons();
-  
-  // Real-time Visual Viewport & Keyboard Resizer
-  // 在键盘弹起期间：主界面和子模态框高度锁定不作改变。
-  // 缩短虚拟键盘延迟：将防抖重计延迟从 150ms 压缩至 50ms。
-  // 待键盘完成弹出直接计算视口遮挡并平移视图位置，同时判别软键盘弹出状态挂载类，以防止底栏被键盘顶起
-  let resizeTimeout = null;
+  let isFrameBlocked = false;
   const updateViewportHeight = () => {
-    if (resizeTimeout) {
-      clearTimeout(resizeTimeout);
-    } else {
-      state.isViewportResizing = true;
-    }
-    
-    resizeTimeout = setTimeout(() => {
-      state.isViewportResizing = false;
-      resizeTimeout = null;
-      
+    if (isFrameBlocked) return;
+    isFrameBlocked = true;
+    window.requestAnimationFrame(() => {
+      isFrameBlocked = false;
       const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
       const totalH = window.innerHeight;
-      
-      // 检测键盘开启状态并挂载到 body 上
       const isKeyboardOpen = vh < totalH - 80;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
-      
-      // 1. 代数计算重叠并整体平移模态框视图位置
-      import("./ui.js").then(({ updateModalShift }) => {
+      import("./ui.js").then(({ updateModalShift, updateSuggestionBoxPosition }) => {
         updateModalShift();
-      });
-      
-      // 2. 将输入框滚动至正中并同步重构提示框定位
-      window.requestAnimationFrame(() => {
         if (window._currentInput && document.activeElement === window._currentInput) {
-          window._currentInput.scrollIntoView({ block: "center", behavior: "smooth" });
-          window._currentInput.dispatchEvent(new Event("input"));
-          import("./ui.js").then(({ updateSuggestionBoxPosition }) => {
-            updateSuggestionBoxPosition(window._currentInput);
-          });
+          updateSuggestionBoxPosition(window._currentInput);
         }
       });
-    }, 50); // 压缩防抖延迟，显著提升跟手与键盘弹出反馈速度
+    });
   };
-  
   if (window.visualViewport) {
-    window.visualViewport.addEventListener("resize", () => {
-      window.requestAnimationFrame(updateViewportHeight);
-    });
-    window.visualViewport.addEventListener("scroll", () => {
-      window.requestAnimationFrame(updateViewportHeight);
-    });
+    window.visualViewport.addEventListener("resize", updateViewportHeight);
+    window.visualViewport.addEventListener("scroll", updateViewportHeight);
   }
-  window.addEventListener("resize", () => {
-    window.requestAnimationFrame(updateViewportHeight);
-  });
-  window.requestAnimationFrame(updateViewportHeight);
-  // 全局滚动捕获监听：当页面任意滚动发生时，若是输入框焦点态，实时对补全框重定位，若已失焦则即刻收回
+  window.addEventListener("resize", updateViewportHeight);
+  updateViewportHeight();
+  // 滚动时的补全定位
   window.addEventListener("scroll", (e) => {
     if (window._currentInput && document.activeElement === window._currentInput) {
+      // 绝对定位现在是内生的，滚动时无需再计算屏幕物理坐标，仅用于决定是否在视口边界发生上下翻转
       window.requestAnimationFrame(() => {
         import("./ui.js").then(({ updateSuggestionBoxPosition }) => {
           updateSuggestionBoxPosition(window._currentInput);
@@ -216,8 +188,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         state.currentSuggestions = [];
       }
     }
-  }, true); // capture 设为 true 从而穿透任意滚动层
-  // 全局点击判定：若点击落在补全框及对应输入框以外的区域，立刻收回补全菜单，并在完全失焦时重置模态框视图位置
+  }, true);
   document.addEventListener("click", (e) => {
     const box = document.getElementById("suggestionBox");
     if (box && box.style.display !== "none") {
@@ -228,7 +199,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         state.currentSuggestions = [];
       }
     }
-    // 延迟检查焦点。若不再聚焦任何输入框，一键重置模态框归位，并移去键盘弹出类
     setTimeout(() => {
       if (!document.activeElement || !document.activeElement.classList.contains("mx-input")) {
         const modal = document.querySelector(".mx-modal-overlay.open .mx-modal");
@@ -447,18 +417,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     showToast("配置已清除");
     document.getElementById("appConfigModal")?.classList.remove("open");
   };
-  // Init virtual log lists
   initIoLogs();
   initSysLogs();
-  // Initial data load
   loadData();
   checkStatus();
-  // Polling
   statusPolling = setInterval(checkStatus, 500);
   appStatusPolling = setInterval(refreshAppStatus, 1000);
-  // Close buttons
   document.querySelectorAll(".mx-btn-close").forEach((btn) => (btn.innerHTML = ICONS.CLOSE));
-  // 挂载淡入样式，触发渐隐式优雅切入
   requestAnimationFrame(() => {
     document.body.classList.add("loaded");
   });

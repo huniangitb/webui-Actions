@@ -12,9 +12,6 @@ import { renderGlobalRules } from "./global.js";
 // 1x1 像素 Base64 透明占位图，用于规避浏览器因空 src 触发 premature onerror 的原生缺陷
 const TRANSPARENT_SPACER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
-// =============================================
-// Rate-limited Icon Queue (Strict 70 requests/sec)
-// =============================================
 const _iconCache = new Set();
 const iconQueue = new Set();
 let isIconQueueRunning = false;
@@ -30,8 +27,7 @@ const processIconQueue = async () => {
             img.src = img.dataset.src;
             img.removeAttribute('data-src');
         }
-        // 严格设定为 14ms (确保每秒不超过 70 次请求)
-        await new Promise(r => setTimeout(r, 14));
+        await new Promise(r => setTimeout(r, 4));
     }
     isIconQueueRunning = false;
 };

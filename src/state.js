@@ -17,6 +17,9 @@ export const state = {
   sysState: { offset: 0, loading: false, hasMore: true, term: "", level: -1 },
   isDarkMode: true,
   currentSuggestions: [], // Pretext-driven autocomplete height measurement cache
+  suggestionBoxHeight: 0, // Cached autocomplete box height to avoid layout thrashing
+  cachedModalHeight: null, // Cached open modal height for keyboard offset calculations
+  lastActiveModal: null,  // Track which modal is currently measured
   isViewportResizing: false,
 };
 export const CONST = {

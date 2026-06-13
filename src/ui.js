@@ -3,7 +3,7 @@ import { run, showToast, ICONS, normalizeToDisplay, normalizeToConfig, debounce 
 import { exec } from "kernelsu";
 import { prepare, layout } from "@chenglou/pretext";
 // =============================================
-// Rule row builder
+// Rule row builder (为每个输入框注入专属的 mx-input-wrapper 包裹器)
 // =============================================
 export const addRuleRow = (type, target, source, containerId) => {
   const container = document.getElementById(containerId);
@@ -17,17 +17,25 @@ export const addRuleRow = (type, target, source, containerId) => {
     <option value="ALLOW">豁免</option>
   </select>
   <div class="rule-inputs">
-    <input type="text" class="mx-input rule-target" style="padding:6px; background:var(--mx-s1); border-radius:6px; font-size:12px;" placeholder="原始路径" value="${target.replace(/"/g, "&quot;")}">
-    <input type="text" class="mx-input rule-source ${type !== "REDIRECT" ? "hidden" : ""}" style="padding:6px; background:var(--mx-s1); border-radius:6px; font-size:12px;" placeholder="重定向至" value="${source.replace(/"/g, "&quot;")}">
+    <div class="mx-input-wrapper">
+      <input type="text" class="mx-input rule-target" style="padding:6px; background:var(--mx-s1); border-radius:6px; font-size:12px;" placeholder="原始路径" value="${target.replace(/"/g, "&quot;")}">
+    </div>
+    <div class="mx-input-wrapper ${type !== "REDIRECT" ? "hidden" : ""}">
+      <input type="text" class="mx-input rule-source" style="padding:6px; background:var(--mx-s1); border-radius:6px; font-size:12px;" placeholder="重定向至" value="${source.replace(/"/g, "&quot;")}">
+    </div>
   </div>
   <button class="mx-btn-icon btn-del flex-shrink-0">${ICONS.DELETE}</button>`;
   const select = div.querySelector(".rule-type");
   select.value = type;
-  select.onchange = (e) =>
-    div.querySelector(".rule-source").classList.toggle("hidden", e.target.value !== "REDIRECT");
+  select.onchange = (e) => {
+    const srcWrapper = div.querySelectorAll(".mx-input-wrapper")[1];
+    if (srcWrapper) {
+      srcWrapper.classList.toggle("hidden", e.target.value !== "REDIRECT");
+    }
+  };
   div.querySelector(".btn-del").onclick = () => div.remove();
-  setupAutocomplete(div.querySelector(".rule-target"));
-  setupAutocomplete(div.querySelector(".rule-source"));
+  setupAutocomplete(div.querySelectorAll(".mx-input")[0]);
+  setupAutocomplete(div.querySelectorAll(".mx-input")[1]);
   container.appendChild(div);
 };
 // =============================================
@@ -103,85 +111,64 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
   });
 };
 // =============================================
-// Modal Shifter (Allows overflowing above screen)
+// Modal Shifter (With Layout cache optimization)
 // =============================================
 export const updateModalShift = () => {
   const modal = document.querySelector(".mx-modal-overlay.open .mx-modal");
   if (!modal) return;
   const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
   const totalH = window.innerHeight;
-  // 键盘未弹出或已收回，归位
   if (vh >= totalH - 60) {
     modal.style.transform = "scale(1) translate3d(0, 0, 0)";
     return;
   }
-  // 暂存当前平移，复位并重构一个不受当前 transform 干扰的基础位置，用于精准测算
-  const prevTransform = modal.style.transform;
-  modal.style.transform = "scale(1) translate3d(0, 0, 0)";
-  const rect = modal.getBoundingClientRect();
-  // 测算完毕，先迅速恢复平移，防止重排画面闪烁
-  modal.style.transform = prevTransform;
-  // 测算在自然状态下，模态框底部有多少像素被键盘盖住
-  const overlap = rect.bottom - vh + 16; // 16px 安全外边距
+  if (!state.cachedModalHeight || state.lastActiveModal !== modal) {
+    state.cachedModalHeight = modal.offsetHeight;
+    state.lastActiveModal = modal;
+  }
+  const naturalTop = (totalH - state.cachedModalHeight) / 2;
+  const naturalBottom = naturalTop + state.cachedModalHeight;
+  const overlap = naturalBottom - vh + 16;
   if (overlap > 0) {
-    // 整体上移 modal 视图位置（允许向上超出屏幕）
     modal.style.transform = `scale(1) translate3d(0, -${overlap}px, 0)`;
   } else {
     modal.style.transform = "scale(1) translate3d(0, 0, 0)";
   }
 };
 // =============================================
-// Autocomplete Positioner (With Pretext optimization)
+// Autocomplete Positioner (高性能 DOM 内生对齐转换器)
 // =============================================
 export const updateSuggestionBoxPosition = (input) => {
   const box = document.getElementById("suggestionBox");
   if (!box || !input || box.style.display === "none") return;
-  const rect = input.getBoundingClientRect();
-  // 移动端核心校准：减去视觉视口本身的滚动平移量 offsetTop / offsetLeft
-  // 确保当输入法将网页顶起、视觉视口发生位移时，定位框仍能毫厘不差地紧贴输入框，不发生任何偏移
-  const vv = window.visualViewport;
-  const vh = vv ? vv.height : window.innerHeight;
-  const scrollY = vv ? vv.offsetTop : 0;
-  const scrollX = vv ? vv.offsetLeft : 0;
-  const inputLeft = rect.left - scrollX;
-  const inputTop = rect.top - scrollY;
-  const inputBottom = rect.bottom - scrollY;
-  box.style.width = rect.width + "px";
-  box.style.left = "0px";
-  box.style.top = "0px";
-  box.style.bottom = "auto";
-  // 使用 Pretext 代数运算计算补全框的精确内容高度，完全规避触发浏览器 Reflow
-  let totalBoxHeight = 2; // 上下边框像素
-  const fontStyle = "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-  const horizontalPadding = 24; // 左右各 12px
-  const iconAndGap = 16 + 8; // 图标宽度及间距
-  const availTextWidth = rect.width - horizontalPadding - iconAndGap;
-  (state.currentSuggestions || []).forEach((s) => {
-    try {
-      const prepared = prepare(s.t, fontStyle);
-      const { height } = layout(prepared, Math.max(availTextWidth, 50), 18);
-      // 项高度 = 测算文本换行后高度 + 垂直 padding (20px) + 下边框 (1px)
-      totalBoxHeight += height + 20 + 1;
-    } catch {
-      totalBoxHeight += 39;
-    }
-  });
-  let computedTop = 0;
-  if (inputBottom > vh / 2) {
-    const maxHeight = Math.min(inputTop - 10, 240);
-    const boxHeight = Math.min(totalBoxHeight, maxHeight);
-    computedTop = inputTop - boxHeight - 4;
-    box.style.maxHeight = maxHeight + "px";
-  } else {
-    const maxHeight = Math.min(vh - inputBottom - 10, 240);
-    computedTop = inputBottom + 4;
-    box.style.maxHeight = maxHeight + "px";
+  const wrapper = input.closest(".mx-input-wrapper");
+  if (!wrapper) return;
+  // 核心优化：动态且无侵入地迁移 DOM 补全框至当前包裹层内，由渲染线程自然进行贴合
+  if (box.parentNode !== wrapper) {
+    wrapper.appendChild(box);
   }
-  // 使用 3D 转换紧贴定位
-  box.style.transform = `translate3d(${inputLeft}px, ${computedTop}px, 0)`;
+  const container = input.closest(".overflow-y-auto");
+  if (container) {
+    const containerRect = container.getBoundingClientRect();
+    const inputRect = input.getBoundingClientRect();
+    // 代数判定输入框在滚动视口内的富余高差，自适应翻转方向
+    const spaceBelow = containerRect.bottom - inputRect.bottom;
+    const spaceAbove = inputRect.top - containerRect.top;
+    if (spaceBelow < 180 && spaceAbove > spaceBelow) {
+      box.style.top = "auto";
+      box.style.bottom = "100%";
+      box.style.marginTop = "0px";
+      box.style.marginBottom = "4px";
+    } else {
+      box.style.top = "100%";
+      box.style.bottom = "auto";
+      box.style.marginTop = "4px";
+      box.style.marginBottom = "0px";
+    }
+  }
 };
 // =============================================
-// Autocomplete (file path)
+// Autocomplete (注入跑道缓冲实现底端对齐)
 // =============================================
 const setupAutocomplete = (input) => {
   if (!input) return;
@@ -209,6 +196,7 @@ const setupAutocomplete = (input) => {
         if (!res || !res.stdout) {
           box.style.display = "none";
           state.currentSuggestions = [];
+          state.suggestionBoxHeight = 0;
           return;
         }
         const sugs = res.stdout
@@ -218,6 +206,7 @@ const setupAutocomplete = (input) => {
         if (sugs.length === 0) {
           box.style.display = "none";
           state.currentSuggestions = [];
+          state.suggestionBoxHeight = 0;
           return;
         }
         let inputPathExists = false;
@@ -231,7 +220,23 @@ const setupAutocomplete = (input) => {
           } catch {}
         }
         input.classList.toggle("path-exists", inputPathExists);
-        state.currentSuggestions = sugs; // 缓存供 Pretext 测量高度
+        state.currentSuggestions = sugs;
+        let totalBoxHeight = 2; 
+        const fontStyle = "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+        const horizontalPadding = 24; 
+        const iconAndGap = 16 + 8;
+        const rect = input.getBoundingClientRect();
+        const availTextWidth = rect.width - horizontalPadding - iconAndGap;
+        sugs.forEach((s) => {
+          try {
+            const prepared = prepare(s.t, fontStyle);
+            const { height } = layout(prepared, Math.max(availTextWidth, 50), 18);
+            totalBoxHeight += height + 20 + 1;
+          } catch {
+            totalBoxHeight += 39;
+          }
+        });
+        state.suggestionBoxHeight = totalBoxHeight;
         box.innerHTML = sugs
           .map(
             (s) =>
@@ -245,18 +250,21 @@ const setupAutocomplete = (input) => {
       } catch {
         box.style.display = "none";
         state.currentSuggestions = [];
+        state.suggestionBoxHeight = 0;
       }
     }, 250)
   );
   input.addEventListener("focus", () => {
     window._currentInput = input;
-    // 聚焦定位：使输入行在局部滚动区内居中。若其下方还有后续行，将自动执行额外偏移量滚动
+    const container = input.closest(".overflow-y-auto");
+    // 【关键优化：跑道缓冲】对底端组件，动态撑开 260px 跑道底边，确保最底部的条目可以完美对齐而不受键盘遮挡
+    if (container) {
+      container.style.paddingBottom = "260px";
+    }
     window.requestAnimationFrame(() => {
-      const container = input.closest(".overflow-y-auto");
       const row = input.closest(".rule-row") || input;
       if (container && row) {
-        row.scrollIntoView({ block: "center", behavior: "smooth" });
-        // 检测下方是否还有更多的规则输入行
+        row.scrollIntoView({ block: "center", behavior: "auto" });
         let nextRowsCount = 0;
         let nextNode = row.nextElementSibling;
         while (nextNode) {
@@ -265,20 +273,18 @@ const setupAutocomplete = (input) => {
           }
           nextNode = nextNode.nextElementSibling;
         }
-        // 如果下方存在多行，自动向下额外平滑滚动偏移，把聚焦项进一步向上推起，从而完整露出下方未填项
         if (nextRowsCount > 0) {
-          const extraScroll = Math.min(nextRowsCount * 45, 120); // 每多一行追加 45px，封顶 120px
+          const extraScroll = Math.min(nextRowsCount * 45, 120);
           setTimeout(() => {
             if (document.activeElement === input) {
-              container.scrollBy({ top: extraScroll, behavior: "smooth" });
+              container.scrollBy({ top: extraScroll, behavior: "auto" });
             }
-          }, 180); // 180ms 延时，确保原生 scrollIntoView 轨迹大致结束
+          }, 100);
         }
       } else {
-        input.scrollIntoView({ block: "center", behavior: "smooth" });
+        input.scrollIntoView({ block: "center", behavior: "auto" });
       }
     });
-    // 大幅缩减键盘弹窗反馈动画延迟：从 320ms 降至 80ms，使体验极其敏捷 snappy
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));
@@ -290,6 +296,11 @@ const setupAutocomplete = (input) => {
       if (document.activeElement !== input) {
         box.style.display = "none";
         state.currentSuggestions = [];
+        // 【关键优化】失去焦点后，收回跑道边距，平稳缩回正常卡片尺寸
+        const container = input.closest(".overflow-y-auto");
+        if (container) {
+          container.style.paddingBottom = "";
+        }
       }
     }, 120);
   });

@@ -38,22 +38,18 @@
     --mx-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
-/* 全局渐显动画基础 */
 body {
     margin: 0; padding: 0;
     font-family: var(--mx-font-sans);
     background: var(--mx-bg);
     color: var(--mx-t1);
     font-size: 14px;
-    /* 采用页面首次载入时计算完毕的初始静态物理高度锁死，确保主界面不受移动端 vh/dvh 重绘收缩的影响 */
     height: var(--initial-vh, 100vh);
     overflow: hidden;
-    /* 初始化不可见，带有微弱缩小 */
     opacity: 0;
     transform: scale(0.98);
     transition: opacity 0.6s var(--mx-ease), transform 0.6s var(--mx-spring), background-color 0.3s var(--mx-ease), color 0.3s var(--mx-ease);
 }
-/* JS 挂载类后触发渐显进入 */
 body.loaded {
     opacity: 1;
     transform: scale(1);
@@ -73,7 +69,15 @@ body.loaded {
 .mx-app { display: flex; height: var(--initial-vh, 100vh); width: 100vw; flex-direction: column; }
 .mx-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
 .mx-topbar-right { display: flex; align-items: center; gap: 8px; }
-.mx-desktop-main { flex: 1; overflow: hidden; position: relative; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+.mx-desktop-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+}
 .mx-bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0;
     height: calc(64px + env(safe-area-inset-bottom));
@@ -82,12 +86,9 @@ body.loaded {
     backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
     border-top: 1px solid var(--mx-border);
     z-index: 100;
-    /* 硬件加速以确保底部导航独立图层 */
     transform: translateZ(0);
     transition: transform 0.25s var(--mx-ease), opacity 0.2s var(--mx-ease);
 }
-/* 当输入法弹出时，底部导航栏（原本固定定位）通常会被浏览器强行往上推起 */
-/* 挂载 keyboard-open 类将导航栏顺滑地移出视口，完全避免其位置变化及多余遮挡 */
 body.keyboard-open .mx-bottom-nav {
     transform: translate3d(0, 100%, 0);
     opacity: 0;
@@ -103,7 +104,7 @@ body.keyboard-open .mx-bottom-nav {
 .mx-btm-item.active { color: var(--mx-primary); font-weight: 600; }
 .btm-icon { width: 22px; height: 22px; display: block; }
 .btm-label { font-size: 11px; }
-.demo-section { display: none; height: 100%; flex-direction: column; padding: 16px; overflow: hidden; }
+.demo-section { display: none; height: 100%; flex-direction: column; padding: 16px; overflow: hidden; flex: 1; }
 .demo-section.active { display: flex; }
 .mx-page-head { margin-bottom: 16px; flex-shrink: 0; }
 .mx-page-title { margin: 0 0 4px 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
@@ -153,21 +154,15 @@ body.keyboard-open .mx-bottom-nav {
 .gap-3 { gap: 12px; }
 .gap-4 { gap: 16px; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-/* 强化滑动阻力体验设置 */
-.overflow-hidden { overflow: hidden; }
-.overflow-y-auto { 
+.overflow-y-auto, .list-scrollable { 
     overflow-y: auto; 
-    overscroll-behavior-y: contain; /* 限制弹簧拉伸反弹的边界 */
-    touch-action: pan-y; /* 提示浏览器这是只读竖向滑动区 */
+    overscroll-behavior-y: contain; 
+    touch-action: pan-y; 
     -webkit-overflow-scrolling: touch; 
     transform: translateZ(0); 
-}
-.list-scrollable {
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
-    touch-action: pan-y;
-    -webkit-overflow-scrolling: touch;
-    transform: translateZ(0);
+    scroll-behavior: smooth;
+    /* 增加 padding 的平滑过渡，当聚焦底端文本框时，缓冲跑道优雅滑出 */
+    transition: padding-bottom 0.15s ease-out;
 }
 .scroll-x { overflow-x: auto; scrollbar-width: none; touch-action: pan-x; -webkit-overflow-scrolling: touch; }
 .scroll-x::-webkit-scrollbar { display: none; }
@@ -228,21 +223,22 @@ body.keyboard-open .mx-bottom-nav {
     opacity: 0; pointer-events: none; transition: opacity 0.25s var(--mx-ease);
 }
 .mx-modal-overlay.open { opacity: 1; pointer-events: auto; }
-.mx-modal { background: var(--mx-bg); width: 92%; max-width: 420px; border-radius: 24px; display: flex; flex-direction: column; /* 彻底去除任何 vh 几何单位，转用相对于父级遮罩层的百分比大小，保证高度绝对静止，规避抖动 */ max-height: 90%; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); transform: scale(0.95); opacity: 0; transition: opacity 0.25s var(--mx-ease), transform 0.25s var(--mx-ease); }
+.mx-modal { background: var(--mx-bg); width: 92%; max-width: 420px; border-radius: 24px; display: flex; flex-direction: column; max-height: 90%; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); transform: scale(0.95); opacity: 0; transition: opacity 0.25s var(--mx-ease), transform 0.25s var(--mx-ease); }
 .mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1); opacity: 1; }
+/* 【核心解决排版抖动与复位】软键盘开启时，强制使 modal 容器的 transform 过渡耗时归零，避免与视口 resize 产生拉扯动画冲突 */
+body.keyboard-open .mx-modal {
+    transition: opacity 0.25s var(--mx-ease), transform 0s !important;
+}
 .mx-modal-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mx-border); flex-shrink: 0;}
 .mx-modal-title { font-size: 18px; font-weight: 700; margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 .mx-modal-body { padding: 20px; overflow-y: auto; flex: 1; min-height:0; }
 .mx-modal-foot { padding: 16px 20px; display: flex; gap: 12px; border-top: 1px solid var(--mx-border); flex-shrink:0;}
-/* --- 高性能动态应用列表动画与优化 --- */
 .app-item {
     display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--mx-border);
     cursor: pointer;
-    /* 极致性能提升：Chromium 黑科技跳过不可见元素的渲染计算 */
     content-visibility: auto;
-    contain-intrinsic-size: 69px; /* 约等于高度，防止滚动条抖动 */
-    /* 开启独立合成层 */
+    contain-intrinsic-size: 69px; 
     transform: translateZ(0); 
     backface-visibility: hidden;
     opacity: 0; transform: scale(0.94) translateY(12px);
@@ -268,7 +264,11 @@ body.keyboard-open .mx-bottom-nav {
 .app-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; max-width: 120px; }
 .rule-row { display: flex; gap: 8px; align-items: center; padding: 8px; background: var(--mx-s3); border: 1px solid var(--mx-border); border-radius: 8px; margin-bottom: 8px; flex-shrink: 0;}
 .rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-/* 初次加载 Spinner 动画器 */
+/* 输入框专属排版容器 */
+.mx-input-wrapper {
+    position: relative;
+    width: 100%;
+}
 .mx-spinner-container {
     display: flex; flex-direction: column; justify-content: center; align-items: center;
     padding: 60px 20px; height: 100%; width: 100%; gap: 16px;
@@ -278,21 +278,18 @@ body.keyboard-open .mx-bottom-nav {
     border: 3px solid var(--mx-s3);
     border-top-color: var(--mx-primary);
     border-radius: 50%;
-    /* 带有柔和缓动节奏的阻尼转圈 */
     animation: mx-spin 0.85s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 @keyframes mx-spin { 
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); } 
 }
-/* IO Logs specific */
 .io-item { background: var(--mx-s2); border: 1px solid var(--mx-border); border-radius: 12px; padding: 6px 12px; flex-shrink: 0; box-sizing: border-box; }
 .io-header { display: flex; align-items: center; gap: 8px; height: 20px; margin-bottom: 8px; overflow: hidden; }
 .io-time { font-size: 11px; color: var(--mx-t2); font-family: var(--mx-font-mono); flex-shrink:0; white-space: nowrap; }
 .io-app { font-weight: 600; font-size: 13px; color: var(--mx-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;min-width: 0;}
 .io-op { flex-shrink: 0;padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; color: #fff; font-family: var(--mx-font-mono); flex-shrink:0; background: var(--mx-gray); }
 .io-detail { background: var(--mx-s1); padding: 8px; border-radius: 8px; font-size: 12px; line-height: 18px; font-family: var(--mx-font-mono); color: var(--mx-t1); word-break: break-all; border: 1px solid var(--mx-border); box-sizing: border-box; }
-/* Sys Logs specific */
 .sys-log-item { background: var(--mx-s2); border: 1px solid var(--mx-border); border-radius: 8px; padding: 6px 12px; flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box; }
 .sys-log-header { display: flex; align-items: center; gap: 8px; height: 18px; overflow: hidden; }
 .sys-log-time { font-size: 11px; color: var(--mx-t2); font-family: var(--mx-font-mono); flex-shrink: 0; }
@@ -319,7 +316,20 @@ body.keyboard-open .mx-bottom-nav {
 .mx-toast { background: var(--mx-s3); color: var(--mx-t1); padding: 10px 16px; border-radius: 24px; font-size: 13px; font-weight: 500; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); animation: toastIn 0.3s var(--mx-spring); pointer-events: auto;}
 @keyframes toastIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .io-time svg { display: flex; align-items: center; flex-shrink: 0; color: var(--mx-t2); }
-.suggestion-box { position: fixed; background: var(--mx-s3); border: 1px solid var(--mx-border); border-radius: 12px; box-shadow: var(--mx-shadow); z-index: 3000; overflow-y: auto; display: none; transform: translate3d(0,0,0); transform-origin: top left; transition: transform 0.1s linear, max-height 0.1s linear; will-change: transform, opacity; }
+/* 【核心解决自动补全框滚动偏移】将 position: fixed 换为绝对定位 absolute，绑定到各自包裹层，随主容器同步滚动 */
+.suggestion-box { 
+    position: absolute; 
+    background: var(--mx-s3); 
+    border: 1px solid var(--mx-border); 
+    border-radius: 12px; 
+    box-shadow: var(--mx-shadow); 
+    z-index: 1000; 
+    overflow-y: auto; 
+    display: none; 
+    width: 100%;
+    max-height: 240px;
+    will-change: transform, opacity; 
+}
 .suggestion-item { padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--mx-border); display: flex; align-items: flex-start; gap: 8px; }
 .suggestion-item:last-child { border-bottom: none; }
 .virtual-log-item { will-change: transform; backface-visibility: hidden; }

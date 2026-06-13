@@ -89,11 +89,7 @@ body.loaded {
     transform: translateZ(0);
     transition: transform 0.25s var(--mx-ease), opacity 0.2s var(--mx-ease);
 }
-body.keyboard-open .mx-bottom-nav {
-    transform: translate3d(0, 100%, 0);
-    opacity: 0;
-    pointer-events: none;
-}
+/* 移除了 keyboard-open 激活时对导航栏的所有偏移与隐藏，导航栏将原位静止并自然地被键盘盖在最下方 */
 .mx-bottom-nav-items { display: flex; list-style: none; margin: 0; padding: 0; height: 64px; }
 .mx-btm-item {
     flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -161,7 +157,6 @@ body.keyboard-open .mx-bottom-nav {
     -webkit-overflow-scrolling: touch; 
     transform: translateZ(0); 
     scroll-behavior: smooth;
-    /* 增加 padding 的平滑过渡，当聚焦底端文本框时，缓冲跑道优雅滑出 */
     transition: padding-bottom 0.15s ease-out;
 }
 .scroll-x { overflow-x: auto; scrollbar-width: none; touch-action: pan-x; -webkit-overflow-scrolling: touch; }
@@ -226,7 +221,6 @@ body.keyboard-open .mx-bottom-nav {
 .mx-modal { background: var(--mx-bg); width: 92%; max-width: 420px; border-radius: 24px; display: flex; flex-direction: column; max-height: 90%; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); transform: scale(0.95); opacity: 0; transition: opacity 0.25s var(--mx-ease), transform 0.25s var(--mx-ease); }
 .mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1); opacity: 1; }
-/* 【核心解决排版抖动与复位】软键盘开启时，强制使 modal 容器的 transform 过渡耗时归零，避免与视口 resize 产生拉扯动画冲突 */
 body.keyboard-open .mx-modal {
     transition: opacity 0.25s var(--mx-ease), transform 0s !important;
 }
@@ -264,7 +258,6 @@ body.keyboard-open .mx-modal {
 .app-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; max-width: 120px; }
 .rule-row { display: flex; gap: 8px; align-items: center; padding: 8px; background: var(--mx-s3); border: 1px solid var(--mx-border); border-radius: 8px; margin-bottom: 8px; flex-shrink: 0;}
 .rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-/* 输入框专属排版容器 */
 .mx-input-wrapper {
     position: relative;
     width: 100%;
@@ -316,7 +309,6 @@ body.keyboard-open .mx-modal {
 .mx-toast { background: var(--mx-s3); color: var(--mx-t1); padding: 10px 16px; border-radius: 24px; font-size: 13px; font-weight: 500; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); animation: toastIn 0.3s var(--mx-spring); pointer-events: auto;}
 @keyframes toastIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .io-time svg { display: flex; align-items: center; flex-shrink: 0; color: var(--mx-t2); }
-/* 【核心解决自动补全框滚动偏移】将 position: fixed 换为绝对定位 absolute，绑定到各自包裹层，随主容器同步滚动 */
 .suggestion-box { 
     position: absolute; 
     background: var(--mx-s3); 

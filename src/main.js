@@ -113,7 +113,6 @@ const generateIgnoreFromVisual = () => {
 const addIgnoreRow = (p) => {
   const div = document.createElement("div");
   div.className = "rule-row flex-shrink-0";
-  // 注入同样的包裹层 mx-input-wrapper，以使样式和结构保持统一
   div.innerHTML = `<div class="mx-input-wrapper" style="position: relative; width: 100%;">
     <input type="text" class="mx-input" style="background:var(--mx-s1); border-radius:6px; font-size:12px; padding:6px;" placeholder="要忽略的路径前缀" value="${p}">
   </div>
@@ -158,9 +157,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       const totalH = window.innerHeight;
       const isKeyboardOpen = vh < totalH - 80;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
-      import("./ui.js").then(({ updateModalShift, updateSuggestionBoxPosition }) => {
+      
+      import("./ui.js").then(({ updateModalShift, updateSuggestionBoxPosition, centerActiveInput }) => {
         updateModalShift();
         if (window._currentInput && document.activeElement === window._currentInput) {
+          // 【核心解决：视口变动同步居中】键盘伸缩过程中，实时锁定输入框物理高度，使其一直稳固居中在剩余视口中
+          centerActiveInput(window._currentInput);
           updateSuggestionBoxPosition(window._currentInput);
         }
       });
@@ -172,10 +174,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   window.addEventListener("resize", updateViewportHeight);
   updateViewportHeight();
-  // 滚动时的补全定位
   window.addEventListener("scroll", (e) => {
     if (window._currentInput && document.activeElement === window._currentInput) {
-      // 绝对定位现在是内生的，滚动时无需再计算屏幕物理坐标，仅用于决定是否在视口边界发生上下翻转
       window.requestAnimationFrame(() => {
         import("./ui.js").then(({ updateSuggestionBoxPosition }) => {
           updateSuggestionBoxPosition(window._currentInput);

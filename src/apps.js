@@ -27,7 +27,7 @@ const processIconQueue = async () => {
             img.src = img.dataset.src;
             img.removeAttribute('data-src');
         }
-        await new Promise(r => setTimeout(r, 4));
+        await new Promise(r => setTimeout(r, 2));
     }
     isIconQueueRunning = false;
 };

@@ -3,7 +3,7 @@ import { run, showToast, ICONS, normalizeToDisplay, normalizeToConfig, debounce 
 import { exec } from "kernelsu";
 import { prepare, layout } from "@chenglou/pretext";
 // =============================================
-// Rule row builder (为每个输入框注入专属的 mx-input-wrapper 包裹器)
+// Rule row builder
 // =============================================
 export const addRuleRow = (type, target, source, containerId) => {
   const container = document.getElementById(containerId);
@@ -136,14 +136,13 @@ export const updateModalShift = () => {
   }
 };
 // =============================================
-// Autocomplete Positioner (高性能 DOM 内生对齐转换器)
+// Autocomplete Positioner
 // =============================================
 export const updateSuggestionBoxPosition = (input) => {
   const box = document.getElementById("suggestionBox");
   if (!box || !input || box.style.display === "none") return;
   const wrapper = input.closest(".mx-input-wrapper");
   if (!wrapper) return;
-  // 核心优化：动态且无侵入地迁移 DOM 补全框至当前包裹层内，由渲染线程自然进行贴合
   if (box.parentNode !== wrapper) {
     wrapper.appendChild(box);
   }
@@ -151,7 +150,6 @@ export const updateSuggestionBoxPosition = (input) => {
   if (container) {
     const containerRect = container.getBoundingClientRect();
     const inputRect = input.getBoundingClientRect();
-    // 代数判定输入框在滚动视口内的富余高差，自适应翻转方向
     const spaceBelow = containerRect.bottom - inputRect.bottom;
     const spaceAbove = inputRect.top - containerRect.top;
     if (spaceBelow < 180 && spaceAbove > spaceBelow) {
@@ -168,7 +166,36 @@ export const updateSuggestionBoxPosition = (input) => {
   }
 };
 // =============================================
-// Autocomplete (注入跑道缓冲实现底端对齐)
+// 【核心新增：高阶视口居中引擎】
+// 精准计算键盘上缘的可视物理空间，使目标输入框在键盘上方完美居中
+// =============================================
+export const centerActiveInput = (input) => {
+  const container = input.closest(".overflow-y-auto");
+  const row = input.closest(".rule-row") || input;
+  if (!container || !row) return;
+
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const containerRect = container.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+
+  // 1. 动态测算键盘上缘以上的容器有效可视高度
+  const visibleHeight = vh - containerRect.top;
+  // 2. 测算可视区域的纵向几何中线
+  const visibleCenter = visibleHeight / 2;
+  // 3. 计算输入行相对滚动视口顶缘的绝对投影偏移
+  const currentRelativeTop = rowRect.top - containerRect.top;
+  const offset = currentRelativeTop - visibleCenter + (rowRect.height / 2);
+
+  // 4. 临时将平滑过渡禁用，使像素定位在单帧中无迟滞完成，完美规避动画冲突
+  container.style.scrollBehavior = "auto";
+  container.scrollTop += offset;
+  
+  window.requestAnimationFrame(() => {
+    container.style.scrollBehavior = "";
+  });
+};
+// =============================================
+// Autocomplete
 // =============================================
 const setupAutocomplete = (input) => {
   if (!input) return;
@@ -257,34 +284,16 @@ const setupAutocomplete = (input) => {
   input.addEventListener("focus", () => {
     window._currentInput = input;
     const container = input.closest(".overflow-y-auto");
-    // 【关键优化：跑道缓冲】对底端组件，动态撑开 260px 跑道底边，确保最底部的条目可以完美对齐而不受键盘遮挡
     if (container) {
-      container.style.paddingBottom = "260px";
+      // 开启富余缓冲跑道
+      container.style.paddingBottom = "280px";
     }
-    window.requestAnimationFrame(() => {
-      const row = input.closest(".rule-row") || input;
-      if (container && row) {
-        row.scrollIntoView({ block: "center", behavior: "auto" });
-        let nextRowsCount = 0;
-        let nextNode = row.nextElementSibling;
-        while (nextNode) {
-          if (nextNode.classList.contains("rule-row")) {
-            nextRowsCount++;
-          }
-          nextNode = nextNode.nextElementSibling;
-        }
-        if (nextRowsCount > 0) {
-          const extraScroll = Math.min(nextRowsCount * 45, 120);
-          setTimeout(() => {
-            if (document.activeElement === input) {
-              container.scrollBy({ top: extraScroll, behavior: "auto" });
-            }
-          }, 100);
-        }
-      } else {
-        input.scrollIntoView({ block: "center", behavior: "auto" });
+    // 延迟 50ms 等待系统软键盘滑起，随后执行精准视口居中
+    setTimeout(() => {
+      if (document.activeElement === input) {
+        centerActiveInput(input);
       }
-    });
+    }, 50);
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));
@@ -296,10 +305,10 @@ const setupAutocomplete = (input) => {
       if (document.activeElement !== input) {
         box.style.display = "none";
         state.currentSuggestions = [];
-        // 【关键优化】失去焦点后，收回跑道边距，平稳缩回正常卡片尺寸
         const container = input.closest(".overflow-y-auto");
         if (container) {
           container.style.paddingBottom = "";
+          container.style.scrollBehavior = "";
         }
       }
     }, 120);

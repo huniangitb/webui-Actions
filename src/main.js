@@ -153,6 +153,18 @@ const closeModalCleanup = () => {
 };
 document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
+  const subpageBody = document.querySelector(".mx-subpage-body");
+  if (subpageBody && window.ResizeObserver) {
+    const ro = new ResizeObserver(() => {
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.classList.contains("mx-input") && subpageBody.contains(activeEl)) {
+        import("./ui.js").then(({ centerActiveInput }) => {
+          centerActiveInput(activeEl);
+        });
+      }
+    });
+    ro.observe(subpageBody);
+  }
   if (navigator.virtualKeyboard) {
     navigator.virtualKeyboard.overlaysContent = true;
     navigator.virtualKeyboard.addEventListener("geometrychange", (e) => {

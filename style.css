@@ -44,7 +44,7 @@
     --mx-sh3: 0 8px 32px rgba(0,0,0,0.08);
 }
 * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
-html { background-color: var(--mx-bg); transition: background-color 0.3s var(--mx-ease); }
+html { background-color: var(--mx-bg); transition: background-color 0.3s var(--mx-ease); overflow: hidden; }
 body {
     margin: 0; padding: 0;
     font-family: var(--mx-font-sans);
@@ -55,10 +55,9 @@ body {
     min-height: 100dvh;
     overflow: hidden;
     opacity: 0;
-    transform: scale(0.98);
-    transition: opacity 0.6s var(--mx-ease), transform 0.6s var(--mx-spring), background-color 0.3s var(--mx-ease), color 0.3s var(--mx-ease);
+    transition: opacity 0.6s var(--mx-ease), background-color 0.3s var(--mx-ease), color 0.3s var(--mx-ease);
 }
-body.loaded { opacity: 1; transform: scale(1); }
+body.loaded { opacity: 1; }
 .mx-topbar {
     padding-top: var(--safe-area-inset-top, env(safe-area-inset-top));
     height: calc(56px + var(--safe-area-inset-top, env(safe-area-inset-top)));
@@ -74,7 +73,7 @@ body.loaded { opacity: 1; transform: scale(1); }
 .mx-app {
     display: flex;
     height: var(--initial-vh, 100dvh);
-    width: 100vw;
+    width: 100%;
     flex-direction: column;
     will-change: opacity;
 }

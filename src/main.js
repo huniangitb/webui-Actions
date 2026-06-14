@@ -202,8 +202,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.addEventListener("scroll", (e) => {
     if (state.isUserTouching) {
       const box = document.getElementById("suggestionBox");
-      if (box && box.style.display !== "none") {
-        box.style.display = "none";
+      if (box && box.classList.contains("open")) {
+        box.classList.remove("open");
         state.currentSuggestions = [];
       }
     }
@@ -213,11 +213,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }, true);
   document.addEventListener("click", (e) => {
     const box = document.getElementById("suggestionBox");
-    if (box && box.style.display !== "none") {
+    if (box && box.classList.contains("open")) {
       const isInput = e.target.classList.contains("rule-target") || e.target.classList.contains("rule-source");
       const isInsideBox = box.contains(e.target);
       if (!isInput && !isInsideBox) {
-        box.style.display = "none";
+        box.classList.remove("open");
         state.currentSuggestions = [];
       }
     }

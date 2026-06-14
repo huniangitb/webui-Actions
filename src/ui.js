@@ -97,7 +97,7 @@ export const setupModeToggle = (groupName, visualId, rawId, contentId, parseFunc
 };
 export const updateSuggestionBoxPosition = (input) => {
   const box = document.getElementById("suggestionBox");
-  if (!box || !input || box.style.display === "none") return;
+  if (!box || !input || !box.classList.contains("open")) return;
   const wrapper = input.closest(".mx-input-wrapper");
   if (!wrapper) return;
   if (box.parentNode !== wrapper) {
@@ -130,11 +130,18 @@ export const centerActiveInput = (input) => {
   const container = input.closest(".editor-scroll") || input.closest(".mx-subpage-body") || input.closest(".overflow-y-auto");
   if (!row || !container) return;
   const performAlign = () => {
-    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    const containerRect = container.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
+    const targetScrollTop = relativeTop - (containerRect.height / 2) + (rowRect.height / 2);
+    container.scrollTo({
+      top: Math.max(0, targetScrollTop),
+      behavior: "smooth"
+    });
   };
   requestAnimationFrame(performAlign);
-  setTimeout(performAlign, 100);
-  setTimeout(performAlign, 200);
+  setTimeout(performAlign, 80);
+  setTimeout(performAlign, 250);
 };
 export const debouncedCenterActive = debounce((input) => {
   centerActiveInput(input);
@@ -161,7 +168,7 @@ const setupAutocomplete = (input) => {
       try {
         const res = await exec(`ls -F -1 "${pDir.replace(/\/+/g, "/")}" 2>/dev/null | head -n 30`);
         if (!res || !res.stdout) {
-          box.style.display = "none";
+          box.classList.remove("open");
           state.currentSuggestions = [];
           state.suggestionBoxHeight = 0;
           return;
@@ -171,7 +178,7 @@ const setupAutocomplete = (input) => {
           .filter((l) => l.endsWith("/") && l.startsWith(sPre))
           .map((l) => ({ t: dBase + l, i: ICONS.FOLDER }));
         if (sugs.length === 0) {
-          box.style.display = "none";
+          box.classList.remove("open");
           state.currentSuggestions = [];
           state.suggestionBoxHeight = 0;
           return;
@@ -210,12 +217,12 @@ const setupAutocomplete = (input) => {
               `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window._currentInput.value='${s.t}';window._currentInput.dispatchEvent(new Event('input'))"><span style="display:flex">${s.i}</span><span style="word-break:break-all;flex:1;line-height:18px;">${s.t}</span></div>`
           )
           .join("");
-        box.style.display = "block";
+        box.classList.add("open");
         window.requestAnimationFrame(() => {
           updateSuggestionBoxPosition(input);
         });
       } catch {
-        box.style.display = "none";
+        box.classList.remove("open");
         state.currentSuggestions = [];
         state.suggestionBoxHeight = 0;
       }
@@ -253,7 +260,7 @@ const setupAutocomplete = (input) => {
     setTimeout(() => {
       const activeEl = document.activeElement;
       if (!activeEl || !activeEl.classList.contains("mx-input")) {
-        box.style.display = "none";
+        box.classList.remove("open");
         state.currentSuggestions = [];
       }
     }, 150);

@@ -71,14 +71,13 @@ body.loaded { opacity: 1; transform: scale(1); }
 .mx-topbar-right { display: flex; align-items: center; gap: 8px; }
 .mx-desktop-main {
     display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; position: relative;
-    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 56px;
     transition: padding-bottom 0.2s var(--mx-ease), padding-top 0.2s var(--mx-ease);
     view-transition-name: main-content;
 }
 .mx-bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0;
-    height: calc(56px + env(safe-area-inset-bottom, 0px));
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    height: 56px;
     background: var(--mx-s1);
     backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
     border-top: 1px solid var(--mx-border);
@@ -233,7 +232,6 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
     padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(16px + env(safe-area-inset-right));
     padding-top: 16px; padding-bottom: 16px;
 }
-/* 解决软键盘升起遮挡末尾元素的物理绝杀方案：赋予超大隐性外扩缓冲区，配合JS的scrollIntoView精准对焦 */
 body.keyboard-open .mx-subpage-body { padding-bottom: 50vh; }
 body.keyboard-open .editor-scroll { padding-bottom: 50vh; }
 .mx-subpage-footer {
@@ -327,7 +325,16 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto.editor-scroll { max-height:
 .mx-card-head { animation: card-shadow-slide linear both; animation-timeline: --cardTimeline; animation-range: 0px 50px; }
 .mx-toast-container { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 3000; display: flex; flex-direction: column; gap: 8px; pointer-events: none;}
 .mx-toast { background: var(--mx-s3); color: var(--mx-t1); padding: 10px 16px; border-radius: 24px; font-size: 13px; font-weight: 500; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); pointer-events: auto; will-change: transform, opacity; }
-.suggestion-box { position: absolute; background: var(--mx-s3); border: 1px solid var(--mx-border); border-radius: 12px; box-shadow: var(--mx-shadow); z-index: 1000; overflow-y: auto; display: none; width: 100%; max-height: 240px; will-change: transform, opacity; }
+.suggestion-box {
+    position: absolute; background: var(--mx-s3); border: 1px solid var(--mx-border); border-radius: 12px;
+    box-shadow: var(--mx-shadow); z-index: 1000; overflow-y: auto; width: 100%; max-height: 240px;
+    will-change: transform, opacity; opacity: 0; visibility: hidden; transform: translateY(4px);
+    transition: opacity 0.2s ease 0s, transform 0.2s ease 0s, visibility 0s ease 0.2s;
+}
+.suggestion-box.open {
+    opacity: 1; visibility: visible; transform: translateY(0);
+    transition: opacity 0.2s ease 1s, transform 0.2s ease 1s, visibility 0s ease 0s;
+}
 .suggestion-item { padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--mx-border); display: flex; align-items: flex-start; gap: 8px; }
 .suggestion-item:last-child { border-bottom: none; }
 .virtual-log-item { will-change: transform; backface-visibility: hidden; }

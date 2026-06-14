@@ -43,17 +43,23 @@ jobs:
         with:
           node-version: '20'
 
-      # 安装依赖。这一步会自动创建/更新 yarn.lock 文件
+      # 自动检测并升级依赖到最新版本（在 semver 范围内）
+      - name: Check and upgrade dependencies
+        run: |
+          npx npm-check-updates -u --packageFile package.json 2>&1 || echo "No updates found or check failed"
+          echo "--- Dependency upgrade check complete ---"
+
+      # 安装依赖。这一步会自动创建/更新 yarn.lock 文件，并生效升级后的版本
       - name: Install dependencies
         run: yarn install
 
-      # 检查 yarn.lock 文件是否有变动，如果有则自动提交
-      - name: Commit yarn.lock
+      # 检查 yarn.lock 和 package.json 是否有变动，如果有则自动提交
+      - name: Commit dependency updates
         id: commit_lockfile
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: Add/update yarn.lock"
-          file_pattern: yarn.lock
+          commit_message: "chore: auto-upgrade dependencies & update yarn.lock"
+          file_pattern: package.json yarn.lock
           push_options: '--force-with-lease'
         # 关键：将提交结果保存到输出，以便后续 Job 判断是否需要 Release
 

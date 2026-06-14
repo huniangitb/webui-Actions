@@ -70,15 +70,19 @@
         <main class="mx-desktop-main mx-body">
             <div class="demo-section active" id="sec-apps">
                 <div class="mx-card mx-anim-card-in flex-col-full">
-                    <div class="mx-card-head" style="border-bottom: 1px solid var(--mx-border); padding-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-                        <div class="mx-input-wrap search-bar-wrap" style="flex: 1; min-width: 200px;">
-                            <span class="mx-input-icon" id="iconSearch"></span>
-                            <input type="text" class="mx-input" id="appSearch" placeholder="搜索应用名称或包名..." />
-                        </div>
-                        <div class="mx-pill-group" id="appFilterGroup">
-                            <button class="active" data-filter="filterUser">用户</button>
-                            <button data-filter="filterSystem">系统</button>
-                            <button data-filter="filterBound">已配置App</button>
+                    <div class="mx-card-head" style="border-bottom: 1px solid var(--mx-border); padding: 12px 16px;">
+                        <div style="display:flex; width:100%; align-items:center; gap:8px;">
+                            <div class="search-bar-wrap" id="searchBarWrap" tabindex="0">
+                                <span class="mx-input-icon" id="iconSearch"></span>
+                                <input type="text" class="mx-input" id="appSearch" placeholder="搜索应用名称或包名..." autocomplete="off" />
+                            </div>
+                            <div class="app-filter-wrapper" id="appFilterWrapper">
+                                <div class="mx-pill-group w-full" id="appFilterGroup" style="margin:0; flex:1;">
+                                    <button class="active" data-filter="filterUser">用户</button>
+                                    <button data-filter="filterSystem">系统</button>
+                                    <button data-filter="filterBound">已配置App</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="mx-card-body p-0 list-scrollable relative" id="appListContainer">
@@ -332,20 +336,43 @@
     <div class="mx-modal-overlay" id="backupModal">
         <div class="mx-modal large" style="margin-top: env(safe-area-inset-top);">
             <div class="mx-modal-head">
-                <div>
-                    <span class="mx-modal-title">数据备份与恢复</span>
-                    <div class="text-muted" style="font-size:11px;">管理系统配置与运行日志</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button class="mx-btn-icon hidden" id="btnBackupBack" style="width:28px;height:28px;margin-left:-8px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M15 18l-6-6 6-6"/></svg>
+                    </button>
+                    <div>
+                        <span class="mx-modal-title" id="backupModalTitle">数据备份与恢复</span>
+                        <div class="text-muted" style="font-size:11px;">管理系统配置与运行日志</div>
+                    </div>
                 </div>
                 <button class="mx-btn-close"></button>
             </div>
-            <div class="mx-modal-body p-0 flex-col-full overflow-hidden">
-                <div class="p-4 flex-col gap-3" style="border-bottom: 1px solid var(--mx-border); background: var(--mx-s1);">
-                    <div style="font-weight:600; font-size:13px; color:var(--mx-t1);">运行日志一键备份</div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span class="text-muted" style="font-size:11px;">将系统运行记录与 Zygisk 注入日志打包保存至内部存储。</span>
-                        <button class="mx-btn mx-btn-primary mx-btn-sm" id="btnOneClickLogs">一键打包日志</button>
+            
+            <div class="mx-modal-body flex-col gap-3" id="backupMainMenu">
+                <div class="mx-card p-3" style="cursor:pointer;" id="btnMenuLogs">
+                    <div style="font-weight:600; color:var(--mx-primary); display:flex; align-items:center; gap:8px;">
+                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                       一键打包日志
                     </div>
+                    <div class="text-muted" style="font-size:12px; margin-top:4px;">将运行记录与注入日志导出至内部存储</div>
                 </div>
+                <div class="mx-card p-3" style="cursor:pointer;" id="btnMenuExport">
+                    <div style="font-weight:600; color:var(--mx-primary); display:flex; align-items:center; gap:8px;">
+                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                       导出配置
+                    </div>
+                    <div class="text-muted" style="font-size:12px; margin-top:4px;">将当前所有规则配置打包备份为 tar 文件</div>
+                </div>
+                <div class="mx-card p-3" style="cursor:pointer;" id="btnMenuImport">
+                    <div style="font-weight:600; color:var(--mx-green); display:flex; align-items:center; gap:8px;">
+                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                       恢复配置
+                    </div>
+                    <div class="text-muted" style="font-size:12px; margin-top:4px;">从选定的 tar 文件中覆盖恢复系统配置</div>
+                </div>
+            </div>
+
+            <div class="mx-modal-body p-0 flex-col-full overflow-hidden hidden" id="backupPickerPanel">
                 <div class="flex-col-full overflow-hidden flex-col">
                     <div class="p-3" style="display:flex; justify-content:space-between; align-items:center; background: var(--mx-s2); border-bottom:1px solid var(--mx-border);">
                         <div id="backupBreadcrumbs" class="text-truncate" style="font-size:12px; font-family:var(--mx-font-mono); font-weight:600; color:var(--mx-primary); flex:1; margin-right:8px;">/storage/emulated/0</div>
@@ -353,12 +380,8 @@
                     </div>
                     <div id="backupFileList" class="flex-grow overflow-y-auto p-2" style="background: var(--mx-bg);"></div>
                 </div>
-            </div>
-            <div class="mx-modal-foot flex-col gap-2" style="background: var(--mx-s1);">
-                <div style="display:flex; gap:10px; width:100%;">
-                    <input type="text" id="backupFileNameInput" class="mx-input" style="flex:1; background:var(--mx-s3); border-radius:8px; font-size:12px; padding:6px 10px;" placeholder="备份文件名 (如: config.tar)" />
-                    <button class="mx-btn mx-btn-primary" id="btnExportConfig" style="font-size:12px; padding:6px 12px;">导出配置</button>
-                    <button class="mx-btn mx-btn-secondary" id="btnImportConfig" style="font-size:12px; padding:6px 12px;" disabled>恢复所选配置</button>
+                <div class="mx-modal-foot flex-col gap-2" style="background: var(--mx-s1);">
+                    <div style="display:flex; gap:10px; width:100%;" id="backupFileActionRow"></div>
                 </div>
             </div>
         </div>

@@ -7,12 +7,44 @@ const BACKUP_ZIP_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColo
 
 let currentPath = "/storage/emulated/0";
 let selectedFile = "";
+let pickerMode = "";
 
 export function openBackupModal() {
   history.pushState({ modalOpen: true }, "");
   document.querySelector(".mx-app").classList.add("frozen");
   document.getElementById("backupModal")?.classList.add("open");
-  updateDefaultBackupName();
+  
+  document.getElementById("backupMainMenu").classList.remove("hidden");
+  document.getElementById("backupPickerPanel").classList.add("hidden");
+  document.getElementById("btnBackupBack").classList.add("hidden");
+  document.getElementById("backupModalTitle").textContent = "数据备份与恢复";
+}
+
+export function showPicker(mode) {
+  pickerMode = mode;
+  document.getElementById("backupMainMenu").classList.add("hidden");
+  document.getElementById("backupPickerPanel").classList.remove("hidden");
+  document.getElementById("btnBackupBack").classList.remove("hidden");
+  document.getElementById("backupModalTitle").textContent = mode === "export" ? "选择导出目录" : "选择恢复文件";
+  
+  const actionRow = document.getElementById("backupFileActionRow");
+  if (mode === "export") {
+    actionRow.innerHTML = `
+      <input type="text" id="backupFileNameInput" class="mx-input" style="flex:1; background:var(--mx-s3); border-radius:8px; font-size:12px; padding:6px 10px;" placeholder="备份文件名 (如: config.tar)" />
+      <button class="mx-btn mx-btn-primary" id="btnActionExport" style="font-size:12px; padding:6px 12px; flex-shrink:0;">导出配置</button>
+    `;
+    updateDefaultBackupName();
+    document.getElementById("btnBackupNewFolder").style.display = "block";
+    document.getElementById("btnActionExport").onclick = backupConfig;
+  } else {
+    actionRow.innerHTML = `
+      <div style="flex:1; font-size:12px; color:var(--mx-t2); display:flex; align-items:center;">请在上方选择 .tar 备份文件</div>
+      <button class="mx-btn mx-btn-secondary" id="btnActionImport" style="font-size:12px; padding:6px 12px; flex-shrink:0;" disabled>恢复选定配置</button>
+    `;
+    document.getElementById("btnBackupNewFolder").style.display = "none";
+    document.getElementById("btnActionImport").onclick = restoreConfig;
+  }
+  
   listDirectory("/storage/emulated/0");
 }
 
@@ -28,7 +60,7 @@ export function updateDefaultBackupName() {
 export async function listDirectory(path) {
   currentPath = path;
   selectedFile = "";
-  const btnImport = document.getElementById("btnImportConfig");
+  const btnImport = document.getElementById("btnActionImport");
   if (btnImport) btnImport.disabled = true;
 
   const breadcrumbsEl = document.getElementById("backupBreadcrumbs");
@@ -99,6 +131,7 @@ function renderFileRow(file) {
 }
 
 export async function exportAllLogs() {
+  showToast("正在打包日志...");
   try {
     const timestamp = new Date().toISOString().replace(/[-T:]/g, "").split(".")[0];
     const targetPath = `/storage/emulated/0/nsproxy_logs_${timestamp}.tar`;
@@ -115,10 +148,11 @@ export async function exportAllLogs() {
       tar -cvf "${targetPath}" . 2>/dev/null
       cd ${CONST.BASE_DIR}
       rm -rf ${CONST.BASE_DIR}/.temp_logs
+      test -f "${targetPath}" && echo "SUCCESS"
     `;
 
     const res = await exec(script);
-    if (res.errno === 0) {
+    if (res.stdout.includes("SUCCESS")) {
       showToast(`日志打包成功: ${targetPath}`);
     } else {
       showToast("日志导出失败");
@@ -137,11 +171,11 @@ export async function backupConfig() {
   }
   const targetTar = `${currentPath}/${name.endsWith(".tar") ? name : name + ".tar"}`;
   try {
-    const cmd = `cd ${CONST.BASE_DIR} && tar -cvf "${targetTar}" injector.conf monitor_ignore.conf list.config webui_settings.json App-rules App-rules-* 2>/dev/null`;
+    const cmd = `cd ${CONST.BASE_DIR} && tar -cvf "${targetTar}" injector.conf monitor_ignore.conf list.config webui_settings.json App-rules App-rules-* 2>/dev/null; test -f "${targetTar}" && echo "SUCCESS"`;
     const res = await exec(cmd);
-    if (res.errno === 0) {
+    if (res.stdout.includes("SUCCESS")) {
       showToast(`备份成功: ${targetTar}`);
-      listDirectory(currentPath);
+      document.getElementById("btnBackupBack").click();
     } else {
       showToast("备份配置失败");
     }
@@ -157,13 +191,12 @@ export async function restoreConfig() {
   }
   if (!confirm(`确定要恢复该配置吗? 这将覆盖当前所有配置。`)) return;
   try {
-    const cmd = `tar -xvf "${selectedFile}" -C ${CONST.BASE_DIR}/ && chmod -R 755 ${CONST.BASE_DIR}`;
+    const cmd = `tar -xvf "${selectedFile}" -C ${CONST.BASE_DIR}/ && chmod -R 755 ${CONST.BASE_DIR}; echo "SUCCESS"`;
     const res = await exec(cmd);
-    if (res.errno === 0) {
+    if (res.stdout.includes("SUCCESS")) {
       showToast("配置恢复成功");
       await loadData();
-      document.querySelector(".mx-modal-overlay.open")?.classList.remove("open");
-      document.querySelector(".mx-app").classList.remove("frozen");
+      import("./main.js").then(({ closeModalCleanup }) => closeModalCleanup());
     } else {
       showToast("恢复配置失败");
     }

@@ -128,7 +128,7 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
     .mx-topbar-right { gap: 6px; }
     .mx-topbar-right .mx-btn-icon { width: 32px; height: 32px; }
     .mx-logo-text { font-size: 15px; }
-    .demo-section .mx-card { background: var(--mx-bg); border-radius: 0; border: none; box-shadow: none; flex: 1; min-height: 0; width: 100%; }
+    .demo-section .mx-card { background: var(--mx-bg); border-radius: 0; border: none; box-shadow: none; }
 }
 @media (min-width: 768px) {
     .mx-app { flex-direction: row; }
@@ -189,10 +189,11 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
 .divider { height: 1px; background: var(--mx-border); margin: 12px 0; }
 .mx-card { background: var(--mx-s2); border-radius: var(--mx-radius); border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); display: flex; flex-direction: column; overflow: hidden; transform: translateZ(0); container-type: inline-size; }
 .mx-modal-body { background: var(--mx-s2); border-radius: 0; display: flex; flex-direction: column; overflow: hidden; transform: translateZ(0); container-type: inline-size; }
+.demo-section .mx-card { flex: 1; min-height: 0; width: 100%; }
 @container (max-width: 440px) { .grid-2 { grid-template-columns: 1fr; } }
 .mx-card-head { padding: 16px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
 .mx-card-title { font-size: 16px; font-weight: 600; }
-.mx-card-body { padding: 16px; flex: 1; overflow-y: auto; }
+.mx-card-body { padding: 16px; flex: 1; min-height: 0; overflow-y: auto; }
 .mx-card-foot { padding: 12px 16px; border-top: 1px solid var(--mx-border); background: var(--mx-s2); flex-shrink: 0; }
 .mx-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px; border-radius: var(--mx-radius-sm); font-size: 13px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s var(--mx-ease); }
 .mx-btn:active { transform: scale(0.96); }
@@ -392,7 +393,6 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 .suggestion-item { padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--mx-border); display: flex; align-items: flex-start; gap: 8px; }
 .suggestion-item:last-child { border-bottom: none; }
 .virtual-log-item { will-change: transform; backface-visibility: hidden; }
-#ioLogContainer, #logViewer { height: 100dvh; }
 @media (hover: hover) { .suggestion-item:hover { background: var(--mx-s4); } }
 .mx-anim-slide-up { animation: slideUp 0.3s var(--mx-ease) both; }
 .mx-anim-card-in { animation: cardIn 0.4s var(--mx-ease) both; animation-delay: 0.1s; }

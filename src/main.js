@@ -292,6 +292,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 250));
   }
 
+  // 滚动应用列表时自动收缩搜索框
+  const appListContainer = document.getElementById("appListContainer");
+  if (appListContainer && searchBarWrap && appSearch && appFilterWrapper) {
+    appListContainer.addEventListener("scroll", () => {
+      if (searchBarWrap.classList.contains("expanded")) {
+        searchBarWrap.classList.remove("expanded");
+        appFilterWrapper.classList.remove("collapsed");
+        searchBarWrap.classList.toggle("has-text", !!appSearch.value.trim());
+        appSearch.blur();
+      }
+    }, { passive: true });
+  }
+
   const ioContainer = document.getElementById("ioLogContainer");
   const ioSearch = document.getElementById("ioSearch");
   if (ioSearch) {

@@ -159,6 +159,11 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
 .flex-col-full { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .flex-shrink-0 { flex-shrink: 0; }
 .flex-grow { flex: 1; min-height: 0; }
+.gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+.gap-6 { gap: 24px; }
 .w-full { width: 100%; }
 .h-full { height: 100%; }
 .m-0 { margin: 0; }
@@ -230,13 +235,13 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
     opacity: 0; pointer-events: none; transition: opacity 0.2s var(--mx-ease);
 }
 .mx-modal-overlay.open { opacity: 1; pointer-events: auto; }
-.mx-modal { 
-    background: var(--mx-bg); width: 92%; max-width: 420px; border-radius: 24px; display: flex; flex-direction: column; 
-    max-height: 85%; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); 
-    transform: scale(0.96) translate3d(0, 16px, 0); opacity: 0; 
+.mx-modal {
+    background: var(--mx-bg); width: 92%; max-width: 420px; border-radius: 24px; display: flex; flex-direction: column;
+    max-height: 85%; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); overflow: hidden;
+    transform: scale(0.96) translate3d(0, 16px, 0); opacity: 0;
     transition: opacity 0.2s var(--mx-ease), transform 0.2s var(--mx-ease); will-change: transform, opacity;
 }
-.mx-modal.large { max-width: 800px; height: 85%; }
+.mx-modal.large { max-width: 800px; height: auto; max-height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1) translate3d(0, 0, 0); opacity: 1; }
 .mx-subpage-container {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
@@ -436,7 +441,7 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 }
 .search-bar-wrap .mx-input-icon {
     position: absolute;
-    left: 10px;
+    left: 4px;
     pointer-events: none;
 }
 .search-bar-wrap .mx-input {
@@ -448,6 +453,7 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 }
 .search-bar-wrap.expanded {
     flex: 1;
+    max-width: 280px;
     background: var(--mx-s3);
     border-color: var(--mx-border);
     cursor: text;
@@ -467,6 +473,9 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
     border-radius: 50%;
     background: var(--mx-primary);
     pointer-events: none;
+}
+.search-bar-wrap.expanded.has-text::after {
+    display: none;
 }
 .app-filter-wrapper {
     display: flex;

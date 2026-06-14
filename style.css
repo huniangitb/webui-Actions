@@ -393,6 +393,7 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 .suggestion-item { padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--mx-border); display: flex; align-items: flex-start; gap: 8px; }
 .suggestion-item:last-child { border-bottom: none; }
 .virtual-log-item { will-change: transform; backface-visibility: hidden; }
+#ioLogContainer, #logViewer { height: 100dvh; }
 @media (hover: hover) { .suggestion-item:hover { background: var(--mx-s4); } }
 .mx-anim-slide-up { animation: slideUp 0.3s var(--mx-ease) both; }
 .mx-anim-card-in { animation: cardIn 0.4s var(--mx-ease) both; animation-delay: 0.1s; }

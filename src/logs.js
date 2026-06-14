@@ -92,11 +92,15 @@ class VirtualLogList {
       this.totalHeight = 0;
     }
   }
+  _isActive() {
+    // 若主视图被冻结或所在tab未激活，跳过一切计算（避免display:none下执行dvh布局浪费性能）
+    if (document.querySelector(".mx-app")?.classList.contains("frozen")) return false;
+    const section = this.container.closest('.demo-section');
+    if (section && !section.classList.contains('active')) return false;
+    return true;
+  }
   _onScroll() {
-    // 物理隔离：若主视图已被冻结，完全屏蔽背景虚拟列表的任何逻辑及重绘
-    if (document.querySelector(".mx-app")?.classList.contains("frozen")) {
-      return;
-    }
+    if (!this._isActive()) return;
     if (!this._ticking) {
       window.requestAnimationFrame(() => {
         this._render();
@@ -106,8 +110,7 @@ class VirtualLogList {
     }
   }
   _onResize() {
-    // 容器尺寸变化时强制标记脏状态，确保 _render 不会因 visibleStart/End 未变而跳过重绘
-    if (document.querySelector(".mx-app")?.classList.contains("frozen")) return;
+    if (!this._isActive()) return;
     this.isDirty = true;
     if (!this._ticking) {
       window.requestAnimationFrame(() => {
@@ -118,10 +121,7 @@ class VirtualLogList {
     }
   }
   _render() {
-    // 物理隔离：冻结保护
-    if (document.querySelector(".mx-app")?.classList.contains("frozen")) {
-      return;
-    }
+    if (!this._isActive()) return;
     const scrollTop = this.container.scrollTop;
     const viewHeight = this.container.clientHeight;
     this.contentEl.style.height = this.totalHeight + "px";

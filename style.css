@@ -379,7 +379,7 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 @keyframes card-shadow-slide { from { box-shadow: none; border-bottom-color: transparent; } to { box-shadow: var(--mx-shadow); border-bottom-color: var(--mx-border); } }
 .mx-card-head { animation: card-shadow-slide linear both; animation-timeline: --cardTimeline; animation-range: 0px 50px; }
 .mx-toast-container { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 3000; display: flex; flex-direction: column; gap: 8px; pointer-events: none;}
-.mx-toast { background: var(--mx-s3); color: var(--mx-t1); padding: 10px 16px; border-radius: 24px; font-size: 13px; font-weight: 500; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); pointer-events: auto; will-change: transform, opacity; }
+.mx-toast { display: flex; align-items: center; gap: 8px; background: var(--mx-s3); color: var(--mx-t1); padding: 10px 16px; border-radius: 24px; font-size: 13px; font-weight: 500; border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); pointer-events: auto; will-change: transform, opacity; }
 .suggestion-box {
     position: absolute; background: var(--mx-s3); border: 1px solid var(--mx-border); border-radius: 12px;
     box-shadow: var(--mx-shadow); z-index: 1000; overflow-y: auto; width: 100%; max-height: 240px;

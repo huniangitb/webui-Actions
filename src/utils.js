@@ -79,7 +79,7 @@ export const ICONS = {
   LOG: getSvg(mdiMathLog),
   SEARCH: getSvg(mdiMagnify, 18, "var(--mx-t2)"),
   COG: getSvg(mdiCog),
-  CLOSE: getSvg(mdiClose, 20),
+  CLOSE: getSvg(mdiClose),
   PLUS: getSvg(mdiPlus, 18),
   DELETE: getSvg(mdiDeleteOutline, 18),
   MOON: getSvg(mdiWeatherNight),
@@ -129,8 +129,8 @@ export const initIcons = () => {
   const btnClear = document.getElementById("btnClearIo");
   if (btnClear) btnClear.innerHTML = ICONS.SWEEP;
 
-  // 解决要点 5：全局自动检索模态框圆形关闭按钮，并无缝填充 X 号图标
-  document.querySelectorAll(".mx-btn-close").forEach((btn) => {
+  // 自动注入 X 号关闭图标
+  document.querySelectorAll(".mx-btn-close").forEach(btn => {
     btn.innerHTML = ICONS.CLOSE;
   });
 };

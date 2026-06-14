@@ -95,7 +95,7 @@
                     <h1 class="mx-page-title">全局规则</h1>
                     <p class="mx-page-sub">对所有应用默认生效的基础配置</p>
                 </div>
-                <div class="mx-card mx-anim-card-in flex-col-full" style="max-height: calc(100dvh - 180px);">
+                <div class="mx-card mx-anim-card-in flex-col-full">
                     <div class="mx-card-head">
                         <span class="mx-card-title">基础设置</span>
                         <div class="mx-pill-group">
@@ -163,7 +163,7 @@
                         <button class="mx-btn mx-btn-danger mx-btn-icon mx-tooltip" id="btnClearIo"></button>
                     </div>
                     <div class="mx-card-body p-0 list-scrollable" id="ioLogContainer" style="background: transparent; z-index: 2;">
-                        <div id="ioLogList" class="flex-col p-0 relative" style="width: 100%;"></div>
+                        <div id="ioLogList" class="flex-col p-0"></div>
                         <div id="ioLoadingIndicator" class="text-center text-muted p-2 hidden" style="font-size:12px;">加载中...</div>
                     </div>
                 </div>
@@ -172,7 +172,7 @@
                 <div class="mx-page-head mx-anim-slide-up">
                     <h1 class="mx-page-title">运行日志</h1>
                 </div>
-                <div class="mx-card mx-anim-card-in flex-col-full" style="max-height: calc(100dvh - 180px);">
+                <div class="mx-card mx-anim-card-in flex-col-full">
                     <div class="mx-card-head" style="padding-bottom:10px;border-bottom: 1px solid var(--mx-border);">
                         <select id="logSourceSelect" class="mx-select" style="width: 140px;">
                             <option value="internal">注入日志</option>
@@ -188,9 +188,7 @@
                         <button class="mx-btn mx-btn-danger mx-btn-sm" id="btnClearLog">清空日志</button>
                     </div>
                     <div class="mx-card-body p-0 flex-col-full relative" style="background: var(--mx-bg);">
-                        <div id="logViewer" class="mx-log-viewer overflow-y-auto h-full relative">
-                            <div id="logViewerContent" style="position: relative; width: 100%;"></div>
-                        </div>
+                        <div id="logViewer" class="mx-log-viewer flex-col p-0 overflow-y-auto h-full"></div>
                         <div id="sysLoadingIndicator" class="loading-overlay hidden">加载中...</div>
                     </div>
                 </div>
@@ -287,19 +285,19 @@
                         <button class="active" data-mode="visual" name="ignoreModeToggle">图形</button>
                         <button data-mode="raw" name="ignoreModeToggle">源码</button>
                     </div>
-                    <button class="mx-btn-close" id="btnCloseIgnoreModal"></button>
+                    <button class="mx-btn-close"></button>
                 </div>
             </div>
             <div class="mx-modal-body p-0 flex-col-full overflow-hidden">
-                <div class="editor-pane active h-full" id="ignoreVisual">
-                    <div class="p-4 flex-col gap-4 overflow-y-auto h-full editor-scroll">
+                <div class="editor-pane active" id="ignoreVisual">
+                    <div class="p-4 flex-col gap-4 overflow-y-auto editor-scroll">
                         <div style="background:rgba(52, 130, 255, 0.1); color:var(--mx-primary); padding:8px 12px; border-radius:8px; font-size:12px;">匹配规则：<b>前缀匹配</b></div>
-                        <div id="ignoreBuilderContainer" class="flex-col gap-2 flex-grow"></div>
+                        <div id="ignoreBuilderContainer" class="flex-col gap-2"></div>
                         <button class="mx-btn mx-btn-secondary mx-btn-sm" style="align-self:flex-start" id="btnAddIgnoreRow">添加路径</button>
                     </div>
                 </div>
-                <div class="editor-pane h-full" id="ignoreRaw">
-                    <textarea id="monitorIgnoreContent" class="mx-code-editor h-full"></textarea>
+                <div class="editor-pane" id="ignoreRaw">
+                    <textarea id="monitorIgnoreContent" class="mx-code-editor"></textarea>
                 </div>
             </div>
             <div class="mx-modal-foot">
@@ -311,7 +309,7 @@
         <div class="mx-modal">
             <div class="mx-modal-head">
                 <span class="mx-modal-title">WebUI 设置</span>
-                <button class="mx-btn-close" id="btnCloseSettingsModal"></button>
+                <button class="mx-btn-close"></button>
             </div>
             <div class="mx-modal-body flex-col gap-3">
                 <label class="mx-switch-row mx-card" style="padding:12px; border:1px solid var(--mx-border); box-shadow:none; cursor:pointer;">

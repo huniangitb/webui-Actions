@@ -119,6 +119,12 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
 }
 .demo-section.active { display: flex; }
 .mx-page-head { display: none; }
+@media (max-width: 767px) {
+    .mx-topbar-right { gap: 6px; }
+    .mx-topbar-right .mx-btn-icon { width: 32px; height: 32px; }
+    .mx-logo-text { font-size: 15px; }
+    .demo-section .mx-card { background: var(--mx-bg); border-radius: 0; border: none; box-shadow: none; height: 100%; width: 100%; }
+}
 @media (min-width: 768px) {
     .mx-app { flex-direction: row; }
     .mx-topbar, .mx-bottom-nav { display: none; }
@@ -171,7 +177,7 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
 .hidden { display: none !important; }
 .relative { position: relative; }
 .divider { height: 1px; background: var(--mx-border); margin: 12px 0; }
-.mx-card { background: var(--mx-bg); border-radius: 0; border: none; box-shadow: none; display: flex; flex-direction: column; overflow: hidden; transform: translateZ(0); container-type: inline-size; height: 100%; width: 100%; }
+.mx-card { background: var(--mx-s2); border-radius: var(--mx-radius); border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); display: flex; flex-direction: column; overflow: hidden; transform: translateZ(0); container-type: inline-size; }
 .mx-modal-body { background: var(--mx-s2); border-radius: 0; display: flex; flex-direction: column; overflow: hidden; transform: translateZ(0); container-type: inline-size; }
 @container (max-width: 440px) { .grid-2 { grid-template-columns: 1fr; } }
 .mx-card-head { padding: 16px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; background: var(--mx-bg); }
@@ -301,35 +307,11 @@ body.keyboard-open .overflow-y-auto {
 @media (min-width: 768px) {
     .mx-subpage-container { left: 240px; width: calc(100vw - 240px); border-left: 1px solid var(--mx-border); }
     .mx-subpage-header { padding-top: calc(16px + env(safe-area-inset-top)); }
-    .mx-card {
-        background: var(--mx-s2);
-        border-radius: var(--mx-radius);
-        border: 1px solid var(--mx-border);
-        box-shadow: var(--mx-shadow);
-    }
 }
-.flex-col { display: flex; flex-direction: column; }
-.flex-col-full { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.flex-shrink-0 { flex-shrink: 0; }
-.flex-grow { flex: 1; min-height: 0; }
-.w-full { width: 100%; }
-.h-full { height: 100%; }
-.m-0 { margin: 0; }
-.p-0 { padding: 0 !important; }
-.p-2 { padding: 8px !important; }
-.p-3 { padding: 12px; }
-.p-4 { padding: 16px; }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.overflow-y-auto, .list-scrollable { overflow-y: auto; overscroll-behavior-y: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; transform: translateZ(0); scroll-behavior: smooth; }
-.scroll-x { overflow-x: auto; scrollbar-width: none; touch-action: pan-x; -webkit-overflow-scrolling: touch; scroll-snap-type: x mandatory; scroll-behavior: smooth; }
-.scroll-x::-webkit-scrollbar { display: none; }
-.scroll-x > * { scroll-snap-align: start; scroll-snap-stop: always; }
-.text-muted { color: var(--mx-t2); }
-.text-center { text-align: center; }
-.text-truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.hidden { display: none !important; }
-.relative { position: relative; }
-.divider { height: 1px; background: var(--mx-border); margin: 12px 0; }
+.mx-modal-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mx-border); flex-shrink: 0;}
+.mx-modal-title { font-size: 18px; font-weight: 700; margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.mx-modal-body { padding: 20px; overflow-y: auto; flex: 1; min-height:0; }
+.mx-modal-foot { padding: 16px 20px; display: flex; gap: 12px; border-top: 1px solid var(--mx-border); flex-shrink:0;}
 .app-item {
     display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--mx-border); cursor: pointer;
     content-visibility: auto; contain-intrinsic-size: 69px; transform: translateZ(0); backface-visibility: hidden;
@@ -417,7 +399,6 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 .mx-anim-card-in { animation: cardIn 0.4s var(--mx-ease) both; animation-delay: 0.1s; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes cardIn { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-
 .backup-file-row {
     display: flex;
     align-items: center;

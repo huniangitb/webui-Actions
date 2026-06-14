@@ -134,14 +134,12 @@ export const centerActiveInput = (input) => {
     const rowRect = row.getBoundingClientRect();
     const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
     const targetScrollTop = relativeTop - (containerRect.height / 2) + (rowRect.height / 2);
-    container.scrollTo({
-      top: Math.max(0, targetScrollTop),
-      behavior: "smooth"
-    });
+    container.scrollTop = Math.max(0, targetScrollTop);
   };
   requestAnimationFrame(performAlign);
-  setTimeout(performAlign, 80);
-  setTimeout(performAlign, 250);
+  setTimeout(performAlign, 60);
+  setTimeout(performAlign, 180);
+  setTimeout(performAlign, 320);
 };
 export const debouncedCenterActive = debounce((input) => {
   centerActiveInput(input);

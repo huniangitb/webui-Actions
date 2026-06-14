@@ -6,6 +6,7 @@ import { loadData, renderAppList, updateAppListStatus, flushInjectorConf, fetchI
 import { setupGlobalHandlers } from "./global.js";
 import { initIoLogs, initSysLogs, fetchIoLogs, fetchSysLogs, resetIoLogs, clearIoLogs, resetSysLogs, clearSysLogs } from "./logs.js";
 import { getSettings, saveSettings, checkPluginInstalled, syncToPlugin } from "./plugin.js";
+import { enableEdgeToEdge } from "kernelsu";
 import "../style.css";
 const lockInitialHeight = () => {
   const initialH = window.innerHeight;
@@ -151,6 +152,11 @@ const closeModalCleanup = () => {
   }
 };
 document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    enableEdgeToEdge(true);
+  } catch (err) {
+    console.warn("enableEdgeToEdge not available:", err);
+  }
   initIcons();
   const ro = new ResizeObserver(() => {
     if (document.body.classList.contains("keyboard-open") && window._currentInput && document.activeElement === window._currentInput) {

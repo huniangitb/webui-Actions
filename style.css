@@ -70,26 +70,28 @@ body.loaded { opacity: 1; transform: scale(1); }
     height: var(--initial-vh, 100dvh);
     width: 100vw;
     flex-direction: column;
-    will-change: transform, opacity;
-    transition: transform 0.4s var(--mx-ease), opacity 0.4s var(--mx-ease);
+    will-change: opacity;
 }
 .mx-app.frozen {
     pointer-events: none;
-    opacity: 0.15;
-    transform: scale(0.96) translate3d(0, -8px, 0);
     user-select: none;
+}
+body.modal-open .mx-desktop-main {
+    opacity: 0.1;
+    pointer-events: none;
 }
 .mx-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
 .mx-topbar-right { display: flex; align-items: center; gap: 8px; }
 .mx-desktop-main {
     display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; position: relative;
-    padding-bottom: 56px;
-    transition: padding-bottom 0.2s var(--mx-ease), padding-top 0.2s var(--mx-ease);
+    padding-bottom: calc(56px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
+    transition: opacity 0.35s var(--mx-ease);
     view-transition-name: main-content;
 }
 .mx-bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0;
-    height: 56px;
+    height: calc(56px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
+    padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom));
     background: var(--mx-s1);
     backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
     border-top: 1px solid var(--mx-border);
@@ -243,9 +245,10 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
     flex: 1; overflow-y: auto; overscroll-behavior-y: contain; background: var(--mx-bg);
     padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(16px + env(safe-area-inset-right));
     padding-top: 16px; padding-bottom: 16px;
+    transition: padding-bottom 0.1s var(--mx-ease);
 }
-body.keyboard-open .mx-subpage-body { padding-bottom: 50vh; }
-body.keyboard-open .editor-scroll { padding-bottom: 50vh; }
+body.keyboard-open .mx-subpage-body { padding-bottom: calc(var(--keyboard-h, 0px) + 30px) !important; }
+body.keyboard-open .editor-scroll { padding-bottom: calc(var(--keyboard-h, 0px) + 30px) !important; }
 .mx-subpage-footer {
     padding-bottom: calc(16px + env(safe-area-inset-bottom)); padding-top: 16px;
     padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(16px + env(safe-area-inset-right));
@@ -265,7 +268,7 @@ body.keyboard-open .editor-scroll { padding-bottom: 50vh; }
 }
 ::view-transition-old(app-subpage) { animation: 200ms cubic-bezier(0.4, 0, 0.2, 1) both fade-out, 200ms cubic-bezier(0.4, 0, 1, 1) both slide-to-right; }
 ::view-transition-new(app-subpage) { animation: 250ms cubic-bezier(0, 0, 0.2, 1) both fade-in, 250ms cubic-bezier(0.1, 0.9, 0.2, 1) both slide-from-right; }
-@keyframes slide-from-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes slide-from-right { transform: translateX(100%); } to { transform: translateX(0); } }
 @keyframes slide-to-right { from { transform: translateX(0); } to { transform: translateX(100%); } }
 ::view-transition-old(main-content) { animation: 100ms cubic-bezier(0.4, 0, 1, 1) both fade-out, 100ms cubic-bezier(0.4, 0, 1, 1) both slide-down-out; }
 ::view-transition-new(main-content) { animation: 200ms cubic-bezier(0, 0, 0.2, 1) both fade-in, 200ms cubic-bezier(0, 0, 0.2, 1) both slide-up-in; }

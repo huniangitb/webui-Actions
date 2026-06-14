@@ -46,10 +46,24 @@
     --mx-sh3: 0 8px 32px rgba(0,0,0,0.08);
 }
 
-* { 
-    box-sizing: border-box; 
-    outline: none; 
-    -webkit-tap-highlight-color: transparent; 
+/* 主题切换期间：全局 1s 丝滑过渡，结束后类被移除，不影响正常交互动画 */
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+    transition:
+        background-color 1s ease,
+        color 1s ease,
+        border-color 1s ease,
+        box-shadow 1s ease,
+        fill 1s ease,
+        stroke 1s ease !important;
+    transition-delay: 0s !important;
+}
+
+* {
+    box-sizing: border-box;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 /* 核心修复 3：锁定最外层视图滚动，彻底杜绝瞬间滚动条 */

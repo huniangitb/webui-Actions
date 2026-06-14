@@ -4,17 +4,25 @@ import { saveSettings } from "./plugin.js";
 
 export const applyTheme = (isDark) => {
   state.isDarkMode = isDark;
-  
+
   const doc = document.documentElement;
-  // 直接切换 data-theme 属性，触发 CSS 中定义的全链路 GPU 过渡
+
+  // 添加过渡类，触发全局 1s 丝滑过渡
+  doc.classList.add("theme-transition");
+
   doc.setAttribute("data-theme", isDark ? "dark" : "light");
 
-  // 动态修改状态栏颜色 Meta 标签，实现全屏沉浸
   const metaThemeColor = document.getElementById("themeColorMeta");
   if (metaThemeColor) {
     metaThemeColor.setAttribute("content", isDark ? "#161616" : "#F0F2F5");
   }
   updateThemeIcons();
+
+  // 过渡完成后移除类，恢复正常交互动画时序
+  clearTimeout(doc._themeTransitionTimer);
+  doc._themeTransitionTimer = setTimeout(() => {
+    doc.classList.remove("theme-transition");
+  }, 1100);
 };
 
 export const systemThemeListener = (e) => {

@@ -20,6 +20,7 @@ import {
 } from "@mdi/js";
 import { exec, toast as ksuToast } from "kernelsu";
 import { state, CONST } from "./state.js";
+
 export const run = async (cmd) => {
   try {
     const res = await exec(cmd);
@@ -28,6 +29,7 @@ export const run = async (cmd) => {
     return "";
   }
 };
+
 export const debounce = (func, wait) => {
   let timeout;
   return function (...args) {
@@ -35,6 +37,7 @@ export const debounce = (func, wait) => {
     timeout = setTimeout(() => func.apply(this, args), wait);
   };
 };
+
 export const showToast = (msg) => {
   try {
     ksuToast(msg);
@@ -65,8 +68,10 @@ export const showToast = (msg) => {
     animOut.onfinish = () => t.remove();
   }, 2500);
 };
+
 const getSvg = (path, size = 24, color = "currentColor") =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="${size}" height="${size}"><path d="${path}" fill="${color}" stroke="none"/></svg>`;
+
 export const ICONS = {
   APPS: getSvg(mdiViewGridOutline),
   GLOBAL: getSvg(mdiWrench),
@@ -74,7 +79,7 @@ export const ICONS = {
   LOG: getSvg(mdiMathLog),
   SEARCH: getSvg(mdiMagnify, 18, "var(--mx-t2)"),
   COG: getSvg(mdiCog),
-  CLOSE: getSvg(mdiClose),
+  CLOSE: getSvg(mdiClose, 20),
   PLUS: getSvg(mdiPlus, 18),
   DELETE: getSvg(mdiDeleteOutline, 18),
   MOON: getSvg(mdiWeatherNight),
@@ -87,6 +92,7 @@ export const ICONS = {
   SWEEP: getSvg(mdiDeleteSweepOutline),
   CLOCK: getSvg(mdiClockOutline, 14, "var(--mx-t2)"),
 };
+
 export const updateThemeIcons = () => {
   const icon = state.isDarkMode ? ICONS.SUN : ICONS.MOON;
   const mobile = document.getElementById("btnThemeToggleMobile");
@@ -94,6 +100,7 @@ export const updateThemeIcons = () => {
   if (mobile) mobile.innerHTML = icon;
   if (desktop) desktop.innerHTML = icon;
 };
+
 export const initIcons = () => {
   const byId = (id) => document.getElementById(id);
   byId("logoIconMobile").innerHTML = ICONS.APPS;
@@ -110,6 +117,7 @@ export const initIcons = () => {
   byId("iconIoSearch").innerHTML = ICONS.SEARCH;
   byId("btnSettingsMobile").innerHTML = ICONS.COG;
   byId("btnSettingsDesktop").innerHTML = ICONS.COG;
+  
   const btnGlobalAdd = document.getElementById("btnGlobalAddRule");
   if (btnGlobalAdd) btnGlobalAdd.innerHTML = `${ICONS.PLUS} 添加规则`;
   const btnAppAdd = document.getElementById("btnAppAddRule");
@@ -120,7 +128,13 @@ export const initIcons = () => {
   if (btnMonitor) btnMonitor.innerHTML = ICONS.IGNORE;
   const btnClear = document.getElementById("btnClearIo");
   if (btnClear) btnClear.innerHTML = ICONS.SWEEP;
+
+  // 解决要点 5：全局自动检索模态框圆形关闭按钮，并无缝填充 X 号图标
+  document.querySelectorAll(".mx-btn-close").forEach((btn) => {
+    btn.innerHTML = ICONS.CLOSE;
+  });
 };
+
 export const normalizeToDisplay = (path) => {
   if (!path) return "";
   if (path.startsWith(CONST.PATH_PREFIX_REAL))
@@ -129,6 +143,7 @@ export const normalizeToDisplay = (path) => {
     return path.substring(CONST.PATH_PREFIX_STORAGE.length) || "/";
   return path;
 };
+
 export const normalizeToConfig = (path, isTarget) => {
   if (!path) return "";
   path = path.trim();

@@ -148,21 +148,36 @@ const switchSection = (sectionId) => {
   }
 };
 
-const closeModalCleanup = () => {
-  const closeActions = () => {
-    document.getElementById("appConfigSubpage")?.classList.remove("open");
-    document.querySelector(".mx-app").classList.remove("frozen");
-    document.body.classList.remove("modal-open");
-    document.body.classList.remove("keyboard-open");
-    document.documentElement.style.setProperty('--keyboard-h', '0px');
-    startPolling();
-  };
-  if (document.startViewTransition) {
-    document.startViewTransition(() => closeActions());
-  } else {
-    closeActions();
-  }
+// ============================================================================
+// 统一移动端物理返回键生命周期管理 (SPA State Manager)
+// ============================================================================
+const pushOverlayState = (overlayId) => {
+  history.pushState({ activeOverlay: overlayId }, "");
 };
+
+const closeModalCleanupDOM = () => {
+  document.getElementById("appConfigSubpage")?.classList.remove("open");
+  document.querySelector(".mx-app").classList.remove("frozen");
+  document.body.classList.remove("modal-open");
+  document.body.classList.remove("keyboard-open");
+  document.documentElement.style.setProperty('--keyboard-h', '0px');
+  startPolling();
+};
+
+window.addEventListener("popstate", (e) => {
+  const subpage = document.getElementById("appConfigSubpage");
+  if (subpage && subpage.classList.contains("open")) {
+    closeModalCleanupDOM();
+  }
+  const ignoreModal = document.getElementById("monitorIgnoreModal");
+  if (ignoreModal && ignoreModal.classList.contains("open")) {
+    ignoreModal.classList.remove("open");
+  }
+  const settingsModal = document.getElementById("settingsModal");
+  if (settingsModal && settingsModal.classList.contains("open")) {
+    settingsModal.classList.remove("open");
+  }
+});
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
@@ -171,6 +186,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.warn("enableEdgeToEdge not available:", err);
   }
   initIcons();
+
+  const savedLogLevel = localStorage.getItem("sys_log_level");
+  if (savedLogLevel !== null) {
+    state.sysState.level = parseInt(savedLogLevel);
+    const select = document.getElementById("logLevelSelect");
+    if (select) select.value = savedLogLevel;
+  }
   
   const ro = new ResizeObserver(() => {
     if (document.body.classList.contains("keyboard-open") && window._currentInput && document.activeElement === window._currentInput) {
@@ -327,6 +349,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (logLevelSelect) {
     logLevelSelect.addEventListener("change", () => {
       state.sysState.level = parseInt(logLevelSelect.value);
+      localStorage.setItem("sys_log_level", logLevelSelect.value); // 日志过滤级别自动落盘
       resetSysLogs();
       fetchSysLogs();
     });
@@ -351,11 +374,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       lbl.textContent = isInstalled ? "状态: 发现清理插件 (已就绪)" : "状态: 未发现清理插件";
       lbl.style.color = isInstalled ? "var(--mx-green)" : "var(--mx-red)";
     }
-    document.getElementById("settingsModal")?.classList.add("open");
+    openOverlay("settingsModal");
   };
   document.getElementById("btnSettingsMobile").onclick = openSettings;
   document.getElementById("btnSettingsDesktop").onclick = openSettings;
-  
+  document.getElementById("btnCloseSettingsModal").onclick = () => history.back();
   document.getElementById("btnSaveSettings").onclick = async () => {
     state.currentSettings.autoTheme = document.getElementById("autoThemeToggle").checked;
     state.currentSettings.syncPlugin = document.getElementById("pluginSyncToggle").checked;
@@ -365,7 +388,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       applyTheme(mediaQuery.matches);
     }
     showToast("设置已保存");
-    document.getElementById("settingsModal")?.classList.remove("open");
+    history.back();
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
   
@@ -373,9 +396,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const content = await run(`cat ${CONST.MONITOR_IGNORE_CONF} 2>/dev/null`);
     document.getElementById("monitorIgnoreContent").value = content;
     parseIgnoreToVisual(content);
-    document.getElementById("monitorIgnoreModal")?.classList.add("open");
+    openOverlay("monitorIgnoreModal");
   };
   document.getElementById("btnAddIgnoreRow").onclick = () => addIgnoreRow("");
+  document.getElementById("btnCloseIgnoreModal").onclick = () => history.back();
   document.getElementById("btnSaveIgnore").onclick = async () => {
     try {
       const isVisual = document
@@ -386,7 +410,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         : document.getElementById("monitorIgnoreContent").value;
       await run(`echo '${content.trim()}' > ${CONST.MONITOR_IGNORE_CONF}`);
       showToast("过滤配置已保存");
-      document.getElementById("monitorIgnoreModal")?.classList.remove("open");
+      history.back();
     } catch {
       showToast("保存失败");
     }
@@ -424,7 +448,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupGlobalHandlers();
   document.getElementById("btnAppAddRule").onclick = () =>
     addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
-  document.getElementById("btnCloseAppModal").onclick = closeModalCleanup;
+  document.getElementById("btnCloseAppModal").onclick = () => history.back();
   
   document.getElementById("btnSaveAppConfig").onclick = async () => {
     try {
@@ -453,7 +477,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       await flushInjectorConf();
       showToast("配置已保存");
-      closeModalCleanup();
+      history.back();
       await loadData();
       await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     } catch {
@@ -470,26 +494,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     await run(`rm -f ${dir}/${state.currentBindingPkg}.conf ${dir}/${state.currentBindingPkg}.conf.disabled`);
     state.injectorStates.delete(`${state.currentBindingPkg}:${state.currentBindingUser}`);
     await flushInjectorConf();
-    closeModalCleanup();
+    history.back();
     await loadData();
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     showToast("配置已清除");
   };
   
   const originalOpenAppConfig = window.openAppConfig;
+  const openOverlay = (elementId, extraCallback) => {
+    document.getElementById(elementId)?.classList.add("open");
+    pushOverlayState(elementId);
+    if (extraCallback) extraCallback();
+  };
+  
   window.openAppConfig = (pkg) => {
     stopPolling();
     document.querySelector(".mx-app").classList.add("frozen");
     document.body.classList.add("modal-open");
-    const openActions = () => {
-        document.getElementById("appConfigSubpage")?.classList.add("open");
-        originalOpenAppConfig(pkg);
-    };
-    if (document.startViewTransition) {
-        document.startViewTransition(() => openActions());
-    } else {
-        openActions();
-    }
+    openOverlay("appConfigSubpage", () => {
+       originalOpenAppConfig(pkg);
+    });
   };
   
   initIoLogs();

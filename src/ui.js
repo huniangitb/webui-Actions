@@ -133,47 +133,31 @@ export const updateSuggestionBoxPosition = (input) => {
 export const centerActiveInput = (input) => {
   if (!input) return;
   const row = input.closest(".rule-row") || input.closest(".mx-form-group") || input;
-  // 过滤掉不带实际滚动特性的外层容器，精确定位负责内部视口滚动的目标
   const container = input.closest(".overflow-y-auto") || input.closest(".mx-subpage-body");
   if (!row || !container) return;
-
-  // 如果已经有正在运行的滚动动画，先将其中止以防逻辑冲突
   if (container._scrollAnimId) {
     cancelAnimationFrame(container._scrollAnimId);
   }
-
-  const duration = 280; // 与物理键盘开启的时间曲线保持一致
+  const duration = 280; 
   const startTime = performance.now();
   const startScrollTop = container.scrollTop;
-
   const step = (currentTime) => {
     const elapsed = currentTime - startTime;
     const progress = Math.min(elapsed / duration, 1);
-
-    // 标准缓动减速曲线 (Cubic Ease Out) 带来流畅感
     const ease = 1 - Math.pow(1 - progress, 3);
-
     const containerRect = container.getBoundingClientRect();
     const rowRect = row.getBoundingClientRect();
-
-    // 在每一帧动态计算在当前拉伸高度下，目标输入框在滚动画布中的绝对 Y 轴深度
     const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
-
-    // 自动将行元素对齐到当前视口的中心位置
     const idealScrollTop = relativeTop - (containerRect.height / 2) + (rowRect.height / 2);
     const maxScrollTop = container.scrollHeight - containerRect.height;
     const targetScrollTop = Math.max(0, Math.min(idealScrollTop, maxScrollTop));
-
-    // 缓动线性差值过渡
     container.scrollTop = startScrollTop + (targetScrollTop - startScrollTop) * ease;
-
     if (progress < 1) {
       container._scrollAnimId = requestAnimationFrame(step);
     } else {
       container._scrollAnimId = null;
     }
   };
-
   container._scrollAnimId = requestAnimationFrame(step);
 };
 
@@ -280,15 +264,11 @@ const setupAutocomplete = (input) => {
   });
   input.addEventListener("focus", () => {
     window._currentInput = input;
-    
-    // 聚焦时瞬间开启高精度 RAF 滚动检测，配合键盘缓缓升起的时差，无缝滑动
     centerActiveInput(input);
-
     const isFirstFocus = !input.hasAttribute("data-has-focused");
     if (isFirstFocus) {
       input.setAttribute("data-has-focused", "true");
     }
-    
     const dispatchDelay = isFirstFocus ? 400 : 0;
     setTimeout(() => {
       if (document.activeElement === input) {

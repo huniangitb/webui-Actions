@@ -167,7 +167,19 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
 .hidden { display: none !important; }
 .relative { position: relative; }
 .divider { height: 1px; background: var(--mx-border); margin: 12px 0; }
-.mx-card, .mx-modal-body { background: var(--mx-s2); border-radius: var(--mx-radius); border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); display: flex; flex-direction: column; overflow: hidden; transform: translateZ(0); container-type: inline-size; }
+
+/* 解决要点 6：去除了 .mx-modal-body 圆角与投影的合并声明，避免内部列表容器的双层圆角矩形嵌套 */
+.mx-card {
+    background: var(--mx-s2);
+    border-radius: var(--mx-radius);
+    border: 1px solid var(--mx-border);
+    box-shadow: var(--mx-shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: translateZ(0);
+    container-type: inline-size;
+}
 @container (max-width: 440px) { .grid-2 { grid-template-columns: 1fr; } }
 .mx-card-head { padding: 16px 16px 0 16px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;}
 .mx-card-title { font-size: 16px; font-weight: 600; }
@@ -182,8 +194,24 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
 .mx-btn-sm { padding: 6px 12px; font-size: 12px; }
 .mx-btn-icon { width: 36px; height: 36px; padding: 0; border-radius: var(--mx-radius-pill); display:flex; align-items:center; justify-content:center; background: transparent; border:none; color:var(--mx-t2);}
 @media (hover: hover) { .mx-btn-icon:hover { background: var(--mx-s3); color:var(--mx-t1);} }
-.mx-btn-close { width: 32px; height: 32px; border-radius: 50%; background: var(--mx-s3); border: none; color: var(--mx-t2); display:flex; align-items:center; justify-content:center; cursor: pointer; transition: all 0.2s; flex-shrink:0;}
+
+.mx-btn-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--mx-s3);
+    border: none;
+    color: var(--mx-t2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s var(--mx-ease);
+    flex-shrink: 0;
+}
 .mx-btn-close:active { transform: scale(0.9); }
+@media (hover: hover) { .mx-btn-close:hover { background: var(--mx-s4); color: var(--mx-t1); } }
+
 .mx-badge { padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; color: #fff; letter-spacing: 0.5px; white-space: nowrap; }
 .mx-badge-gray { background: var(--mx-t2); }
 .mx-badge-success { background: var(--mx-green); }
@@ -227,12 +255,23 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
 }
 .mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1) translate3d(0, 0, 0); opacity: 1; }
+
+/* 解决要点 8：应用配置页切入切出硬件加速过渡声明，全面杜绝进入子页面时触发导航级 View Transition 的抖动 */
 .mx-subpage-container {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
     background: var(--mx-bg); color: var(--mx-t1); z-index: 1500;
-    display: none; flex-direction: column; box-sizing: border-box; view-transition-name: app-subpage;
+    display: flex; flex-direction: column; box-sizing: border-box;
+    transform: translate3d(100%, 0, 0);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.28s var(--mx-ease), opacity 0.22s var(--mx-ease);
+    will-change: transform, opacity;
 }
-.mx-subpage-container.open { display: flex; }
+.mx-subpage-container.open {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+    pointer-events: auto;
+}
 .mx-subpage-header {
     padding-top: calc(12px + env(safe-area-inset-top)); padding-bottom: 12px;
     padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(16px + env(safe-area-inset-right));
@@ -241,7 +280,6 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
 .mx-subpage-header-title { flex: 1; min-width: 0; }
 .mx-subpage-header-title h3 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mx-subpage-header-title span { font-size: 11px; color: var(--mx-t2); font-family: var(--mx-font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-
 .mx-subpage-body {
     flex: 1; overflow-y: auto; overscroll-behavior-y: contain; background: var(--mx-bg);
     padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(16px + env(safe-area-inset-right));
@@ -249,12 +287,10 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
     transition: padding-bottom 0.28s cubic-bezier(0.1, 0.9, 0.2, 1);
     will-change: padding-bottom;
 }
-
 body.keyboard-open .mx-subpage-body,
 body.keyboard-open .overflow-y-auto { 
     padding-bottom: calc(var(--keyboard-h, 0px) + 30px) !important; 
 }
-
 .mx-subpage-footer {
     padding-bottom: calc(16px + env(safe-area-inset-bottom)); padding-top: 16px;
     padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(16px + env(safe-area-inset-right));
@@ -269,20 +305,32 @@ body.keyboard-open .overflow-y-auto {
     transform: rotate(45deg); margin-left: 4px;
 }
 @media (min-width: 768px) {
-    .mx-subpage-container { left: 240px; width: calc(100vw - 240px); border-left: 1px solid var(--mx-border); }
+    .mx-subpage-container { 
+        left: 240px; 
+        width: calc(100vw - 240px); 
+        border-left: 1px solid var(--mx-border); 
+        transform: translate3d(40px, 0, 0); 
+    }
+    .mx-subpage-container.open {
+        transform: translate3d(0, 0, 0);
+    }
     .mx-subpage-header { padding-top: calc(16px + env(safe-area-inset-top)); }
 }
-::view-transition-old(app-subpage) { animation: 200ms cubic-bezier(0.4, 0, 0.2, 1) both fade-out, 200ms cubic-bezier(0.4, 0, 1, 1) both slide-to-right; }
-::view-transition-new(app-subpage) { animation: 250ms cubic-bezier(0, 0, 0.2, 1) both fade-in, 250ms cubic-bezier(0.1, 0.9, 0.2, 1) both slide-from-right; }
-@keyframes slide-from-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
-@keyframes slide-to-right { from { transform: translateX(0); } to { transform: translateX(100%); } }
-::view-transition-old(main-content) { animation: 100ms cubic-bezier(0.4, 0, 1, 1) both fade-out, 100ms cubic-bezier(0.4, 0, 1, 1) both slide-down-out; }
-::view-transition-new(main-content) { animation: 200ms cubic-bezier(0, 0, 0.2, 1) both fade-in, 200ms cubic-bezier(0, 0, 0.2, 1) both slide-up-in; }
-@keyframes slide-down-out { to { transform: translateY(12px); } }
-@keyframes slide-up-in { from { transform: translateY(12px); } }
+
 .mx-modal-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mx-border); flex-shrink: 0;}
 .mx-modal-title { font-size: 18px; font-weight: 700; margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.mx-modal-body { padding: 20px; overflow-y: auto; flex: 1; min-height:0; }
+
+/* 解决要点 6：彻底脱离 nested 阴影与多重嵌套边框，保持扁平 */
+.mx-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
 .mx-modal-foot { padding: 16px 20px; display: flex; gap: 12px; border-top: 1px solid var(--mx-border); flex-shrink:0;}
 .app-item {
     display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--mx-border); cursor: pointer;
@@ -307,11 +355,7 @@ body.keyboard-open .overflow-y-auto {
 .rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .mx-input-wrapper { position: relative; width: 100%; min-width: 0; }
 .btn-del { width: 32px !important; height: 32px !important; flex-shrink: 0; }
-
-body.keyboard-open:not(.modal-open) .overflow-y-auto { 
-    max-height: calc(100% - var(--keyboard-h, 0px)); 
-}
-
+body.keyboard-open:not(.modal-open) .overflow-y-auto { max-height: calc(100% - var(--keyboard-h, 0px)); }
 .editor-scroll { position: relative; }
 .mx-spinner-container { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 60px 20px; height: 100%; width: 100%; gap: 16px; }
 .mx-spinner { width: 36px; height: 36px; border: 3px solid var(--mx-s3); border-top-color: var(--mx-primary); border-radius: 50%; animation: mx-spin 0.85s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
@@ -343,8 +387,11 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 .op-IOCTL { background: #343a40; }
 .op-SYMLINK, .op-LINK { background: #0dcaf0; }
 .mx-code-editor { width: 100%; height: 100%; background: var(--mx-s1); color: var(--mx-t1); border: none; padding: 16px; font-family: var(--mx-font-mono); font-size: 12px; resize: none; line-height: 1.5; }
+
+/* 解决要点 7：过滤模态框 Active 子面板能够完全拉伸填充满父级 Flex 高度并限制溢出 */
 .editor-pane { display: none; height: 100%; flex-direction: column; }
-.editor-pane.active { display: flex; }
+.editor-pane.active { display: flex; flex: 1; min-height: 0; }
+
 .list-scrollable { scroll-timeline: --cardTimeline y; }
 @keyframes card-shadow-slide { from { box-shadow: none; border-bottom-color: transparent; } to { box-shadow: var(--mx-shadow); border-bottom-color: var(--mx-border); } }
 .mx-card-head { animation: card-shadow-slide linear both; animation-timeline: --cardTimeline; animation-range: 0px 50px; }
@@ -368,7 +415,10 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 .mx-anim-card-in { animation: cardIn 0.4s var(--mx-ease) both; animation-delay: 0.1s; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes cardIn { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-::view-transition-old(root) { animation: 80ms ease-out both fade-out; }
-::view-transition-new(root) { animation: 120ms ease-in both fade-in; }
-@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
-@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* 解决要点 9：彻底禁用根切换过渡动画，将主页面 Title、Sidebar 等一律稳定固化，只有 main-content 独立流畅渐变 */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation: none !important;
+    mix-blend-mode: normal;
+}

@@ -1,395 +1,447 @@
 import { state, CONST } from "./state.js";
 import { run, showToast, ICONS } from "./utils.js";
-import { prepare, layout } from "@chenglou/pretext";
+import { listPackages, getPackagesInfo } from "kernelsu";
+import { parseConfigTextToVisual, generateConfigTextFromVisual, setupModeToggle } from "./ui.js";
+import { syncToPlugin } from "./plugin.js";
+import { renderGlobalRules } from "./global.js";
 
-class VirtualLogList {
-  constructor(containerEl, contentEl, options = {}) {
-    this.container = containerEl;
-    this.contentEl = contentEl;
-    this.buffer = options.buffer || 10;
-    this.estimatedLineHeight = options.estimatedLineHeight || 20;
-    this.font = options.font || '13px monospace';
-    this.lineHeight = options.lineHeight || 20;
-    this.gap = options.gap || 0;
-    this.padding = options.padding || 0; 
-    this.chromeHeight = options.chromeHeight || 0; 
-    this.textWidthOffset = options.textWidthOffset || 0; 
-    this.prepareFn = options.prepareFn || null;
-    this.onEmpty = options.onEmpty || "";
-    this.entries = [];
-    this.prefixHeights = []; 
-    this.totalHeight = 0;
-    this.visibleStart = 0;
-    this.visibleEnd = 0;
-    this.isDirty = true;
-    this._ticking = false;
-    this._onScroll = this._onScroll.bind(this);
-    this.container.addEventListener("scroll", this._onScroll);
-    this.contentEl.style.position = "relative";
-  }
-  append(entryList) {
-    const availWidth = this.container.clientWidth - (this.padding * 2) - this.textWidthOffset;
-    const safeAvailWidth = Math.max(availWidth, 100);
-    for (const entry of entryList) {
-      let h = this.estimatedLineHeight;
-      let prep = null;
-      let cHeight = typeof this.chromeHeight === 'function' ? this.chromeHeight(entry) : this.chromeHeight;
-      if (entry.text) {
-        try {
-          prep = prepare(entry.text, this.font);
-          const { height } = layout(prep, safeAvailWidth, this.lineHeight);
-          h = height + cHeight;
-        } catch {
-          h = this.estimatedLineHeight;
+const TRANSPARENT_SPACER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+const _iconCache = new Set();
+const iconQueue = new Set();
+let isIconQueueRunning = false;
+
+const processIconQueue = async () => {
+    if (isIconQueueRunning) return;
+    isIconQueueRunning = true;
+    while (iconQueue.size > 0) {
+        const img = iconQueue.values().next().value;
+        iconQueue.delete(img);
+        if (img && img.dataset.src) {
+            img.src = img.dataset.src;
+            img.removeAttribute('data-src');
         }
-      } else {
-        h = cHeight;
-      }
-      this.entries.push({ height: h, prepared: prep, data: entry });
+        await new Promise(r => setTimeout(r, 2));
     }
-    this._recalcTotalHeight();
-    this.isDirty = true;
-    this._render();
-  }
-  clear() {
-    this.entries = [];
-    this.prefixHeights = [];
-    this._recalcTotalHeight();
-    this.isDirty = true;
-    this.container.scrollTop = 0;
-    this._render();
-  }
-  replace(entryList) {
-    this.clear();
-    this.append(entryList);
-  }
-  get scrollHeight() {
-    return this.totalHeight;
-  }
-  destroy() {
-    this.container.removeEventListener("scroll", this._onScroll);
-  }
-  _recalcTotalHeight() {
-    this.prefixHeights = [];
-    let currentY = this.padding;
-    for (let i = 0; i < this.entries.length; i++) {
-      this.prefixHeights.push(currentY);
-      currentY += this.entries[i].height + this.gap;
-    }
-    if (this.entries.length > 0) {
-      this.totalHeight = currentY - this.gap + this.padding;
-    } else {
-      this.totalHeight = 0;
-    }
-  }
-  _onScroll() {
-    if (document.querySelector(".mx-app")?.classList.contains("frozen")) {
-      return;
-    }
-    if (!this._ticking) {
-      window.requestAnimationFrame(() => {
-        this._render();
-        this._ticking = false;
-      });
-      this._ticking = true;
-    }
-  }
-  _render() {
-    if (document.querySelector(".mx-app")?.classList.contains("frozen")) {
-      return;
-    }
-    const scrollTop = this.container.scrollTop;
-    const viewHeight = this.container.clientHeight;
-    this.contentEl.style.height = this.totalHeight + "px";
-    if (this.entries.length === 0) {
-      if (this.onEmpty && this.contentEl.innerHTML !== this.onEmpty) {
-        this.contentEl.innerHTML = this.onEmpty;
-      }
-      return;
-    }
-    const startIdx = this._findIndex(scrollTop);
-    const renderStart = Math.max(0, startIdx - this.buffer);
-    let endIdx = startIdx;
-    const maxBottom = scrollTop + viewHeight + this.buffer * this.estimatedLineHeight;
-    while (endIdx < this.entries.length && this.prefixHeights[endIdx] < maxBottom) {
-      endIdx++;
-    }
-    const renderEnd = Math.min(this.entries.length, endIdx + this.buffer);
-    if (this.visibleStart === renderStart && this.visibleEnd === renderEnd && !this.isDirty) {
-      return;
-    }
-    this.visibleStart = renderStart;
-    this.visibleEnd = renderEnd;
-    this.isDirty = false;
-    let y = this.prefixHeights[renderStart];
-    let html = "";
-    for (let i = renderStart; i < renderEnd; i++) {
-      const entry = this.entries[i];
-      const content = this.prepareFn ? this.prepareFn(entry.data) : entry.data.text || "";
-      html += `<div class="virtual-log-item" style="position:absolute;top:${y}px;left:${this.padding}px;right:${this.padding}px;height:${entry.height}px;">${content}</div>`;
-      y += entry.height + this.gap;
-    }
-    this.contentEl.innerHTML = html;
-  }
-  _findIndex(scrollTop) {
-    let lo = 0, hi = this.prefixHeights.length - 1;
-    while (lo <= hi) {
-      const mid = (lo + hi) >>> 1;
-      if (this.prefixHeights[mid] <= scrollTop) {
-        lo = mid + 1;
-      } else {
-        hi = mid - 1;
-      }
-    }
-    return Math.max(0, lo - 1);
-  }
-}
-
-let ioVirtualList = null;
-export const initIoLogs = () => {
-  const container = document.getElementById("ioLogContainer");
-  const content = document.getElementById("ioLogList");
-  if (!container || !content) return;
-  ioVirtualList = new VirtualLogList(container, content, {
-    font: "12px monospace",
-    lineHeight: 18,
-    estimatedLineHeight: 60,
-    gap: 6, 
-    padding: 8, 
-    textWidthOffset: 44, 
-    chromeHeight: 60, 
-    prepareFn: renderIoEntry,
-    onEmpty: '<div style="padding:40px;text-align:center;color:var(--mx-t2);">暂无记录</div>',
-  });
+    isIconQueueRunning = false;
 };
 
-export const resetIoLogs = () => {
-  ioVirtualList?.clear();
-  state.ioState.offset = 0;
-  state.ioState.hasMore = true;
+const enqueueIcon = (img) => {
+    if (!img || !img.dataset.src) return;
+    iconQueue.add(img);
+    processIconQueue();
 };
 
-export const clearIoLogs = async () => {
-  await run(`${CONST.LOG_CTL} clear-io`);
-  showToast("监控记录已清理");
-  resetIoLogs();
-  fetchIoLogs();
+let loadedIconsInBatch = 0;
+let targetIconCount = 0;
+let isTransitioningOut = false;
+
+window.onIconLoaded = (img) => {
+  if (img.src.startsWith("data:image/gif;base64,")) return;
+  img.classList.add('icon-loaded');
+  _iconCache.add(img.dataset.pkg);
+  checkBatchLoading();
 };
 
-const renderIoEntry = (entry) => {
-  const { timeStr, appName, op, details } = entry;
-  return `
-    <div class="io-item">
-      <div class="io-header">
-        <span class="io-time">
-          ${ICONS.CLOCK}
-          <span>${timeStr}</span>
-          <span class="io-app">${appName}</span>
-        </span>
-        <span class="io-op op-${op}">${op}</span>
-      </div>
-      <div class="io-detail">${details}</div>
-    </div>`;
+window.onIconError = (img) => {
+  if (img.src.startsWith("data:image/gif;base64,")) return;
+  img.classList.add('icon-error');
+  img.src = img.dataset.fallback;
+  checkBatchLoading();
 };
 
-export const fetchIoLogs = async () => {
-  if (state.ioState.loading || !state.ioState.hasMore) return;
-  state.ioState.loading = true;
+const checkBatchLoading = () => {
+  if (isTransitioningOut || !state.isInitialLoad) return;
+  loadedIconsInBatch++;
+  if (loadedIconsInBatch >= targetIconCount) {
+    isTransitioningOut = true;
+    hideSpinnerOverlay();
+  }
+};
+
+const hideSpinnerOverlay = () => {
+  const overlay = document.getElementById("appLoadingOverlay");
+  if (overlay) {
+    overlay.style.opacity = "0";
+    overlay.style.pointerEvents = "none";
+    setTimeout(() => {
+      overlay.style.display = "none";
+    }, 400);
+  }
+  state.isAppListReady = true;
+  state.isInitialLoad = false;
+  initListObserver();
+  const listEl = document.getElementById("appList");
+  if (listEl) {
+    listEl.querySelectorAll('.app-item').forEach(el => listObserver.observe(el));
+  }
+};
+
+export const fetchActiveMounts = async () => {
+  const m = new Set();
   try {
-    const res = await run(`${CONST.LOG_CTL} search-io "${state.ioState.term}" ${CONST.PAGE_LIMIT} ${state.ioState.offset} api`);
-    if (!res) {
-      state.ioState.hasMore = false;
-      if (state.ioState.offset === 0) ioVirtualList?.clear();
-    } else {
-      const lines = res.split("\n");
-      let dataLines = lines;
-      const lastLine = lines[lines.length - 1];
-      if (lastLine.startsWith("DONE|")) {
-        state.ioState.hasMore = parseInt(lastLine.split("|")[2]) > 0;
-        dataLines = lines.slice(0, -1);
-      } else if (lastLine === "OK") {
-        state.ioState.hasMore = false;
-        dataLines = lines.slice(0, -1);
-      }
-      if (dataLines.length > 0) {
-        state.ioState.offset += dataLines.length;
-        const entries = parseIoLines(dataLines);
-        if (ioVirtualList) ioVirtualList.append(entries);
-        else {
-          const listEl = document.getElementById("ioLogList");
-          if (listEl.innerHTML.includes("暂无记录")) listEl.innerHTML = "";
-          listEl.insertAdjacentHTML("beforeend", renderIoLegacy(dataLines));
+    const args = await run("ps -A -o args | grep fuse_daemon | grep -v grep");
+    if (args)
+      args.split("\n").forEach((l) => {
+        const mt = l.match(/--pkg=([a-zA-Z0-9._]+)/);
+        if (mt) m.add(mt[1]);
+      });
+  } catch {}
+  return m;
+};
+
+export const fetchInjectedApps = async () => {
+  try {
+    state.injectedApps.clear();
+    const res = await run(`${CONST.LOG_CTL} list-injected api`);
+    if (res)
+      res.split("\n").forEach((l) => {
+        if (l.startsWith("APP|")) {
+          const p = l.split("|");
+          if (p.length >= 7)
+            state.injectedApps.set(p[1], {
+              pid: p[2],
+              uid: p[3],
+              redirect: p[4],
+              hide: p[5],
+              ro: p[6],
+            });
         }
-      } else if (state.ioState.offset === 0) {
-        ioVirtualList?.clear();
+      });
+  } catch {}
+};
+
+export const loadData = async () => {
+  if (state.isInitialLoad === undefined) {
+    state.isInitialLoad = true;
+    state.isAppListReady = false;
+  }
+  const overlay = document.getElementById("appLoadingOverlay");
+  if (overlay && state.isInitialLoad) {
+    overlay.style.display = "flex";
+    overlay.style.opacity = "1";
+    overlay.style.pointerEvents = "auto";
+  }
+  try {
+    state.activeMounts = await fetchActiveMounts();
+    await fetchInjectedApps();
+    const userRes = await run("pm list users");
+    state.activeUsers = [];
+    if (userRes) {
+      for (const m of userRes.matchAll(/UserInfo\{(\d+):/g))
+        state.activeUsers.push(parseInt(m[1]));
+    }
+    if (state.activeUsers.length === 0) state.activeUsers.push(0);
+    const injectorConf = await run(`cat ${CONST.INJECTOR_CONF} 2>/dev/null`);
+    state.globalConfText = "";
+    state.injectorStates.clear();
+    state.injectorRulesMap.clear();
+    if (injectorConf) {
+      let currentSection = "";
+      injectorConf.split("\n").forEach((line) => {
+        const tLine = line.trim();
+        if (!tLine) return;
+        const secMatch = tLine.match(/^\[(.*?)\](?:\s+(ON|OFF))?/);
+        if (secMatch) {
+          currentSection = secMatch[1];
+          if (currentSection !== "GLOBAL")
+            state.injectorStates.set(currentSection, secMatch[2] || "ON");
+          if (!state.injectorRulesMap.has(currentSection))
+            state.injectorRulesMap.set(currentSection, []);
+        } else if (currentSection) {
+          state.injectorRulesMap.get(currentSection).push(tLine);
+        }
+      });
+      state.globalConfText = (state.injectorRulesMap.get("GLOBAL") || []).join("\n") || "";
+    }
+    const ruleFilesMap = new Map();
+    for (const uid of state.activeUsers) {
+      const dir =
+        uid === 0
+          ? `${CONST.BASE_DIR}/App-rules`
+          : `${CONST.BASE_DIR}/App-rules-${uid}`;
+      const lsRes = await run(`ls -1 ${dir} 2>/dev/null`);
+      if (lsRes) {
+        const files = lsRes
+          .split("\n")
+          .filter((f) => f.endsWith(".conf") || f.endsWith(".conf.disabled"));
+        for (const file of files) {
+          const isDisabled = file.endsWith(".conf.disabled");
+          const pkg = file.replace(/\.conf(\.disabled)?$/, "");
+          ruleFilesMap.set(`${pkg}:${uid}`, await run(`cat ${dir}/${file} 2>/dev/null`));
+          if (isDisabled) ruleFilesMap.set(`${pkg}:${uid}_disabled`, true);
+          else ruleFilesMap.set(`${pkg}:${uid}_enabled`, true);
+        }
       }
     }
-  } catch {
-    state.ioState.hasMore = false;
-  } finally {
-    state.ioState.loading = false;
+    const buildAppMap = (src) => {
+      state.appMap.clear();
+      if (!Array.isArray(src)) return;
+      src.forEach((info) => {
+        if (!info || !info.packageName) return;
+        const appUsers = {};
+        let isConfiguredAny = false;
+        state.activeUsers.forEach((uid) => {
+          const exactKey = `${info.packageName}:${uid}`;
+          const stateVal =
+            state.injectorStates.get(exactKey) || state.injectorStates.get(info.packageName) || "ON";
+          const ruleText = ruleFilesMap.get(exactKey) || "";
+          const hasRulesFile = ruleFilesMap.has(exactKey);
+          const isEnabled = ruleFilesMap.get(`${exactKey}_enabled`)
+            ? true
+            : ruleFilesMap.get(`${exactKey}_disabled`)
+              ? false
+              : stateVal === "ON" && hasRulesFile;
+          if (hasRulesFile || stateVal === "OFF") isConfiguredAny = true;
+          appUsers[uid] = {
+            isEnabled,
+            text: ruleText,
+            hasRules:
+              /REDIRECT|HIDE|RO|ALLOW/.test(ruleText) ||
+              /REDIRECT|HIDE|RO|ALLOW/.test(
+                (state.injectorRulesMap.get(exactKey) || []).join("")
+              ),
+          };
+        });
+        state.appMap.set(info.packageName, { ...info, isConfigured: isConfiguredAny, users: appUsers });
+      });
+    };
+    let infos = [];
+    let usedFallback = false;
+    let primaryEmpty = false;
+    try {
+      const userPkgs = (await listPackages("user")) || [];
+      const sysPkgs = (await listPackages("system")) || [];
+      const allPkgs = [...new Set([...userPkgs, ...sysPkgs])];
+      if (allPkgs.length > 0) {
+        infos = (await getPackagesInfo(allPkgs)) || [];
+        if (infos.length === 0) primaryEmpty = true;
+      } else {
+        primaryEmpty = true;
+      }
+    } catch {
+      primaryEmpty = true;
+    }
+    buildAppMap(infos);
+    if (primaryEmpty || state.appMap.size === 0) {
+      const fallbackList = await run(`cat ${CONST.LIST_CONFIG} 2>/dev/null`);
+      if (fallbackList) {
+        infos = [];
+        fallbackList.split("\n").forEach((line) => {
+          const tl = line.trim();
+          if (tl && !tl.startsWith("#") && tl.includes("=")) {
+            const pkg = tl.substring(0, tl.indexOf("=")).trim();
+            if (pkg)
+              infos.push({
+                packageName: pkg,
+                appLabel: tl.substring(tl.indexOf("=") + 1).trim() || pkg,
+                isSystem: false,
+              });
+          }
+        });
+        buildAppMap(infos);
+        if (state.appMap.size > 0) usedFallback = true;
+      }
+    }
+    state.usingFallback = usedFallback;
+    if (usedFallback) showToast("应用列表为空，已回退至兼容模式");
+    requestAnimationFrame(() => {
+        renderAppList();
+        renderGlobalRules();
+    });
+    const sysAppsToPreload = Array.from(state.appMap.values()).filter(a => a.isSystem).slice(0, 30);
+    sysAppsToPreload.forEach(app => {
+        if (!_iconCache.has(app.packageName)) {
+            const dummyImg = document.createElement('img');
+            dummyImg.dataset.src = `ksu://icon/${app.packageName}`;
+            dummyImg.dataset.pkg = app.packageName;
+            dummyImg.onload = () => _iconCache.add(app.packageName);
+            enqueueIcon(dummyImg);
+        }
+    });
+  } catch (e) {
+    showToast("加载异常: " + e.message);
   }
 };
 
-const parseIoLines = (lines) => {
-  return lines
-    .map((line) => {
-      if (!line.trim()) return null;
-      const parts = line.split("|");
-      if (parts.length < 2) return null;
-      let timeStr = "--:--:--";
-      const rawTs = parts[0];
-      if (/^\d+$/.test(rawTs)) {
-        const d = new Date(parseInt(rawTs) * 1000);
-        if (!isNaN(d)) timeStr = d.toLocaleTimeString("zh-CN", { hour12: false });
-      } else if (rawTs.includes(" ")) {
-        const dt = rawTs.split(" ");
-        timeStr = dt[1] || dt[0];
+let listObserver = null;
+const initListObserver = () => {
+  const rootEl = document.getElementById('appList');
+  if (!rootEl) return;
+  if (listObserver) listObserver.disconnect();
+  listObserver = new IntersectionObserver((entries) => {
+    const intersecting = entries.filter(e => e.isIntersecting);
+    intersecting.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+    entries.forEach(entry => {
+      const el = entry.target;
+      if (entry.isIntersecting) {
+        const idx = intersecting.indexOf(entry);
+        if (state.isAppListReady) {
+          el.style.transitionDelay = `${idx * 30}ms`;
+          const icon = el.querySelector('.app-icon');
+          if (icon) icon.style.transitionDelay = `${idx * 30 + 30}ms`;
+          requestAnimationFrame(() => el.classList.add('show'));
+        }
+        const icon = el.querySelector('.app-icon');
+        if (icon && icon.dataset.src) {
+          enqueueIcon(icon);
+        }
       } else {
-        timeStr = rawTs;
+        el.style.transitionDelay = '0ms';
+        const icon = el.querySelector('.app-icon');
+        if (icon) icon.style.transitionDelay = '0ms';
+        el.classList.remove('show');
       }
-      let pkg = "未知", op = "INFO", details = parts.slice(1).join("|");
-      const m = details.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
-      if (m) { pkg = m[1]; op = m[2]; details = m[3]; }
-      const appName = state.appMap.has(pkg) ? state.appMap.get(pkg).appLabel : pkg;
-      return { text: details, timeStr, appName, op, details };
+    });
+  }, { root: rootEl, threshold: 0.01, rootMargin: "30px" });
+};
+
+export const renderAppList = () => {
+  const listEl = document.getElementById("appList");
+  if (!listEl) return;
+  const searchVal = (document.getElementById("appSearch")?.value || "").toLowerCase();
+  const items = Array.from(state.appMap.values())
+    .filter((app) => {
+      if (state.usingFallback && app.isSystem) return false;
+      if (state.currentAppFilter === "filterUser" && app.isSystem) return false;
+      if (state.currentAppFilter === "filterSystem" && !app.isSystem) return false;
+      if (state.currentAppFilter === "filterBound" && !app.isConfigured) return false;
+      const label = (app.appLabel || app.packageName).toLowerCase();
+      return (
+        !searchVal ||
+        label.includes(searchVal) ||
+        app.packageName.toLowerCase().includes(searchVal)
+      );
     })
-    .filter(Boolean);
-};
-
-const renderIoLegacy = (lines) => {
-  return lines
-    .map((line) => {
-      if (!line.trim()) return "";
-      const parts = line.split("|");
-      if (parts.length < 2) return "";
-      let timeStr = "--:--:--";
-      const rawTs = parts[0];
-      if (/^\d+$/.test(rawTs)) {
-        const d = new Date(parseInt(rawTs) * 1000);
-        if (!isNaN(d)) timeStr = d.toLocaleTimeString("zh-CN", { hour12: false });
-      } else if (rawTs.includes(" ")) {
-        const dt = rawTs.split(" ");
-        timeStr = dt[1] || dt[0];
-      } else {
-        timeStr = rawTs;
-      }
-      let pkg = "未知", op = "INFO", details = parts.slice(1).join("|");
-      const m = details.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
-      if (m) { pkg = m[1]; op = m[2]; details = m[3]; }
-      const appName = state.appMap.has(pkg) ? state.appMap.get(pkg).appLabel : pkg;
-      return `<div class="io-item"><div class="io-header"><span class="io-time">${ICONS.CLOCK}<span>${timeStr}</span><span class="io-app">${appName}</span></span><span class="io-op op-${op}">${op}</span></div><div class="io-detail">${details}</div></div>`;
-    }).join("");
-};
-
-let sysVirtualList = null;
-export const initSysLogs = () => {
-  const viewer = document.getElementById("logViewer");
-  const content = document.getElementById("logViewerContent");
-  if (!viewer || !content) return;
-  
-  // 完全隔离容器视图 (viewer) 与自适应高度内容层 (content)
-  sysVirtualList = new VirtualLogList(viewer, content, {
-    font: "12px monospace",
-    lineHeight: 18,
-    estimatedLineHeight: 36,
-    gap: 6,
-    padding: 8,
-    textWidthOffset: 26, 
-    chromeHeight: (entry) => (entry.tag || entry.timeStr) ? 36 : 14,
-    prepareFn: renderSysEntry,
-    onEmpty: "",
-  });
-};
-
-export const resetSysLogs = () => {
-  sysVirtualList?.clear();
-  state.sysState.offset = 0;
-  state.sysState.hasMore = true;
-};
-
-export const clearSysLogs = async () => {
-  const source = document.getElementById("logSourceSelect")?.value;
-  if (source === "zygisk") {
-    await run("logcat -c");
-  } else {
-    await run(`${CONST.LOG_CTL} clear-sys`);
-  }
-  showToast("日志已清空");
-  if (source === "internal") resetSysLogs();
-  fetchSysLogs();
-};
-
-const renderSysEntry = (entry) => {
-  const { timeStr, tag, msg } = entry;
-  if (tag) {
-    return `<div class="sys-log-item">
-      <div class="sys-log-header">
-        <span class="sys-log-time">${timeStr}</span>
-        <span class="sys-log-tag">[${tag}]</span>
-      </div>
-      <div class="sys-log-msg">${msg}</div>
-    </div>`;
-  }
-  if (timeStr) {
-    return `<div class="sys-log-item">
-      <div class="sys-log-header">
-        <span class="sys-log-time">${timeStr}</span>
-      </div>
-      <div class="sys-log-msg">${msg}</div>
-    </div>`;
-  }
-  return `<div class="sys-log-raw">${msg}</div>`;
-};
-
-export const fetchSysLogs = async () => {
-  const source = document.getElementById("logSourceSelect").value;
-  const viewer = document.getElementById("logViewer");
-  if (source === "zygisk") {
-    viewer.textContent = (await run("logcat -d -s Zygisk_NSProxy NamespaceProxy_Injector")) || "无 Zygisk 日志";
-    viewer.scrollTop = viewer.scrollHeight;
+    .sort(
+      (a, b) =>
+        (!!b.isConfigured - !!a.isConfigured) ||
+        (a.appLabel || "").localeCompare(b.appLabel || "")
+    );
+  if (items.length === 0) {
+    listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--mx-t2);">无匹配应用</div>';
     return;
   }
-  if (state.sysState.loading || !state.sysState.hasMore) return;
-  state.sysState.loading = true;
-  try {
-    const levelArg = state.sysState.level > -1 ? `--level ${state.sysState.level}` : "";
-    const res = await run(`${CONST.LOG_CTL} search-sys ${levelArg} "" ${CONST.PAGE_LIMIT} ${state.sysState.offset} api`);
-    if (!res) {
-      state.sysState.hasMore = false;
-    } else {
-      const lines = res.split("\n");
-      let dataLines = lines;
-      const lastLine = lines[lines.length - 1];
-      if (lastLine.startsWith("DONE|")) {
-        state.sysState.hasMore = parseInt(lastLine.split("|")[2]) > 0;
-        dataLines = lines.slice(0, -1);
-      } else if (lastLine === "OK") {
-        state.sysState.hasMore = false;
-        dataLines = lines.slice(0, -1);
-      }
-      if (dataLines.length > 0) {
-        state.sysState.offset += dataLines.length;
-        const entries = parseSysLines(dataLines);
-        if (sysVirtualList) sysVirtualList.append(entries);
-      }
-    }
-  } catch {
-    state.sysState.hasMore = false;
-  } finally {
-    state.sysState.loading = false;
+  isTransitioningOut = false;
+  loadedIconsInBatch = 0;
+  targetIconCount = Math.min(items.length, 6);
+  if (targetIconCount === 0) {
+    hideSpinnerOverlay();
   }
+  const finalHTML = items
+    .map((app) => {
+      let badgesHTML = state.activeUsers
+        .filter((u) => app.users[u]?.text.trim() || app.users[u]?.hasRules || app.isConfigured)
+        .map((u) => {
+          const c = app.users[u];
+          return `<span class="mx-badge ${c.isEnabled ? "mx-badge-primary" : "mx-badge-gray"}">U${u}${c.isEnabled ? "" : " OFF"}</span>`;
+        })
+        .join("");
+      if (state.activeMounts.has(app.packageName))
+        badgesHTML += `<span class="mx-badge mx-badge-success">MOUNTED</span>`;
+      let injStr = "";
+      const inj = state.injectedApps.get(app.packageName);
+      if (inj) {
+        const flags = [];
+        if (inj.redirect === "1") flags.push('<span style="color:var(--mx-primary);font-weight:800">R</span>');
+        if (inj.hide === "1") flags.push('<span style="color:var(--mx-amber);font-weight:800">H</span>');
+        if (inj.ro === "1") flags.push('<span style="color:var(--mx-red);font-weight:800">RO</span>');
+        injStr = `<span style="font-size:10px;margin-left:6px;padding:2px 6px;background:var(--mx-s3);border-radius:4px;font-family:var(--mx-font-mono);flex-shrink:0;">PID ${inj.pid} ${flags.join(" ")}</span>`;
+      }
+      const isCached = _iconCache.has(app.packageName);
+      return `<div class="app-item" data-pkg="${app.packageName}" onclick="window.openAppConfig('${app.packageName}')">
+        <img class="app-icon${isCached ? ' icon-loaded' : ''}" src="${isCached ? `ksu://icon/${app.packageName}` : TRANSPARENT_SPACER}" data-src="${isCached ? '' : `ksu://icon/${app.packageName}`}" onerror="window.onIconError(this)" data-fallback="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2365676b'><path d='M17.6,9.48l1.84-3.18c0.16-0.31,0.04-0.69-0.26-0.85c-0.31-0.16-0.69-0.04-0.85,0.26L16.4,9c-1.35-0.6-2.85-0.95-4.4-0.95S8.95,8.4,7.6,9L5.67,5.71C5.51,5.41,5.13,5.29,4.83,5.45C4.52,5.61,4.4,6,4.56,6.3L6.4,9.48C3.3,11.25,1.28,14.44,1,18.15h22C22.72,14.44,20.7,11.25,17.6,9.48z M7,15.25c-0.69,0-1.25-0.56-1.25-1.25S6.31,12.75,7,12.75s1.25,0.56,1.25,1.25S7.69,15.25,7,15.25z M17,15.25c-0.69,0-1.25-0.56-1.25-1.25s0.56-1.25,1.25-1.25s1.25,0.56,1.25,1.25S17.69,15.25,17,15.25z'/></svg>" onload="window.onIconLoaded(this)" data-pkg="${app.packageName}" />
+        <div class="app-info">
+          <div class="app-name" style="display:flex;align-items:center;">
+            <span style="overflow:hidden;text-overflow:ellipsis;">${app.appLabel}</span><span class="inj-str">${injStr}</span>
+          </div>
+          <div class="app-pkg">${app.packageName}</div>
+        </div>
+        <div class="app-badges">${badgesHTML}</div>
+      </div>`;
+    })
+    .join("");
+  listEl.innerHTML = finalHTML;
+  initListObserver();
+  listEl.querySelectorAll('.app-item').forEach(el => listObserver.observe(el));
 };
 
-const parseSysLines = (lines) => {
-  return lines.map((line) => {
-    const matchTag = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\|\[(.*?)\](.*)$/);
-    const matchSimple = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(.*)$/);
-    if (matchTag) {
-      return { text: matchTag[3], timeStr: matchTag[1], tag: matchTag[2], msg: matchTag[3] };
-    } else if (matchSimple) {
-      return { text: matchSimple[2], timeStr: matchSimple[1], tag: null, msg: matchSimple[2] };
+export const updateAppListStatus = () => {
+  document.querySelectorAll('#appList .app-item').forEach(item => {
+    const pkg = item.dataset.pkg;
+    const app = state.appMap.get(pkg);
+    if (!app) return;
+    let badgesHTML = state.activeUsers
+      .filter((u) => app.users[u]?.text.trim() || app.users[u]?.hasRules || app.isConfigured)
+      .map((u) => {
+        const c = app.users[u];
+        return `<span class="mx-badge ${c.isEnabled ? "mx-badge-primary" : "mx-badge-gray"}">U${u}${c.isEnabled ? "" : " OFF"}</span>`;
+      })
+      .join("");
+    if (state.activeMounts.has(pkg))
+      badgesHTML += `<span class="mx-badge mx-badge-success">MOUNTED</span>`;
+    const badgeEl = item.querySelector('.app-badges');
+    if (badgeEl && badgeEl.innerHTML !== badgesHTML) badgeEl.innerHTML = badgesHTML;
+    let injStr = "";
+    const inj = state.injectedApps.get(pkg);
+    if (inj) {
+      const flags = [];
+      if (inj.redirect === "1") flags.push('<span style="color:var(--mx-primary);font-weight:800">R</span>');
+      if (inj.hide === "1") flags.push('<span style="color:var(--mx-amber);font-weight:800">H</span>');
+      if (inj.ro === "1") flags.push('<span style="color:var(--mx-red);font-weight:800">RO</span>');
+      injStr = `<span style="font-size:10px;margin-left:6px;padding:2px 6px;background:var(--mx-s3);border-radius:4px;font-family:var(--mx-font-mono);flex-shrink:0;">PID ${inj.pid} ${flags.join(" ")}</span>`;
     }
-    return { text: line, timeStr: null, tag: null, msg: line };
+    const injEl = item.querySelector('.inj-str');
+    if (injEl && injEl.innerHTML !== injStr) injEl.innerHTML = injStr;
   });
 };
+
+export const openAppConfig = (pkg) => {
+  state.currentBindingPkg = pkg;
+  const app = state.appMap.get(pkg);
+  if (!app) return;
+  document.getElementById("bindAppName").textContent = app.appLabel;
+  document.getElementById("bindAppPkg").textContent = pkg;
+  const tabs = document.getElementById("appUserTabs");
+  if (state.activeUsers.length <= 1) {
+    tabs.style.display = "none";
+  } else {
+    tabs.style.display = "flex";
+    tabs.innerHTML = state.activeUsers
+      .map(
+        (uid) =>
+          `<button class="${uid === state.activeUsers[0] ? "active" : ""}" data-uid="${uid}" onclick="window.switchAppUser(${uid})">User ${uid}</button>`
+      )
+      .join("");
+  }
+  window.switchAppUser(state.activeUsers[0]);
+  document.getElementById("appConfigSubpage").classList.add("open");
+};
+
+export const switchAppUser = (uid) => {
+  state.currentBindingUser = uid;
+  document.querySelectorAll("#appUserTabs button").forEach((btn) =>
+    btn.classList.toggle("active", parseInt(btn.dataset.uid) === uid)
+  );
+  const app = state.appMap.get(state.currentBindingPkg);
+  const uConf = app?.users[uid] || { isEnabled: false, text: "" };
+  document.getElementById("appEnableToggle").checked = uConf.isEnabled;
+  document.getElementById("appRuleContent").value = uConf.text;
+  parseConfigTextToVisual(uConf.text, "appRuleBuilderContainer", "appMonitorSelect", "appSandboxSelect", null);
+  const visualBtn = document.querySelector('button[name="appModeToggle"][data-mode="visual"]');
+  if (visualBtn) visualBtn.click();
+};
+
+export const flushInjectorConf = async () => {
+  let r = `[GLOBAL]\n${state.globalConfText.trim() ? state.globalConfText.trim() + "\n" : ""}`;
+  state.injectorStates.forEach((s, k) => {
+    if (k === "GLOBAL") return;
+    r += `[${k}] ${s}\n`;
+    const il = state.injectorRulesMap.get(k) || [];
+    if (il.length > 0) r += il.join("\n") + "\n";
+  });
+  const escaped = r.trim().replace(/'/g, "'\\''");
+  await run(`echo '${escaped}' > ${CONST.INJECTOR_CONF}`);
+};
+
+window.openAppConfig = openAppConfig;
+window.switchAppUser = switchAppUser;

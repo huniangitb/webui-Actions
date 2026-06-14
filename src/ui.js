@@ -135,29 +135,37 @@ export const centerActiveInput = (input) => {
   const row = input.closest(".rule-row") || input.closest(".mx-form-group") || input;
   const container = input.closest(".overflow-y-auto") || input.closest(".mx-subpage-body");
   if (!row || !container) return;
+
   if (container._scrollAnimId) {
     cancelAnimationFrame(container._scrollAnimId);
   }
-  const duration = 280; 
+
+  const duration = 280;
   const startTime = performance.now();
   const startScrollTop = container.scrollTop;
+
   const step = (currentTime) => {
     const elapsed = currentTime - startTime;
     const progress = Math.min(elapsed / duration, 1);
     const ease = 1 - Math.pow(1 - progress, 3);
+
     const containerRect = container.getBoundingClientRect();
     const rowRect = row.getBoundingClientRect();
     const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
+
     const idealScrollTop = relativeTop - (containerRect.height / 2) + (rowRect.height / 2);
     const maxScrollTop = container.scrollHeight - containerRect.height;
     const targetScrollTop = Math.max(0, Math.min(idealScrollTop, maxScrollTop));
+
     container.scrollTop = startScrollTop + (targetScrollTop - startScrollTop) * ease;
+
     if (progress < 1) {
       container._scrollAnimId = requestAnimationFrame(step);
     } else {
       container._scrollAnimId = null;
     }
   };
+
   container._scrollAnimId = requestAnimationFrame(step);
 };
 
@@ -169,6 +177,7 @@ const setupAutocomplete = (input) => {
   if (!input) return;
   const box = document.getElementById("suggestionBox");
   if (!box) return;
+  
   input.addEventListener(
     "input",
     debounce(async (e) => {
@@ -247,6 +256,7 @@ const setupAutocomplete = (input) => {
       }
     }, 250)
   );
+
   input.addEventListener("keydown", (e) => {
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       const inputs = Array.from(document.querySelectorAll(".mx-subpage-container.open .mx-input:not([readonly])"));
@@ -262,6 +272,7 @@ const setupAutocomplete = (input) => {
       }
     }
   });
+
   input.addEventListener("focus", () => {
     window._currentInput = input;
     centerActiveInput(input);
@@ -276,6 +287,7 @@ const setupAutocomplete = (input) => {
       }
     }, dispatchDelay);
   });
+
   input.addEventListener("blur", () => {
     setTimeout(() => {
       const activeEl = document.activeElement;

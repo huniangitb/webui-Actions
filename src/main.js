@@ -121,7 +121,6 @@ const addIgnoreRow = (p) => {
   document.getElementById("ignoreBuilderContainer")?.appendChild(div);
 };
 
-// 移除了 document.startViewTransition 以避免全局页面抖动
 const switchSection = (sectionId) => {
   document.querySelectorAll(".demo-section").forEach((el) => el.classList.remove("active"));
   document.getElementById(`sec-${sectionId}`)?.classList.add("active");
@@ -144,9 +143,8 @@ const switchSection = (sectionId) => {
 
 const closeModalCleanup = () => {
   if (history.state && history.state.modalOpen) {
-    history.back(); // 让 popstate 接管关闭逻辑
+    history.back();
   } else {
-    // 兜底方案
     document.getElementById("appConfigSubpage")?.classList.remove("open");
     document.querySelector(".mx-app").classList.remove("frozen");
     document.body.classList.remove("modal-open");
@@ -165,9 +163,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   initIcons();
 
-  // History API - 统一处理后退键及模态框关闭
   window.addEventListener("popstate", () => {
-    // 处理 App 子页面的关闭
     const appConfig = document.getElementById("appConfigSubpage");
     if (appConfig && appConfig.classList.contains("open")) {
       appConfig.classList.remove("open");
@@ -175,9 +171,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.body.classList.remove("modal-open", "keyboard-open");
       document.documentElement.style.setProperty('--keyboard-h', '0px');
       startPolling();
-      window._currentInput = null; // 重点修复第二次进入后滚动定位失效
+      window._currentInput = null;
     }
-    // 处理独立弹窗模态框的关闭
     document.querySelectorAll(".mx-modal-overlay.open").forEach((el) => {
       el.classList.remove("open");
     });
@@ -330,7 +325,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const logLevelSelect = document.getElementById("logLevelSelect");
   const logViewer = document.getElementById("logViewer");
   
-  // 恢复保存的日志级别
   const savedLogLevel = localStorage.getItem("sysLogLevel");
   if (savedLogLevel) {
     state.sysState.level = parseInt(savedLogLevel);
@@ -346,7 +340,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (logLevelSelect) {
     logLevelSelect.addEventListener("change", () => {
       state.sysState.level = parseInt(logLevelSelect.value);
-      localStorage.setItem("sysLogLevel", logLevelSelect.value); // 持久化保存
+      localStorage.setItem("sysLogLevel", logLevelSelect.value);
       resetSysLogs();
       fetchSysLogs();
     });
@@ -447,7 +441,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnAppAddRule").onclick = () =>
     addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
     
-  // 绑定所有关闭按钮的后退行为
   document.getElementById("btnCloseAppModal").onclick = closeModalCleanup;
   document.querySelectorAll(".mx-btn-close").forEach(btn => {
     btn.onclick = () => closeModalCleanup();
@@ -504,7 +497,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   const originalOpenAppConfig = window.openAppConfig;
-  // 取消此处过度激进的 document.startViewTransition
   window.openAppConfig = (pkg) => {
     stopPolling();
     history.pushState({ modalOpen: true }, "");

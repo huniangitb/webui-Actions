@@ -22,6 +22,32 @@ export const state = {
   lastActiveModal: null,  // Track which modal is currently measured
   isViewportResizing: false,
   isUserTouching: false,  // 追踪用户真实物理触控
+  resumePolling: null,    // 由 main.js 在初始化时设置，用于 closeModalCleanup 恢复轮询
+};
+
+/**
+ * 关闭所有模态框/子页面并恢复轮询。
+ * 避免 main.js ↔ backup.js 循环依赖，移到此共享模块。
+ */
+export const closeModalCleanup = () => {
+  if (history.state && history.state.modalOpen) {
+    history.back();
+  } else {
+    const appConfig = document.getElementById("appConfigSubpage");
+    if (appConfig && appConfig.classList.contains("open")) {
+      appConfig.classList.remove("open");
+      appConfig.classList.add("closing");
+      setTimeout(() => {
+        appConfig.classList.remove("closing");
+      }, 220);
+    }
+    document.querySelector(".mx-app")?.classList.remove("frozen");
+    document.body.classList.remove("modal-open", "keyboard-open");
+    document.documentElement.style.setProperty('--keyboard-h', '0px');
+    document.querySelectorAll(".mx-modal-overlay.open").forEach((el) => el.classList.remove("open"));
+    state.resumePolling?.();
+    window._currentInput = null;
+  }
 };
 
 export const CONST = {

@@ -1,4 +1,4 @@
-import { state, CONST } from "./state.js";
+import { state, CONST, closeModalCleanup } from "./state.js";
 import { run, showToast, ICONS } from "./utils.js";
 import { loadData } from "./apps.js";
 import { exec } from "kernelsu";
@@ -196,7 +196,7 @@ export async function restoreConfig() {
     if (res.stdout.includes("SUCCESS")) {
       showToast("配置恢复成功");
       await loadData();
-      import("./main.js").then(({ closeModalCleanup }) => closeModalCleanup());
+      closeModalCleanup();
     } else {
       showToast("恢复配置失败");
     }

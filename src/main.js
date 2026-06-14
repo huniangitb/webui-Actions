@@ -1,4 +1,4 @@
-import { state, CONST } from "./state.js";
+import { state, CONST, closeModalCleanup } from "./state.js";
 import { run, showToast, ICONS, initIcons, debounce } from "./utils.js";
 import { applyTheme, systemThemeListener, handleManualThemeToggle } from "./theme.js";
 import { setupModeToggle, addRuleRow, parseConfigTextToVisual, generateConfigTextFromVisual } from "./ui.js";
@@ -30,6 +30,7 @@ export const startPolling = () => {
     appStatusPolling = setInterval(refreshAppStatus, 2000);
   }
 };
+state.resumePolling = startPolling;
 export const stopPolling = () => {
   if (statusPolling) {
     clearInterval(statusPolling);
@@ -40,6 +41,7 @@ export const stopPolling = () => {
     appStatusPolling = null;
   }
 };
+state.suspendPolling = stopPolling;
 
 const checkStatus = async () => {
   if (document.querySelector(".mx-app")?.classList.contains("frozen")) return;
@@ -138,27 +140,6 @@ const switchSection = (sectionId) => {
       resetSysLogs();
     }
     fetchSysLogs();
-  }
-};
-
-export const closeModalCleanup = () => {
-  if (history.state && history.state.modalOpen) {
-    history.back();
-  } else {
-    const appConfig = document.getElementById("appConfigSubpage");
-    if (appConfig && appConfig.classList.contains("open")) {
-      appConfig.classList.remove("open");
-      appConfig.classList.add("closing");
-      setTimeout(() => {
-        appConfig.classList.remove("closing");
-      }, 220);
-    }
-    document.querySelector(".mx-app").classList.remove("frozen");
-    document.body.classList.remove("modal-open", "keyboard-open");
-    document.documentElement.style.setProperty('--keyboard-h', '0px');
-    document.querySelectorAll(".mx-modal-overlay.open").forEach((el) => el.classList.remove("open"));
-    startPolling();
-    window._currentInput = null;
   }
 };
 

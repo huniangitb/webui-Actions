@@ -245,6 +245,11 @@ const setupAutocomplete = (input) => {
   });
   input.addEventListener("focus", () => {
     window._currentInput = input;
+    const isFirstFocus = !input.hasAttribute("data-has-focused");
+    const dispatchDelay = isFirstFocus ? 750 : 0;
+    if (isFirstFocus) {
+      input.setAttribute("data-has-focused", "true");
+    }
     setTimeout(() => {
       if (document.activeElement === input) {
         centerActiveInput(input);
@@ -254,7 +259,7 @@ const setupAutocomplete = (input) => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));
       }
-    }, 150);
+    }, dispatchDelay);
   });
   input.addEventListener("blur", () => {
     setTimeout(() => {

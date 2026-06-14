@@ -65,8 +65,20 @@ body.loaded { opacity: 1; transform: scale(1); }
 }
 .mx-sidebar { display: none; }
 .mx-desktop-shell { display: none; }
-.mx-app { display: flex; height: var(--initial-vh, 100dvh); width: 100vw; flex-direction: column; will-change: transform, opacity; }
-.mx-app.frozen { pointer-events: none; filter: grayscale(0.4) opacity(0.85); user-select: none; }
+.mx-app {
+    display: flex;
+    height: var(--initial-vh, 100dvh);
+    width: 100vw;
+    flex-direction: column;
+    will-change: transform, opacity;
+    transition: transform 0.4s var(--mx-ease), opacity 0.4s var(--mx-ease);
+}
+.mx-app.frozen {
+    pointer-events: none;
+    opacity: 0.15;
+    transform: scale(0.96) translate3d(0, -8px, 0);
+    user-select: none;
+}
 .mx-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
 .mx-topbar-right { display: flex; align-items: center; gap: 8px; }
 .mx-desktop-main {

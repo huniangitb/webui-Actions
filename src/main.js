@@ -167,6 +167,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isKeyboardOpen = height > 0;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
       document.documentElement.style.setProperty('--keyboard-h', `${height}px`);
+      if (isKeyboardOpen && window._currentInput) {
+         import("./ui.js").then(({ centerActiveInput }) => {
+            centerActiveInput(window._currentInput);
+         });
+      }
     });
   } else {
     let isFrameBlocked = false;
@@ -181,6 +186,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         const isKeyboardOpen = keyboardHeight > 80;
         document.body.classList.toggle("keyboard-open", isKeyboardOpen);
         document.documentElement.style.setProperty('--keyboard-h', `${isKeyboardOpen ? keyboardHeight : 0}px`);
+        if (isKeyboardOpen && window._currentInput) {
+           import("./ui.js").then(({ centerActiveInput }) => {
+              centerActiveInput(window._currentInput);
+           });
+        }
       });
     };
     if (window.visualViewport) {

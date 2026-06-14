@@ -40,7 +40,7 @@ export const addRuleRow = (type, target, source, containerId) => {
 export const parseConfigTextToVisual = (text, containerId, monitorSelectId, sandboxSelectId, injectSelectId) => {
   const container = document.getElementById(containerId);
   if (container) {
-    // 核心安全拯救：在清空旧节点前，如果自动补全面板在里面，先将其移回 body 避免被一同销毁
+    // 强制安全移动：如果当前自动补全面板嵌入于待清理的 DOM 容器内，先将其移入 Body 防止被 innerHTML 顺带抹消
     const box = document.getElementById("suggestionBox");
     if (box && container.contains(box)) {
       document.body.appendChild(box);
@@ -183,7 +183,7 @@ export const debouncedCenterActive = debounce((input) => {
 const setupAutocomplete = (input) => {
   if (!input) return;
   
-  // 核心安全重建：如果发现面板被意外销毁，在这里立即原地重新初始化，保证每次使用都可用
+  // 原地容错与自动实例化：双重保证 `#suggestionBox` 在任何生命周期下皆可用
   let box = document.getElementById("suggestionBox");
   if (!box) {
     box = document.createElement("div");
@@ -306,7 +306,6 @@ const setupAutocomplete = (input) => {
     setTimeout(() => {
       const activeEl = document.activeElement;
       if (!activeEl || !activeEl.classList.contains("mx-input")) {
-        // 如果面板还在，安全地移回 body
         const suggestionBox = document.getElementById("suggestionBox");
         if (suggestionBox) {
           suggestionBox.classList.remove("open");

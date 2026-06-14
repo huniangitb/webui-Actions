@@ -109,7 +109,16 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
 .btm-icon { width: 22px; height: 22px; display: block; }
 .btm-icon svg { width: 100%; height: 100%; display: block; }
 .btm-label { font-size: 11px; }
-.demo-section { display: none; height: 100%; flex-direction: column; padding: 16px; overflow: hidden; flex: 1; }
+
+/* 调整手机端外边距，底部设为0，实现卡片与底部导航栏无缝贴合 */
+.demo-section { 
+    display: none; 
+    height: 100%; 
+    flex-direction: column; 
+    padding: 12px 12px 0 12px; 
+    overflow: hidden; 
+    flex: 1; 
+}
 .demo-section.active { display: flex; }
 .mx-page-head { margin-bottom: 16px; flex-shrink: 0; }
 .mx-page-title { margin: 0 0 4px 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
@@ -237,13 +246,12 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
     display: none; flex-direction: column; box-sizing: border-box;
 }
 
-/* 子页面呼出推入动效 */
+/* 改为流畅的水平方向左右推入动画 */
 .mx-subpage-container.open {
     display: flex;
     animation: subpageOpen 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* 子页面退回弹出动效 */
 .mx-subpage-container.closing {
     display: flex;
     pointer-events: none;
@@ -253,22 +261,22 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
 @keyframes subpageOpen {
     from {
         opacity: 0;
-        transform: translate3d(0, 48px, 0) scale(0.97);
+        transform: translate3d(100%, 0, 0); /* 自右向左推入 */
     }
     to {
         opacity: 1;
-        transform: translate3d(0, 0, 0) scale(1);
+        transform: translate3d(0, 0, 0);
     }
 }
 
 @keyframes subpageClose {
     from {
         opacity: 1;
-        transform: translate3d(0, 0, 0) scale(1);
+        transform: translate3d(0, 0, 0);
     }
     to {
         opacity: 0;
-        transform: translate3d(0, 48px, 0) scale(0.97);
+        transform: translate3d(100%, 0, 0); /* 自左向右推出 */
     }
 }
 
@@ -342,6 +350,13 @@ body.keyboard-open .overflow-y-auto {
 
 body.keyboard-open:not(.modal-open) .overflow-y-auto { 
     max-height: calc(100% - var(--keyboard-h, 0px)); 
+}
+
+/* 列表容器：首部与“添加规则”保持10px间距，并强制在底部预留 68px 透明缓冲垫 */
+#appRuleBuilderContainer,
+#globalRuleBuilderContainer {
+    margin-top: 10px;
+    padding-bottom: 68px; /* 一个完整配置项 rule-row 的缓冲高度 */
 }
 
 .editor-scroll { position: relative; }

@@ -143,16 +143,16 @@ const switchSection = (sectionId) => {
 
 const closeModalCleanup = () => {
   if (history.state && history.state.modalOpen) {
-    history.back(); // 优先驱动 popstate，实现物理返回键与虚拟返回键动效一致
+    history.back(); // 优先触发 popstate
   } else {
-    // 兜底同步动画逻辑
+    // 兜底同步关闭动画逻辑
     const appConfig = document.getElementById("appConfigSubpage");
     if (appConfig && appConfig.classList.contains("open")) {
       appConfig.classList.remove("open");
       appConfig.classList.add("closing");
       setTimeout(() => {
         appConfig.classList.remove("closing");
-      }, 220);
+      }, 220); // 确保与向右滑出 CSS transition 完美重合
     }
     document.querySelector(".mx-app").classList.remove("frozen");
     document.body.classList.remove("modal-open");
@@ -172,20 +172,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   initIcons();
 
   window.addEventListener("popstate", () => {
-    // 关闭应用配置时的平滑推出动画生命周期
+    // 处理应用配置页面关闭的向右推出的过渡动画
     const appConfig = document.getElementById("appConfigSubpage");
     if (appConfig && appConfig.classList.contains("open")) {
       appConfig.classList.remove("open");
       appConfig.classList.add("closing");
       setTimeout(() => {
         appConfig.classList.remove("closing");
-      }, 220); // 动效周期完成后清理类名
+      }, 220);
 
       document.querySelector(".mx-app").classList.remove("frozen");
       document.body.classList.remove("modal-open", "keyboard-open");
       document.documentElement.style.setProperty('--keyboard-h', '0px');
       startPolling();
-      window._currentInput = null; // 确保清空当前引用
+      window._currentInput = null;
     }
     document.querySelectorAll(".mx-modal-overlay.open").forEach((el) => {
       el.classList.remove("open");

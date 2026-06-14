@@ -37,10 +37,16 @@ export const debounce = (func, wait) => {
   };
 };
 export const showToast = (msg) => {
-  try {
-    ksuToast(msg);
-  } catch {}
   const c = document.getElementById("toastContainer");
+  // DOM toast 优先；容器不存在时 fallback 到 KernelSU 原生 toast
+  if (!c) {
+    try { ksuToast(msg); } catch {}
+    return;
+  }
+  // 去重：相同消息的 toast 已存在则不重复创建
+  for (let i = 0; i < c.children.length; i++) {
+    if (c.children[i].textContent === msg) return;
+  }
   const t = document.createElement("div");
   t.className = "mx-toast";
   t.textContent = msg;

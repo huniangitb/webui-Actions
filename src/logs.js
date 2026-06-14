@@ -13,9 +13,9 @@ class VirtualLogList {
     this.font = options.font || '13px monospace';
     this.lineHeight = options.lineHeight || 20;
     this.gap = options.gap || 0;
-    this.padding = options.padding || 0; 
-    this.chromeHeight = options.chromeHeight || 0; 
-    this.textWidthOffset = options.textWidthOffset || 0; 
+    this.padding = options.padding || 0;
+    this.chromeHeight = options.chromeHeight || 0;
+    this.textWidthOffset = options.textWidthOffset || 0;
     this.prepareFn = options.prepareFn || null;
     this.onEmpty = options.onEmpty || "";
     this.entries = [];
@@ -26,7 +26,10 @@ class VirtualLogList {
     this.isDirty = true;
     this._ticking = false;
     this._onScroll = this._onScroll.bind(this);
+    this._onResize = this._onResize.bind(this);
     this.container.addEventListener("scroll", this._onScroll);
+    this._resizeObserver = new ResizeObserver(this._onResize);
+    this._resizeObserver.observe(this.container);
     this.contentEl.style.position = "relative";
   }
   append(entryList) {
@@ -71,6 +74,10 @@ class VirtualLogList {
   }
   destroy() {
     this.container.removeEventListener("scroll", this._onScroll);
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = null;
+    }
   }
   _recalcTotalHeight() {
     this.prefixHeights = [];
@@ -90,6 +97,18 @@ class VirtualLogList {
     if (document.querySelector(".mx-app")?.classList.contains("frozen")) {
       return;
     }
+    if (!this._ticking) {
+      window.requestAnimationFrame(() => {
+        this._render();
+        this._ticking = false;
+      });
+      this._ticking = true;
+    }
+  }
+  _onResize() {
+    // 容器尺寸变化时强制标记脏状态，确保 _render 不会因 visibleStart/End 未变而跳过重绘
+    if (document.querySelector(".mx-app")?.classList.contains("frozen")) return;
+    this.isDirty = true;
     if (!this._ticking) {
       window.requestAnimationFrame(() => {
         this._render();

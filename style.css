@@ -123,7 +123,7 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
     .mx-topbar-right { gap: 6px; }
     .mx-topbar-right .mx-btn-icon { width: 32px; height: 32px; }
     .mx-logo-text { font-size: 15px; }
-    .demo-section .mx-card { background: var(--mx-bg); border-radius: 0; border: none; box-shadow: none; height: 100%; width: 100%; }
+    .demo-section .mx-card { background: var(--mx-bg); border-radius: 0; border: none; box-shadow: none; flex: 1; min-height: 0; width: 100%; }
 }
 @media (min-width: 768px) {
     .mx-app { flex-direction: row; }
@@ -453,7 +453,6 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 }
 .search-bar-wrap.expanded {
     flex: 1;
-    max-width: 280px;
     background: var(--mx-s3);
     border-color: var(--mx-border);
     cursor: text;
@@ -467,7 +466,7 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
     content: '';
     position: absolute;
     top: 8px;
-    right: 8px;
+    right: 2px;
     width: 6px;
     height: 6px;
     border-radius: 50%;

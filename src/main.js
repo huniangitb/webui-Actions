@@ -11,12 +11,28 @@ import { enableEdgeToEdge } from "kernelsu";
 import { initRipple } from "./ripple.js";
 import "../style.css";
 
+// 核心修复 1 & 3：升级多点自适应高度锁定算法，对抗 WebView 沉浸式转换滞后
 const lockInitialHeight = () => {
-  const initialH = window.innerHeight;
-  document.documentElement.style.setProperty('--initial-vh', `${initialH}px`);
+  const update = () => {
+    // 优先采用 visualViewport 计算绝对高度，避免移动端软键盘弹出前夕获取错误的高度数据
+    const initialH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    if (initialH > 100) {
+      document.documentElement.style.setProperty('--initial-vh', `${initialH}px`);
+    }
+  };
+  
+  update();
+  
+  // 在生命周期的多个核心时间节点重复校正锁定的高度
+  window.addEventListener("load", update);
+  window.addEventListener("orientationchange", () => setTimeout(update, 200));
+  
+  // 延时保障队列，对抗 enableEdgeToEdge 引起的异步二次重绘
+  setTimeout(update, 100);
+  setTimeout(update, 300);
+  setTimeout(update, 600);
 };
 lockInitialHeight();
-window.addEventListener("orientationchange", () => setTimeout(lockInitialHeight, 200));
 
 let statusPolling = null;
 let appStatusPolling = null;
@@ -32,6 +48,7 @@ export const startPolling = () => {
   }
 };
 state.resumePolling = startPolling;
+
 export const stopPolling = () => {
   if (statusPolling) {
     clearInterval(statusPolling);
@@ -162,14 +179,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     startPolling();
     window._currentInput = null;
   });
-
   const ro = new ResizeObserver(() => {
     if (document.body.classList.contains("keyboard-open") && window._currentInput && document.activeElement === window._currentInput) {
        import("./ui.js").then(({ centerActiveInput }) => centerActiveInput(window._currentInput));
     }
   });
   document.querySelectorAll('.mx-subpage-body, .overflow-y-auto').forEach(el => ro.observe(el));
-
   if (navigator.virtualKeyboard) {
     navigator.virtualKeyboard.overlaysContent = true;
     navigator.virtualKeyboard.addEventListener("geometrychange", (e) => {
@@ -206,11 +221,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.addEventListener("resize", updateViewportHeight);
     updateViewportHeight();
   }
-
   document.addEventListener("touchstart", () => { state.isUserTouching = true; }, { passive: true });
   document.addEventListener("touchend", () => { state.isUserTouching = false; }, { passive: true });
   document.addEventListener("touchcancel", () => { state.isUserTouching = false; }, { passive: true });
-  
   window.addEventListener("scroll", (e) => {
     if (state.isUserTouching) {
       const box = document.getElementById("suggestionBox");
@@ -221,7 +234,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     if (window.scrollY !== 0) window.scrollTo(0, 0);
   }, true);
-
   document.addEventListener("click", (e) => {
     const box = document.getElementById("suggestionBox");
     if (box && box.classList.contains("open")) {
@@ -242,7 +254,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }, 150);
   });
-
   state.currentSettings = await getSettings();
   document.getElementById("autoThemeToggle").checked = state.currentSettings.autoTheme;
   document.getElementById("pluginSyncToggle").checked = state.currentSettings.syncPlugin;
@@ -255,11 +266,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   document.getElementById("btnThemeToggleMobile").onclick = handleManualThemeToggle;
   document.getElementById("btnThemeToggleDesktop").onclick = handleManualThemeToggle;
-
   document.querySelectorAll(".mx-nav-item, .mx-btm-item").forEach((btn) => {
     if (btn.id !== "btnBackupDesktop") btn.onclick = () => switchSection(btn.dataset.section);
   });
-
   document.querySelectorAll("#appFilterGroup button").forEach((btn) => {
     btn.onclick = () => {
       document.querySelectorAll("#appFilterGroup button").forEach((b) => b.classList.remove("active"));
@@ -268,11 +277,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderAppList();
     };
   });
-
   const searchBarWrap = document.getElementById("searchBarWrap");
   const appSearch = document.getElementById("appSearch");
   const appFilterWrapper = document.getElementById("appFilterWrapper");
-
   if (searchBarWrap && appSearch && appFilterWrapper) {
     searchBarWrap.addEventListener("click", () => {
       if (!searchBarWrap.classList.contains("expanded")) {
@@ -281,18 +288,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         appSearch.focus();
       }
     });
-
     appSearch.addEventListener("blur", () => {
       searchBarWrap.classList.remove("expanded");
       appFilterWrapper.classList.remove("collapsed");
       searchBarWrap.classList.toggle("has-text", !!appSearch.value.trim());
     });
-
     appSearch.addEventListener("input", debounce(() => {
       renderAppList();
     }, 250));
   }
-
   // 滚动应用列表时自动收缩搜索框
   const appListContainer = document.getElementById("appListContainer");
   if (appListContainer && searchBarWrap && appSearch && appFilterWrapper) {
@@ -305,7 +309,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }, { passive: true });
   }
-
   const ioContainer = document.getElementById("ioLogContainer");
   const ioSearch = document.getElementById("ioSearch");
   if (ioSearch) {
@@ -321,7 +324,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   document.getElementById("btnClearIo").onclick = clearIoLogs;
-
   const logSelect = document.getElementById("logSourceSelect");
   const logLevelSelect = document.getElementById("logLevelSelect");
   const logViewer = document.getElementById("logViewer");
@@ -352,7 +354,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnClearLog").onclick = clearSysLogs;
   document.getElementById("btnToggleStatusMobile").onclick = toggleStatus;
   document.getElementById("btnToggleStatusDesktop").onclick = toggleStatus;
-
   const openSettings = async () => {
     history.pushState({ modalOpen: true }, "");
     const isInstalled = await checkPluginInstalled();
@@ -385,7 +386,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
   document.getElementById("btnSettingsMobile").onclick = openSettings;
   document.getElementById("btnSettingsDesktop").onclick = openSettings;
-
   const openAboutModal = () => {
     history.pushState({ modalOpen: true }, "");
     document.getElementById("aboutModal")?.classList.add("open");
@@ -395,22 +395,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnJoinQQGroup")?.addEventListener("click", async () => {
     await run('am start -a android.intent.action.VIEW -d "mqqapi://card/show_pslcard?src_type=internal&version=1&card_type=group&uin=1093864387"');
   });
-
   const btnBackupMobile = document.getElementById("btnBackupMobile");
   if (btnBackupMobile) btnBackupMobile.onclick = openBackupModal;
   const btnBackupDesktop = document.getElementById("btnBackupDesktop");
   if (btnBackupDesktop) btnBackupDesktop.onclick = openBackupModal;
-  
   const btnMenuLogs = document.getElementById("btnMenuLogs");
   if (btnMenuLogs) btnMenuLogs.onclick = exportAllLogs;
   const btnMenuExport = document.getElementById("btnMenuExport");
   if (btnMenuExport) btnMenuExport.onclick = () => showPicker("export");
   const btnMenuImport = document.getElementById("btnMenuImport");
   if (btnMenuImport) btnMenuImport.onclick = () => showPicker("import");
-  
   const btnBackupNewFolder = document.getElementById("btnBackupNewFolder");
   if (btnBackupNewFolder) btnBackupNewFolder.onclick = createNewFolder;
-
   document.getElementById("btnSaveSettings").onclick = async () => {
     state.currentSettings.autoTheme = document.getElementById("autoThemeToggle").checked;
     state.currentSettings.syncPlugin = document.getElementById("pluginSyncToggle").checked;
@@ -423,7 +419,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     closeModalCleanup();
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
-
   document.getElementById("btnMonitorIgnore").onclick = async () => {
     const content = await run(`cat ${CONST.MONITOR_IGNORE_CONF} 2>/dev/null`);
     document.getElementById("monitorIgnoreContent").value = content;
@@ -441,7 +436,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       closeModalCleanup();
     } catch { showToast.error("保存失败"); }
   };
-
   setupModeToggle("globalModeToggle", "globalVisual", "globalRaw", "globalRuleContent",
     (val) => parseConfigTextToVisual(val, "globalRuleBuilderContainer", "globalMonitorSelect", "globalSandboxSelect", "globalInjectSelect"),
     () => generateConfigTextFromVisual("globalRuleBuilderContainer", "globalMonitorSelect", "globalSandboxSelect", "globalInjectSelect")
@@ -451,22 +445,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     () => generateConfigTextFromVisual("appRuleBuilderContainer", "appMonitorSelect", "appSandboxSelect", null)
   );
   setupModeToggle("ignoreModeToggle", "ignoreVisual", "ignoreRaw", "monitorIgnoreContent", parseIgnoreToVisual, generateIgnoreFromVisual);
-  
   setupGlobalHandlers();
   document.getElementById("btnAppAddRule").onclick = () => addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
   document.getElementById("btnCloseAppModal").onclick = closeModalCleanup;
   document.querySelectorAll(".mx-btn-close").forEach(btn => btn.onclick = () => closeModalCleanup());
-
   document.getElementById("btnSaveAppConfig").onclick = async () => {
     try {
       const isVisual = document.querySelector('button[name="appModeToggle"][data-mode="visual"]')?.classList.contains("active");
       const text = isVisual ? generateConfigTextFromVisual("appRuleBuilderContainer", "appMonitorSelect", "appSandboxSelect", null) : document.getElementById("appRuleContent").value;
       const isEnabled = document.getElementById("appEnableToggle").checked;
       const exactKey = `${state.currentBindingPkg}:${state.currentBindingUser}`;
-      
       if (!isEnabled) state.injectorStates.set(exactKey, "OFF");
       else state.injectorStates.set(exactKey, "ON");
-      
       const dir = state.currentBindingUser === 0 ? `${CONST.BASE_DIR}/App-rules` : `${CONST.BASE_DIR}/App-rules-${state.currentBindingUser}`;
       await run(`mkdir -p ${dir}`);
       const escaped = text.trim().replace(/'/g, "'\\''");
@@ -484,7 +474,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     } catch { showToast.error("保存失败"); }
   };
-
   document.getElementById("btnDeleteAppConfig").onclick = async () => {
     if (!confirm("确定清除配置吗?")) return;
     const dir = state.currentBindingUser === 0 ? `${CONST.BASE_DIR}/App-rules` : `${CONST.BASE_DIR}/App-rules-${state.currentBindingUser}`;
@@ -496,7 +485,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     showToast.success("配置已清除");
   };
-
   const originalOpenAppConfig = window.openAppConfig;
   window.openAppConfig = (pkg) => {
     stopPolling();
@@ -506,7 +494,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("appConfigSubpage")?.classList.add("open");
     originalOpenAppConfig(pkg);
   };
-
   initIoLogs();
   initSysLogs();
   loadData();

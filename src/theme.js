@@ -4,8 +4,20 @@ import { saveSettings } from "./plugin.js";
 
 export const applyTheme = (isDark) => {
   state.isDarkMode = isDark;
-  document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
-  
+
+  // 显式设置过渡，强制浏览器对 data-theme 切换进行动态动画
+  const doc = document.documentElement;
+  doc.style.transition = 'background-color 0.5s ease';
+  document.body.style.transition = 'background-color 0.5s ease, color 0.5s ease';
+
+  doc.setAttribute("data-theme", isDark ? "dark" : "light");
+
+  // 过渡结束后清理行内样式，恢复 CSS 类管理
+  setTimeout(() => {
+    doc.style.transition = '';
+    document.body.style.transition = '';
+  }, 550);
+
   // 动态修改状态栏颜色 Meta 标签，实现全屏沉浸
   const metaThemeColor = document.getElementById("themeColorMeta");
   if (metaThemeColor) {

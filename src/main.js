@@ -358,8 +358,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     const isInstalled = await checkPluginInstalled();
     const lbl = document.getElementById("pluginStatusLabel");
     if (lbl) {
-      lbl.textContent = isInstalled ? "状态: 发现清理插件 (已就绪)" : "状态: 未发现清理插件";
-      lbl.style.color = isInstalled ? "var(--mx-green)" : "var(--mx-red)";
+      if (isInstalled) {
+        lbl.textContent = "状态: 发现清理插件 (已就绪)";
+        lbl.style.color = "var(--mx-green)";
+        lbl.style.display = "";
+        lbl.style.justifyContent = "";
+        lbl.style.alignItems = "";
+      } else {
+        lbl.innerHTML = "";
+        lbl.style.display = "flex";
+        lbl.style.justifyContent = "space-between";
+        lbl.style.alignItems = "center";
+        lbl.style.color = "";
+        const span = document.createElement("span");
+        span.textContent = "状态: 未发现清理插件";
+        span.style.color = "var(--mx-red)";
+        const a = document.createElement("a");
+        a.textContent = "去下载";
+        a.style.cssText = "margin-left:auto;color:var(--mx-primary);text-decoration:none;font-size:11px;cursor:pointer;";
+        a.onclick = () => { run('am start -a android.intent.action.VIEW -d "https://wwbti.lanzoue.com/i3K1v3ofox5a"'); };
+        lbl.appendChild(span);
+        lbl.appendChild(a);
+      }
     }
     document.getElementById("settingsModal")?.classList.add("open");
   };

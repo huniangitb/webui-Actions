@@ -241,14 +241,20 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
 .mx-subpage-header-title { flex: 1; min-width: 0; }
 .mx-subpage-header-title h3 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mx-subpage-header-title span { font-size: 11px; color: var(--mx-t2); font-family: var(--mx-font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+
 .mx-subpage-body {
     flex: 1; overflow-y: auto; overscroll-behavior-y: contain; background: var(--mx-bg);
     padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(16px + env(safe-area-inset-right));
     padding-top: 16px; padding-bottom: 16px;
-    transition: padding-bottom 0.1s var(--mx-ease);
+    transition: padding-bottom 0.28s cubic-bezier(0.1, 0.9, 0.2, 1);
+    will-change: padding-bottom;
 }
-body.keyboard-open .mx-subpage-body { padding-bottom: calc(var(--keyboard-h, 0px) + 30px) !important; }
-body.keyboard-open .editor-scroll { padding-bottom: calc(var(--keyboard-h, 0px) + 30px) !important; }
+
+body.keyboard-open .mx-subpage-body,
+body.keyboard-open .overflow-y-auto { 
+    padding-bottom: calc(var(--keyboard-h, 0px) + 30px) !important; 
+}
+
 .mx-subpage-footer {
     padding-bottom: calc(16px + env(safe-area-inset-bottom)); padding-top: 16px;
     padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(16px + env(safe-area-inset-right));
@@ -301,7 +307,11 @@ body.keyboard-open .editor-scroll { padding-bottom: calc(var(--keyboard-h, 0px) 
 .rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .mx-input-wrapper { position: relative; width: 100%; min-width: 0; }
 .btn-del { width: 32px !important; height: 32px !important; flex-shrink: 0; }
-body.keyboard-open:not(.modal-open) .overflow-y-auto.editor-scroll { max-height: calc(100% - var(--keyboard-h, 0px)); }
+
+body.keyboard-open:not(.modal-open) .overflow-y-auto { 
+    max-height: calc(100% - var(--keyboard-h, 0px)); 
+}
+
 .editor-scroll { position: relative; }
 .mx-spinner-container { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 60px 20px; height: 100%; width: 100%; gap: 16px; }
 .mx-spinner { width: 36px; height: 36px; border: 3px solid var(--mx-s3); border-top-color: var(--mx-primary); border-radius: 50%; animation: mx-spin 0.85s cubic-bezier(0.4, 0, 0.2, 1) infinite; }

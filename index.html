@@ -17,6 +17,7 @@
             </div>
             <div class="mx-topbar-right">
                 <span class="mx-badge mx-badge-gray" id="statusBadgeMobile">...</span>
+                <button class="mx-btn-icon" id="btnBackupMobile" title="备份与恢复"></button>
                 <button class="mx-btn-icon mx-theme-toggle" id="btnThemeToggleMobile"></button>
                 <button class="mx-btn-icon" id="btnSettingsMobile"></button>
                 <button class="mx-btn-icon" id="btnToggleStatusMobile"></button>
@@ -39,6 +40,9 @@
             </div>
             <div class="mx-nav-item" data-section="log">
                 <span class="nav-icon" id="navIconLog"></span><span class="mx-nav-label">日志</span>
+            </div>
+            <div class="mx-nav-item" id="btnBackupDesktop">
+                <span class="nav-icon" id="navIconBackup"></span><span class="mx-nav-label">备份恢复</span>
             </div>
             <div class="mx-sidebar-bottom">
                 <div class="status-panel">
@@ -322,6 +326,40 @@
             </div>
             <div class="mx-modal-foot">
                 <button class="mx-btn mx-btn-primary w-full" id="btnSaveSettings">保存并应用</button>
+            </div>
+        </div>
+    </div>
+    <div class="mx-modal-overlay" id="backupModal">
+        <div class="mx-modal large" style="margin-top: env(safe-area-inset-top);">
+            <div class="mx-modal-head">
+                <div>
+                    <span class="mx-modal-title">数据备份与恢复</span>
+                    <div class="text-muted" style="font-size:11px;">管理系统配置与运行日志</div>
+                </div>
+                <button class="mx-btn-close"></button>
+            </div>
+            <div class="mx-modal-body p-0 flex-col-full overflow-hidden">
+                <div class="p-4 flex-col gap-3" style="border-bottom: 1px solid var(--mx-border); background: var(--mx-s1);">
+                    <div style="font-weight:600; font-size:13px; color:var(--mx-t1);">运行日志一键备份</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="text-muted" style="font-size:11px;">将系统运行记录与 Zygisk 注入日志打包保存至内部存储。</span>
+                        <button class="mx-btn mx-btn-primary mx-btn-sm" id="btnOneClickLogs">一键打包日志</button>
+                    </div>
+                </div>
+                <div class="flex-col-full overflow-hidden flex-col">
+                    <div class="p-3" style="display:flex; justify-content:space-between; align-items:center; background: var(--mx-s2); border-bottom:1px solid var(--mx-border);">
+                        <div id="backupBreadcrumbs" class="text-truncate" style="font-size:12px; font-family:var(--mx-font-mono); font-weight:600; color:var(--mx-primary); flex:1; margin-right:8px;">/storage/emulated/0</div>
+                        <button class="mx-btn mx-btn-secondary mx-btn-sm" style="padding:4px 8px; font-size:11px;" id="btnBackupNewFolder">新建文件夹</button>
+                    </div>
+                    <div id="backupFileList" class="flex-grow overflow-y-auto p-2" style="background: var(--mx-bg);"></div>
+                </div>
+            </div>
+            <div class="mx-modal-foot flex-col gap-2" style="background: var(--mx-s1);">
+                <div style="display:flex; gap:10px; width:100%;">
+                    <input type="text" id="backupFileNameInput" class="mx-input" style="flex:1; background:var(--mx-s3); border-radius:8px; font-size:12px; padding:6px 10px;" placeholder="备份文件名 (如: config.tar)" />
+                    <button class="mx-btn mx-btn-primary" id="btnExportConfig" style="font-size:12px; padding:6px 12px;">导出配置</button>
+                    <button class="mx-btn mx-btn-secondary" id="btnImportConfig" style="font-size:12px; padding:6px 12px;" disabled>恢复所选配置</button>
+                </div>
             </div>
         </div>
     </div>

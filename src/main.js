@@ -6,19 +6,17 @@ import { loadData, renderAppList, updateAppListStatus, flushInjectorConf, fetchI
 import { setupGlobalHandlers } from "./global.js";
 import { initIoLogs, initSysLogs, fetchIoLogs, fetchSysLogs, resetIoLogs, clearIoLogs, resetSysLogs, clearSysLogs } from "./logs.js";
 import { getSettings, saveSettings, checkPluginInstalled, syncToPlugin } from "./plugin.js";
+import { openBackupModal, exportAllLogs, backupConfig, restoreConfig, createNewFolder } from "./backup.js";
 import { enableEdgeToEdge } from "kernelsu";
 import "../style.css";
-
 const lockInitialHeight = () => {
   const initialH = window.innerHeight;
   document.documentElement.style.setProperty('--initial-vh', `${initialH}px`);
 };
 lockInitialHeight();
 window.addEventListener("orientationchange", () => setTimeout(lockInitialHeight, 200));
-
 let statusPolling = null;
 let appStatusPolling = null;
-
 export const startPolling = () => {
   if (!statusPolling) {
     checkStatus();
@@ -29,7 +27,6 @@ export const startPolling = () => {
     appStatusPolling = setInterval(refreshAppStatus, 2000);
   }
 };
-
 export const stopPolling = () => {
   if (statusPolling) {
     clearInterval(statusPolling);
@@ -40,7 +37,6 @@ export const stopPolling = () => {
     appStatusPolling = null;
   }
 };
-
 const checkStatus = async () => {
   if (document.querySelector(".mx-app")?.classList.contains("frozen")) return;
   try {
@@ -65,7 +61,6 @@ const checkStatus = async () => {
     if (info) info.textContent = state.currentPid ? `PID ${state.currentPid}` : "OFFLINE";
   } catch {}
 };
-
 const toggleStatus = async () => {
   if (state.currentPid) {
     await run(`kill -15 ${state.currentPid}`);
@@ -77,7 +72,6 @@ const toggleStatus = async () => {
   }
   setTimeout(checkStatus, 500);
 };
-
 const refreshAppStatus = async () => {
   if (document.querySelector(".mx-app")?.classList.contains("frozen")) return;
   try {
@@ -88,7 +82,6 @@ const refreshAppStatus = async () => {
     }
   } catch {}
 };
-
 const parseIgnoreToVisual = (t) => {
   const c = document.getElementById("ignoreBuilderContainer");
   if (!c) return;
@@ -100,7 +93,6 @@ const parseIgnoreToVisual = (t) => {
     });
   if (c.children.length === 0) addIgnoreRow("");
 };
-
 const generateIgnoreFromVisual = () => {
   let r = "";
   document.querySelectorAll("#ignoreBuilderContainer input").forEach((i) => {
@@ -109,7 +101,6 @@ const generateIgnoreFromVisual = () => {
   });
   return r.trim();
 };
-
 const addIgnoreRow = (p) => {
   const div = document.createElement("div");
   div.className = "rule-row flex-shrink-0";
@@ -120,7 +111,6 @@ const addIgnoreRow = (p) => {
   div.querySelector(".btn-del").onclick = () => div.remove();
   document.getElementById("ignoreBuilderContainer")?.appendChild(div);
 };
-
 const switchSection = (sectionId) => {
   document.querySelectorAll(".demo-section").forEach((el) => el.classList.remove("active"));
   document.getElementById(`sec-${sectionId}`)?.classList.add("active");
@@ -140,19 +130,17 @@ const switchSection = (sectionId) => {
     fetchSysLogs();
   }
 };
-
 const closeModalCleanup = () => {
   if (history.state && history.state.modalOpen) {
-    history.back(); // 优先触发 popstate
+    history.back();
   } else {
-    // 兜底同步关闭动画逻辑
     const appConfig = document.getElementById("appConfigSubpage");
     if (appConfig && appConfig.classList.contains("open")) {
       appConfig.classList.remove("open");
       appConfig.classList.add("closing");
       setTimeout(() => {
         appConfig.classList.remove("closing");
-      }, 220); // 确保与向右滑出 CSS transition 完美重合
+      }, 220);
     }
     document.querySelector(".mx-app").classList.remove("frozen");
     document.body.classList.remove("modal-open");
@@ -162,7 +150,6 @@ const closeModalCleanup = () => {
     window._currentInput = null;
   }
 };
-
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     enableEdgeToEdge(true);
@@ -170,9 +157,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.warn("enableEdgeToEdge not available:", err);
   }
   initIcons();
-
   window.addEventListener("popstate", () => {
-    // 处理应用配置页面关闭的向右推出的过渡动画
     const appConfig = document.getElementById("appConfigSubpage");
     if (appConfig && appConfig.classList.contains("open")) {
       appConfig.classList.remove("open");
@@ -180,7 +165,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => {
         appConfig.classList.remove("closing");
       }, 220);
-
       document.querySelector(".mx-app").classList.remove("frozen");
       document.body.classList.remove("modal-open", "keyboard-open");
       document.documentElement.style.setProperty('--keyboard-h', '0px');
@@ -191,7 +175,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       el.classList.remove("open");
     });
   });
-
   const ro = new ResizeObserver(() => {
     if (document.body.classList.contains("keyboard-open") && window._currentInput && document.activeElement === window._currentInput) {
        import("./ui.js").then(({ centerActiveInput }) => {
@@ -200,7 +183,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
   document.querySelectorAll('.mx-subpage-body, .overflow-y-auto').forEach(el => ro.observe(el));
-
   if (navigator.virtualKeyboard) {
     navigator.virtualKeyboard.overlaysContent = true;
     navigator.virtualKeyboard.addEventListener("geometrychange", (e) => {
@@ -241,7 +223,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.addEventListener("resize", updateViewportHeight);
     updateViewportHeight();
   }
-
   document.addEventListener("touchstart", () => {
     state.isUserTouching = true;
   }, { passive: true });
@@ -251,7 +232,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.addEventListener("touchcancel", () => {
     state.isUserTouching = false;
   }, { passive: true });
-
   window.addEventListener("scroll", (e) => {
     if (state.isUserTouching) {
       const box = document.getElementById("suggestionBox");
@@ -264,7 +244,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.scrollTo(0, 0);
     }
   }, true);
-
   document.addEventListener("click", (e) => {
     const box = document.getElementById("suggestionBox");
     if (box && box.classList.contains("open")) {
@@ -285,7 +264,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }, 150);
   });
-
   state.currentSettings = await getSettings();
   document.getElementById("autoThemeToggle").checked = state.currentSettings.autoTheme;
   document.getElementById("pluginSyncToggle").checked = state.currentSettings.syncPlugin;
@@ -296,14 +274,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   } else {
     applyTheme(state.isDarkMode);
   }
-
   document.getElementById("btnThemeToggleMobile").onclick = handleManualThemeToggle;
   document.getElementById("btnThemeToggleDesktop").onclick = handleManualThemeToggle;
-
   document.querySelectorAll(".mx-nav-item, .mx-btm-item").forEach((btn) => {
-    btn.onclick = () => switchSection(btn.dataset.section);
+    if (btn.id !== "btnBackupDesktop") {
+      btn.onclick = () => switchSection(btn.dataset.section);
+    }
   });
-
   document.querySelectorAll("#appFilterGroup button").forEach((btn) => {
     btn.onclick = () => {
       document.querySelectorAll("#appFilterGroup button").forEach((b) => b.classList.remove("active"));
@@ -312,9 +289,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderAppList();
     };
   });
-
   document.getElementById("appSearch")?.addEventListener("input", debounce(renderAppList, 250));
-
   const ioContainer = document.getElementById("ioLogContainer");
   const ioSearch = document.getElementById("ioSearch");
   if (ioSearch) {
@@ -334,17 +309,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   document.getElementById("btnClearIo").onclick = clearIoLogs;
-
   const logSelect = document.getElementById("logSourceSelect");
   const logLevelSelect = document.getElementById("logLevelSelect");
   const logViewer = document.getElementById("logViewer");
-  
   const savedLogLevel = localStorage.getItem("sysLogLevel");
   if (savedLogLevel) {
     state.sysState.level = parseInt(savedLogLevel);
     if (logLevelSelect) logLevelSelect.value = savedLogLevel;
   }
-  
   if (logSelect) {
     logSelect.addEventListener("change", () => {
       if (logSelect.value === "internal") resetSysLogs();
@@ -371,7 +343,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnClearLog").onclick = clearSysLogs;
   document.getElementById("btnToggleStatusMobile").onclick = toggleStatus;
   document.getElementById("btnToggleStatusDesktop").onclick = toggleStatus;
-
   const openSettings = async () => {
     history.pushState({ modalOpen: true }, "");
     const isInstalled = await checkPluginInstalled();
@@ -384,6 +355,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
   document.getElementById("btnSettingsMobile").onclick = openSettings;
   document.getElementById("btnSettingsDesktop").onclick = openSettings;
+  
+  const btnBackupMobile = document.getElementById("btnBackupMobile");
+  if (btnBackupMobile) btnBackupMobile.onclick = openBackupModal;
+  const btnBackupDesktop = document.getElementById("btnBackupDesktop");
+  if (btnBackupDesktop) btnBackupDesktop.onclick = openBackupModal;
+  const btnOneClickLogs = document.getElementById("btnOneClickLogs");
+  if (btnOneClickLogs) btnOneClickLogs.onclick = exportAllLogs;
+  const btnExportConfig = document.getElementById("btnExportConfig");
+  if (btnExportConfig) btnExportConfig.onclick = backupConfig;
+  const btnImportConfig = document.getElementById("btnImportConfig");
+  if (btnImportConfig) btnImportConfig.onclick = restoreConfig;
+  const btnBackupNewFolder = document.getElementById("btnBackupNewFolder");
+  if (btnBackupNewFolder) btnBackupNewFolder.onclick = createNewFolder;
 
   document.getElementById("btnSaveSettings").onclick = async () => {
     state.currentSettings.autoTheme = document.getElementById("autoThemeToggle").checked;
@@ -397,7 +381,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     closeModalCleanup();
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
-
   document.getElementById("btnMonitorIgnore").onclick = async () => {
     const content = await run(`cat ${CONST.MONITOR_IGNORE_CONF} 2>/dev/null`);
     document.getElementById("monitorIgnoreContent").value = content;
@@ -421,7 +404,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("保存失败");
     }
   };
-
   setupModeToggle(
     "globalModeToggle",
     "globalVisual",
@@ -450,16 +432,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     parseIgnoreToVisual,
     generateIgnoreFromVisual
   );
-
   setupGlobalHandlers();
   document.getElementById("btnAppAddRule").onclick = () =>
     addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
-    
   document.getElementById("btnCloseAppModal").onclick = closeModalCleanup;
   document.querySelectorAll(".mx-btn-close").forEach(btn => {
     btn.onclick = () => closeModalCleanup();
   });
-
   document.getElementById("btnSaveAppConfig").onclick = async () => {
     try {
       const isVisual = document
@@ -494,7 +473,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("保存失败");
     }
   };
-
   document.getElementById("btnDeleteAppConfig").onclick = async () => {
     if (!confirm("确定清除配置吗?")) return;
     const dir =
@@ -509,7 +487,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     showToast("配置已清除");
   };
-
   const originalOpenAppConfig = window.openAppConfig;
   window.openAppConfig = (pkg) => {
     stopPolling();
@@ -519,7 +496,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("appConfigSubpage")?.classList.add("open");
     originalOpenAppConfig(pkg);
   };
-
   initIoLogs();
   initSysLogs();
   loadData();

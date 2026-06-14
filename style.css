@@ -417,3 +417,36 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 .mx-anim-card-in { animation: cardIn 0.4s var(--mx-ease) both; animation-delay: 0.1s; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes cardIn { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+.backup-file-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s var(--mx-ease);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+.backup-file-row:hover {
+    background: var(--mx-s3);
+}
+.backup-file-row.selected {
+    background: rgba(39, 122, 247, 0.15);
+    border-left: 3px solid var(--mx-primary);
+    border-radius: 4px 8px 8px 4px;
+}
+.backup-file-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--mx-t2);
+}
+.backup-file-row.selected .backup-file-icon {
+    color: var(--mx-primary);
+}
+.backup-file-name {
+    font-size: 13px;
+    color: var(--mx-t1);
+    flex: 1;
+}

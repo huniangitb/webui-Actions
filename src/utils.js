@@ -17,10 +17,10 @@ import {
   mdiEyeOffOutline,
   mdiDeleteSweepOutline,
   mdiClockOutline,
+  mdiBackupRestore,
 } from "@mdi/js";
 import { exec, toast as ksuToast } from "kernelsu";
 import { state, CONST } from "./state.js";
-
 export const run = async (cmd) => {
   try {
     const res = await exec(cmd);
@@ -29,7 +29,6 @@ export const run = async (cmd) => {
     return "";
   }
 };
-
 export const debounce = (func, wait) => {
   let timeout;
   return function (...args) {
@@ -37,7 +36,6 @@ export const debounce = (func, wait) => {
     timeout = setTimeout(() => func.apply(this, args), wait);
   };
 };
-
 export const showToast = (msg) => {
   try {
     ksuToast(msg);
@@ -68,10 +66,8 @@ export const showToast = (msg) => {
     animOut.onfinish = () => t.remove();
   }, 2500);
 };
-
 const getSvg = (path, size = 24, color = "currentColor") =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="${size}" height="${size}"><path d="${path}" fill="${color}" stroke="none"/></svg>`;
-
 export const ICONS = {
   APPS: getSvg(mdiViewGridOutline),
   GLOBAL: getSvg(mdiWrench),
@@ -91,8 +87,8 @@ export const ICONS = {
   IGNORE: getSvg(mdiEyeOffOutline),
   SWEEP: getSvg(mdiDeleteSweepOutline),
   CLOCK: getSvg(mdiClockOutline, 14, "var(--mx-t2)"),
+  BACKUP: getSvg(mdiBackupRestore),
 };
-
 export const updateThemeIcons = () => {
   const icon = state.isDarkMode ? ICONS.SUN : ICONS.MOON;
   const mobile = document.getElementById("btnThemeToggleMobile");
@@ -100,7 +96,6 @@ export const updateThemeIcons = () => {
   if (mobile) mobile.innerHTML = icon;
   if (desktop) desktop.innerHTML = icon;
 };
-
 export const initIcons = () => {
   const byId = (id) => document.getElementById(id);
   byId("logoIconMobile").innerHTML = ICONS.APPS;
@@ -118,6 +113,11 @@ export const initIcons = () => {
   byId("btnSettingsMobile").innerHTML = ICONS.COG;
   byId("btnSettingsDesktop").innerHTML = ICONS.COG;
   
+  const btnBackupMobile = byId("btnBackupMobile");
+  if (btnBackupMobile) btnBackupMobile.innerHTML = ICONS.BACKUP;
+  const navIconBackup = byId("navIconBackup");
+  if (navIconBackup) navIconBackup.innerHTML = ICONS.BACKUP;
+
   const btnGlobalAdd = document.getElementById("btnGlobalAddRule");
   if (btnGlobalAdd) btnGlobalAdd.innerHTML = `${ICONS.PLUS} 添加规则`;
   const btnAppAdd = document.getElementById("btnAppAddRule");
@@ -128,13 +128,10 @@ export const initIcons = () => {
   if (btnMonitor) btnMonitor.innerHTML = ICONS.IGNORE;
   const btnClear = document.getElementById("btnClearIo");
   if (btnClear) btnClear.innerHTML = ICONS.SWEEP;
-
-  // 自动注入 X 号关闭图标
   document.querySelectorAll(".mx-btn-close").forEach(btn => {
     btn.innerHTML = ICONS.CLOSE;
   });
 };
-
 export const normalizeToDisplay = (path) => {
   if (!path) return "";
   if (path.startsWith(CONST.PATH_PREFIX_REAL))
@@ -143,7 +140,6 @@ export const normalizeToDisplay = (path) => {
     return path.substring(CONST.PATH_PREFIX_STORAGE.length) || "/";
   return path;
 };
-
 export const normalizeToConfig = (path, isTarget) => {
   if (!path) return "";
   path = path.trim();

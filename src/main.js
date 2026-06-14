@@ -365,7 +365,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
   document.getElementById("btnSettingsMobile").onclick = openSettings;
   document.getElementById("btnSettingsDesktop").onclick = openSettings;
-  
+
+  const openAboutModal = () => {
+    history.pushState({ modalOpen: true }, "");
+    document.getElementById("aboutModal")?.classList.add("open");
+  };
+  document.getElementById("logoIconMobile")?.addEventListener("click", openAboutModal);
+  document.getElementById("logoIconDesktop")?.addEventListener("click", openAboutModal);
+  document.getElementById("btnJoinQQGroup")?.addEventListener("click", async () => {
+    await run('am start -a android.intent.action.VIEW -d "mqqapi://card/show_pslcard?src_type=internal&version=1&card_type=group&uin=1093864387"');
+  });
+
   const btnBackupMobile = document.getElementById("btnBackupMobile");
   if (btnBackupMobile) btnBackupMobile.onclick = openBackupModal;
   const btnBackupDesktop = document.getElementById("btnBackupDesktop");

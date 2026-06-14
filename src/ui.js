@@ -39,7 +39,14 @@ export const addRuleRow = (type, target, source, containerId) => {
 
 export const parseConfigTextToVisual = (text, containerId, monitorSelectId, sandboxSelectId, injectSelectId) => {
   const container = document.getElementById(containerId);
-  if (container) container.innerHTML = "";
+  if (container) {
+    // 核心安全拯救：在清空旧节点前，如果自动补全面板在里面，先将其移回 body 避免被一同销毁
+    const box = document.getElementById("suggestionBox");
+    if (box && container.contains(box)) {
+      document.body.appendChild(box);
+    }
+    container.innerHTML = "";
+  }
   const selMonitor = document.getElementById(monitorSelectId);
   if (selMonitor) selMonitor.value = "";
   const selSandbox = document.getElementById(sandboxSelectId);
@@ -175,8 +182,15 @@ export const debouncedCenterActive = debounce((input) => {
 
 const setupAutocomplete = (input) => {
   if (!input) return;
-  const box = document.getElementById("suggestionBox");
-  if (!box) return;
+  
+  // 核心安全重建：如果发现面板被意外销毁，在这里立即原地重新初始化，保证每次使用都可用
+  let box = document.getElementById("suggestionBox");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "suggestionBox";
+    box.className = "suggestion-box";
+    document.body.appendChild(box);
+  }
   
   input.addEventListener(
     "input",
@@ -292,8 +306,12 @@ const setupAutocomplete = (input) => {
     setTimeout(() => {
       const activeEl = document.activeElement;
       if (!activeEl || !activeEl.classList.contains("mx-input")) {
-        box.classList.remove("open");
-        state.currentSuggestions = [];
+        // 如果面板还在，安全地移回 body
+        const suggestionBox = document.getElementById("suggestionBox");
+        if (suggestionBox) {
+          suggestionBox.classList.remove("open");
+          state.currentSuggestions = [];
+        }
       }
     }, 150);
   });

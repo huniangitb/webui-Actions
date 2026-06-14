@@ -169,7 +169,6 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
 
 .mx-card { background: var(--mx-s2); border-radius: var(--mx-radius); border: 1px solid var(--mx-border); box-shadow: var(--mx-shadow); display: flex; flex-direction: column; overflow: hidden; transform: translateZ(0); container-type: inline-size; }
 
-/* 移除了内部圆角渲染，使其完美贴合父容器边缘 */
 .mx-modal-body { background: var(--mx-s2); border-radius: 0; display: flex; flex-direction: column; overflow: hidden; transform: translateZ(0); container-type: inline-size; }
 
 @container (max-width: 440px) { .grid-2 { grid-template-columns: 1fr; } }
@@ -231,12 +230,48 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav { transform: translateY(calc(
 }
 .mx-modal.large { max-width: 800px; height: 85%; }
 .mx-modal-overlay.open .mx-modal { transform: scale(1) translate3d(0, 0, 0); opacity: 1; }
+
 .mx-subpage-container {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
     background: var(--mx-bg); color: var(--mx-t1); z-index: 1500;
-    display: none; flex-direction: column; box-sizing: border-box; view-transition-name: app-subpage;
+    display: none; flex-direction: column; box-sizing: border-box;
 }
-.mx-subpage-container.open { display: flex; }
+
+/* 子页面呼出推入动效 */
+.mx-subpage-container.open {
+    display: flex;
+    animation: subpageOpen 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 子页面退回弹出动效 */
+.mx-subpage-container.closing {
+    display: flex;
+    pointer-events: none;
+    animation: subpageClose 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes subpageOpen {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 48px, 0) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
+@keyframes subpageClose {
+    from {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translate3d(0, 48px, 0) scale(0.97);
+    }
+}
+
 .mx-subpage-header {
     padding-top: calc(12px + env(safe-area-inset-top)); padding-bottom: 12px;
     padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(16px + env(safe-area-inset-right));
@@ -276,10 +311,6 @@ body.keyboard-open .overflow-y-auto {
     .mx-subpage-container { left: 240px; width: calc(100vw - 240px); border-left: 1px solid var(--mx-border); }
     .mx-subpage-header { padding-top: calc(16px + env(safe-area-inset-top)); }
 }
-::view-transition-old(app-subpage) { animation: 200ms cubic-bezier(0.4, 0, 0.2, 1) both fade-out, 200ms cubic-bezier(0.4, 0, 1, 1) both slide-to-right; }
-::view-transition-new(app-subpage) { animation: 250ms cubic-bezier(0, 0, 0.2, 1) both fade-in, 250ms cubic-bezier(0.1, 0.9, 0.2, 1) both slide-from-right; }
-@keyframes slide-from-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
-@keyframes slide-to-right { from { transform: translateX(0); } to { transform: translateX(100%); } }
 
 .mx-modal-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mx-border); flex-shrink: 0;}
 .mx-modal-title { font-size: 18px; font-weight: 700; margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }

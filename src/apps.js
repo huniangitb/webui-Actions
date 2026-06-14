@@ -243,7 +243,7 @@ export const loadData = async () => {
       }
     }
     state.usingFallback = usedFallback;
-    if (usedFallback) showToast("应用列表为空，已回退至兼容模式");
+    if (usedFallback) showToast.warning("应用列表为空，已回退至兼容模式");
     requestAnimationFrame(() => {
         renderAppList();
         renderGlobalRules();
@@ -259,7 +259,7 @@ export const loadData = async () => {
         }
     });
   } catch (e) {
-    showToast("加载异常: " + e.message);
+    showToast.error("加载异常: " + e.message);
   }
 };
 

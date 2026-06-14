@@ -13,10 +13,9 @@ export function openBackupModal() {
   history.pushState({ modalOpen: true }, "");
   document.querySelector(".mx-app").classList.add("frozen");
   document.getElementById("backupModal")?.classList.add("open");
-  
+
   document.getElementById("backupMainMenu").classList.remove("hidden");
   document.getElementById("backupPickerPanel").classList.add("hidden");
-  document.getElementById("btnBackupBack").classList.add("hidden");
   document.getElementById("backupModalTitle").textContent = "数据备份与恢复";
 }
 
@@ -24,7 +23,6 @@ export function showPicker(mode) {
   pickerMode = mode;
   document.getElementById("backupMainMenu").classList.add("hidden");
   document.getElementById("backupPickerPanel").classList.remove("hidden");
-  document.getElementById("btnBackupBack").classList.remove("hidden");
   document.getElementById("backupModalTitle").textContent = mode === "export" ? "选择导出目录" : "选择恢复文件";
   
   const actionRow = document.getElementById("backupFileActionRow");
@@ -131,7 +129,7 @@ function renderFileRow(file) {
 }
 
 export async function exportAllLogs() {
-  showToast("正在打包日志...");
+  showToast.info("正在打包日志...");
   try {
     const timestamp = new Date().toISOString().replace(/[-T:]/g, "").split(".")[0];
     const targetPath = `/storage/emulated/0/nsproxy_logs_${timestamp}.tar`;
@@ -153,12 +151,12 @@ export async function exportAllLogs() {
 
     const res = await exec(script);
     if (res.stdout.includes("SUCCESS")) {
-      showToast(`日志打包成功: ${targetPath}`);
+      showToast.success(`日志打包成功: ${targetPath}`);
     } else {
-      showToast("日志导出失败");
+      showToast.error("日志导出失败");
     }
   } catch (e) {
-    showToast(`导出日志发生异常: ${e.message}`);
+    showToast.error(`导出日志发生异常: ${e.message}`);
   }
 }
 
@@ -166,7 +164,7 @@ export async function backupConfig() {
   const nameInput = document.getElementById("backupFileNameInput");
   const name = nameInput ? nameInput.value.trim() : "";
   if (!name) {
-    showToast("请输入备份文件名");
+    showToast.warning("请输入备份文件名");
     return;
   }
   const targetTar = `${currentPath}/${name.endsWith(".tar") ? name : name + ".tar"}`;
@@ -174,19 +172,21 @@ export async function backupConfig() {
     const cmd = `cd ${CONST.BASE_DIR} && tar -cvf "${targetTar}" injector.conf monitor_ignore.conf list.config webui_settings.json App-rules App-rules-* 2>/dev/null; test -f "${targetTar}" && echo "SUCCESS"`;
     const res = await exec(cmd);
     if (res.stdout.includes("SUCCESS")) {
-      showToast(`备份成功: ${targetTar}`);
-      document.getElementById("btnBackupBack").click();
+      showToast.success(`备份成功: ${targetTar}`);
+      document.getElementById("backupPickerPanel").classList.add("hidden");
+      document.getElementById("backupMainMenu").classList.remove("hidden");
+      document.getElementById("backupModalTitle").textContent = "数据备份与恢复";
     } else {
-      showToast("备份配置失败");
+      showToast.error("备份配置失败");
     }
   } catch (e) {
-    showToast(`备份发生异常: ${e.message}`);
+    showToast.error(`备份发生异常: ${e.message}`);
   }
 }
 
 export async function restoreConfig() {
   if (!selectedFile) {
-    showToast("请先选择备份文件 (.tar)");
+    showToast.warning("请先选择备份文件 (.tar)");
     return;
   }
   if (!confirm(`确定要恢复该配置吗? 这将覆盖当前所有配置。`)) return;
@@ -194,14 +194,14 @@ export async function restoreConfig() {
     const cmd = `tar -xvf "${selectedFile}" -C ${CONST.BASE_DIR}/ && chmod -R 755 ${CONST.BASE_DIR}; echo "SUCCESS"`;
     const res = await exec(cmd);
     if (res.stdout.includes("SUCCESS")) {
-      showToast("配置恢复成功");
+      showToast.success("配置恢复成功");
       await loadData();
       closeModalCleanup();
     } else {
-      showToast("恢复配置失败");
+      showToast.error("恢复配置失败");
     }
   } catch (e) {
-    showToast(`恢复配置异常: ${e.message}`);
+    showToast.error(`恢复配置异常: ${e.message}`);
   }
 }
 
@@ -211,12 +211,12 @@ export async function createNewFolder() {
   try {
     const res = await exec(`mkdir -p "${currentPath}/${folderName.trim()}"`);
     if (res.errno === 0) {
-      showToast("新建文件夹成功");
+      showToast.success("新建文件夹成功");
       listDirectory(currentPath);
     } else {
-      showToast("创建文件夹失败");
+      showToast.error("创建文件夹失败");
     }
   } catch (e) {
-    showToast(`新建文件夹异常: ${e.message}`);
+    showToast.error(`新建文件夹异常: ${e.message}`);
   }
 }

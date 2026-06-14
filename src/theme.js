@@ -24,7 +24,7 @@ export const handleManualThemeToggle = () => {
     state.currentSettings.autoTheme = false;
     document.getElementById("autoThemeToggle").checked = false;
     saveSettings(state.currentSettings);
-    import("./utils.js").then(({ showToast }) => showToast("已关闭系统深色模式跟随"));
+    import("./utils.js").then(({ showToast }) => showToast.info("已关闭系统深色模式跟随"));
   }
   applyTheme(!state.isDarkMode);
 };

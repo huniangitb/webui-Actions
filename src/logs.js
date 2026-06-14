@@ -195,7 +195,7 @@ export const resetIoLogs = () => {
 };
 export const clearIoLogs = async () => {
   await run(`${CONST.LOG_CTL} clear-io`);
-  showToast("监控记录已清理");
+  showToast.info("监控记录已清理");
   resetIoLogs();
   fetchIoLogs();
 };
@@ -332,7 +332,7 @@ export const clearSysLogs = async () => {
   } else {
     await run(`${CONST.LOG_CTL} clear-sys`);
   }
-  showToast("日志已清空");
+  showToast.info("日志已清空");
   if (source === "internal") resetSysLogs();
   fetchSysLogs();
 };

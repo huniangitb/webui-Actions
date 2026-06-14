@@ -35,11 +35,11 @@ export const setupGlobalHandlers = () => {
           )
         : document.getElementById("globalRuleContent").value;
       await flushInjectorConf();
-      showToast("全局规则已保存");
+      showToast.success("全局规则已保存");
       await loadData();
       await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     } catch (e) {
-      showToast("保存失败");
+      showToast.error("保存失败");
     }
   };
 

@@ -8,6 +8,7 @@ import { initIoLogs, initSysLogs, fetchIoLogs, fetchSysLogs, resetIoLogs, clearI
 import { getSettings, saveSettings, checkPluginInstalled, syncToPlugin } from "./plugin.js";
 import { openBackupModal, showPicker, exportAllLogs, createNewFolder } from "./backup.js";
 import { enableEdgeToEdge } from "kernelsu";
+import { initRipple } from "./ripple.js";
 import "../style.css";
 
 const lockInitialHeight = () => {
@@ -71,10 +72,10 @@ const checkStatus = async () => {
 const toggleStatus = async () => {
   if (state.currentPid) {
     await run(`kill -15 ${state.currentPid}`);
-    showToast("发送停止信号...");
+    showToast.info("发送停止信号...");
   } else {
     await run(`sh ${CONST.SERVICE_SH}`);
-    showToast("启动服务...");
+    showToast.info("启动服务...");
     setTimeout(loadData, 1000);
   }
   setTimeout(checkStatus, 500);
@@ -146,7 +147,7 @@ const switchSection = (sectionId) => {
 document.addEventListener("DOMContentLoaded", async () => {
   try { enableEdgeToEdge(true); } catch (err) {}
   initIcons();
-  
+  initRipple();
   window.addEventListener("popstate", () => {
     const appConfig = document.getElementById("appConfigSubpage");
     if (appConfig && appConfig.classList.contains("open")) {
@@ -379,13 +380,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   const btnBackupNewFolder = document.getElementById("btnBackupNewFolder");
   if (btnBackupNewFolder) btnBackupNewFolder.onclick = createNewFolder;
-  
-  document.getElementById("btnBackupBack").onclick = () => {
-    document.getElementById("backupPickerPanel").classList.add("hidden");
-    document.getElementById("backupMainMenu").classList.remove("hidden");
-    document.getElementById("btnBackupBack").classList.add("hidden");
-    document.getElementById("backupModalTitle").textContent = "数据备份与恢复";
-  };
 
   document.getElementById("btnSaveSettings").onclick = async () => {
     state.currentSettings.autoTheme = document.getElementById("autoThemeToggle").checked;
@@ -395,7 +389,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
       applyTheme(mediaQuery.matches);
     }
-    showToast("设置已保存");
+    showToast.success("设置已保存");
     closeModalCleanup();
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
@@ -413,9 +407,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isVisual = document.querySelector('button[name="ignoreModeToggle"][data-mode="visual"]')?.classList.contains("active");
       const content = isVisual ? generateIgnoreFromVisual() : document.getElementById("monitorIgnoreContent").value;
       await run(`echo '${content.trim()}' > ${CONST.MONITOR_IGNORE_CONF}`);
-      showToast("过滤配置已保存");
+      showToast.success("过滤配置已保存");
       closeModalCleanup();
-    } catch { showToast("保存失败"); }
+    } catch { showToast.error("保存失败"); }
   };
 
   setupModeToggle("globalModeToggle", "globalVisual", "globalRaw", "globalRuleContent",
@@ -454,11 +448,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         await run(`rm -f ${dir}/${state.currentBindingPkg}.conf`);
       }
       await flushInjectorConf();
-      showToast("配置已保存");
+      showToast.success("配置已保存");
       closeModalCleanup();
       await loadData();
       await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
-    } catch { showToast("保存失败"); }
+    } catch { showToast.error("保存失败"); }
   };
 
   document.getElementById("btnDeleteAppConfig").onclick = async () => {
@@ -470,7 +464,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     closeModalCleanup();
     await loadData();
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
-    showToast("配置已清除");
+    showToast.success("配置已清除");
   };
 
   const originalOpenAppConfig = window.openAppConfig;

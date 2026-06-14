@@ -22,6 +22,9 @@
     --mx-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --mx-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     --mx-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    --mx-sh1: 0 1px 4px rgba(0,0,0,0.5);
+    --mx-sh2: 0 4px 16px rgba(0,0,0,0.4);
+    --mx-sh3: 0 8px 32px rgba(0,0,0,0.45);
 }
 [data-theme="light"] {
     --mx-primary: #3482FF;
@@ -36,6 +39,9 @@
     --mx-border: #dddfe2;
     --mx-red: #E94634;
     --mx-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    --mx-sh1: 0 1px 4px rgba(0,0,0,0.08);
+    --mx-sh2: 0 4px 16px rgba(0,0,0,0.06);
+    --mx-sh3: 0 8px 32px rgba(0,0,0,0.08);
 }
 * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
 html { background-color: var(--mx-bg); transition: background-color 0.3s var(--mx-ease); }
@@ -487,3 +493,29 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
     opacity: 0;
     pointer-events: none;
 }
+
+/* ═══ MIUIX Console 移植 ──── 涟漪效果 ═══ */
+@keyframes mx-ripple {
+  to { transform: scale(4); opacity: 0; }
+}
+
+/* ═══ 顺滑圆角（Smooth Corner） ═══ */
+.mx-smooth {
+  position: relative;
+}
+
+/* ═══ Toast 变体：语义色图标 ═══ */
+.mx-toast-success .mx-toast-icon { color: var(--mx-green); }
+.mx-toast-warning .mx-toast-icon { color: var(--mx-amber); }
+.mx-toast-error   .mx-toast-icon { color: var(--mx-red); }
+.mx-toast-info    .mx-toast-icon { color: var(--mx-blue); }
+
+/* ═══ 交错延迟动画工具类 ═══ */
+.mx-delay-1 { animation-delay: 50ms; }
+.mx-delay-2 { animation-delay: 100ms; }
+.mx-delay-3 { animation-delay: 150ms; }
+.mx-delay-4 { animation-delay: 200ms; }
+.mx-delay-5 { animation-delay: 250ms; }
+.mx-delay-6 { animation-delay: 300ms; }
+.mx-delay-7 { animation-delay: 350ms; }
+.mx-delay-8 { animation-delay: 400ms; }

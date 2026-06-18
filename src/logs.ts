@@ -3,7 +3,14 @@ import { run, showToast, ICONS } from "./utils.js";
 import { prepare, layout } from "@chenglou/pretext";
 import type { IoLogEntry, SysLogEntry, VirtualLogEntry, VirtualLogOptions } from "./types/index";
 
-// --- VirtualLogList default constants ---
+// ── Helpers ──
+
+/** Build a fast content hash from an entry for dedup comparison */
+function entryHash<E extends IoLogEntry | SysLogEntry>(e: E): string {
+  return (e as IoLogEntry).text ?? (e as SysLogEntry).text ?? "";
+}
+
+// ── VirtualLogList default constants ──
 
 const DEFAULT_BUFFER = 10;
 const DEFAULT_ESTIMATED_LINE_HEIGHT = 20;
@@ -15,7 +22,7 @@ const DEFAULT_CHROME_HEIGHT = 0;
 const DEFAULT_TEXT_WIDTH_OFFSET = 0;
 const DEFAULT_ON_EMPTY = "";
 
-// --- Virtual log list (Pretext-powered) ---
+// ── Virtual log list (Pretext-powered) ──
 
 class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEntry> {
   private container: HTMLElement;
@@ -38,6 +45,8 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   private isDirty: boolean;
   private _ticking: boolean;
   private _resizeObserver: ResizeObserver | null;
+  /** Hash set of current visible content for flicker-free dedup */
+  private _contentHashes: Set<string>;
 
   constructor(containerEl: HTMLElement, contentEl: HTMLElement, options: VirtualLogOptions<E> = {}) {
     this.container = containerEl;
@@ -59,6 +68,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     this.visibleEnd = 0;
     this.isDirty = true;
     this._ticking = false;
+    this._contentHashes = new Set();
     this._onScroll = this._onScroll.bind(this);
     this._onResize = this._onResize.bind(this);
     this.container.addEventListener("scroll", this._onScroll);
@@ -89,6 +99,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
       } else {
         h = cHeight;
       }
+      this._contentHashes.add(entryHash(entry));
       this.entries.push({ height: h, prepared: prep, data: entry });
     }
     this._recalcTotalHeight();
@@ -99,6 +110,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   clear(): void {
     this.entries = [];
     this.prefixHeights = [];
+    this._contentHashes.clear();
     this._recalcTotalHeight();
     this.isDirty = true;
     this.container.scrollTop = 0;
@@ -108,6 +120,63 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   replace(entryList: E[]): void {
     this.clear();
     this.append(entryList);
+  }
+
+  /**
+   * Fetch → sort → dedup → replace with transition.
+   * Accepts raw lines, parses, sorts, deduplicates against current content,
+   * and only re-renders when data actually changed.
+   */
+  replaceSorted(
+    rawLines: string[],
+    parser: (lines: string[]) => E[],
+    sortFn?: (a: E, b: E) => number,
+  ): void {
+    // Parse
+    let parsed = parser(rawLines);
+
+    // Sort if provided
+    if (sortFn) {
+      parsed = parsed.sort(sortFn);
+    }
+
+    // Deduplicate within new data first
+    const seen = new Set<string>();
+    const deduped: E[] = [];
+    for (const e of parsed) {
+      const h = entryHash(e);
+      if (!seen.has(h)) {
+        seen.add(h);
+        deduped.push(e);
+      }
+    }
+
+    // Fast path: compare hashes with current — skip render if identical
+    if (this.entries.length === deduped.length) {
+      let same = true;
+      for (let i = 0; i < deduped.length; i++) {
+        if (entryHash(deduped[i]) !== entryHash(this.entries[i].data as E)) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return;
+    }
+
+    // Data changed; add a brief opacity transition on the container before replacing
+    this.contentEl.style.transition = "opacity 0.15s var(--mx-ease)";
+    this.contentEl.style.opacity = "0";
+
+    setTimeout(() => {
+      this.replace(deduped);
+      requestAnimationFrame(() => {
+        this.contentEl.style.opacity = "1";
+        /* Clean up transition after animation so it doesn't interfere with scroll */
+        setTimeout(() => {
+          this.contentEl.style.transition = "";
+        }, 300);
+      });
+    }, 80);
   }
 
   get scrollHeight(): number {
@@ -217,7 +286,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   }
 }
 
-// --- Shared parsing helpers ---
+// ── Shared parsing helpers ──
 
 function parseTimestamp(rawTs: string): string {
   if (/^\d+$/.test(rawTs)) {
@@ -252,9 +321,12 @@ function resolveAppName(pkg: string): string {
   return state.appMap.has(pkg) ? state.appMap.get(pkg)!.appLabel : pkg;
 }
 
-// --- IO log state & functions ---
+// ── IO log state & functions ──
 
 let ioVirtualList: VirtualLogList<IoLogEntry> | null = null;
+
+// Cache the last raw data to skip redundant fetches
+let _lastIoRaw = "";
 
 export const initIoLogs = (): void => {
   const container = document.getElementById("ioLogContainer") as HTMLElement | null;
@@ -276,6 +348,7 @@ export const initIoLogs = (): void => {
 
 export const resetIoLogs = (): void => {
   ioVirtualList?.clear();
+  _lastIoRaw = "";
   state.ioState.offset = 0;
   state.ioState.hasMore = true;
 };
@@ -323,6 +396,11 @@ function parseStreamedResult(raw: string): StreamedResult {
   return { dataLines: lines, hasMore: false };
 }
 
+/** Sort IO entries by timestamp (newest first) */
+function sortIoEntries(a: IoLogEntry, b: IoLogEntry): number {
+  return b.timeStr.localeCompare(a.timeStr);
+}
+
 export const fetchIoLogs = async (): Promise<void> => {
   if (state.ioState.loading || !state.ioState.hasMore) return;
   state.ioState.loading = true;
@@ -334,17 +412,23 @@ export const fetchIoLogs = async (): Promise<void> => {
       state.ioState.hasMore = false;
       if (state.ioState.offset === 0) ioVirtualList?.clear();
     } else {
+      /* Dedup against last raw payload to avoid processing identical data */
+      if (res === _lastIoRaw && state.ioState.offset > 0) {
+        state.ioState.hasMore = false;
+        return;
+      }
+      _lastIoRaw = res;
+
       const { dataLines, hasMore } = parseStreamedResult(res);
       state.ioState.hasMore = hasMore;
       if (dataLines.length > 0) {
         state.ioState.offset += dataLines.length;
-        const entries = parseIoLines(dataLines);
         if (ioVirtualList) {
-          ioVirtualList.append(entries);
+          ioVirtualList.replaceSorted(dataLines, parseIoLines, sortIoEntries);
         } else {
           const listEl = document.getElementById("ioLogList")!;
           if (listEl.innerHTML.includes("暂无记录")) listEl.innerHTML = "";
-          listEl.insertAdjacentHTML("beforeend", renderIoLegacy(dataLines));
+          listEl.innerHTML = renderIoLegacy(dataLines);
         }
       } else if (state.ioState.offset === 0) {
         ioVirtualList?.clear();
@@ -387,9 +471,17 @@ function renderIoLegacy(lines: string[]): string {
     .join("");
 }
 
-// --- Sys log state & functions ---
+// ── Sys log state & functions ──
 
 let sysVirtualList: VirtualLogList<SysLogEntry> | null = null;
+let _lastSysRaw = "";
+
+/** Sort sys entries by timestamp (newest first) */
+function sortSysEntries(a: SysLogEntry, b: SysLogEntry): number {
+  const ta = a.timeStr ?? "";
+  const tb = b.timeStr ?? "";
+  return tb.localeCompare(ta);
+}
 
 export const initSysLogs = (): void => {
   const viewer = document.getElementById("logViewer") as HTMLElement | null;
@@ -410,6 +502,7 @@ export const initSysLogs = (): void => {
 
 export const resetSysLogs = (): void => {
   sysVirtualList?.clear();
+  _lastSysRaw = "";
   state.sysState.offset = 0;
   state.sysState.hasMore = true;
 };
@@ -468,12 +561,20 @@ export const fetchSysLogs = async (): Promise<void> => {
     if (!res) {
       state.sysState.hasMore = false;
     } else {
+      /* Dedup against last raw payload to skip processing when nothing changed */
+      if (res === _lastSysRaw && state.sysState.offset > 0) {
+        state.sysState.hasMore = false;
+        return;
+      }
+      _lastSysRaw = res;
+
       const { dataLines, hasMore } = parseStreamedResult(res);
       state.sysState.hasMore = hasMore;
       if (dataLines.length > 0) {
         state.sysState.offset += dataLines.length;
-        const entries = parseSysLines(dataLines);
-        if (sysVirtualList) sysVirtualList.append(entries);
+        if (sysVirtualList) {
+          sysVirtualList.replaceSorted(dataLines, parseSysLines, sortSysEntries);
+        }
       }
     }
   } catch {

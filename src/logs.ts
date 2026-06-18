@@ -106,6 +106,8 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     this._render();
   }
 
+  private _fadeOutTimer: ReturnType<typeof setTimeout> | null = null;
+
   clear(): void {
     this.entries = [];
     this.prefixHeights = [];
@@ -113,10 +115,10 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     this._recalcTotalHeight();
     this.isDirty = true;
     this.container.scrollTop = 0;
-    this._fadeOutAndClear();
+    this._fadeOutAndClear(false);
   }
 
-  private _fadeOutAndClear(): void {
+  private _fadeOutAndClear(delayClear = false): void {
     const nodes = Array.from(this._renderedNodes.values());
     if (nodes.length === 0) {
       this._renderedNodes.clear();
@@ -124,7 +126,10 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
       return;
     }
     for (const el of nodes) el.classList.add("vlog-leave");
-    setTimeout(() => {
+    if (this._fadeOutTimer) clearTimeout(this._fadeOutTimer);
+    this._fadeOutTimer = setTimeout(() => {
+      this._fadeOutTimer = null;
+      if (delayClear) return; /* replace() handles timing */
       this._renderedNodes.clear();
       this.contentEl.innerHTML = "";
       if (this.onEmpty) this.contentEl.innerHTML = this.onEmpty;
@@ -132,7 +137,9 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   }
 
   replace(entryList: E[]): void {
-    this._fadeOutAndClear();
+    /* Start fade-out on old nodes but mark 'delayClear' so the timeout doesn't nuke content */
+    this._fadeOutAndClear(true);
+    /* Synchronously clear data and DOM, then append fresh data */
     this.entries = [];
     this.prefixHeights = [];
     this._contentHashes.clear();
@@ -140,8 +147,9 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     this.visibleStart = 0;
     this.visibleEnd = 0;
     this.isDirty = true;
-    // Use rAF to let fade-out start before new items render
-    requestAnimationFrame(() => this.append(entryList));
+    this._renderedNodes.clear();
+    this.contentEl.innerHTML = "";
+    this.append(entryList);
   }
 
   replaceSorted(

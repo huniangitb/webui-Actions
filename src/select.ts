@@ -44,8 +44,28 @@ function positionDropdown(trigger: HTMLElement, dropdown: HTMLElement): void {
   const spaceAbove = rect.top - 8;
   const maxH = Math.min(240, Math.max(spaceBelow, spaceAbove) - 4);
   dropdown.style.maxHeight = `${maxH}px`;
-  dropdown.style.width = `${rect.width}px`;
-  dropdown.style.left = `${rect.left}px`;
+  dropdown.style.minWidth = `${rect.width}px`;
+
+  /* Measure longest option text to size dropdown width, capped at 360px / 80vw */
+  const viewportCap = Math.min(window.innerWidth - 32, 360);
+  let maxW = rect.width;
+  const options = dropdown.querySelectorAll<HTMLElement>(".mx-select-option");
+  if (options.length > 0) {
+    const measurer = document.createElement("span");
+    measurer.style.cssText = "position:fixed;visibility:hidden;white-space:nowrap;padding:0 14px;font-size:13px;font-family:var(--mx-font-sans)";
+    document.body.appendChild(measurer);
+    for (const opt of options) {
+      measurer.textContent = opt.textContent;
+      const w = measurer.offsetWidth;
+      if (w > maxW) maxW = w;
+    }
+    document.body.removeChild(measurer);
+  }
+  const capped = Math.min(maxW, viewportCap);
+  dropdown.style.width = `${capped}px`;
+
+  /* Keep within viewport horizontally */
+  dropdown.style.left = `${Math.min(rect.left, window.innerWidth - capped - 8)}px`;
 
   if (spaceBelow < 160 && spaceAbove > spaceBelow) {
     dropdown.style.top = "";

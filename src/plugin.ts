@@ -35,23 +35,25 @@ interface ParsedRules {
   sandboxState: string | undefined;
 }
 
-const convertToStoragePath = (p: string): string => {
+function deduplicate<T>(arr: T[]): T[] | undefined {
+  return arr.length > 0 ? [...new Set(arr)] : undefined;
+}
+
+function convertToStoragePath(p: string): string {
   if (!p) return p;
   let result = p.trim();
   if (result.startsWith("/data/media/0")) {
     result = "/storage/emulated/0" + result.substring(13);
-  } else if (result.startsWith("/") && !result.startsWith("/storage/emulated/0")) {
-    result = "/storage/emulated/0" + result;
-  } else if (!result.startsWith("/")) {
-    result = "/storage/emulated/0/" + result;
+  } else if (!result.startsWith("/storage/emulated/0")) {
+    result = "/storage/emulated/0" + (result.startsWith("/") ? result : "/" + result);
   }
   if (!result.endsWith("/")) {
     result += "/";
   }
   return result.replace(/\/+/g, "/");
-};
+}
 
-const parseRules = (text: string | undefined): ParsedRules => {
+function parseRules(text: string | undefined): ParsedRules {
   const redirects: RedirectRule[] = [];
   const hides: string[] = [];
   const ros: string[] = [];
@@ -60,26 +62,47 @@ const parseRules = (text: string | undefined): ParsedRules => {
 
   if (!text) return { redirects, hides, ros, allows, sandboxState };
 
-  text.split("\n").forEach((line) => {
+  for (const line of text.split("\n")) {
     const parts = line.trim().split(/\s+/);
-    if (parts[0] === "REDIRECT" && parts.length >= 3) {
-      redirects.push({
-        source: convertToStoragePath(parts[1]),
-        target: convertToStoragePath(parts.slice(2).join(" ")),
-      });
-    } else if (parts[0] === "HIDE" && parts.length >= 2) {
-      hides.push(convertToStoragePath(parts[1]));
-    } else if (parts[0] === "RO" && parts.length >= 2) {
-      ros.push(convertToStoragePath(parts[1]));
-    } else if (parts[0] === "ALLOW" && parts.length >= 2) {
-      allows.push(convertToStoragePath(parts[1]));
-    } else if (parts[0] === "SANDBOX" && parts.length >= 2) {
-      if (parts[1] === "ON") sandboxState = "ON";
-      else if (parts[1] === "OFF") sandboxState = "OFF";
+    const directive = parts[0];
+    const hasPath = parts.length >= 2;
+    if (!directive) continue;
+
+    switch (directive) {
+      case "REDIRECT":
+        if (parts.length >= 3) {
+          redirects.push({
+            source: convertToStoragePath(parts[1]),
+            target: convertToStoragePath(parts.slice(2).join(" ")),
+          });
+        }
+        break;
+      case "HIDE":
+        if (hasPath) hides.push(convertToStoragePath(parts[1]));
+        break;
+      case "RO":
+        if (hasPath) ros.push(convertToStoragePath(parts[1]));
+        break;
+      case "ALLOW":
+        if (hasPath) allows.push(convertToStoragePath(parts[1]));
+        break;
+      case "SANDBOX":
+        if (parts[1] === "ON" || parts[1] === "OFF") sandboxState = parts[1];
+        break;
     }
-  });
+  }
   return { redirects, hides, ros, allows, sandboxState };
-};
+}
+
+function hasSpecialRules(rules: ParsedRules): boolean {
+  return (
+    rules.sandboxState === "ON" ||
+    rules.redirects.length > 0 ||
+    rules.hides.length > 0 ||
+    rules.ros.length > 0 ||
+    rules.allows.length > 0
+  );
+}
 
 interface PluginTemplate {
   template_name: string;
@@ -166,22 +189,16 @@ export async function syncToPlugin(
 
   // 3. global template
   const globalRules = parseRules(globalConfText);
-  const hasGlobalRules =
-    globalRules.redirects.length > 0 ||
-    globalRules.hides.length > 0 ||
-    globalRules.ros.length > 0 ||
-    globalRules.allows.length > 0 ||
-    globalRules.sandboxState === "ON";
 
-  if (hasGlobalRules && allEnabledApps.size > 0) {
+  if (hasSpecialRules(globalRules) && allEnabledApps.size > 0) {
     templates.push({
       template_name: "NS-Proxy-Global",
       hook_operation: ["query", "insert"],
       apply_to_app: Array.from(allEnabledApps),
       enable_sandbox: globalRules.sandboxState === "ON",
-      exempt_path: globalRules.allows.length > 0 ? [...new Set(globalRules.allows)] : undefined,
-      filter_path: globalRules.hides.length > 0 ? [...new Set(globalRules.hides)] : undefined,
-      read_only_path: globalRules.ros.length > 0 ? [...new Set(globalRules.ros)] : undefined,
+      exempt_path: deduplicate(globalRules.allows),
+      filter_path: deduplicate(globalRules.hides),
+      read_only_path: deduplicate(globalRules.ros),
       redirect_rules: globalRules.redirects.length > 0 ? globalRules.redirects : undefined,
     });
   }
@@ -195,34 +212,25 @@ export async function syncToPlugin(
   });
 
   pkgRules.forEach((data, pkg) => {
-    const isSpecial =
-      data.sandboxState === "ON" ||
-      data.hides.length > 0 ||
-      data.redirects.length > 0 ||
-      data.ros.length > 0 ||
-      data.allows.length > 0;
-    if (isSpecial) {
-      const appInfo = appMap.get(pkg);
-      const label = appInfo?.appLabel || pkg;
-      // append pkg for deduplication when labels collide
-      const finalName =
-        (labelCounts.get(label) ?? 0) > 1 && label !== pkg ? `${label} (${pkg})` : label;
+    if (!hasSpecialRules(data)) return;
 
-      const redirectRules = data.redirects.length > 0
+    const appInfo = appMap.get(pkg);
+    const label = appInfo?.appLabel || pkg;
+    const finalName =
+      (labelCounts.get(label) ?? 0) > 1 && label !== pkg ? `${label} (${pkg})` : label;
+
+    templates.push({
+      template_name: finalName,
+      hook_operation: ["query", "insert"],
+      apply_to_app: [pkg],
+      enable_sandbox: data.sandboxState === "ON",
+      exempt_path: deduplicate(data.allows),
+      filter_path: deduplicate(data.hides),
+      read_only_path: deduplicate(data.ros),
+      redirect_rules: data.redirects.length > 0
         ? [...new Map(data.redirects.map((r) => [r.source, r])).values()]
-        : undefined;
-
-      templates.push({
-        template_name: finalName,
-        hook_operation: ["query", "insert"],
-        apply_to_app: [pkg],
-        enable_sandbox: data.sandboxState === "ON",
-        exempt_path: data.allows.length > 0 ? [...new Set(data.allows)] : undefined,
-        filter_path: data.hides.length > 0 ? [...new Set(data.hides)] : undefined,
-        read_only_path: data.ros.length > 0 ? [...new Set(data.ros)] : undefined,
-        redirect_rules: redirectRules,
-      });
-    }
+        : undefined,
+    });
   });
 
   // 5. write rule file

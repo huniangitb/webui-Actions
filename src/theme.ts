@@ -4,12 +4,9 @@ import { saveSettings } from "./plugin.js";
 
 export const applyTheme = (isDark: boolean): void => {
   state.isDarkMode = isDark;
-
   const doc = document.documentElement;
 
-  // add transition class for smooth 1s theme transition
   doc.classList.add("theme-transition");
-
   doc.setAttribute("data-theme", isDark ? "dark" : "light");
 
   const metaThemeColor = document.getElementById("themeColorMeta");
@@ -18,11 +15,10 @@ export const applyTheme = (isDark: boolean): void => {
   }
   updateThemeIcons();
 
-  // remove transition class after animation completes
-  clearTimeout((doc as unknown as Record<string, ReturnType<typeof setTimeout>>)._themeTransitionTimer);
-  (doc as unknown as Record<string, ReturnType<typeof setTimeout>>)._themeTransitionTimer = setTimeout(() => {
+  clearTimeout(doc._themeTransitionTimer);
+  doc._themeTransitionTimer = setTimeout(() => {
     doc.classList.remove("theme-transition");
-  }, 1100);
+  }, 500);
 };
 
 export const systemThemeListener = (e: MediaQueryListEvent): void => {

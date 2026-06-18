@@ -1,11 +1,11 @@
-import type { AppState, Settings } from "./types/index";
+import type { AppState } from "./types/index";
 
 export const state: AppState = {
   appMap: new Map(),
   globalConfText: "",
   injectorStates: new Map(),
   injectorRulesMap: new Map(),
-  currentSettings: { autoTheme: true, syncPlugin: false } as Settings,
+  currentSettings: { autoTheme: true, syncPlugin: false },
   activeUsers: [0],
   activeMounts: new Set(),
   injectedApps: new Map(),
@@ -27,29 +27,24 @@ export const state: AppState = {
   suspendPolling: null,
 };
 
-/**
- * Close all modals/subpages and resume polling.
- * Moved here to avoid circular imports between main.js ↔ backup.js.
- */
 export const closeModalCleanup = (): void => {
-  if (history.state && (history.state as Record<string, unknown>).modalOpen) {
+  const historyState = history.state as Record<string, unknown> | null;
+  if (historyState?.modalOpen) {
     history.back();
-  } else {
-    const appConfig = document.getElementById("appConfigSubpage");
-    if (appConfig && appConfig.classList.contains("open")) {
-      appConfig.classList.remove("open");
-      appConfig.classList.add("closing");
-      setTimeout(() => {
-        appConfig.classList.remove("closing");
-      }, 220);
-    }
-    document.querySelector(".mx-app")?.classList.remove("frozen");
-    document.body.classList.remove("modal-open", "keyboard-open");
-    document.documentElement.style.setProperty("--keyboard-h", "0px");
-    document.querySelectorAll(".mx-modal-overlay.open").forEach((el) => el.classList.remove("open"));
-    state.resumePolling?.();
-    (window as unknown as Record<string, unknown>)._currentInput = null;
+    return;
   }
+  const appConfig = document.getElementById("appConfigSubpage");
+  if (appConfig?.classList.contains("open")) {
+    appConfig.classList.remove("open");
+    appConfig.classList.add("closing");
+    setTimeout(() => appConfig.classList.remove("closing"), 220);
+  }
+  document.querySelector(".mx-app")?.classList.remove("frozen");
+  document.body.classList.remove("modal-open", "keyboard-open");
+  document.documentElement.style.setProperty("--keyboard-h", "0px");
+  document.querySelectorAll(".mx-modal-overlay.open").forEach((el) => el.classList.remove("open"));
+  state.resumePolling?.();
+  window._currentInput = null;
 };
 
 export const CONST = {

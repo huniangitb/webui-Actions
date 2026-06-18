@@ -19,17 +19,19 @@ export const renderGlobalRules = (): void => {
 export const setupGlobalHandlers = (): void => {
   document.getElementById("btnSaveGlobal")!.onclick = async () => {
     try {
-      const isVisual = document
-        .querySelector('button[name="globalModeToggle"][data-mode="visual"]')
-        ?.classList.contains("active");
-      state.globalConfText = isVisual
-        ? generateConfigTextFromVisual(
-            "globalRuleBuilderContainer",
-            "globalMonitorSelect",
-            "globalSandboxSelect",
-            "globalInjectSelect",
-          )
-        : (document.getElementById("globalRuleContent") as HTMLTextAreaElement).value;
+      const visualBtn = document.querySelector<HTMLElement>(
+        'button[name="globalModeToggle"][data-mode="visual"]',
+      );
+      if (visualBtn?.classList.contains("active")) {
+        state.globalConfText = generateConfigTextFromVisual(
+          "globalRuleBuilderContainer",
+          "globalMonitorSelect",
+          "globalSandboxSelect",
+          "globalInjectSelect",
+        );
+      } else {
+        state.globalConfText = (document.getElementById("globalRuleContent") as HTMLTextAreaElement).value;
+      }
       await flushInjectorConf();
       showToast.success("全局规则已保存");
       await loadData();

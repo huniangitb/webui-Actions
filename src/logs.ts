@@ -3,9 +3,19 @@ import { run, showToast, ICONS } from "./utils.js";
 import { prepare, layout } from "@chenglou/pretext";
 import type { IoLogEntry, SysLogEntry, VirtualLogEntry, VirtualLogOptions } from "./types/index";
 
-// =============================================
-// Virtual log list (Pretext-powered)
-// =============================================
+// --- VirtualLogList default constants ---
+
+const DEFAULT_BUFFER = 10;
+const DEFAULT_ESTIMATED_LINE_HEIGHT = 20;
+const DEFAULT_FONT = "13px monospace";
+const DEFAULT_LINE_HEIGHT = 20;
+const DEFAULT_GAP = 0;
+const DEFAULT_PADDING = 0;
+const DEFAULT_CHROME_HEIGHT = 0;
+const DEFAULT_TEXT_WIDTH_OFFSET = 0;
+const DEFAULT_ON_EMPTY = "";
+
+// --- Virtual log list (Pretext-powered) ---
 
 class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEntry> {
   private container: HTMLElement;
@@ -32,16 +42,16 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   constructor(containerEl: HTMLElement, contentEl: HTMLElement, options: VirtualLogOptions<E> = {}) {
     this.container = containerEl;
     this.contentEl = contentEl;
-    this.buffer = options.buffer ?? 10;
-    this.estimatedLineHeight = options.estimatedLineHeight ?? 20;
-    this.font = options.font ?? "13px monospace";
-    this.lineHeight = options.lineHeight ?? 20;
-    this.gap = options.gap ?? 0;
-    this.padding = options.padding ?? 0;
-    this.chromeHeight = options.chromeHeight ?? 0;
-    this.textWidthOffset = options.textWidthOffset ?? 0;
+    this.buffer = options.buffer ?? DEFAULT_BUFFER;
+    this.estimatedLineHeight = options.estimatedLineHeight ?? DEFAULT_ESTIMATED_LINE_HEIGHT;
+    this.font = options.font ?? DEFAULT_FONT;
+    this.lineHeight = options.lineHeight ?? DEFAULT_LINE_HEIGHT;
+    this.gap = options.gap ?? DEFAULT_GAP;
+    this.padding = options.padding ?? DEFAULT_PADDING;
+    this.chromeHeight = options.chromeHeight ?? DEFAULT_CHROME_HEIGHT;
+    this.textWidthOffset = options.textWidthOffset ?? DEFAULT_TEXT_WIDTH_OFFSET;
     this.prepareFn = options.prepareFn ?? null;
-    this.onEmpty = options.onEmpty ?? "";
+    this.onEmpty = options.onEmpty ?? DEFAULT_ON_EMPTY;
     this.entries = [];
     this.prefixHeights = [];
     this.totalHeight = 0;
@@ -133,8 +143,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     return true;
   }
 
-  private _onScroll(): void {
-    if (!this._isActive()) return;
+  private _scheduleRender(): void {
     if (!this._ticking) {
       window.requestAnimationFrame(() => {
         this._render();
@@ -144,16 +153,15 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     }
   }
 
+  private _onScroll(): void {
+    if (!this._isActive()) return;
+    this._scheduleRender();
+  }
+
   private _onResize(): void {
     if (!this._isActive()) return;
     this.isDirty = true;
-    if (!this._ticking) {
-      window.requestAnimationFrame(() => {
-        this._render();
-        this._ticking = false;
-      });
-      this._ticking = true;
-    }
+    this._scheduleRender();
   }
 
   private _render(): void {
@@ -209,9 +217,42 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   }
 }
 
-// =============================================
-// IO log state & functions
-// =============================================
+// --- Shared parsing helpers ---
+
+function parseTimestamp(rawTs: string): string {
+  if (/^\d+$/.test(rawTs)) {
+    const d = new Date(parseInt(rawTs) * 1000);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString("zh-CN", { hour12: false });
+    }
+    return "--:--:--";
+  }
+  if (rawTs.includes(" ")) {
+    const dt = rawTs.split(" ");
+    return dt[1] || dt[0];
+  }
+  return rawTs;
+}
+
+interface ParsedLogMeta {
+  pkg: string;
+  op: string;
+  details: string;
+}
+
+function parseLogMeta(rawDetails: string): ParsedLogMeta {
+  const m = rawDetails.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
+  if (m) {
+    return { pkg: m[1], op: m[2], details: m[3] };
+  }
+  return { pkg: "未知", op: "INFO", details: rawDetails };
+}
+
+function resolveAppName(pkg: string): string {
+  return state.appMap.has(pkg) ? state.appMap.get(pkg)!.appLabel : pkg;
+}
+
+// --- IO log state & functions ---
 
 let ioVirtualList: VirtualLogList<IoLogEntry> | null = null;
 
@@ -246,7 +287,7 @@ export const clearIoLogs = async (): Promise<void> => {
   fetchIoLogs();
 };
 
-const renderIoEntry = (entry: IoLogEntry): string => {
+function renderIoEntry(entry: IoLogEntry): string {
   const { timeStr, appName, op, details } = entry;
   return `
     <div class="io-item">
@@ -260,7 +301,27 @@ const renderIoEntry = (entry: IoLogEntry): string => {
       </div>
       <div class="io-detail">${details}</div>
     </div>`;
-};
+}
+
+interface StreamedResult {
+  dataLines: string[];
+  hasMore: boolean;
+}
+
+function parseStreamedResult(raw: string): StreamedResult {
+  const lines = raw.split("\n");
+  const lastLine = lines[lines.length - 1];
+  if (lastLine.startsWith("DONE|")) {
+    return {
+      dataLines: lines.slice(0, -1),
+      hasMore: parseInt(lastLine.split("|")[2]) > 0,
+    };
+  }
+  if (lastLine === "OK") {
+    return { dataLines: lines.slice(0, -1), hasMore: false };
+  }
+  return { dataLines: lines, hasMore: false };
+}
 
 export const fetchIoLogs = async (): Promise<void> => {
   if (state.ioState.loading || !state.ioState.hasMore) return;
@@ -273,16 +334,8 @@ export const fetchIoLogs = async (): Promise<void> => {
       state.ioState.hasMore = false;
       if (state.ioState.offset === 0) ioVirtualList?.clear();
     } else {
-      const lines = res.split("\n");
-      let dataLines = lines;
-      const lastLine = lines[lines.length - 1];
-      if (lastLine.startsWith("DONE|")) {
-        state.ioState.hasMore = parseInt(lastLine.split("|")[2]) > 0;
-        dataLines = lines.slice(0, -1);
-      } else if (lastLine === "OK") {
-        state.ioState.hasMore = false;
-        dataLines = lines.slice(0, -1);
-      }
+      const { dataLines, hasMore } = parseStreamedResult(res);
+      state.ioState.hasMore = hasMore;
       if (dataLines.length > 0) {
         state.ioState.offset += dataLines.length;
         const entries = parseIoLines(dataLines);
@@ -304,79 +357,37 @@ export const fetchIoLogs = async (): Promise<void> => {
   }
 };
 
-const parseIoLines = (lines: string[]): IoLogEntry[] => {
+function parseIoLines(lines: string[]): IoLogEntry[] {
   return lines
     .map((line: string): IoLogEntry | null => {
       if (!line.trim()) return null;
       const parts = line.split("|");
       if (parts.length < 2) return null;
-      let timeStr = "--:--:--";
-      const rawTs = parts[0];
-      if (/^\d+$/.test(rawTs)) {
-        const d = new Date(parseInt(rawTs) * 1000);
-        if (!isNaN(d.getTime()))
-          timeStr = d.toLocaleTimeString("zh-CN", { hour12: false });
-      } else if (rawTs.includes(" ")) {
-        const dt = rawTs.split(" ");
-        timeStr = dt[1] || dt[0];
-      } else {
-        timeStr = rawTs;
-      }
-      let pkg = "未知";
-      let op = "INFO";
-      let details = parts.slice(1).join("|");
-      const m = details.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
-      if (m) {
-        pkg = m[1];
-        op = m[2];
-        details = m[3];
-      }
-      const appName = state.appMap.has(pkg)
-        ? state.appMap.get(pkg)!.appLabel
-        : pkg;
+      const timeStr = parseTimestamp(parts[0]);
+      const rawDetails = parts.slice(1).join("|");
+      const { pkg, op, details } = parseLogMeta(rawDetails);
+      const appName = resolveAppName(pkg);
       return { text: details, timeStr, appName, op, details };
     })
     .filter((e): e is IoLogEntry => e !== null);
-};
+}
 
-const renderIoLegacy = (lines: string[]): string => {
+function renderIoLegacy(lines: string[]): string {
   return lines
     .map((line: string) => {
       if (!line.trim()) return "";
       const parts = line.split("|");
       if (parts.length < 2) return "";
-      let timeStr = "--:--:--";
-      const rawTs = parts[0];
-      if (/^\d+$/.test(rawTs)) {
-        const d = new Date(parseInt(rawTs) * 1000);
-        if (!isNaN(d.getTime()))
-          timeStr = d.toLocaleTimeString("zh-CN", { hour12: false });
-      } else if (rawTs.includes(" ")) {
-        const dt = rawTs.split(" ");
-        timeStr = dt[1] || dt[0];
-      } else {
-        timeStr = rawTs;
-      }
-      let pkg = "未知";
-      let op = "INFO";
-      let details = parts.slice(1).join("|");
-      const m = details.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
-      if (m) {
-        pkg = m[1];
-        op = m[2];
-        details = m[3];
-      }
-      const appName = state.appMap.has(pkg)
-        ? state.appMap.get(pkg)!.appLabel
-        : pkg;
+      const timeStr = parseTimestamp(parts[0]);
+      const rawDetails = parts.slice(1).join("|");
+      const { pkg, op, details } = parseLogMeta(rawDetails);
+      const appName = resolveAppName(pkg);
       return `<div class="io-item"><div class="io-header"><span class="io-time">${ICONS.CLOCK}<span>${timeStr}</span><span class="io-app">${appName}</span></span><span class="io-op op-${op}">${op}</span></div><div class="io-detail">${details}</div></div>`;
     })
     .join("");
-};
+}
 
-// =============================================
-// Sys log state & functions
-// =============================================
+// --- Sys log state & functions ---
 
 let sysVirtualList: VirtualLogList<SysLogEntry> | null = null;
 
@@ -409,13 +420,13 @@ export const clearSysLogs = async (): Promise<void> => {
     await run("logcat -c");
   } else {
     await run(`${CONST.LOG_CTL} clear-sys`);
+    if (source === "internal") resetSysLogs();
   }
   showToast.info("日志已清空");
-  if (source === "internal") resetSysLogs();
   fetchSysLogs();
 };
 
-const renderSysEntry = (entry: SysLogEntry): string => {
+function renderSysEntry(entry: SysLogEntry): string {
   const { timeStr, tag, msg } = entry;
   if (tag) {
     return `<div class="sys-log-item">
@@ -435,7 +446,7 @@ const renderSysEntry = (entry: SysLogEntry): string => {
     </div>`;
   }
   return `<div class="sys-log-raw">${msg}</div>`;
-};
+}
 
 export const fetchSysLogs = async (): Promise<void> => {
   const source = (document.getElementById("logSourceSelect") as HTMLSelectElement).value;
@@ -457,16 +468,8 @@ export const fetchSysLogs = async (): Promise<void> => {
     if (!res) {
       state.sysState.hasMore = false;
     } else {
-      const lines = res.split("\n");
-      let dataLines = lines;
-      const lastLine = lines[lines.length - 1];
-      if (lastLine.startsWith("DONE|")) {
-        state.sysState.hasMore = parseInt(lastLine.split("|")[2]) > 0;
-        dataLines = lines.slice(0, -1);
-      } else if (lastLine === "OK") {
-        state.sysState.hasMore = false;
-        dataLines = lines.slice(0, -1);
-      }
+      const { dataLines, hasMore } = parseStreamedResult(res);
+      state.sysState.hasMore = hasMore;
       if (dataLines.length > 0) {
         state.sysState.offset += dataLines.length;
         const entries = parseSysLines(dataLines);
@@ -480,7 +483,7 @@ export const fetchSysLogs = async (): Promise<void> => {
   }
 };
 
-const parseSysLines = (lines: string[]): SysLogEntry[] => {
+function parseSysLines(lines: string[]): SysLogEntry[] {
   return lines.map((line: string) => {
     const matchTag = line.match(
       /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\|\[(.*?)\](.*)$/,
@@ -505,4 +508,4 @@ const parseSysLines = (lines: string[]): SysLogEntry[] => {
     }
     return { text: line, timeStr: null, tag: null, msg: line };
   });
-};
+}

@@ -113,20 +113,18 @@ const toast = (msg: string, type?: ToastType): void => {
   }, 2500);
 };
 
-// Toast with sub-methods
-type ToastFn = {
-  (msg: string): void;
+const toastBody = (msg: string): void => toast(msg);
+
+export const showToast = toastBody as typeof toastBody & {
   success: (msg: string) => void;
   warning: (msg: string) => void;
   error: (msg: string) => void;
   info: (msg: string) => void;
 };
-
-export const showToast = ((msg: string): void => toast(msg)) as ToastFn;
-showToast.success = (msg: string): void => toast(msg, "success");
-showToast.warning = (msg: string): void => toast(msg, "warning");
-showToast.error = (msg: string): void => toast(msg, "error");
-showToast.info = (msg: string): void => toast(msg, "info");
+showToast.success = (msg) => toast(msg, "success");
+showToast.warning = (msg) => toast(msg, "warning");
+showToast.error = (msg) => toast(msg, "error");
+showToast.info = (msg) => toast(msg, "info");
 
 // ── Icons ──
 
@@ -163,28 +161,28 @@ export const updateThemeIcons = (): void => {
   if (desktop) desktop.innerHTML = icon;
 };
 
+const setById = (id: string, innerHTML: string): void => {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = innerHTML;
+};
+
 export const initIcons = (): void => {
-  const byId = (id: string): HTMLElement | null => document.getElementById(id);
-
-  byId("logoIconMobile")!.innerHTML = ICONS.APPS;
-  byId("logoIconDesktop")!.innerHTML = ICONS.APPS;
-  byId("navIconApps")!.innerHTML = ICONS.APPS;
-  byId("navIconGlobal")!.innerHTML = ICONS.GLOBAL;
-  byId("navIconIo")!.innerHTML = ICONS.IO;
-  byId("navIconLog")!.innerHTML = ICONS.LOG;
-  byId("btmIconApps")!.innerHTML = ICONS.APPS;
-  byId("btmIconGlobal")!.innerHTML = ICONS.GLOBAL;
-  byId("btmIconIo")!.innerHTML = ICONS.IO;
-  byId("btmIconLog")!.innerHTML = ICONS.LOG;
-  byId("iconSearch")!.innerHTML = ICONS.SEARCH;
-  byId("iconIoSearch")!.innerHTML = ICONS.SEARCH;
-  byId("btnSettingsMobile")!.innerHTML = ICONS.COG;
-  byId("btnSettingsDesktop")!.innerHTML = ICONS.COG;
-
-  const btnBackupMobile = byId("btnBackupMobile");
-  if (btnBackupMobile) btnBackupMobile.innerHTML = ICONS.BACKUP;
-  const navIconBackup = byId("navIconBackup");
-  if (navIconBackup) navIconBackup.innerHTML = ICONS.BACKUP;
+  setById("logoIconMobile", ICONS.APPS);
+  setById("logoIconDesktop", ICONS.APPS);
+  setById("navIconApps", ICONS.APPS);
+  setById("navIconGlobal", ICONS.GLOBAL);
+  setById("navIconIo", ICONS.IO);
+  setById("navIconLog", ICONS.LOG);
+  setById("btmIconApps", ICONS.APPS);
+  setById("btmIconGlobal", ICONS.GLOBAL);
+  setById("btmIconIo", ICONS.IO);
+  setById("btmIconLog", ICONS.LOG);
+  setById("iconSearch", ICONS.SEARCH);
+  setById("iconIoSearch", ICONS.SEARCH);
+  setById("btnSettingsMobile", ICONS.COG);
+  setById("btnSettingsDesktop", ICONS.COG);
+  setById("btnBackupMobile", ICONS.BACKUP);
+  setById("navIconBackup", ICONS.BACKUP);
 
   const btnGlobalAdd = document.getElementById("btnGlobalAddRule");
   if (btnGlobalAdd) btnGlobalAdd.innerHTML = `${ICONS.PLUS} 添加规则`;
@@ -192,10 +190,8 @@ export const initIcons = (): void => {
   if (btnAppAdd) btnAppAdd.innerHTML = `${ICONS.PLUS} 添加规则`;
   const btnAddIgnore = document.getElementById("btnAddIgnoreRow");
   if (btnAddIgnore) btnAddIgnore.textContent = "添加路径";
-  const btnMonitor = document.getElementById("btnMonitorIgnore");
-  if (btnMonitor) btnMonitor.innerHTML = ICONS.IGNORE;
-  const btnClear = document.getElementById("btnClearIo");
-  if (btnClear) btnClear.innerHTML = ICONS.SWEEP;
+  setById("btnMonitorIgnore", ICONS.IGNORE);
+  setById("btnClearIo", ICONS.SWEEP);
   document.querySelectorAll(".mx-btn-close").forEach((btn) => {
     btn.innerHTML = ICONS.CLOSE;
   });
@@ -204,9 +200,9 @@ export const initIcons = (): void => {
 export const normalizeToDisplay = (path: string | null | undefined): string => {
   if (!path) return "";
   if (path.startsWith(CONST.PATH_PREFIX_REAL))
-    return path.substring(CONST.PATH_PREFIX_REAL.length) || "/";
+    return path.slice(CONST.PATH_PREFIX_REAL.length) || "/";
   if (path.startsWith(CONST.PATH_PREFIX_STORAGE))
-    return path.substring(CONST.PATH_PREFIX_STORAGE.length) || "/";
+    return path.slice(CONST.PATH_PREFIX_STORAGE.length) || "/";
   return path;
 };
 

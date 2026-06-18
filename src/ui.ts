@@ -4,6 +4,21 @@ import { exec } from "kernelsu";
 import { prepare, layout } from "@chenglou/pretext";
 import type { Suggestion } from "./types/index";
 
+function getSelectById(id: string | null): HTMLSelectElement | null {
+  if (!id) return null;
+  return document.getElementById(id) as HTMLSelectElement | null;
+}
+
+function clearSelectValue(id: string | null): void {
+  const sel = getSelectById(id);
+  if (sel) sel.value = "";
+}
+
+function getSelectValue(id: string | null): string {
+  const sel = getSelectById(id);
+  return sel?.value ?? "";
+}
+
 export const addRuleRow = (
   type: string,
   target: string,
@@ -52,33 +67,39 @@ export const parseConfigTextToVisual = (
 ): void => {
   const container = document.getElementById(containerId);
   if (container) {
-    // safely move suggestionBox to body if it's inside the container
     const box = document.getElementById("suggestionBox");
     if (box && container.contains(box)) {
       document.body.appendChild(box);
     }
     container.innerHTML = "";
   }
-  const selMonitor = document.getElementById(monitorSelectId) as HTMLSelectElement | null;
-  if (selMonitor) selMonitor.value = "";
-  const selSandbox = document.getElementById(sandboxSelectId) as HTMLSelectElement | null;
-  if (selSandbox) selSandbox.value = "";
-  const selInject = injectSelectId
-    ? (document.getElementById(injectSelectId) as HTMLSelectElement | null)
-    : null;
-  if (selInject) selInject.value = "";
-  if (text) {
-    text.split("\n").forEach((line) => {
-      const parts = line.trim().split(/\s+/);
-      if (parts[0] === "REDIRECT" && parts.length >= 3)
-        addRuleRow("REDIRECT", normalizeToDisplay(parts[1]), normalizeToDisplay(parts.slice(2).join(" ")), containerId);
-      else if (["HIDE", "RO", "ALLOW"].includes(parts[0]) && parts.length >= 2)
-        addRuleRow(parts[0], normalizeToDisplay(parts[1]), "", containerId);
-      else if (parts[0] === "MONITOR" && selMonitor) selMonitor.value = parts[1];
-      else if (parts[0] === "SANDBOX" && selSandbox) selSandbox.value = parts[1];
-      else if (parts[0] === "GLOBAL_INJECT" && selInject) selInject.value = parts[1];
-    });
-  }
+  clearSelectValue(monitorSelectId);
+  clearSelectValue(sandboxSelectId);
+  clearSelectValue(injectSelectId);
+
+  if (!text) return;
+
+  const selMonitor = getSelectById(monitorSelectId);
+  const selSandbox = getSelectById(sandboxSelectId);
+  const selInject = getSelectById(injectSelectId);
+
+  text.split("\n").forEach((line) => {
+    const parts = line.trim().split(/\s+/);
+    const cmd = parts[0];
+    if (cmd === "REDIRECT" && parts.length >= 3) {
+      addRuleRow("REDIRECT", normalizeToDisplay(parts[1]), normalizeToDisplay(parts.slice(2).join(" ")), containerId);
+    } else if (parts.length >= 2) {
+      if (cmd === "HIDE" || cmd === "RO" || cmd === "ALLOW") {
+        addRuleRow(cmd, normalizeToDisplay(parts[1]), "", containerId);
+      } else if (cmd === "MONITOR" && selMonitor) {
+        selMonitor.value = parts[1];
+      } else if (cmd === "SANDBOX" && selSandbox) {
+        selSandbox.value = parts[1];
+      } else if (cmd === "GLOBAL_INJECT" && selInject) {
+        selInject.value = parts[1];
+      }
+    }
+  });
 };
 
 export const generateConfigTextFromVisual = (
@@ -88,23 +109,28 @@ export const generateConfigTextFromVisual = (
   injectSelectId: string | null,
 ): string => {
   let res = "";
-  const selInject = injectSelectId
-    ? (document.getElementById(injectSelectId) as HTMLSelectElement | null)
-    : null;
-  if (selInject && selInject.value) res += `GLOBAL_INJECT ${selInject.value}\n`;
-  const selMonitor = document.getElementById(monitorSelectId) as HTMLSelectElement | null;
-  if (selMonitor && selMonitor.value) res += `MONITOR ${selMonitor.value}\n`;
-  const selSandbox = document.getElementById(sandboxSelectId) as HTMLSelectElement | null;
-  if (selSandbox && selSandbox.value) res += `SANDBOX ${selSandbox.value}\n`;
+
+  const injectVal = getSelectValue(injectSelectId);
+  if (injectVal) res += `GLOBAL_INJECT ${injectVal}\n`;
+
+  const monitorVal = getSelectValue(monitorSelectId);
+  if (monitorVal) res += `MONITOR ${monitorVal}\n`;
+
+  const sandboxVal = getSelectValue(sandboxSelectId);
+  if (sandboxVal) res += `SANDBOX ${sandboxVal}\n`;
+
   document.querySelectorAll(`#${containerId} .rule-row`).forEach((row) => {
     const type = (row.querySelector(".rule-type") as HTMLSelectElement).value;
     const target = (row.querySelector(".rule-target") as HTMLInputElement).value.trim();
-    const source = (row.querySelector(".rule-source") as HTMLInputElement).value.trim();
-    if (target) {
-      if (type === "REDIRECT" && source)
+    if (!target) return;
+
+    if (type === "REDIRECT") {
+      const source = (row.querySelector(".rule-source") as HTMLInputElement).value.trim();
+      if (source) {
         res += `REDIRECT ${normalizeToConfig(target, true)} ${normalizeToConfig(source, false)}\n`;
-      else if (["HIDE", "RO", "ALLOW"].includes(type))
-        res += `${type} ${normalizeToConfig(target, true)}\n`;
+      }
+    } else if (type === "HIDE" || type === "RO" || type === "ALLOW") {
+      res += `${type} ${normalizeToConfig(target, true)}\n`;
     }
   });
   return res.trim();
@@ -118,18 +144,24 @@ export const setupModeToggle = (
   parseFunc: (val: string) => void,
   genFunc: () => string,
 ): void => {
-  document.querySelectorAll(`button[name="${groupName}"]`).forEach((btn) => {
+  const buttons = document.querySelectorAll(`button[name="${groupName}"]`);
+  const visualEl = document.getElementById(visualId)!;
+  const rawEl = document.getElementById(rawId)!;
+  const contentEl = document.getElementById(contentId) as HTMLTextAreaElement;
+
+  buttons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(`button[name="${groupName}"]`).forEach((b) => b.classList.remove("active"));
+      buttons.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
+
       if ((btn as HTMLElement).dataset.mode === "visual") {
-        parseFunc((document.getElementById(contentId) as HTMLTextAreaElement).value);
-        document.getElementById(rawId)!.classList.remove("active");
-        document.getElementById(visualId)!.classList.add("active");
+        parseFunc(contentEl.value);
+        rawEl.classList.remove("active");
+        visualEl.classList.add("active");
       } else {
-        (document.getElementById(contentId) as HTMLTextAreaElement).value = genFunc();
-        document.getElementById(visualId)!.classList.remove("active");
-        document.getElementById(rawId)!.classList.add("active");
+        contentEl.value = genFunc();
+        visualEl.classList.remove("active");
+        rawEl.classList.add("active");
       }
     });
   });
@@ -138,34 +170,32 @@ export const setupModeToggle = (
 export const updateSuggestionBoxPosition = (input: HTMLInputElement): void => {
   const box = document.getElementById("suggestionBox");
   if (!box || !input || !box.classList.contains("open")) return;
+
   const wrapper = input.closest(".mx-input-wrapper");
   if (!wrapper) return;
+
   if (box.parentNode !== wrapper) {
     wrapper.appendChild(box);
   }
+
   const container =
     input.closest(".overflow-y-auto") ||
     input.closest(".mx-subpage-body") ||
     input.closest(".editor-scroll");
-  if (container) {
-    const containerRect = container.getBoundingClientRect();
-    const inputRect = input.getBoundingClientRect();
-    const vvHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    const effectiveBottom = Math.min(containerRect.bottom, vvHeight);
-    const spaceBelow = effectiveBottom - inputRect.bottom;
-    const spaceAbove = inputRect.top - containerRect.top;
-    if (spaceBelow < 180 && spaceAbove > spaceBelow) {
-      box.style.top = "auto";
-      box.style.bottom = "100%";
-      box.style.marginTop = "0px";
-      box.style.marginBottom = "4px";
-    } else {
-      box.style.top = "100%";
-      box.style.bottom = "auto";
-      box.style.marginTop = "4px";
-      box.style.marginBottom = "0px";
-    }
-  }
+  if (!container) return;
+
+  const containerRect = container.getBoundingClientRect();
+  const inputRect = input.getBoundingClientRect();
+  const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const effectiveBottom = Math.min(containerRect.bottom, viewportHeight);
+  const spaceBelow = effectiveBottom - inputRect.bottom;
+  const spaceAbove = inputRect.top - containerRect.top;
+
+  const placeAbove = spaceBelow < 180 && spaceAbove > spaceBelow;
+  box.style.top = placeAbove ? "auto" : "100%";
+  box.style.bottom = placeAbove ? "100%" : "auto";
+  box.style.marginTop = placeAbove ? "0px" : "4px";
+  box.style.marginBottom = placeAbove ? "4px" : "0px";
 };
 
 export const centerActiveInput = (input: HTMLElement): void => {
@@ -219,6 +249,84 @@ declare global {
   }
 }
 
+// ---- Autocomplete helpers ----
+
+interface ParsedAutocompletePath {
+  prefixDir: string;
+  searchPrefix: string;
+  displayBase: string;
+}
+
+function parseAutocompletePath(value: string): ParsedAutocompletePath {
+  const result: ParsedAutocompletePath = {
+    prefixDir: CONST.PATH_PREFIX_REAL + "/",
+    searchPrefix: "",
+    displayBase: "/",
+  };
+
+  const clean = value.replace(/^\/+/, "");
+  if (!clean) return result;
+
+  const lastSlash = clean.lastIndexOf("/");
+  if (lastSlash === -1) {
+    result.searchPrefix = clean;
+  } else {
+    result.prefixDir = CONST.PATH_PREFIX_REAL + "/" + clean.substring(0, lastSlash + 1);
+    result.searchPrefix = clean.substring(lastSlash + 1);
+    result.displayBase = "/" + clean.substring(0, lastSlash + 1);
+  }
+  return result;
+}
+
+function closeSuggestionBox(box: HTMLElement): void {
+  box.classList.remove("open");
+  state.currentSuggestions = [];
+  state.suggestionBoxHeight = 0;
+}
+
+async function checkInputPathExists(val: string): Promise<boolean> {
+  if (!val.trim()) return false;
+  const fullPath = val.startsWith("/")
+    ? CONST.PATH_PREFIX_REAL + val
+    : CONST.PATH_PREFIX_REAL + "/" + val;
+  try {
+    const checkRes = await exec(
+      `test -d "${fullPath.replace(/\/+/g, "/")}" 2>/dev/null && echo yes`,
+    );
+    return checkRes.stdout?.trim() === "yes";
+  } catch {
+    return false;
+  }
+}
+
+const FONT_STYLE = "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const HORIZONTAL_PADDING = 24;
+const ICON_AND_GAP = 16 + 8;
+
+function computeSuggestionBoxHeight(sugs: Suggestion[], inputRectWidth: number): number {
+  let totalHeight = 2;
+  const availTextWidth = inputRectWidth - HORIZONTAL_PADDING - ICON_AND_GAP;
+  for (const s of sugs) {
+    try {
+      const preparedText = prepare(s.t, FONT_STYLE);
+      const { height } = layout(preparedText, Math.max(availTextWidth, 50), 18);
+      totalHeight += height + 20 + 1;
+    } catch {
+      totalHeight += 39;
+    }
+  }
+  return totalHeight;
+}
+
+function buildSuggestionHtml(sugs: Suggestion[]): string {
+  return sugs
+    .map(
+      (s) =>
+        `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window._currentInput.value='${s.t}';window._currentInput.dispatchEvent(new Event('input'))"><span style="display:flex">${s.i}</span><span style="word-break:break-all;flex:1;line-height:18px;">${s.t}</span></div>`,
+    )
+    .join("");
+}
+
 // ---- Autocomplete setup ----
 
 const setupAutocomplete = (input: HTMLInputElement | null): void => {
@@ -236,118 +344,77 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
     "input",
     debounce(async (e: Event) => {
       const val = (e.target as HTMLInputElement).value;
-      let pDir = CONST.PATH_PREFIX_REAL + "/";
-      let sPre = "";
-      let dBase = "/";
-      const cVal = val ? val.replace(/^\/+/, "") : "";
-      if (cVal) {
-        const ls = cVal.lastIndexOf("/");
-        if (ls === -1) {
-          sPre = cVal;
-        } else {
-          pDir = CONST.PATH_PREFIX_REAL + "/" + cVal.substring(0, ls + 1);
-          sPre = cVal.substring(ls + 1);
-          dBase = "/" + cVal.substring(0, ls + 1);
-        }
-      }
+      const { prefixDir, searchPrefix, displayBase } = parseAutocompletePath(val);
+
       try {
-        const res = await exec(`ls -F -1 "${pDir.replace(/\/+/g, "/")}" 2>/dev/null | head -n 30`);
+        const res = await exec(
+          `ls -F -1 "${prefixDir.replace(/\/+/g, "/")}" 2>/dev/null | head -n 30`,
+        );
         if (!res || !res.stdout) {
-          box!.classList.remove("open");
-          state.currentSuggestions = [];
-          state.suggestionBoxHeight = 0;
+          closeSuggestionBox(box!);
           return;
         }
+
         const sugs: Suggestion[] = res.stdout
           .split("\n")
-          .filter((l: string) => l.endsWith("/") && l.startsWith(sPre))
-          .map((l: string) => ({ t: dBase + l, i: ICONS.FOLDER }));
+          .filter((l: string) => l.endsWith("/") && l.startsWith(searchPrefix))
+          .map((l: string) => ({ t: displayBase + l, i: ICONS.FOLDER }));
+
         if (sugs.length === 0) {
-          box!.classList.remove("open");
-          state.currentSuggestions = [];
-          state.suggestionBoxHeight = 0;
+          closeSuggestionBox(box!);
           return;
         }
-        let inputPathExists = false;
-        if (val.trim()) {
-          const fullPath = val.startsWith("/")
-            ? CONST.PATH_PREFIX_REAL + val
-            : CONST.PATH_PREFIX_REAL + "/" + val;
-          try {
-            const checkRes = await exec(`test -d "${fullPath.replace(/\/+/g, "/")}" 2>/dev/null && echo yes`);
-            inputPathExists = checkRes.stdout?.trim() === "yes";
-          } catch {
-            /* ignore */
-          }
-        }
+
+        const inputPathExists = await checkInputPathExists(val);
         input.classList.toggle("path-exists", inputPathExists);
+
         state.currentSuggestions = sugs;
-        let totalBoxHeight = 2;
-        const fontStyle =
-          "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-        const horizontalPadding = 24;
-        const iconAndGap = 16 + 8;
-        const rect = input.getBoundingClientRect();
-        const availTextWidth = rect.width - horizontalPadding - iconAndGap;
-        sugs.forEach((s) => {
-          try {
-            const prepared = prepare(s.t, fontStyle);
-            const { height } = layout(prepared, Math.max(availTextWidth, 50), 18);
-            totalBoxHeight += height + 20 + 1;
-          } catch {
-            totalBoxHeight += 39;
-          }
-        });
-        state.suggestionBoxHeight = totalBoxHeight;
-        box!.innerHTML = sugs
-          .map(
-            (s) =>
-              `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window._currentInput.value='${s.t}';window._currentInput.dispatchEvent(new Event('input'))"><span style="display:flex">${s.i}</span><span style="word-break:break-all;flex:1;line-height:18px;">${s.t}</span></div>`,
-          )
-          .join("");
+        state.suggestionBoxHeight = computeSuggestionBoxHeight(sugs, input.getBoundingClientRect().width);
+        box!.innerHTML = buildSuggestionHtml(sugs);
         box!.classList.add("open");
         window.requestAnimationFrame(() => {
           updateSuggestionBoxPosition(input);
         });
       } catch {
-        box!.classList.remove("open");
-        state.currentSuggestions = [];
-        state.suggestionBoxHeight = 0;
+        closeSuggestionBox(box!);
       }
     }, 250),
   );
 
   input.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      const inputs = Array.from(
-        document.querySelectorAll<HTMLInputElement>(".mx-subpage-container.open .mx-input:not([readonly])"),
-      );
-      const idx = inputs.indexOf(input);
-      if (idx !== -1) {
-        if (e.key === "ArrowUp" && idx > 0) {
-          e.preventDefault();
-          inputs[idx - 1].focus();
-        } else if (e.key === "ArrowDown" && idx < inputs.length - 1) {
-          e.preventDefault();
-          inputs[idx + 1].focus();
-        }
-      }
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+
+    const inputs = Array.from(
+      document.querySelectorAll<HTMLInputElement>(
+        ".mx-subpage-container.open .mx-input:not([readonly])",
+      ),
+    );
+    const idx = inputs.indexOf(input);
+    if (idx === -1) return;
+
+    if (e.key === "ArrowUp" && idx > 0) {
+      e.preventDefault();
+      inputs[idx - 1].focus();
+    } else if (e.key === "ArrowDown" && idx < inputs.length - 1) {
+      e.preventDefault();
+      inputs[idx + 1].focus();
     }
   });
 
   input.addEventListener("focus", () => {
     window._currentInput = input;
     centerActiveInput(input);
+
     const isFirstFocus = !input.hasAttribute("data-has-focused");
     if (isFirstFocus) {
       input.setAttribute("data-has-focused", "true");
     }
-    const dispatchDelay = isFirstFocus ? 400 : 0;
+
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));
       }
-    }, dispatchDelay);
+    }, isFirstFocus ? 400 : 0);
   });
 
   input.addEventListener("blur", () => {

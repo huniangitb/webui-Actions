@@ -1,5 +1,3 @@
-/* ── Core domain types ── */
-
 export interface PackageInfo {
   packageName: string;
   appLabel: string;

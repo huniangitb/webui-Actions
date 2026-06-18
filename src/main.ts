@@ -33,9 +33,67 @@ import { enableEdgeToEdge } from "kernelsu";
 import { initRipple } from "./ripple.js";
 import "../style.css";
 
+// ── Helpers ──
+
+function isVisualMode(toggleName: string): boolean {
+  return !!document
+    .querySelector(`button[name="${toggleName}"][data-mode="visual"]`)
+    ?.classList.contains("active");
+}
+
+function getStatusSuffixes(): readonly string[] {
+  return ["Mobile", "Desktop"];
+}
+
+function closeSuggestionsOnScroll(): void {
+  if (!state.isUserTouching) return;
+  const box = document.getElementById("suggestionBox");
+  if (box && box.classList.contains("open")) {
+    box.classList.remove("open");
+    state.currentSuggestions = [];
+  }
+}
+
+function scrollToInputIfKeyboardOpen(input: HTMLElement): void {
+  if (document.body.classList.contains("keyboard-open")) {
+    import("./ui.js").then(({ centerActiveInput }) => centerActiveInput(input));
+  }
+}
+
+function buildPluginStatusLabel(container: HTMLElement, installed: boolean): void {
+  if (installed) {
+    container.textContent = "状态: 发现清理插件 (已就绪)";
+    container.style.color = "var(--mx-green)";
+    container.style.display = "";
+    container.style.justifyContent = "";
+    container.style.alignItems = "";
+  } else {
+    container.innerHTML = "";
+    container.style.display = "flex";
+    container.style.justifyContent = "space-between";
+    container.style.alignItems = "center";
+    container.style.color = "";
+
+    const span = document.createElement("span");
+    span.textContent = "状态: 未发现清理插件";
+    span.style.color = "var(--mx-red)";
+
+    const link = document.createElement("a");
+    link.textContent = "去下载";
+    link.style.cssText =
+      "margin-left:auto;color:var(--mx-primary);text-decoration:none;font-size:11px;cursor:pointer;";
+    link.onclick = () => {
+      run('am start -a android.intent.action.VIEW -d "https://wwbti.lanzoue.com/i3K1v3ofox5a"');
+    };
+
+    container.appendChild(span);
+    container.appendChild(link);
+  }
+}
+
 // ── Height lock for WebView keyboard handling ──
 
-const lockInitialHeight = (): void => {
+function lockInitialHeight(): void {
   const update = (): void => {
     const initialH = window.visualViewport
       ? window.visualViewport.height
@@ -45,13 +103,15 @@ const lockInitialHeight = (): void => {
     }
   };
 
+  const delayedUpdate = () => setTimeout(update, 200);
+
   update();
   window.addEventListener("load", update);
-  window.addEventListener("orientationchange", () => setTimeout(update, 200));
+  window.addEventListener("orientationchange", delayedUpdate);
   setTimeout(update, 100);
   setTimeout(update, 300);
   setTimeout(update, 600);
-};
+}
 lockInitialHeight();
 
 // ── Polling ──
@@ -59,37 +119,39 @@ lockInitialHeight();
 let statusPolling: ReturnType<typeof setInterval> | null = null;
 let appStatusPolling: ReturnType<typeof setInterval> | null = null;
 
-const checkStatus = async (): Promise<void> => {
+function updateStatusBadge(suffix: string): void {
+  const badge = document.getElementById("statusBadge" + suffix);
+  const btn = document.getElementById("btnToggleStatus" + suffix);
+  if (!badge || !btn) return;
+
+  if (state.currentPid) {
+    badge.className = "mx-badge mx-badge-success";
+    badge.textContent = "RUNNING";
+    btn.innerHTML = ICONS.STOP;
+  } else {
+    badge.className = "mx-badge mx-badge-gray";
+    badge.textContent = "STOPPED";
+    btn.innerHTML = ICONS.PLAY;
+  }
+}
+
+async function checkStatus(): Promise<void> {
   if (document.querySelector(".mx-app")?.classList.contains("frozen")) return;
   try {
-    let pid = (await run("pidof injector")) || (await run("pgrep -x injector"));
+    const pid = (await run("pidof injector")) || (await run("pgrep -x injector"));
     state.currentPid = pid ? pid.split(" ")[0] : null;
-    ["Mobile", "Desktop"].forEach((suffix) => {
-      const b = document.getElementById("statusBadge" + suffix);
-      const btn = document.getElementById("btnToggleStatus" + suffix);
-      if (b && btn) {
-        if (state.currentPid) {
-          b.className = "mx-badge mx-badge-success";
-          b.textContent = "RUNNING";
-          btn.innerHTML = ICONS.STOP;
-        } else {
-          b.className = "mx-badge mx-badge-gray";
-          b.textContent = "STOPPED";
-          btn.innerHTML = ICONS.PLAY;
-        }
-      }
-    });
+    getStatusSuffixes().forEach(updateStatusBadge);
+
     const info = document.getElementById("statusInfo");
-    if (info)
-      info.textContent = state.currentPid
-        ? `PID ${state.currentPid}`
-        : "OFFLINE";
+    if (info) {
+      info.textContent = state.currentPid ? `PID ${state.currentPid}` : "OFFLINE";
+    }
   } catch {
     /* ignore */
   }
-};
+}
 
-export const startPolling = (): void => {
+export function startPolling(): void {
   if (!statusPolling) {
     checkStatus();
     statusPolling = setInterval(checkStatus, 1500);
@@ -98,10 +160,10 @@ export const startPolling = (): void => {
     refreshAppStatus();
     appStatusPolling = setInterval(refreshAppStatus, 2000);
   }
-};
+}
 state.resumePolling = startPolling;
 
-export const stopPolling = (): void => {
+export function stopPolling(): void {
   if (statusPolling) {
     clearInterval(statusPolling);
     statusPolling = null;
@@ -110,10 +172,10 @@ export const stopPolling = (): void => {
     clearInterval(appStatusPolling);
     appStatusPolling = null;
   }
-};
+}
 state.suspendPolling = stopPolling;
 
-const toggleStatus = async (): Promise<void> => {
+async function toggleStatus(): Promise<void> {
   if (state.currentPid) {
     await run(`kill -15 ${state.currentPid}`);
     showToast.info("发送停止信号...");
@@ -123,9 +185,9 @@ const toggleStatus = async (): Promise<void> => {
     setTimeout(loadData, 1000);
   }
   setTimeout(checkStatus, 500);
-};
+}
 
-const refreshAppStatus = async (): Promise<void> => {
+async function refreshAppStatus(): Promise<void> {
   if (document.querySelector(".mx-app")?.classList.contains("frozen")) return;
   try {
     const [mounts] = await Promise.all([fetchActiveMounts(), fetchInjectedApps()]);
@@ -136,11 +198,11 @@ const refreshAppStatus = async (): Promise<void> => {
   } catch {
     /* ignore */
   }
-};
+}
 
 // ── Monitor ignore helpers ──
 
-const parseIgnoreToVisual = (t: string): void => {
+function parseIgnoreToVisual(t: string): void {
   const c = document.getElementById("ignoreBuilderContainer");
   if (!c) return;
   c.innerHTML = "";
@@ -151,18 +213,18 @@ const parseIgnoreToVisual = (t: string): void => {
     });
   }
   if (c.children.length === 0) addIgnoreRow("");
-};
+}
 
-const generateIgnoreFromVisual = (): string => {
+function generateIgnoreFromVisual(): string {
   let r = "";
   document.querySelectorAll<HTMLInputElement>("#ignoreBuilderContainer input").forEach((i) => {
     const v = i.value.trim();
     if (v) r += `${v}\n`;
   });
   return r.trim();
-};
+}
 
-const addIgnoreRow = (p: string): void => {
+function addIgnoreRow(p: string): void {
   const div = document.createElement("div");
   div.className = "rule-row flex-shrink-0";
   div.innerHTML = `<div class="mx-input-wrapper" style="position: relative; width: 100%;">
@@ -171,39 +233,40 @@ const addIgnoreRow = (p: string): void => {
   <button class="mx-btn-icon btn-del flex-shrink-0">${ICONS.DELETE}</button>`;
   div.querySelector(".btn-del")!.addEventListener("click", () => div.remove());
   document.getElementById("ignoreBuilderContainer")?.appendChild(div);
-};
+}
 
 // ── Section switching ──
 
-const switchSection = (sectionId: string): void => {
+const SECTION_TITLES: Record<string, string> = {
+  apps: "应用配置",
+  global: "全局规则",
+  io: "系统监控",
+  log: "运行日志",
+};
+
+function switchSection(sectionId: string): void {
   document.querySelectorAll(".demo-section").forEach((el) => el.classList.remove("active"));
   document.getElementById(`sec-${sectionId}`)?.classList.add("active");
-  document.querySelectorAll(".mx-nav-item").forEach((el) =>
-    el.classList.toggle("active", (el as HTMLElement).dataset.section === sectionId),
+
+  const selector = ".mx-nav-item, .mx-btm-item";
+  document.querySelectorAll<HTMLElement>(selector).forEach((el) =>
+    el.classList.toggle("active", el.dataset.section === sectionId),
   );
-  document.querySelectorAll(".mx-btm-item").forEach((el) =>
-    el.classList.toggle("active", (el as HTMLElement).dataset.section === sectionId),
-  );
-  const titles: Record<string, string> = {
-    apps: "应用配置",
-    global: "全局规则",
-    io: "系统监控",
-    log: "运行日志",
-  };
+
   const breadcrumb = document.getElementById("breadcrumbTitle");
-  if (breadcrumb) breadcrumb.textContent = titles[sectionId] ?? sectionId;
+  if (breadcrumb) breadcrumb.textContent = SECTION_TITLES[sectionId] ?? sectionId;
+
   if (sectionId === "io") {
     resetIoLogs();
     fetchIoLogs();
+    return;
   }
   if (sectionId === "log") {
     const source = (document.getElementById("logSourceSelect") as HTMLSelectElement)?.value;
-    if (source === "internal") {
-      resetSysLogs();
-    }
+    if (source === "internal") resetSysLogs();
     fetchSysLogs();
   }
-};
+}
 
 // ── DOMContentLoaded ──
 
@@ -232,80 +295,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     window._currentInput = null;
   });
 
-  // Keyboard handling
+  // ResizeObserver for re-centering input in open keyboard
   const ro = new ResizeObserver(() => {
-    if (
-      document.body.classList.contains("keyboard-open") &&
-      window._currentInput &&
-      document.activeElement === window._currentInput
-    ) {
-      import("./ui.js").then(({ centerActiveInput }) => centerActiveInput(window._currentInput!));
+    if (window._currentInput && document.activeElement === window._currentInput) {
+      scrollToInputIfKeyboardOpen(window._currentInput);
     }
   });
   document.querySelectorAll(".mx-subpage-body, .overflow-y-auto").forEach((el) => ro.observe(el));
 
-  if (navigator.virtualKeyboard) {
-    navigator.virtualKeyboard.overlaysContent = true;
-    navigator.virtualKeyboard.addEventListener("geometrychange", (e: Event) => {
-      const { height } = (e.target as unknown as VirtualKeyboard).boundingRect;
-      const isKeyboardOpen = height > 0;
-      document.body.classList.toggle("keyboard-open", isKeyboardOpen);
-      document.documentElement.style.setProperty("--keyboard-h", `${height}px`);
-      if (isKeyboardOpen && window._currentInput) {
-        import("./ui.js").then(({ centerActiveInput }) => centerActiveInput(window._currentInput!));
-      }
-    });
-  } else {
-    let isFrameBlocked = false;
-    const updateViewportHeight = (): void => {
-      if (isFrameBlocked) return;
-      isFrameBlocked = true;
-      window.requestAnimationFrame(() => {
-        isFrameBlocked = false;
-        const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        const totalH = window.innerHeight;
-        const keyboardHeight = totalH - vh;
-        const isKeyboardOpen = keyboardHeight > 80;
-        document.body.classList.toggle("keyboard-open", isKeyboardOpen);
-        document.documentElement.style.setProperty(
-          "--keyboard-h",
-          `${isKeyboardOpen ? keyboardHeight : 0}px`,
-        );
-        if (isKeyboardOpen && window._currentInput) {
-          import("./ui.js").then(({ centerActiveInput }) => centerActiveInput(window._currentInput!));
-        }
-      });
-    };
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", updateViewportHeight);
-      window.visualViewport.addEventListener("scroll", updateViewportHeight);
-    }
-    window.addEventListener("resize", updateViewportHeight);
-    updateViewportHeight();
-  }
+  // Keyboard handling
+  setupKeyboardHandling();
 
   // Touch tracking
-  document.addEventListener("touchstart", () => {
-    state.isUserTouching = true;
-  }, { passive: true });
-  document.addEventListener("touchend", () => {
-    state.isUserTouching = false;
-  }, { passive: true });
-  document.addEventListener("touchcancel", () => {
-    state.isUserTouching = false;
-  }, { passive: true });
+  document.addEventListener("touchstart", () => { state.isUserTouching = true; }, { passive: true });
+  document.addEventListener("touchend", () => { state.isUserTouching = false; }, { passive: true });
+  document.addEventListener("touchcancel", () => { state.isUserTouching = false; }, { passive: true });
 
   // Scroll handling
   window.addEventListener(
     "scroll",
     () => {
-      if (state.isUserTouching) {
-        const box = document.getElementById("suggestionBox");
-        if (box && box.classList.contains("open")) {
-          box.classList.remove("open");
-          state.currentSuggestions = [];
-        }
-      }
+      closeSuggestionsOnScroll();
       if (window.scrollY !== 0) window.scrollTo(0, 0);
     },
     true,
@@ -318,8 +328,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const target = e.target as HTMLElement;
       const isInput =
         target.classList.contains("rule-target") || target.classList.contains("rule-source");
-      const isInsideBox = box.contains(target);
-      if (!isInput && !isInsideBox) {
+      if (!isInput && !box.contains(target)) {
         box.classList.remove("open");
         state.currentSuggestions = [];
       }
@@ -356,8 +365,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Navigation
   document.querySelectorAll<HTMLElement>(".mx-nav-item, .mx-btm-item").forEach((btn) => {
-    if (btn.id !== "btnBackupDesktop")
+    if (btn.id !== "btnBackupDesktop") {
       btn.onclick = () => switchSection(btn.dataset.section ?? "");
+    }
   });
 
   // App filter
@@ -371,104 +381,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Search bar
-  const searchBarWrap = document.getElementById("searchBarWrap");
-  const appSearch = document.getElementById("appSearch") as HTMLInputElement | null;
-  const appFilterWrapper = document.getElementById("appFilterWrapper");
-  if (searchBarWrap && appSearch && appFilterWrapper) {
-    searchBarWrap.addEventListener("click", () => {
-      if (!searchBarWrap.classList.contains("expanded")) {
-        searchBarWrap.classList.add("expanded");
-        appFilterWrapper.classList.add("collapsed");
-        appSearch.focus();
-      }
-    });
-    appSearch.addEventListener("blur", () => {
-      searchBarWrap.classList.remove("expanded");
-      appFilterWrapper.classList.remove("collapsed");
-      searchBarWrap.classList.toggle("has-text", !!appSearch.value.trim());
-    });
-    appSearch.addEventListener(
-      "input",
-      debounce(() => {
-        renderAppList();
-      }, 250),
-    );
-
-    // Collapse search on scroll
-    const appListContainer = document.getElementById("appListContainer");
-    if (appListContainer) {
-      appListContainer.addEventListener(
-        "scroll",
-        () => {
-          if (searchBarWrap.classList.contains("expanded")) {
-            searchBarWrap.classList.remove("expanded");
-            appFilterWrapper.classList.remove("collapsed");
-            searchBarWrap.classList.toggle("has-text", !!appSearch.value.trim());
-            appSearch.blur();
-          }
-        },
-        { passive: true },
-      );
-    }
-  }
+  setupSearchBar();
 
   // IO search
-  const ioContainer = document.getElementById("ioLogContainer");
-  const ioSearch = document.getElementById("ioSearch") as HTMLInputElement | null;
-  if (ioSearch) {
-    ioSearch.addEventListener(
-      "input",
-      debounce(() => {
-        state.ioState.term = ioSearch.value.trim();
-        resetIoLogs();
-        fetchIoLogs();
-      }, 500),
-    );
-  }
-  if (ioContainer) {
-    ioContainer.addEventListener("scroll", () => {
-      if (
-        ioContainer.scrollTop + ioContainer.clientHeight >=
-        ioContainer.scrollHeight - 50
-      )
-        fetchIoLogs();
-    });
-  }
-  document.getElementById("btnClearIo")!.onclick = clearIoLogs;
+  setupIoSection();
 
   // Logs
-  const logSelect = document.getElementById("logSourceSelect") as HTMLSelectElement | null;
-  const logLevelSelect = document.getElementById("logLevelSelect") as HTMLSelectElement | null;
-  const logViewer = document.getElementById("logViewer");
-  const savedLogLevel = localStorage.getItem("sysLogLevel");
-  if (savedLogLevel) {
-    state.sysState.level = parseInt(savedLogLevel);
-    if (logLevelSelect) logLevelSelect.value = savedLogLevel;
-  }
-  if (logSelect) {
-    logSelect.addEventListener("change", () => {
-      if (logSelect.value === "internal") resetSysLogs();
-      fetchSysLogs();
-    });
-  }
-  if (logLevelSelect) {
-    logLevelSelect.addEventListener("change", () => {
-      state.sysState.level = parseInt(logLevelSelect.value);
-      localStorage.setItem("sysLogLevel", logLevelSelect.value);
-      resetSysLogs();
-      fetchSysLogs();
-    });
-  }
-  if (logViewer) {
-    logViewer.addEventListener("scroll", () => {
-      if (
-        logSelect?.value === "internal" &&
-        logViewer.scrollTop + logViewer.clientHeight >= logViewer.scrollHeight - 50
-      )
-        fetchSysLogs();
-    });
-  }
-  document.getElementById("btnClearLog")!.onclick = clearSysLogs;
+  setupLogSection();
 
   // Status toggle
   document.getElementById("btnToggleStatusMobile")!.onclick = toggleStatus;
@@ -479,35 +398,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     history.pushState({ modalOpen: true }, "");
     const isInstalled = await checkPluginInstalled();
     const lbl = document.getElementById("pluginStatusLabel");
-    if (lbl) {
-      if (isInstalled) {
-        lbl.textContent = "状态: 发现清理插件 (已就绪)";
-        lbl.style.color = "var(--mx-green)";
-        lbl.style.display = "";
-        lbl.style.justifyContent = "";
-        lbl.style.alignItems = "";
-      } else {
-        lbl.innerHTML = "";
-        lbl.style.display = "flex";
-        lbl.style.justifyContent = "space-between";
-        lbl.style.alignItems = "center";
-        lbl.style.color = "";
-        const span = document.createElement("span");
-        span.textContent = "状态: 未发现清理插件";
-        span.style.color = "var(--mx-red)";
-        const a = document.createElement("a");
-        a.textContent = "去下载";
-        a.style.cssText =
-          "margin-left:auto;color:var(--mx-primary);text-decoration:none;font-size:11px;cursor:pointer;";
-        a.onclick = () => {
-          run(
-            'am start -a android.intent.action.VIEW -d "https://wwbti.lanzoue.com/i3K1v3ofox5a"',
-          );
-        };
-        lbl.appendChild(span);
-        lbl.appendChild(a);
-      }
-    }
+    if (lbl) buildPluginStatusLabel(lbl, isInstalled);
     document.getElementById("settingsModal")?.classList.add("open");
   };
   document.getElementById("btnSettingsMobile")!.onclick = openSettings;
@@ -562,9 +453,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnAddIgnoreRow")!.onclick = () => addIgnoreRow("");
   document.getElementById("btnSaveIgnore")!.onclick = async () => {
     try {
-      const isVisual = document
-        .querySelector('button[name="ignoreModeToggle"][data-mode="visual"]')
-        ?.classList.contains("active");
+      const isVisual = isVisualMode("ignoreModeToggle");
       const content = isVisual
         ? generateIgnoreFromVisual()
         : (document.getElementById("monitorIgnoreContent") as HTMLTextAreaElement).value;
@@ -610,9 +499,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Save app config
   document.getElementById("btnSaveAppConfig")!.onclick = async () => {
     try {
-      const isVisual = document
-        .querySelector('button[name="appModeToggle"][data-mode="visual"]')
-        ?.classList.contains("active");
+      const isVisual = isVisualMode("appModeToggle");
       const text = isVisual
         ? generateConfigTextFromVisual("appRuleBuilderContainer", "appMonitorSelect", "appSandboxSelect", null)
         : (document.getElementById("appRuleContent") as HTMLTextAreaElement).value;
@@ -678,3 +565,150 @@ document.addEventListener("DOMContentLoaded", async () => {
   startPolling();
   requestAnimationFrame(() => document.body.classList.add("loaded"));
 });
+
+// ── Setup sub-functions (extracted from DOMContentLoaded to reduce nesting) ──
+
+function setupKeyboardHandling(): void {
+  if (navigator.virtualKeyboard) {
+    navigator.virtualKeyboard.overlaysContent = true;
+    navigator.virtualKeyboard.addEventListener("geometrychange", (e: Event) => {
+      const { height } = (e.target as unknown as VirtualKeyboard).boundingRect;
+      const isOpen = height > 0;
+      document.body.classList.toggle("keyboard-open", isOpen);
+      document.documentElement.style.setProperty("--keyboard-h", `${height}px`);
+      if (isOpen && window._currentInput) scrollToInputIfKeyboardOpen(window._currentInput);
+    });
+    return;
+  }
+
+  // Fallback: use visualViewport + resize to detect keyboard
+  let isFrameBlocked = false;
+  const updateViewportHeight = (): void => {
+    if (isFrameBlocked) return;
+    isFrameBlocked = true;
+    window.requestAnimationFrame(() => {
+      isFrameBlocked = false;
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      const keyboardHeight = window.innerHeight - vh;
+      const isOpen = keyboardHeight > 80;
+      document.body.classList.toggle("keyboard-open", isOpen);
+      document.documentElement.style.setProperty(
+        "--keyboard-h",
+        isOpen ? `${keyboardHeight}px` : "0px",
+      );
+      if (isOpen && window._currentInput) scrollToInputIfKeyboardOpen(window._currentInput);
+    });
+  };
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", updateViewportHeight);
+    window.visualViewport.addEventListener("scroll", updateViewportHeight);
+  }
+  window.addEventListener("resize", updateViewportHeight);
+  updateViewportHeight();
+}
+
+function setupSearchBar(): void {
+  const searchBarWrap = document.getElementById("searchBarWrap");
+  const appSearch = document.getElementById("appSearch") as HTMLInputElement | null;
+  const appFilterWrapper = document.getElementById("appFilterWrapper");
+  if (!searchBarWrap || !appSearch || !appFilterWrapper) return;
+
+  searchBarWrap.addEventListener("click", () => {
+    if (!searchBarWrap.classList.contains("expanded")) {
+      searchBarWrap.classList.add("expanded");
+      appFilterWrapper.classList.add("collapsed");
+      appSearch.focus();
+    }
+  });
+
+  appSearch.addEventListener("blur", () => {
+    searchBarWrap.classList.remove("expanded");
+    appFilterWrapper.classList.remove("collapsed");
+    searchBarWrap.classList.toggle("has-text", !!appSearch.value.trim());
+  });
+
+  appSearch.addEventListener("input", debounce(() => renderAppList(), 250));
+
+  const appListContainer = document.getElementById("appListContainer");
+  if (appListContainer) {
+    appListContainer.addEventListener(
+      "scroll",
+      () => {
+        if (searchBarWrap.classList.contains("expanded")) {
+          searchBarWrap.classList.remove("expanded");
+          appFilterWrapper.classList.remove("collapsed");
+          searchBarWrap.classList.toggle("has-text", !!appSearch.value.trim());
+          appSearch.blur();
+        }
+      },
+      { passive: true },
+    );
+  }
+}
+
+function setupIoSection(): void {
+  const ioSearch = document.getElementById("ioSearch") as HTMLInputElement | null;
+  if (ioSearch) {
+    ioSearch.addEventListener(
+      "input",
+      debounce(() => {
+        state.ioState.term = ioSearch.value.trim();
+        resetIoLogs();
+        fetchIoLogs();
+      }, 500),
+    );
+  }
+
+  const ioContainer = document.getElementById("ioLogContainer");
+  if (ioContainer) {
+    ioContainer.addEventListener("scroll", () => {
+      if (ioContainer.scrollTop + ioContainer.clientHeight >= ioContainer.scrollHeight - 50) {
+        fetchIoLogs();
+      }
+    });
+  }
+
+  document.getElementById("btnClearIo")!.onclick = clearIoLogs;
+}
+
+function setupLogSection(): void {
+  const logSelect = document.getElementById("logSourceSelect") as HTMLSelectElement | null;
+  const logLevelSelect = document.getElementById("logLevelSelect") as HTMLSelectElement | null;
+  const logViewer = document.getElementById("logViewer");
+
+  const savedLogLevel = localStorage.getItem("sysLogLevel");
+  if (savedLogLevel) {
+    state.sysState.level = parseInt(savedLogLevel);
+    if (logLevelSelect) logLevelSelect.value = savedLogLevel;
+  }
+
+  if (logSelect) {
+    logSelect.addEventListener("change", () => {
+      if (logSelect.value === "internal") resetSysLogs();
+      fetchSysLogs();
+    });
+  }
+
+  if (logLevelSelect) {
+    logLevelSelect.addEventListener("change", () => {
+      state.sysState.level = parseInt(logLevelSelect.value);
+      localStorage.setItem("sysLogLevel", logLevelSelect.value);
+      resetSysLogs();
+      fetchSysLogs();
+    });
+  }
+
+  if (logViewer) {
+    logViewer.addEventListener("scroll", () => {
+      if (
+        logSelect?.value === "internal" &&
+        logViewer.scrollTop + logViewer.clientHeight >= logViewer.scrollHeight - 50
+      ) {
+        fetchSysLogs();
+      }
+    });
+  }
+
+  document.getElementById("btnClearLog")!.onclick = clearSysLogs;
+}

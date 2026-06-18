@@ -96,15 +96,15 @@ export interface VirtualLogEntry {
   data: IoLogEntry | SysLogEntry;
 }
 
-export interface VirtualLogOptions {
+export interface VirtualLogOptions<E = IoLogEntry | SysLogEntry> {
   buffer?: number;
   estimatedLineHeight?: number;
   font?: string;
   lineHeight?: number;
   gap?: number;
   padding?: number;
-  chromeHeight?: number | ((entry: IoLogEntry | SysLogEntry) => number);
+  chromeHeight?: number | ((entry: E) => number);
   textWidthOffset?: number;
-  prepareFn?: ((entry: IoLogEntry | SysLogEntry) => string) | null;
+  prepareFn?: ((entry: E) => string) | null;
   onEmpty?: string;
 }

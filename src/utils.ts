@@ -41,7 +41,8 @@ export const debounce = <T extends (...args: any[]) => void>(
   wait: number,
 ): ((...args: Parameters<T>) => void) => {
   let timeout: ReturnType<typeof setTimeout>;
-  return function (...args: Parameters<T>): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return function (this: any, ...args: Parameters<T>): void {
     clearTimeout(timeout);
     timeout = setTimeout(() => func.apply(this, args), wait);
   };

@@ -62,3 +62,15 @@ interface HTMLElement {
   _scrollAnimId: number | null;
   _themeTransitionTimer: ReturnType<typeof setTimeout>;
 }
+
+// VirtualKeyboard API (Android WebView)
+interface VirtualKeyboard {
+  overlaysContent: boolean;
+  boundingRect: DOMRect;
+  addEventListener(type: "geometrychange", listener: (e: Event) => void): void;
+  removeEventListener(type: "geometrychange", listener: (e: Event) => void): void;
+}
+
+interface Navigator {
+  virtualKeyboard?: VirtualKeyboard;
+}

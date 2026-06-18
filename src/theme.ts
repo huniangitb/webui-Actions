@@ -32,7 +32,7 @@ export const systemThemeListener = (e: MediaQueryListEvent): void => {
 export const handleManualThemeToggle = (): void => {
   if (state.currentSettings.autoTheme) {
     state.currentSettings.autoTheme = false;
-    document.getElementById("autoThemeToggle")!.checked = false;
+    (document.getElementById("autoThemeToggle") as HTMLInputElement).checked = false;
     saveSettings(state.currentSettings);
     import("./utils.js").then(({ showToast }) => showToast.info("已关闭系统深色模式跟随"));
   }

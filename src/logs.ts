@@ -29,7 +29,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   private _ticking: boolean;
   private _resizeObserver: ResizeObserver | null;
 
-  constructor(containerEl: HTMLElement, contentEl: HTMLElement, options: VirtualLogOptions = {}) {
+  constructor(containerEl: HTMLElement, contentEl: HTMLElement, options: VirtualLogOptions<E> = {}) {
     this.container = containerEl;
     this.contentEl = contentEl;
     this.buffer = options.buffer ?? 10;

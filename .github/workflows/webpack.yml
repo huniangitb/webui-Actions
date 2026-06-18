@@ -3,7 +3,6 @@ name: Build, TypeScript Check & Release
 on:
   push:
     branches:
-      - fuse-ui-miuix
       - 'fuse-ui-miuix-*'
   pull_request:
     branches:

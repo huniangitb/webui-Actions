@@ -17,8 +17,9 @@ const processIconQueue = async (): Promise<void> => {
   isIconQueueRunning = true;
   while (iconQueue.size > 0) {
     const img = iconQueue.values().next().value;
+    if (!img) continue;
     iconQueue.delete(img);
-    if (img && img.dataset.src) {
+    if (img.dataset.src) {
       img.src = img.dataset.src;
       img.removeAttribute("data-src");
     }

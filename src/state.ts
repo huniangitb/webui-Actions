@@ -5,7 +5,7 @@ export const state: AppState = {
   globalConfText: "",
   injectorStates: new Map(),
   injectorRulesMap: new Map(),
-  currentSettings: { autoTheme: true, syncPlugin: false },
+  currentSettings: { autoTheme: true, syncPlugin: false, colorProfile: "teal" },
   activeUsers: [0],
   activeMounts: new Set(),
   injectedApps: new Map(),

@@ -544,6 +544,10 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav {
     position: relative; display: inline-flex;
     vertical-align: middle;
     z-index: 10;
+    max-width: 100%;
+}
+.mx-custom-select:not([style*="width"]) {
+    width: 100%;
 }
 .mx-select-trigger {
     display: flex; align-items: center; gap: 6px;
@@ -1076,11 +1080,23 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 .suggestion-item + .suggestion-item { border-top: 1px solid var(--mx-border-light); }
 @media (hover: hover) { .suggestion-item:hover { background: var(--mx-primary-subtle); } }
 
-.virtual-log-item { will-change: transform; backface-visibility: hidden; animation: logItemIn 0.12s var(--mx-ease) both; }
+.virtual-log-item { will-change: transform; backface-visibility: hidden; }
 
-@keyframes logItemIn {
-    from { opacity: 0.5; transform: translateY(2px); }
+.vlog-enter {
+    animation: vlogEnter 0.2s var(--mx-ease) both;
+}
+.vlog-leave {
+    animation: vlogLeave 0.2s var(--mx-ease) both;
+    pointer-events: none;
+}
+
+@keyframes vlogEnter {
+    from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: translateY(0); }
+}
+@keyframes vlogLeave {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-4px); }
 }
 
 /* ── Card animation ── */

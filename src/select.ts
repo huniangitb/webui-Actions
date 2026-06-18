@@ -81,9 +81,16 @@ export function initCustomSelect(nativeSelect: HTMLSelectElement, _options?: Cus
     </span>
   `;
 
-  /* Match trigger width to original select width */
-  wrapper.style.width = `${nativeSelect.offsetWidth}px`;
-  wrapper.style.minWidth = `${nativeSelect.offsetWidth}px`;
+  /* Match trigger width to original select width.
+     offsetWidth works for visible elements; fallback to inline style if hidden (e.g. inside modals). */
+  let selectWidth = nativeSelect.offsetWidth;
+  if (selectWidth <= 0 && nativeSelect.style.width) {
+    selectWidth = parseFloat(nativeSelect.style.width) || 0;
+  }
+  if (selectWidth > 0) {
+    wrapper.style.width = `${selectWidth}px`;
+    wrapper.style.minWidth = `${selectWidth}px`;
+  }
 
   /* Create dropdown (appended to body) */
   const dropdown = document.createElement("div");

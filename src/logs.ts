@@ -22,7 +22,7 @@ const DEFAULT_CHROME_HEIGHT = 0;
 const DEFAULT_TEXT_WIDTH_OFFSET = 0;
 const DEFAULT_ON_EMPTY = "";
 
-// ── Virtual log list (Pretext-powered) ──
+// ── Virtual log list (Pretext-powered) with per-item DOM diffing ──
 
 class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEntry> {
   private container: HTMLElement;
@@ -45,8 +45,10 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   private isDirty: boolean;
   private _ticking: boolean;
   private _resizeObserver: ResizeObserver | null;
-  /** Hash set of current visible content for flicker-free dedup */
   private _contentHashes: Set<string>;
+  /** DOM node cache keyed by data-index for per-item transitions */
+  private _renderedNodes: Map<number, HTMLElement>;
+  private _leaveDuration = 200;
 
   constructor(containerEl: HTMLElement, contentEl: HTMLElement, options: VirtualLogOptions<E> = {}) {
     this.container = containerEl;
@@ -69,6 +71,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     this.isDirty = true;
     this._ticking = false;
     this._contentHashes = new Set();
+    this._renderedNodes = new Map();
     this._onScroll = this._onScroll.bind(this);
     this._onResize = this._onResize.bind(this);
     this.container.addEventListener("scroll", this._onScroll);
@@ -78,16 +81,12 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   }
 
   append(entryList: E[]): void {
-    const availWidth =
-      this.container.clientWidth - this.padding * 2 - this.textWidthOffset;
+    const availWidth = this.container.clientWidth - this.padding * 2 - this.textWidthOffset;
     const safeAvailWidth = Math.max(availWidth, 100);
     for (const entry of entryList) {
       let h = this.estimatedLineHeight;
       let prep: object | null = null;
-      const cHeight =
-        typeof this.chromeHeight === "function"
-          ? this.chromeHeight(entry)
-          : this.chromeHeight;
+      const cHeight = typeof this.chromeHeight === "function" ? this.chromeHeight(entry) : this.chromeHeight;
       if ((entry as IoLogEntry).text || (entry as SysLogEntry).text) {
         try {
           prep = prepare(entry.text ?? "", this.font);
@@ -114,71 +113,69 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     this._recalcTotalHeight();
     this.isDirty = true;
     this.container.scrollTop = 0;
-    this._render();
+    this._fadeOutAndClear();
+  }
+
+  private _fadeOutAndClear(): void {
+    const nodes = Array.from(this._renderedNodes.values());
+    if (nodes.length === 0) {
+      this._renderedNodes.clear();
+      this.contentEl.innerHTML = this.onEmpty || "";
+      return;
+    }
+    for (const el of nodes) el.classList.add("vlog-leave");
+    setTimeout(() => {
+      this._renderedNodes.clear();
+      this.contentEl.innerHTML = "";
+      if (this.onEmpty) this.contentEl.innerHTML = this.onEmpty;
+    }, this._leaveDuration);
   }
 
   replace(entryList: E[]): void {
-    this.clear();
-    this.append(entryList);
+    this._fadeOutAndClear();
+    this.entries = [];
+    this.prefixHeights = [];
+    this._contentHashes.clear();
+    this.totalHeight = 0;
+    this.visibleStart = 0;
+    this.visibleEnd = 0;
+    this.isDirty = true;
+    // Use rAF to let fade-out start before new items render
+    requestAnimationFrame(() => this.append(entryList));
   }
 
-  /**
-   * Fetch → sort → dedup → replace with transition.
-   * Accepts raw lines, parses, sorts, deduplicates against current content,
-   * and only re-renders when data actually changed.
-   */
   replaceSorted(
     rawLines: string[],
     parser: (lines: string[]) => E[],
     sortFn?: (a: E, b: E) => number,
   ): void {
-    // Parse
     let parsed = parser(rawLines);
+    if (sortFn) parsed = parsed.sort(sortFn);
 
-    // Sort if provided
-    if (sortFn) {
-      parsed = parsed.sort(sortFn);
-    }
-
-    // Deduplicate within new data first
     const seen = new Set<string>();
     const deduped: E[] = [];
     for (const e of parsed) {
       const h = entryHash(e);
-      if (!seen.has(h)) {
-        seen.add(h);
-        deduped.push(e);
-      }
+      if (!seen.has(h)) { seen.add(h); deduped.push(e); }
     }
 
-    // Fast path: compare hashes with current — skip render if identical
     if (this.entries.length === deduped.length) {
-      let same = true;
       for (let i = 0; i < deduped.length; i++) {
         if (entryHash(deduped[i]) !== entryHash(this.entries[i].data as E)) {
-          same = false;
-          break;
+          this.replace(deduped);
+          return;
         }
       }
-      if (same) return;
+      return; // identical — skip
     }
-
-    // Data changed — directly replace; new items fade in via logItemIn CSS animation.
-    // No opacity trick needed because the render is skipped entirely when content
-    // hasn't changed (fast path above).
     this.replace(deduped);
   }
 
-  get scrollHeight(): number {
-    return this.totalHeight;
-  }
+  get scrollHeight(): number { return this.totalHeight; }
 
   destroy(): void {
     this.container.removeEventListener("scroll", this._onScroll);
-    if (this._resizeObserver) {
-      this._resizeObserver.disconnect();
-      this._resizeObserver = null;
-    }
+    if (this._resizeObserver) { this._resizeObserver.disconnect(); this._resizeObserver = null; }
   }
 
   private _recalcTotalHeight(): void {
@@ -188,89 +185,125 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
       this.prefixHeights.push(currentY);
       currentY += this.entries[i].height + this.gap;
     }
-    if (this.entries.length > 0) {
-      this.totalHeight = currentY - this.gap + this.padding;
-    } else {
-      this.totalHeight = 0;
-    }
+    this.totalHeight = this.entries.length > 0 ? currentY - this.gap + this.padding : 0;
   }
 
   private _isActive(): boolean {
     if (document.querySelector(".mx-app")?.classList.contains("frozen")) return false;
     const section = this.container.closest(".demo-section");
-    if (section && !section.classList.contains("active")) return false;
-    return true;
+    return !(section && !section.classList.contains("active"));
   }
 
   private _scheduleRender(): void {
     if (!this._ticking) {
-      window.requestAnimationFrame(() => {
-        this._render();
-        this._ticking = false;
-      });
+      window.requestAnimationFrame(() => { this._render(); this._ticking = false; });
       this._ticking = true;
     }
   }
 
-  private _onScroll(): void {
-    if (!this._isActive()) return;
-    this._scheduleRender();
-  }
-
-  private _onResize(): void {
-    if (!this._isActive()) return;
-    this.isDirty = true;
-    this._scheduleRender();
-  }
+  private _onScroll(): void { if (this._isActive()) this._scheduleRender(); }
+  private _onResize(): void { if (this._isActive()) { this.isDirty = true; this._scheduleRender(); } }
 
   private _render(): void {
     if (!this._isActive()) return;
     const scrollTop = this.container.scrollTop;
     const viewHeight = this.container.clientHeight;
     this.contentEl.style.height = this.totalHeight + "px";
+
     if (this.entries.length === 0) {
       if (this.onEmpty && this.contentEl.innerHTML !== this.onEmpty) {
+        this._renderedNodes.clear();
         this.contentEl.innerHTML = this.onEmpty;
       }
       return;
     }
+
     const startIdx = this._findIndex(scrollTop);
     const renderStart = Math.max(0, startIdx - this.buffer);
     let endIdx = startIdx;
     const maxBottom = scrollTop + viewHeight + this.buffer * this.estimatedLineHeight;
-    while (endIdx < this.entries.length && this.prefixHeights[endIdx] < maxBottom) {
-      endIdx++;
-    }
+    while (endIdx < this.entries.length && this.prefixHeights[endIdx] < maxBottom) endIdx++;
     const renderEnd = Math.min(this.entries.length, endIdx + this.buffer);
+
     if (this.visibleStart === renderStart && this.visibleEnd === renderEnd && !this.isDirty) {
+      this._updateNodePositions(renderStart, renderEnd);
       return;
     }
+
+    const oldStart = this.visibleStart;
+    const oldEnd = this.visibleEnd;
     this.visibleStart = renderStart;
     this.visibleEnd = renderEnd;
     this.isDirty = false;
+
+    // Build wanted indices
+    const wanted = new Set<number>();
+    for (let i = renderStart; i < renderEnd; i++) wanted.add(i);
+
+    // 1. Fade-out nodes no longer in range
+    const toRemove: number[] = [];
+    for (const [idx, el] of this._renderedNodes) {
+      if (!wanted.has(idx)) {
+        el.classList.add("vlog-leave");
+        toRemove.push(idx);
+      }
+    }
+    if (toRemove.length > 0) {
+      setTimeout(() => {
+        for (const idx of toRemove) {
+          const el = this._renderedNodes.get(idx);
+          if (el?.parentNode) el.parentNode.removeChild(el);
+          this._renderedNodes.delete(idx);
+        }
+      }, this._leaveDuration);
+    }
+
+    // 2. Add / update nodes in range
     let y = this.prefixHeights[renderStart];
-    let html = "";
+    let insertBefore = this.contentEl.firstChild;
     for (let i = renderStart; i < renderEnd; i++) {
       const entry = this.entries[i];
-      const content = this.prepareFn
-        ? this.prepareFn(entry.data as E)
-        : ((entry.data as IoLogEntry).text ?? "");
-      html += `<div class="virtual-log-item" style="position:absolute;top:${y}px;left:${this.padding}px;right:${this.padding}px;height:${entry.height}px;">${content}</div>`;
+      const existing = this._renderedNodes.get(i);
+
+      if (existing) {
+        existing.style.top = `${y}px`;
+        existing.style.height = `${entry.height}px`;
+      } else {
+        const content = this.prepareFn
+          ? this.prepareFn(entry.data as E)
+          : ((entry.data as IoLogEntry).text ?? "");
+        const el = document.createElement("div");
+        el.className = "virtual-log-item vlog-enter";
+        el.style.cssText = `position:absolute;left:${this.padding}px;right:${this.padding}px;top:${y}px;height:${entry.height}px;`;
+        el.innerHTML = content;
+        this._renderedNodes.set(i, el);
+        this.contentEl.insertBefore(el, insertBefore);
+        setTimeout(() => el.classList.remove("vlog-enter"), 300);
+      }
       y += entry.height + this.gap;
+      const node = this._renderedNodes.get(i);
+      if (node) insertBefore = node.nextSibling ?? null;
     }
-    this.contentEl.innerHTML = html;
+  }
+
+  private _updateNodePositions(from: number, to: number): void {
+    let y = this.prefixHeights[from];
+    for (let i = from; i < to; i++) {
+      const el = this._renderedNodes.get(i);
+      if (el) {
+        el.style.top = `${y}px`;
+        el.style.height = `${this.entries[i].height}px`;
+      }
+      y += this.entries[i].height + this.gap;
+    }
   }
 
   private _findIndex(scrollTop: number): number {
-    let lo = 0;
-    let hi = this.prefixHeights.length - 1;
+    let lo = 0, hi = this.prefixHeights.length - 1;
     while (lo <= hi) {
       const mid = (lo + hi) >>> 1;
-      if (this.prefixHeights[mid] <= scrollTop) {
-        lo = mid + 1;
-      } else {
-        hi = mid - 1;
-      }
+      if (this.prefixHeights[mid] <= scrollTop) lo = mid + 1;
+      else hi = mid - 1;
     }
     return Math.max(0, lo - 1);
   }
@@ -281,32 +314,17 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
 function parseTimestamp(rawTs: string): string {
   if (/^\d+$/.test(rawTs)) {
     const d = new Date(parseInt(rawTs) * 1000);
-    if (!isNaN(d.getTime())) {
-      return d.toLocaleTimeString("zh-CN", { hour12: false });
-    }
-    return "--:--:--";
+    return !isNaN(d.getTime()) ? d.toLocaleTimeString("zh-CN", { hour12: false }) : "--:--:--";
   }
-  if (rawTs.includes(" ")) {
-    const dt = rawTs.split(" ");
-    return dt[1] || dt[0];
-  }
+  if (rawTs.includes(" ")) { const dt = rawTs.split(" "); return dt[1] || dt[0]; }
   return rawTs;
 }
 
-interface ParsedLogMeta {
-  pkg: string;
-  op: string;
-  details: string;
-}
-
+interface ParsedLogMeta { pkg: string; op: string; details: string; }
 function parseLogMeta(rawDetails: string): ParsedLogMeta {
   const m = rawDetails.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
-  if (m) {
-    return { pkg: m[1], op: m[2], details: m[3] };
-  }
-  return { pkg: "未知", op: "INFO", details: rawDetails };
+  return m ? { pkg: m[1], op: m[2], details: m[3] } : { pkg: "未知", op: "INFO", details: rawDetails };
 }
-
 function resolveAppName(pkg: string): string {
   return state.appMap.has(pkg) ? state.appMap.get(pkg)!.appLabel : pkg;
 }
@@ -314,8 +332,6 @@ function resolveAppName(pkg: string): string {
 // ── IO log state & functions ──
 
 let ioVirtualList: VirtualLogList<IoLogEntry> | null = null;
-
-// Cache the last raw data to skip redundant fetches
 let _lastIoRaw = "";
 
 export const initIoLogs = (): void => {
@@ -323,142 +339,71 @@ export const initIoLogs = (): void => {
   const content = document.getElementById("ioLogList") as HTMLElement | null;
   if (!container || !content) return;
   ioVirtualList = new VirtualLogList<IoLogEntry>(container, content, {
-    font: "12px monospace",
-    lineHeight: 18,
-    estimatedLineHeight: 60,
-    gap: 6,
-    padding: 8,
-    textWidthOffset: 44,
-    chromeHeight: 60,
-    prepareFn: renderIoEntry,
-    onEmpty:
-      '<div style="padding:40px;text-align:center;color:var(--mx-t2);">暂无记录</div>',
+    font: "12px monospace", lineHeight: 18, estimatedLineHeight: 60, gap: 6, padding: 8,
+    textWidthOffset: 44, chromeHeight: 60, prepareFn: renderIoEntry,
+    onEmpty: '<div style="padding:40px;text-align:center;color:var(--mx-t2);">暂无记录</div>',
   });
 };
 
-export const resetIoLogs = (): void => {
-  ioVirtualList?.clear();
-  _lastIoRaw = "";
-  state.ioState.offset = 0;
-  state.ioState.hasMore = true;
-};
+export const resetIoLogs = (): void => { ioVirtualList?.clear(); _lastIoRaw = ""; state.ioState.offset = 0; state.ioState.hasMore = true; };
 
-export const clearIoLogs = async (): Promise<void> => {
-  await run(`${CONST.LOG_CTL} clear-io`);
-  showToast.info("监控记录已清理");
-  resetIoLogs();
-  fetchIoLogs();
-};
+export const clearIoLogs = async (): Promise<void> => { await run(`${CONST.LOG_CTL} clear-io`); showToast.info("监控记录已清理"); resetIoLogs(); fetchIoLogs(); };
 
 function renderIoEntry(entry: IoLogEntry): string {
-  const { timeStr, appName, op, details } = entry;
-  return `
-    <div class="io-item">
-      <div class="io-header">
-        <span class="io-time">
-          ${ICONS.CLOCK}
-          <span>${timeStr}</span>
-          <span class="io-app">${appName}</span>
-        </span>
-        <span class="io-op op-${op}">${op}</span>
-      </div>
-      <div class="io-detail">${details}</div>
-    </div>`;
+  return `<div class="io-item"><div class="io-header"><span class="io-time">${ICONS.CLOCK}<span>${entry.timeStr}</span><span class="io-app">${entry.appName}</span></span><span class="io-op op-${entry.op}">${entry.op}</span></div><div class="io-detail">${entry.details}</div></div>`;
 }
 
-interface StreamedResult {
-  dataLines: string[];
-  hasMore: boolean;
-}
-
+interface StreamedResult { dataLines: string[]; hasMore: boolean; }
 function parseStreamedResult(raw: string): StreamedResult {
   const lines = raw.split("\n");
-  const lastLine = lines[lines.length - 1];
-  if (lastLine.startsWith("DONE|")) {
-    return {
-      dataLines: lines.slice(0, -1),
-      hasMore: parseInt(lastLine.split("|")[2]) > 0,
-    };
-  }
-  if (lastLine === "OK") {
-    return { dataLines: lines.slice(0, -1), hasMore: false };
-  }
+  const last = lines[lines.length - 1];
+  if (last.startsWith("DONE|")) return { dataLines: lines.slice(0, -1), hasMore: parseInt(last.split("|")[2]) > 0 };
+  if (last === "OK") return { dataLines: lines.slice(0, -1), hasMore: false };
   return { dataLines: lines, hasMore: false };
 }
 
-/** Sort IO entries by timestamp (newest first) */
-function sortIoEntries(a: IoLogEntry, b: IoLogEntry): number {
-  return b.timeStr.localeCompare(a.timeStr);
-}
+function sortIoEntries(a: IoLogEntry, b: IoLogEntry): number { return b.timeStr.localeCompare(a.timeStr); }
 
 export const fetchIoLogs = async (): Promise<void> => {
   if (state.ioState.loading || !state.ioState.hasMore) return;
   state.ioState.loading = true;
   try {
-    const res = await run(
-      `${CONST.LOG_CTL} search-io "${state.ioState.term}" ${CONST.PAGE_LIMIT} ${state.ioState.offset} api`,
-    );
+    const res = await run(`${CONST.LOG_CTL} search-io "${state.ioState.term}" ${CONST.PAGE_LIMIT} ${state.ioState.offset} api`);
     if (!res) {
       state.ioState.hasMore = false;
       if (state.ioState.offset === 0) ioVirtualList?.clear();
     } else {
-      /* Dedup against last raw payload to avoid processing identical data */
-      if (res === _lastIoRaw && state.ioState.offset > 0) {
-        state.ioState.hasMore = false;
-        return;
-      }
+      if (res === _lastIoRaw && state.ioState.offset > 0) { state.ioState.hasMore = false; return; }
       _lastIoRaw = res;
-
       const { dataLines, hasMore } = parseStreamedResult(res);
       state.ioState.hasMore = hasMore;
       if (dataLines.length > 0) {
         state.ioState.offset += dataLines.length;
-        if (ioVirtualList) {
-          ioVirtualList.replaceSorted(dataLines, parseIoLines, sortIoEntries);
-        } else {
-          const listEl = document.getElementById("ioLogList")!;
-          if (listEl.innerHTML.includes("暂无记录")) listEl.innerHTML = "";
-          listEl.innerHTML = renderIoLegacy(dataLines);
-        }
-      } else if (state.ioState.offset === 0) {
-        ioVirtualList?.clear();
-      }
+        ioVirtualList ? ioVirtualList.replaceSorted(dataLines, parseIoLines, sortIoEntries) : (document.getElementById("ioLogList")!.innerHTML = renderIoLegacy(dataLines));
+      } else if (state.ioState.offset === 0) ioVirtualList?.clear();
     }
-  } catch {
-    state.ioState.hasMore = false;
-  } finally {
-    state.ioState.loading = false;
-  }
+  } catch { state.ioState.hasMore = false; } finally { state.ioState.loading = false; }
 };
 
 function parseIoLines(lines: string[]): IoLogEntry[] {
-  return lines
-    .map((line: string): IoLogEntry | null => {
-      if (!line.trim()) return null;
-      const parts = line.split("|");
-      if (parts.length < 2) return null;
-      const timeStr = parseTimestamp(parts[0]);
-      const rawDetails = parts.slice(1).join("|");
-      const { pkg, op, details } = parseLogMeta(rawDetails);
-      const appName = resolveAppName(pkg);
-      return { text: details, timeStr, appName, op, details };
-    })
-    .filter((e): e is IoLogEntry => e !== null);
+  return lines.map((line: string): IoLogEntry | null => {
+    if (!line.trim()) return null;
+    const parts = line.split("|");
+    if (parts.length < 2) return null;
+    const timeStr = parseTimestamp(parts[0]), rawDetails = parts.slice(1).join("|");
+    const { pkg, op, details } = parseLogMeta(rawDetails);
+    return { text: details, timeStr, appName: resolveAppName(pkg), op, details };
+  }).filter((e): e is IoLogEntry => e !== null);
 }
 
 function renderIoLegacy(lines: string[]): string {
-  return lines
-    .map((line: string) => {
-      if (!line.trim()) return "";
-      const parts = line.split("|");
-      if (parts.length < 2) return "";
-      const timeStr = parseTimestamp(parts[0]);
-      const rawDetails = parts.slice(1).join("|");
-      const { pkg, op, details } = parseLogMeta(rawDetails);
-      const appName = resolveAppName(pkg);
-      return `<div class="io-item"><div class="io-header"><span class="io-time">${ICONS.CLOCK}<span>${timeStr}</span><span class="io-app">${appName}</span></span><span class="io-op op-${op}">${op}</span></div><div class="io-detail">${details}</div></div>`;
-    })
-    .join("");
+  return lines.map((l: string) => {
+    if (!l.trim()) return "";
+    const parts = l.split("|");
+    if (parts.length < 2) return "";
+    const timeStr = parseTimestamp(parts[0]), { pkg, op, details } = parseLogMeta(parts.slice(1).join("|"));
+    return `<div class="io-item"><div class="io-header"><span class="io-time">${ICONS.CLOCK}<span>${timeStr}</span><span class="io-app">${resolveAppName(pkg)}</span></span><span class="io-op op-${op}">${op}</span></div><div class="io-detail">${details}</div></div>`;
+  }).join("");
 }
 
 // ── Sys log state & functions ──
@@ -466,137 +411,64 @@ function renderIoLegacy(lines: string[]): string {
 let sysVirtualList: VirtualLogList<SysLogEntry> | null = null;
 let _lastSysRaw = "";
 
-/** Sort sys entries by timestamp (newest first) */
-function sortSysEntries(a: SysLogEntry, b: SysLogEntry): number {
-  const ta = a.timeStr ?? "";
-  const tb = b.timeStr ?? "";
-  return tb.localeCompare(ta);
-}
+function sortSysEntries(a: SysLogEntry, b: SysLogEntry): number { return (b.timeStr ?? "").localeCompare(a.timeStr ?? ""); }
 
 export const initSysLogs = (): void => {
   const viewer = document.getElementById("logViewer") as HTMLElement | null;
   if (!viewer) return;
   sysVirtualList = new VirtualLogList<SysLogEntry>(viewer, viewer, {
-    font: "12px monospace",
-    lineHeight: 18,
-    estimatedLineHeight: 36,
-    gap: 6,
-    padding: 8,
-    textWidthOffset: 26,
-    chromeHeight: (entry: SysLogEntry): number =>
-      entry.tag || entry.timeStr ? 36 : 14,
-    prepareFn: renderSysEntry,
-    onEmpty: "",
+    font: "12px monospace", lineHeight: 18, estimatedLineHeight: 36, gap: 6, padding: 8, textWidthOffset: 26,
+    chromeHeight: (e: SysLogEntry): number => e.tag || e.timeStr ? 36 : 14, prepareFn: renderSysEntry, onEmpty: "",
   });
 };
 
-export const resetSysLogs = (): void => {
-  sysVirtualList?.clear();
-  _lastSysRaw = "";
-  state.sysState.offset = 0;
-  state.sysState.hasMore = true;
-};
+export const resetSysLogs = (): void => { sysVirtualList?.clear(); _lastSysRaw = ""; state.sysState.offset = 0; state.sysState.hasMore = true; };
 
 export const clearSysLogs = async (): Promise<void> => {
-  const source = (document.getElementById("logSourceSelect") as HTMLSelectElement)?.value;
-  if (source === "zygisk") {
-    await run("logcat -c");
-  } else {
-    await run(`${CONST.LOG_CTL} clear-sys`);
-    if (source === "internal") resetSysLogs();
-  }
+  const src = (document.getElementById("logSourceSelect") as HTMLSelectElement)?.value;
+  await run(src === "zygisk" ? "logcat -c" : `${CONST.LOG_CTL} clear-sys`);
   showToast.info("日志已清空");
+  if (src === "internal") resetSysLogs();
   fetchSysLogs();
 };
 
 function renderSysEntry(entry: SysLogEntry): string {
-  const { timeStr, tag, msg } = entry;
-  if (tag) {
-    return `<div class="sys-log-item">
-      <div class="sys-log-header">
-        <span class="sys-log-time">${timeStr}</span>
-        <span class="sys-log-tag">[${tag}]</span>
-      </div>
-      <div class="sys-log-msg">${msg}</div>
-    </div>`;
-  }
-  if (timeStr) {
-    return `<div class="sys-log-item">
-      <div class="sys-log-header">
-        <span class="sys-log-time">${timeStr}</span>
-      </div>
-      <div class="sys-log-msg">${msg}</div>
-    </div>`;
-  }
-  return `<div class="sys-log-raw">${msg}</div>`;
+  if (entry.tag) return `<div class="sys-log-item"><div class="sys-log-header"><span class="sys-log-time">${entry.timeStr}</span><span class="sys-log-tag">[${entry.tag}]</span></div><div class="sys-log-msg">${entry.msg}</div></div>`;
+  if (entry.timeStr) return `<div class="sys-log-item"><div class="sys-log-header"><span class="sys-log-time">${entry.timeStr}</span></div><div class="sys-log-msg">${entry.msg}</div></div>`;
+  return `<div class="sys-log-raw">${entry.msg}</div>`;
 }
 
 export const fetchSysLogs = async (): Promise<void> => {
   const source = (document.getElementById("logSourceSelect") as HTMLSelectElement).value;
   const viewer = document.getElementById("logViewer") as HTMLElement;
   if (source === "zygisk") {
-    viewer.textContent =
-      (await run("logcat -d -s Zygisk_NSProxy NamespaceProxy_Injector")) || "无 Zygisk 日志";
+    viewer.textContent = (await run("logcat -d -s Zygisk_NSProxy NamespaceProxy_Injector")) || "无 Zygisk 日志";
     viewer.scrollTop = viewer.scrollHeight;
     return;
   }
   if (state.sysState.loading || !state.sysState.hasMore) return;
   state.sysState.loading = true;
   try {
-    const levelArg =
-      state.sysState.level > -1 ? `--level ${state.sysState.level}` : "";
-    const res = await run(
-      `${CONST.LOG_CTL} search-sys ${levelArg} "" ${CONST.PAGE_LIMIT} ${state.sysState.offset} api`,
-    );
-    if (!res) {
-      state.sysState.hasMore = false;
-    } else {
-      /* Dedup against last raw payload to skip processing when nothing changed */
-      if (res === _lastSysRaw && state.sysState.offset > 0) {
-        state.sysState.hasMore = false;
-        return;
-      }
-      _lastSysRaw = res;
-
-      const { dataLines, hasMore } = parseStreamedResult(res);
-      state.sysState.hasMore = hasMore;
-      if (dataLines.length > 0) {
-        state.sysState.offset += dataLines.length;
-        if (sysVirtualList) {
-          sysVirtualList.replaceSorted(dataLines, parseSysLines, sortSysEntries);
-        }
-      }
+    const levelArg = state.sysState.level > -1 ? `--level ${state.sysState.level}` : "";
+    const res = await run(`${CONST.LOG_CTL} search-sys ${levelArg} "" ${CONST.PAGE_LIMIT} ${state.sysState.offset} api`);
+    if (!res) { state.sysState.hasMore = false; return; }
+    if (res === _lastSysRaw && state.sysState.offset > 0) { state.sysState.hasMore = false; return; }
+    _lastSysRaw = res;
+    const { dataLines, hasMore } = parseStreamedResult(res);
+    state.sysState.hasMore = hasMore;
+    if (dataLines.length > 0) {
+      state.sysState.offset += dataLines.length;
+      if (sysVirtualList) sysVirtualList.replaceSorted(dataLines, parseSysLines, sortSysEntries);
     }
-  } catch {
-    state.sysState.hasMore = false;
-  } finally {
-    state.sysState.loading = false;
-  }
+  } catch { state.sysState.hasMore = false; } finally { state.sysState.loading = false; }
 };
 
 function parseSysLines(lines: string[]): SysLogEntry[] {
   return lines.map((line: string) => {
-    const matchTag = line.match(
-      /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\|\[(.*?)\](.*)$/,
-    );
-    const matchSimple = line.match(
-      /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(.*)$/,
-    );
-    if (matchTag) {
-      return {
-        text: matchTag[3],
-        timeStr: matchTag[1],
-        tag: matchTag[2],
-        msg: matchTag[3],
-      };
-    } else if (matchSimple) {
-      return {
-        text: matchSimple[2],
-        timeStr: matchSimple[1],
-        tag: null,
-        msg: matchSimple[2],
-      };
-    }
+    const mTag = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\|\[(.*?)\](.*)$/);
+    const mSim = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(.*)$/);
+    if (mTag) return { text: mTag[3], timeStr: mTag[1], tag: mTag[2], msg: mTag[3] };
+    if (mSim) return { text: mSim[2], timeStr: mSim[1], tag: null, msg: mSim[2] };
     return { text: line, timeStr: null, tag: null, msg: line };
   });
 }

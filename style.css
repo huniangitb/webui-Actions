@@ -646,7 +646,7 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav {
 }
 .mx-subpage-container.open {
     display: flex;
-    animation: subpageOpen 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: subpageOpen 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .mx-subpage-container.closing {
     display: flex; pointer-events: none;

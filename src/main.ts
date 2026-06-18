@@ -247,7 +247,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (navigator.virtualKeyboard) {
     navigator.virtualKeyboard.overlaysContent = true;
     navigator.virtualKeyboard.addEventListener("geometrychange", (e: Event) => {
-      const { height } = (e.target as VirtualKeyboard).boundingRect;
+      const { height } = (e.target as unknown as VirtualKeyboard).boundingRect;
       const isKeyboardOpen = height > 0;
       document.body.classList.toggle("keyboard-open", isKeyboardOpen);
       document.documentElement.style.setProperty("--keyboard-h", `${height}px`);

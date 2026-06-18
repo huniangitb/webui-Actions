@@ -1,0 +1,31 @@
+name: TypeScript Type Check
+
+on:
+  push:
+    branches:
+      - fuse-ui-miuix
+  pull_request:
+    branches:
+      - fuse-ui-miuix
+  workflow_dispatch:
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run TypeScript type check
+        run: npx tsc --noEmit
+
+      - name: Run Parcel build
+        run: npx parcel build index.html --no-source-maps --public-url ./ --no-cache

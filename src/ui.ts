@@ -1,0 +1,365 @@
+import { state, CONST } from "./state.js";
+import { run, showToast, ICONS, normalizeToDisplay, normalizeToConfig, debounce } from "./utils.js";
+import { exec } from "kernelsu";
+import { prepare, layout } from "@chenglou/pretext";
+import type { Suggestion } from "./types/index";
+
+export const addRuleRow = (
+  type: string,
+  target: string,
+  source: string,
+  containerId: string,
+): void => {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const div = document.createElement("div");
+  div.className = "rule-row";
+  div.innerHTML = `<select class="mx-select rule-type flex-shrink-0" style="width:90px; padding:8px 24px 8px 8px; font-size:12px;">
+    <option value="REDIRECT">重定向</option>
+    <option value="HIDE">隐藏</option>
+    <option value="RO">只读</option>
+    <option value="ALLOW">豁免</option>
+  </select>
+  <div class="rule-inputs">
+    <div class="mx-input-wrapper">
+      <input type="text" class="mx-input rule-target" style="padding:6px; background:var(--mx-s1); border-radius:6px; font-size:12px;" placeholder="原始路径" value="${target.replace(/"/g, "&quot;")}">
+    </div>
+    <div class="mx-input-wrapper ${type !== "REDIRECT" ? "hidden" : ""}">
+      <input type="text" class="mx-input rule-source" style="padding:6px; background:var(--mx-s1); border-radius:6px; font-size:12px;" placeholder="重定向至" value="${source.replace(/"/g, "&quot;")}">
+    </div>
+  </div>
+  <button class="mx-btn-icon btn-del flex-shrink-0">${ICONS.DELETE}</button>`;
+  const select = div.querySelector(".rule-type") as HTMLSelectElement;
+  select.value = type;
+  select.onchange = (e: Event) => {
+    const srcWrapper = div.querySelectorAll(".mx-input-wrapper")[1] as HTMLElement;
+    if (srcWrapper) {
+      srcWrapper.classList.toggle("hidden", (e.target as HTMLSelectElement).value !== "REDIRECT");
+    }
+  };
+  div.querySelector(".btn-del")?.addEventListener("click", () => div.remove());
+  setupAutocomplete(div.querySelectorAll(".mx-input")[0] as HTMLInputElement);
+  setupAutocomplete(div.querySelectorAll(".mx-input")[1] as HTMLInputElement);
+  container.appendChild(div);
+};
+
+export const parseConfigTextToVisual = (
+  text: string | null | undefined,
+  containerId: string,
+  monitorSelectId: string,
+  sandboxSelectId: string,
+  injectSelectId: string | null,
+): void => {
+  const container = document.getElementById(containerId);
+  if (container) {
+    // safely move suggestionBox to body if it's inside the container
+    const box = document.getElementById("suggestionBox");
+    if (box && container.contains(box)) {
+      document.body.appendChild(box);
+    }
+    container.innerHTML = "";
+  }
+  const selMonitor = document.getElementById(monitorSelectId) as HTMLSelectElement | null;
+  if (selMonitor) selMonitor.value = "";
+  const selSandbox = document.getElementById(sandboxSelectId) as HTMLSelectElement | null;
+  if (selSandbox) selSandbox.value = "";
+  const selInject = injectSelectId
+    ? (document.getElementById(injectSelectId) as HTMLSelectElement | null)
+    : null;
+  if (selInject) selInject.value = "";
+  if (text) {
+    text.split("\n").forEach((line) => {
+      const parts = line.trim().split(/\s+/);
+      if (parts[0] === "REDIRECT" && parts.length >= 3)
+        addRuleRow("REDIRECT", normalizeToDisplay(parts[1]), normalizeToDisplay(parts.slice(2).join(" ")), containerId);
+      else if (["HIDE", "RO", "ALLOW"].includes(parts[0]) && parts.length >= 2)
+        addRuleRow(parts[0], normalizeToDisplay(parts[1]), "", containerId);
+      else if (parts[0] === "MONITOR" && selMonitor) selMonitor.value = parts[1];
+      else if (parts[0] === "SANDBOX" && selSandbox) selSandbox.value = parts[1];
+      else if (parts[0] === "GLOBAL_INJECT" && selInject) selInject.value = parts[1];
+    });
+  }
+};
+
+export const generateConfigTextFromVisual = (
+  containerId: string,
+  monitorSelectId: string,
+  sandboxSelectId: string,
+  injectSelectId: string | null,
+): string => {
+  let res = "";
+  const selInject = injectSelectId
+    ? (document.getElementById(injectSelectId) as HTMLSelectElement | null)
+    : null;
+  if (selInject && selInject.value) res += `GLOBAL_INJECT ${selInject.value}\n`;
+  const selMonitor = document.getElementById(monitorSelectId) as HTMLSelectElement | null;
+  if (selMonitor && selMonitor.value) res += `MONITOR ${selMonitor.value}\n`;
+  const selSandbox = document.getElementById(sandboxSelectId) as HTMLSelectElement | null;
+  if (selSandbox && selSandbox.value) res += `SANDBOX ${selSandbox.value}\n`;
+  document.querySelectorAll(`#${containerId} .rule-row`).forEach((row) => {
+    const type = (row.querySelector(".rule-type") as HTMLSelectElement).value;
+    const target = (row.querySelector(".rule-target") as HTMLInputElement).value.trim();
+    const source = (row.querySelector(".rule-source") as HTMLInputElement).value.trim();
+    if (target) {
+      if (type === "REDIRECT" && source)
+        res += `REDIRECT ${normalizeToConfig(target, true)} ${normalizeToConfig(source, false)}\n`;
+      else if (["HIDE", "RO", "ALLOW"].includes(type))
+        res += `${type} ${normalizeToConfig(target, true)}\n`;
+    }
+  });
+  return res.trim();
+};
+
+export const setupModeToggle = (
+  groupName: string,
+  visualId: string,
+  rawId: string,
+  contentId: string,
+  parseFunc: (val: string) => void,
+  genFunc: () => string,
+): void => {
+  document.querySelectorAll(`button[name="${groupName}"]`).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(`button[name="${groupName}"]`).forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      if ((btn as HTMLElement).dataset.mode === "visual") {
+        parseFunc((document.getElementById(contentId) as HTMLTextAreaElement).value);
+        document.getElementById(rawId)!.classList.remove("active");
+        document.getElementById(visualId)!.classList.add("active");
+      } else {
+        (document.getElementById(contentId) as HTMLTextAreaElement).value = genFunc();
+        document.getElementById(visualId)!.classList.remove("active");
+        document.getElementById(rawId)!.classList.add("active");
+      }
+    });
+  });
+};
+
+export const updateSuggestionBoxPosition = (input: HTMLInputElement): void => {
+  const box = document.getElementById("suggestionBox");
+  if (!box || !input || !box.classList.contains("open")) return;
+  const wrapper = input.closest(".mx-input-wrapper");
+  if (!wrapper) return;
+  if (box.parentNode !== wrapper) {
+    wrapper.appendChild(box);
+  }
+  const container =
+    input.closest(".overflow-y-auto") ||
+    input.closest(".mx-subpage-body") ||
+    input.closest(".editor-scroll");
+  if (container) {
+    const containerRect = container.getBoundingClientRect();
+    const inputRect = input.getBoundingClientRect();
+    const vvHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const effectiveBottom = Math.min(containerRect.bottom, vvHeight);
+    const spaceBelow = effectiveBottom - inputRect.bottom;
+    const spaceAbove = inputRect.top - containerRect.top;
+    if (spaceBelow < 180 && spaceAbove > spaceBelow) {
+      box.style.top = "auto";
+      box.style.bottom = "100%";
+      box.style.marginTop = "0px";
+      box.style.marginBottom = "4px";
+    } else {
+      box.style.top = "100%";
+      box.style.bottom = "auto";
+      box.style.marginTop = "4px";
+      box.style.marginBottom = "0px";
+    }
+  }
+};
+
+export const centerActiveInput = (input: HTMLElement): void => {
+  if (!input) return;
+  const row = input.closest(".rule-row") || input.closest(".mx-form-group") || input;
+  const container: HTMLElement | null =
+    input.closest(".overflow-y-auto") ||
+    input.closest(".mx-subpage-body");
+  if (!row || !container) return;
+
+  if (container._scrollAnimId) {
+    cancelAnimationFrame(container._scrollAnimId);
+  }
+
+  const duration = 280;
+  const startTime = performance.now();
+  const startScrollTop = container.scrollTop;
+
+  const step = (currentTime: number) => {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const ease = 1 - Math.pow(1 - progress, 3);
+
+    const containerRect = container.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
+
+    const idealScrollTop = relativeTop - containerRect.height / 2 + rowRect.height / 2;
+    const maxScrollTop = container.scrollHeight - containerRect.height;
+    const targetScrollTop = Math.max(0, Math.min(idealScrollTop, maxScrollTop));
+
+    container.scrollTop = startScrollTop + (targetScrollTop - startScrollTop) * ease;
+
+    if (progress < 1) {
+      container._scrollAnimId = requestAnimationFrame(step);
+    } else {
+      container._scrollAnimId = null;
+    }
+  };
+
+  container._scrollAnimId = requestAnimationFrame(step);
+};
+
+export const debouncedCenterActive = debounce((input: HTMLElement) => {
+  centerActiveInput(input);
+}, 80);
+
+declare global {
+  interface Window {
+    _currentInput: HTMLInputElement | null;
+  }
+}
+
+// ---- Autocomplete setup ----
+
+const setupAutocomplete = (input: HTMLInputElement | null): void => {
+  if (!input) return;
+
+  let box = document.getElementById("suggestionBox");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "suggestionBox";
+    box.className = "suggestion-box";
+    document.body.appendChild(box);
+  }
+
+  input.addEventListener(
+    "input",
+    debounce(async (e: Event) => {
+      const val = (e.target as HTMLInputElement).value;
+      let pDir = CONST.PATH_PREFIX_REAL + "/";
+      let sPre = "";
+      let dBase = "/";
+      const cVal = val ? val.replace(/^\/+/, "") : "";
+      if (cVal) {
+        const ls = cVal.lastIndexOf("/");
+        if (ls === -1) {
+          sPre = cVal;
+        } else {
+          pDir = CONST.PATH_PREFIX_REAL + "/" + cVal.substring(0, ls + 1);
+          sPre = cVal.substring(ls + 1);
+          dBase = "/" + cVal.substring(0, ls + 1);
+        }
+      }
+      try {
+        const res = await exec(`ls -F -1 "${pDir.replace(/\/+/g, "/")}" 2>/dev/null | head -n 30`);
+        if (!res || !res.stdout) {
+          box!.classList.remove("open");
+          state.currentSuggestions = [];
+          state.suggestionBoxHeight = 0;
+          return;
+        }
+        const sugs: Suggestion[] = res.stdout
+          .split("\n")
+          .filter((l: string) => l.endsWith("/") && l.startsWith(sPre))
+          .map((l: string) => ({ t: dBase + l, i: ICONS.FOLDER }));
+        if (sugs.length === 0) {
+          box!.classList.remove("open");
+          state.currentSuggestions = [];
+          state.suggestionBoxHeight = 0;
+          return;
+        }
+        let inputPathExists = false;
+        if (val.trim()) {
+          const fullPath = val.startsWith("/")
+            ? CONST.PATH_PREFIX_REAL + val
+            : CONST.PATH_PREFIX_REAL + "/" + val;
+          try {
+            const checkRes = await exec(`test -d "${fullPath.replace(/\/+/g, "/")}" 2>/dev/null && echo yes`);
+            inputPathExists = checkRes.stdout?.trim() === "yes";
+          } catch {
+            /* ignore */
+          }
+        }
+        input.classList.toggle("path-exists", inputPathExists);
+        state.currentSuggestions = sugs;
+        let totalBoxHeight = 2;
+        const fontStyle =
+          "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+        const horizontalPadding = 24;
+        const iconAndGap = 16 + 8;
+        const rect = input.getBoundingClientRect();
+        const availTextWidth = rect.width - horizontalPadding - iconAndGap;
+        sugs.forEach((s) => {
+          try {
+            const prepared = prepare(s.t, fontStyle);
+            const { height } = layout(prepared, Math.max(availTextWidth, 50), 18);
+            totalBoxHeight += height + 20 + 1;
+          } catch {
+            totalBoxHeight += 39;
+          }
+        });
+        state.suggestionBoxHeight = totalBoxHeight;
+        box!.innerHTML = sugs
+          .map(
+            (s) =>
+              `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window._currentInput.value='${s.t}';window._currentInput.dispatchEvent(new Event('input'))"><span style="display:flex">${s.i}</span><span style="word-break:break-all;flex:1;line-height:18px;">${s.t}</span></div>`,
+          )
+          .join("");
+        box!.classList.add("open");
+        window.requestAnimationFrame(() => {
+          updateSuggestionBoxPosition(input);
+        });
+      } catch {
+        box!.classList.remove("open");
+        state.currentSuggestions = [];
+        state.suggestionBoxHeight = 0;
+      }
+    }, 250),
+  );
+
+  input.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      const inputs = Array.from(
+        document.querySelectorAll<HTMLInputElement>(".mx-subpage-container.open .mx-input:not([readonly])"),
+      );
+      const idx = inputs.indexOf(input);
+      if (idx !== -1) {
+        if (e.key === "ArrowUp" && idx > 0) {
+          e.preventDefault();
+          inputs[idx - 1].focus();
+        } else if (e.key === "ArrowDown" && idx < inputs.length - 1) {
+          e.preventDefault();
+          inputs[idx + 1].focus();
+        }
+      }
+    }
+  });
+
+  input.addEventListener("focus", () => {
+    window._currentInput = input;
+    centerActiveInput(input);
+    const isFirstFocus = !input.hasAttribute("data-has-focused");
+    if (isFirstFocus) {
+      input.setAttribute("data-has-focused", "true");
+    }
+    const dispatchDelay = isFirstFocus ? 400 : 0;
+    setTimeout(() => {
+      if (document.activeElement === input) {
+        input.dispatchEvent(new Event("input"));
+      }
+    }, dispatchDelay);
+  });
+
+  input.addEventListener("blur", () => {
+    setTimeout(() => {
+      const activeEl = document.activeElement;
+      if (!activeEl || !activeEl.classList.contains("mx-input")) {
+        const suggestionBox = document.getElementById("suggestionBox");
+        if (suggestionBox) {
+          suggestionBox.classList.remove("open");
+          state.currentSuggestions = [];
+        }
+      }
+    }, 150);
+  });
+};

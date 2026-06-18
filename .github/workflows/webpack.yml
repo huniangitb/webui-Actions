@@ -1,72 +1,43 @@
-name: Build and Maintain yarn.lock & Release
+name: Build, TypeScript Check & Release
 
-# 触发工作流的事件
 on:
-  # 1. 当代码推送到 Clean-C-webui 分支时自动触发
   push:
     branches:
       - fuse-ui-miuix
-
-  # 2. 当有 Pull Request 指向 Clean-C-webui 分支时自动触发
   pull_request:
     branches:
       - fuse-ui-miuix
-
-  # 3. 保留手动触发功能
   workflow_dispatch:
     inputs:
       branch:
         description: '要构建的仓库分支 (The branch to build)'
         required: true
-        default: 'fuse-ui-miuix' # 默认使用 Clean-C-webui 分支
+        default: 'fuse-ui-miuix'
         type: string
 
 jobs:
-  build:
+  typecheck:
     runs-on: ubuntu-24.04
-
-    # 授权：允许工作流将代码推送回仓库 (用于 yarn.lock 提交)
     permissions:
       contents: write
-
     steps:
-      # 检出代码
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          # 动态决定检出哪个分支
           ref: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.branch) || github.ref }}
 
-      # 设置 Node.js 环境
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # 自动检测并升级依赖到最新版本（在 semver 范围内）
-      - name: Check and upgrade dependencies
-        run: |
-          npx npm-check-updates -u --packageFile package.json 2>&1 || echo "No updates found or check failed"
-          echo "--- Dependency upgrade check complete ---"
-
-      # 安装依赖。这一步会自动创建/更新 yarn.lock 文件，并生效升级后的版本
       - name: Install dependencies
         run: yarn install
 
-      # 检查 yarn.lock 和 package.json 是否有变动，如果有则自动提交
-      - name: Commit dependency updates
-        id: commit_lockfile
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore: auto-upgrade dependencies & update yarn.lock"
-          file_pattern: package.json yarn.lock
-          push_options: '--force-with-lease'
-        # 关键：将提交结果保存到输出，以便后续 Job 判断是否需要 Release
+      - name: TypeScript type check
+        run: npx tsc --noEmit
 
-      - name: Build project
+      - name: Build project (Parcel)
         run: yarn build
 
-      # 将构建产物打包成 zip 文件，方便 Release 附加
       - name: Archive production artifacts
         run: zip -r webui-dist.zip dist/
 
@@ -75,33 +46,24 @@ jobs:
         with:
           name: webui-dist-archive
           path: webui-dist.zip
-          retention-days: 1 # 临时保留，主要用于 Release Job 下载
+          retention-days: 1
 
-  # 新增 Release Job
   release:
-    # 仅在 push 事件触发，并且 build 成功时运行
     if: github.event_name == 'push'
-    needs: build
+    needs: typecheck
     runs-on: ubuntu-24.04
-    
-    # 授权：允许创建 Release
     permissions:
       contents: write
-
     steps:
-      # 1. 下载构建产物
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
           name: webui-dist-archive
 
-      # 2. 获取当前版本号或生成 Tag
-      # 假设您使用 git tag 来管理版本，或者使用日期时间作为版本
       - name: Get current date for tag
         id: date
         run: echo "RELEASE_TAG=v$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
 
-      # 3. 创建 GitHub Release
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -109,11 +71,10 @@ jobs:
           name: WebUI Release ${{ steps.date.outputs.RELEASE_TAG }}
           body: |
             Automated release of the WebUI build.
-            
+
             Changes:
-            - Updated dependencies (yarn.lock)
+            - TypeScript type check passed
             - Latest build artifacts included.
-          draft: false # 立即发布
+          draft: false
           prerelease: false
-          # 附加构建产物 (webui-dist.zip)
           files: webui-dist.zip

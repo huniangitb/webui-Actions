@@ -6,7 +6,9 @@
   "license": "MIT",
   "scripts": {
     "start": "parcel index.html",
-    "build": "parcel build index.html --no-source-maps --public-url ./ --no-cache"
+    "build": "parcel build index.html --no-source-maps --public-url ./ --no-cache",
+    "typecheck": "tsc --noEmit",
+    "check": "tsc --noEmit && parcel build index.html --no-source-maps --public-url ./ --no-cache"
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.8",
@@ -14,6 +16,7 @@
   },
   "devDependencies": {
     "@mdi/js": "^7.4.47",
-    "parcel": "^2.16.4"
+    "parcel": "^2.16.4",
+    "typescript": "^6.0.3"
   }
 }

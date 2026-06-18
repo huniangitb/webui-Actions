@@ -977,6 +977,17 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
     word-break: break-all;
 }
 
+/* ── Structured path display in IO details ── */
+.io-path-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.io-path-arrow {
+  color: var(--mx-primary);
+  font-weight: 700;
+}
+
 /* ── IO operation colors ── */
 .op-OPENDIR, .op-OPEN, .op-READDIR { background: #0EA5E9; }
 .op-ACCESS, .op-READ, .op-GETATTR { background: var(--mx-green); }

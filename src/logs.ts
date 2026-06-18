@@ -347,8 +347,8 @@ export const initIoLogs = (): void => {
   const content = document.getElementById("ioLogList") as HTMLElement | null;
   if (!container || !content) return;
   ioVirtualList = new VirtualLogList<IoLogEntry>(container, content, {
-    font: "12px monospace", lineHeight: 18, estimatedLineHeight: 60, gap: 6, padding: 8,
-    textWidthOffset: 44, chromeHeight: 60, prepareFn: renderIoEntry,
+    font: "11px monospace", lineHeight: 18, estimatedLineHeight: 60, gap: 6, padding: 8,
+    textWidthOffset: 46, chromeHeight: 62, prepareFn: renderIoEntry,
     onEmpty: '<div style="padding:40px;text-align:center;color:var(--mx-t2);">暂无记录</div>',
   });
 };
@@ -358,7 +358,16 @@ export const resetIoLogs = (): void => { ioVirtualList?.clear(); _lastIoRaw = ""
 export const clearIoLogs = async (): Promise<void> => { await run(`${CONST.LOG_CTL} clear-io`); showToast.info("监控记录已清理"); resetIoLogs(); fetchIoLogs(); };
 
 function renderIoEntry(entry: IoLogEntry): string {
-  return `<div class="io-item"><div class="io-header"><span class="io-time">${ICONS.CLOCK}<span>${entry.timeStr}</span><span class="io-app">${entry.appName}</span></span><span class="io-op op-${entry.op}">${entry.op}</span></div><div class="io-detail">${entry.details}</div></div>`;
+  let detailHtml = entry.details;
+  /* Structured display for path redirect: "/from -> /to" shown as two lines */
+  const arrowSep = " -> ";
+  const arrowIdx = detailHtml.indexOf(arrowSep);
+  if (arrowIdx !== -1) {
+    const fromPath = detailHtml.substring(0, arrowIdx);
+    const toPath = detailHtml.substring(arrowIdx + arrowSep.length);
+    detailHtml = `<div class="io-path-wrap"><div>${fromPath}</div><div><span class="io-path-arrow">→ </span>${toPath}</div></div>`;
+  }
+  return `<div class="io-item"><div class="io-header"><span class="io-time">${ICONS.CLOCK}<span>${entry.timeStr}</span><span class="io-app">${entry.appName}</span></span><span class="io-op op-${entry.op}">${entry.op}</span></div><div class="io-detail">${detailHtml}</div></div>`;
 }
 
 interface StreamedResult { dataLines: string[]; hasMore: boolean; }
@@ -425,8 +434,8 @@ export const initSysLogs = (): void => {
   const viewer = document.getElementById("logViewer") as HTMLElement | null;
   if (!viewer) return;
   sysVirtualList = new VirtualLogList<SysLogEntry>(viewer, viewer, {
-    font: "12px monospace", lineHeight: 18, estimatedLineHeight: 36, gap: 6, padding: 8, textWidthOffset: 26,
-    chromeHeight: (e: SysLogEntry): number => e.tag || e.timeStr ? 36 : 14, prepareFn: renderSysEntry, onEmpty: "",
+    font: "11px monospace", lineHeight: 18, estimatedLineHeight: 38, gap: 6, padding: 8, textWidthOffset: 24,
+    chromeHeight: (e: SysLogEntry): number => e.tag || e.timeStr ? 38 : 16, prepareFn: renderSysEntry, onEmpty: "",
   });
 };
 

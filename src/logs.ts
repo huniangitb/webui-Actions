@@ -137,19 +137,85 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   }
 
   replace(entryList: E[]): void {
-    /* Start fade-out on old nodes but mark 'delayClear' so the timeout doesn't nuke content */
-    this._fadeOutAndClear(true);
-    /* Synchronously clear data and DOM, then append fresh data */
-    this.entries = [];
-    this.prefixHeights = [];
-    this._contentHashes.clear();
-    this.totalHeight = 0;
+    /* Cancel any pending fade-out from previous replace */
+    if (this._fadeOutTimer) { clearTimeout(this._fadeOutTimer); this._fadeOutTimer = null; }
+
+    if (entryList.length === 0) { this.clear(); return; }
+
+    /* 1. Build new entries with Pretext heights (dedup by content hash) */
+    const availWidth = this.container.clientWidth - this.padding * 2 - this.textWidthOffset;
+    const safeAvailWidth = Math.max(availWidth, 100);
+    const newEntries: VirtualLogEntry[] = [];
+    const newHashes = new Set<string>();
+
+    for (const data of entryList) {
+      const hash = entryHash(data);
+      if (newHashes.has(hash)) continue;
+      newHashes.add(hash);
+
+      let h = this.estimatedLineHeight;
+      let prep: object | null = null;
+      const cHeight = typeof this.chromeHeight === "function" ? this.chromeHeight(data) : this.chromeHeight;
+      if ((data as IoLogEntry).text || (data as SysLogEntry).text) {
+        try {
+          prep = prepare(data.text ?? "", this.font);
+          const { height } = layout(prep as object, safeAvailWidth, this.lineHeight);
+          h = height + cHeight;
+        } catch { h = this.estimatedLineHeight; }
+      } else { h = cHeight; }
+      newEntries.push({ height: h, prepared: prep, data });
+    }
+
+    /* 2. Fade out stale nodes (hash no longer in new list) */
+    const staleNodes: HTMLElement[] = [];
+    const oldHashIdx = new Map<string, number>();
+    for (let i = 0; i < this.entries.length; i++) {
+      oldHashIdx.set(entryHash(this.entries[i].data as E), i);
+    }
+    for (const [hash, idx] of oldHashIdx) {
+      if (!newHashes.has(hash)) {
+        const el = this._renderedNodes.get(idx);
+        if (el) { el.classList.add("vlog-leave"); staleNodes.push(el); }
+      }
+    }
+
+    /* 3. Rebuild state: keep surviving nodes, update data */
+    const survivingNodes = new Map<number, HTMLElement>(); /* new index -> old DOM node */
+    for (let i = 0; i < newEntries.length; i++) {
+      const hash = entryHash(newEntries[i].data as E);
+      const oldIdx = oldHashIdx.get(hash);
+      if (oldIdx !== undefined) {
+        /* Preserve previously corrected height */
+        const oldHeight = this.entries[oldIdx].height;
+        newEntries[i].height = oldHeight;
+        const el = this._renderedNodes.get(oldIdx);
+        if (el) {
+          el.dataset.hc = "1";
+          survivingNodes.set(i, el);
+        }
+      }
+    }
+
+    this.entries = newEntries;
+    this._contentHashes = newHashes;
+    this._renderedNodes.clear();
+    for (const [i, el] of survivingNodes) this._renderedNodes.set(i, el);
+
+    this._recalcTotalHeight();
+    this.isDirty = true;
     this.visibleStart = 0;
     this.visibleEnd = 0;
-    this.isDirty = true;
-    this._renderedNodes.clear();
-    this.contentEl.innerHTML = "";
-    this.append(entryList);
+    this._scheduleRender();
+
+    /* 4. Remove stale DOM nodes after fade-out completes */
+    if (staleNodes.length > 0) {
+      this._fadeOutTimer = setTimeout(() => {
+        this._fadeOutTimer = null;
+        for (const el of staleNodes) {
+          if (el?.parentNode) el.parentNode.removeChild(el);
+        }
+      }, this._leaveDuration);
+    }
   }
 
   replaceSorted(

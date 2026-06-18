@@ -977,15 +977,19 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
     word-break: break-all;
 }
 
-/* ── Structured path display in IO details ── */
-.io-path-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+/* ── Structured path boxes for redirect IO entries ── */
+.io-path-box {
+  background: var(--mx-s1);
+  padding: 8px 10px;
+  border: 1px solid var(--mx-border-light);
+  border-radius: 8px;
+  line-height: 18px;
+  font-size: var(--mx-font-size-xs);
+  font-family: var(--mx-font-mono);
+  word-break: break-all;
 }
-.io-path-arrow {
-  color: var(--mx-primary);
-  font-weight: 700;
+.io-path-box + .io-path-box {
+  margin-top: 4px;
 }
 
 /* ── IO operation colors ── */

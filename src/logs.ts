@@ -269,6 +269,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     // 2. Add / update nodes in range
     let y = this.prefixHeights[renderStart];
     let insertBefore = this.contentEl.firstChild;
+    let hasNewNodes = false;
     for (let i = renderStart; i < renderEnd; i++) {
       const entry = this.entries[i];
       const existing = this._renderedNodes.get(i);
@@ -282,16 +283,21 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
           : ((entry.data as IoLogEntry).text ?? "");
         const el = document.createElement("div");
         el.className = "virtual-log-item vlog-enter";
-        el.style.cssText = `position:absolute;left:${this.padding}px;right:${this.padding}px;top:${y}px;height:${entry.height}px;`;
+        /* No fixed height initially — let DOM size naturally for measurement */
+        el.style.cssText = `position:absolute;left:${this.padding}px;right:${this.padding}px;top:${y}px;`;
         el.innerHTML = content;
         this._renderedNodes.set(i, el);
         this.contentEl.insertBefore(el, insertBefore);
+        hasNewNodes = true;
         setTimeout(() => el.classList.remove("vlog-enter"), 300);
       }
       y += entry.height + this.gap;
       const node = this._renderedNodes.get(i);
       if (node) insertBefore = node.nextSibling ?? null;
     }
+
+    /* Post-render: measure actual heights and correct */
+    if (hasNewNodes) this._correctHeights();
   }
 
   private _updateNodePositions(from: number, to: number): void {
@@ -303,6 +309,30 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
         el.style.height = `${this.entries[i].height}px`;
       }
       y += this.entries[i].height + this.gap;
+    }
+  }
+
+  /** Measure actual rendered height of newly created items and correct entry heights */
+  private _correctHeights(): void {
+    let changed = false;
+    let firstIdx = -1;
+    for (const [idx, el] of this._renderedNodes) {
+      if (el.dataset.hc === "1") continue;
+      /* Read natural content height (no fixed height was set on new nodes) */
+      const natural = el.offsetHeight;
+      if (natural > 0 && natural !== this.entries[idx].height) {
+        this.entries[idx].height = natural;
+        if (firstIdx < 0 || idx < firstIdx) firstIdx = idx;
+        changed = true;
+      }
+      el.style.height = `${this.entries[idx].height}px`;
+      el.dataset.hc = "1";
+    }
+    if (changed && firstIdx >= 0) {
+      this._recalcTotalHeight();
+      this.contentEl.style.height = this.totalHeight + "px";
+      const repositionFrom = Math.min(firstIdx, this.visibleStart);
+      this._updateNodePositions(repositionFrom, this.visibleEnd);
     }
   }
 
@@ -347,8 +377,9 @@ export const initIoLogs = (): void => {
   const content = document.getElementById("ioLogList") as HTMLElement | null;
   if (!container || !content) return;
   ioVirtualList = new VirtualLogList<IoLogEntry>(container, content, {
-    font: "11px monospace", lineHeight: 18, estimatedLineHeight: 60, gap: 6, padding: 8,
-    textWidthOffset: 46, chromeHeight: 62, prepareFn: renderIoEntry,
+    font: "11px monospace", lineHeight: 18, estimatedLineHeight: 80, gap: 6, padding: 8,
+    textWidthOffset: 46, chromeHeight: (e: IoLogEntry): number => e.details.includes(" -> ") ? 84 : 62,
+    prepareFn: renderIoEntry,
     onEmpty: '<div style="padding:40px;text-align:center;color:var(--mx-t2);">暂无记录</div>',
   });
 };
@@ -358,16 +389,15 @@ export const resetIoLogs = (): void => { ioVirtualList?.clear(); _lastIoRaw = ""
 export const clearIoLogs = async (): Promise<void> => { await run(`${CONST.LOG_CTL} clear-io`); showToast.info("监控记录已清理"); resetIoLogs(); fetchIoLogs(); };
 
 function renderIoEntry(entry: IoLogEntry): string {
-  let detailHtml = entry.details;
-  /* Structured display for path redirect: "/from -> /to" shown as two lines */
+  /* Structured display for path redirect: two separate bordered boxes */
   const arrowSep = " -> ";
-  const arrowIdx = detailHtml.indexOf(arrowSep);
+  const arrowIdx = entry.details.indexOf(arrowSep);
   if (arrowIdx !== -1) {
-    const fromPath = detailHtml.substring(0, arrowIdx);
-    const toPath = detailHtml.substring(arrowIdx + arrowSep.length);
-    detailHtml = `<div class="io-path-wrap"><div>${fromPath}</div><div><span class="io-path-arrow">→ </span>${toPath}</div></div>`;
+    const fromPath = entry.details.substring(0, arrowIdx);
+    const toPath = entry.details.substring(arrowIdx + arrowSep.length);
+    return `<div class="io-item"><div class="io-header"><span class="io-time">${ICONS.CLOCK}<span>${entry.timeStr}</span><span class="io-app">${entry.appName}</span></span><span class="io-op op-${entry.op}">${entry.op}</span></div><div class="io-path-box">${fromPath}</div><div class="io-path-box">${toPath}</div></div>`;
   }
-  return `<div class="io-item"><div class="io-header"><span class="io-time">${ICONS.CLOCK}<span>${entry.timeStr}</span><span class="io-app">${entry.appName}</span></span><span class="io-op op-${entry.op}">${entry.op}</span></div><div class="io-detail">${detailHtml}</div></div>`;
+  return `<div class="io-item"><div class="io-header"><span class="io-time">${ICONS.CLOCK}<span>${entry.timeStr}</span><span class="io-app">${entry.appName}</span></span><span class="io-op op-${entry.op}">${entry.op}</span></div><div class="io-detail">${entry.details}</div></div>`;
 }
 
 interface StreamedResult { dataLines: string[]; hasMore: boolean; }

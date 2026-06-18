@@ -163,5 +163,5 @@ export function initCustomSelect(nativeSelect: HTMLSelectElement, _options?: Cus
 }
 
 export function initAllCustomSelects(container: HTMLElement | Document = document): void {
-  container.querySelectorAll<HTMLSelectElement>("select.mx-select").forEach(initCustomSelect);
+  container.querySelectorAll<HTMLSelectElement>("select.mx-select").forEach((el) => initCustomSelect(el));
 }

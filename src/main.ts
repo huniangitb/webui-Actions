@@ -31,6 +31,7 @@ import { getSettings, saveSettings, checkPluginInstalled, syncToPlugin } from ".
 import { openBackupModal, showPicker, exportAllLogs, createNewFolder } from "./backup.js";
 import { enableEdgeToEdge } from "kernelsu";
 import { initRipple } from "./ripple.js";
+import { initAllCustomSelects } from "./select.js";
 import "../style.css";
 
 // ── Helpers ──
@@ -245,6 +246,10 @@ const SECTION_TITLES: Record<string, string> = {
 };
 
 function switchSection(sectionId: string): void {
+  /* Don't re-fetch logs if already on this section — prevents list flicker */
+  if (state.currentSection === sectionId) return;
+  state.currentSection = sectionId;
+
   document.querySelectorAll(".demo-section").forEach((el) => el.classList.remove("active"));
   document.getElementById(`sec-${sectionId}`)?.classList.add("active");
 
@@ -278,6 +283,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   initIcons();
   initRipple();
+  initAllCustomSelects();
 
   // Handle browser back for modals
   window.addEventListener("popstate", () => {

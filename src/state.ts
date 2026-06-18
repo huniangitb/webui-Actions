@@ -23,6 +23,7 @@ export const state: AppState = {
   lastActiveModal: null,
   isViewportResizing: false,
   isUserTouching: false,
+  currentSection: "",
   resumePolling: null,
   suspendPolling: null,
 };

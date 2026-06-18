@@ -83,6 +83,7 @@ export interface AppState {
   lastActiveModal: string | null;
   isViewportResizing: boolean;
   isUserTouching: boolean;
+  currentSection: string;
   isInitialLoad?: boolean;
   isAppListReady?: boolean;
   resumePolling: (() => void) | null;

@@ -539,6 +539,97 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav {
     box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
 }
 
+/* ── Custom Select ── */
+.mx-custom-select {
+    position: relative; display: inline-flex;
+    vertical-align: middle;
+    z-index: 10;
+}
+.mx-select-trigger {
+    display: flex; align-items: center; gap: 6px;
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--mx-s3);
+    color: var(--mx-t1);
+    border: 1.5px solid var(--mx-border);
+    border-radius: var(--mx-radius-sm);
+    font-size: var(--mx-font-size-base);
+    font-family: var(--mx-font-sans);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s var(--mx-spring);
+    text-align: left;
+    white-space: nowrap;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.mx-select-trigger:hover {
+    border-color: var(--mx-primary);
+    background: var(--mx-s4);
+}
+.mx-custom-select:focus-within .mx-select-trigger {
+    border-color: var(--mx-border-focus);
+    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
+}
+.mx-select-trigger-label {
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis;
+}
+.mx-select-arrow {
+    flex-shrink: 0;
+    display: flex; align-items: center;
+    color: var(--mx-t2);
+    transition: transform 0.25s var(--mx-spring);
+}
+
+.mx-select-dropdown {
+    position: absolute;
+    left: 0; right: 0;
+    min-width: 100%;
+    background: var(--mx-s2);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-sm);
+    box-shadow: var(--mx-shadow-lg);
+    overflow-y: auto;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transform: translateY(-4px);
+    transition: opacity 0.2s var(--mx-ease),
+                transform 0.2s var(--mx-ease),
+                visibility 0s ease 0.2s;
+    z-index: 100;
+}
+.mx-select-dropdown.open {
+    opacity: 1; visibility: visible; pointer-events: auto;
+    transform: translateY(0);
+    transition: opacity 0.2s var(--mx-ease),
+                transform 0.2s var(--mx-spring),
+                visibility 0s ease 0s;
+}
+
+.mx-select-option {
+    display: block; width: 100%;
+    padding: 10px 14px;
+    background: transparent;
+    color: var(--mx-t1);
+    border: none;
+    font-size: var(--mx-font-size-sm);
+    font-family: var(--mx-font-sans);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.mx-select-option + .mx-select-option {
+    border-top: 1px solid var(--mx-border-light);
+}
+.mx-select-option:hover {
+    background: var(--mx-primary-subtle);
+}
+.mx-select-option.active {
+    color: var(--mx-primary);
+    font-weight: 600;
+    background: var(--mx-primary-subtle);
+}
+
 /* ── Pill group (segmented control) ── */
 .mx-pill-group {
     display: flex;
@@ -779,7 +870,8 @@ body.keyboard-open .overflow-y-auto {
     border-color: var(--mx-border-focus);
     background: var(--mx-s4);
 }
-.rule-type { width: 90px !important; flex-shrink: 0; }
+.rule-type { width: 95px; flex-shrink: 0; }
+.rule-type .mx-select-trigger { font-size: 12px; padding: 8px; }
 .rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .mx-input-wrapper { position: relative; width: 100%; min-width: 0; }
 .btn-del { width: 32px !important; height: 32px !important; flex-shrink: 0; }

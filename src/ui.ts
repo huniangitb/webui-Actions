@@ -3,6 +3,7 @@ import { run, showToast, ICONS, normalizeToDisplay, normalizeToConfig, debounce 
 import { exec } from "kernelsu";
 import { prepare, layout } from "@chenglou/pretext";
 import type { Suggestion } from "./types/index";
+import { initCustomSelect } from "./select.js";
 
 function getSelectById(id: string | null): HTMLSelectElement | null {
   if (!id) return null;
@@ -29,7 +30,7 @@ export const addRuleRow = (
   if (!container) return;
   const div = document.createElement("div");
   div.className = "rule-row";
-  div.innerHTML = `<select class="mx-select rule-type flex-shrink-0" style="width:90px; padding:8px 24px 8px 8px; font-size:12px;">
+  div.innerHTML = `<select class="mx-select rule-type" style="width:95px; font-size:12px;">
     <option value="REDIRECT">重定向</option>
     <option value="HIDE">隐藏</option>
     <option value="RO">只读</option>
@@ -52,6 +53,8 @@ export const addRuleRow = (
       srcWrapper.classList.toggle("hidden", (e.target as HTMLSelectElement).value !== "REDIRECT");
     }
   };
+  /* Init custom select after adding to DOM so layout is ready */
+  requestAnimationFrame(() => initCustomSelect(select));
   div.querySelector(".btn-del")?.addEventListener("click", () => div.remove());
   setupAutocomplete(div.querySelectorAll(".mx-input")[0] as HTMLInputElement);
   setupAutocomplete(div.querySelectorAll(".mx-input")[1] as HTMLInputElement);

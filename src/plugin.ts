@@ -255,8 +255,8 @@ export async function syncToPlugin(
   // 6. reload feedback
   const reloadRes = await exec("/data/Namespace-Proxy/reload_rules");
   if (reloadRes.stdout && reloadRes.stdout.trim().includes("SUCCESS")) {
-    toast(`同步成功：已转换 ${templates.length} 个规则模板，插件已重载`);
+    showToast.success(`同步成功：已转换 ${templates.length} 个规则模板，插件已重载`);
   } else {
-    console.warn("Reload rules failed:", reloadRes.stderr);
+    showToast.error("Reload rules failed:", reloadRes.stderr);
   }
 }

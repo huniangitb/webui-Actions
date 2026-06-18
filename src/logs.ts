@@ -163,20 +163,10 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
       if (same) return;
     }
 
-    // Data changed; add a brief opacity transition on the container before replacing
-    this.contentEl.style.transition = "opacity 0.15s var(--mx-ease)";
-    this.contentEl.style.opacity = "0";
-
-    setTimeout(() => {
-      this.replace(deduped);
-      requestAnimationFrame(() => {
-        this.contentEl.style.opacity = "1";
-        /* Clean up transition after animation so it doesn't interfere with scroll */
-        setTimeout(() => {
-          this.contentEl.style.transition = "";
-        }, 300);
-      });
-    }, 80);
+    // Data changed — directly replace; new items fade in via logItemIn CSS animation.
+    // No opacity trick needed because the render is skipped entirely when content
+    // hasn't changed (fast path above).
+    this.replace(deduped);
   }
 
   get scrollHeight(): number {

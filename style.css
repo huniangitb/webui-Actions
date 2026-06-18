@@ -1076,10 +1076,10 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 .suggestion-item + .suggestion-item { border-top: 1px solid var(--mx-border-light); }
 @media (hover: hover) { .suggestion-item:hover { background: var(--mx-primary-subtle); } }
 
-.virtual-log-item { will-change: transform; backface-visibility: hidden; animation: logItemIn 0.3s var(--mx-ease) both; }
+.virtual-log-item { will-change: transform; backface-visibility: hidden; animation: logItemIn 0.12s var(--mx-ease) both; }
 
 @keyframes logItemIn {
-    from { opacity: 0; transform: translateY(4px); }
+    from { opacity: 0.5; transform: translateY(2px); }
     to { opacity: 1; transform: translateY(0); }
 }
 

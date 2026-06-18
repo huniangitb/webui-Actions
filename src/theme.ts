@@ -11,7 +11,7 @@ export const applyTheme = (isDark: boolean): void => {
 
   const metaThemeColor = document.getElementById("themeColorMeta");
   if (metaThemeColor) {
-    metaThemeColor.setAttribute("content", isDark ? "#161616" : "#F0F2F5");
+    metaThemeColor.setAttribute("content", isDark ? "#0C0E12" : "#F0F2F5");
   }
   updateThemeIcons();
 

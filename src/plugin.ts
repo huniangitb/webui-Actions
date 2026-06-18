@@ -7,19 +7,27 @@ export async function getSettings(): Promise<Settings> {
   try {
     const res = await exec(`cat ${SETTINGS_FILE} 2>/dev/null`);
     if (res.stdout) return JSON.parse(res.stdout) as Settings;
-  } catch {
-    /* ignore */
+  } catch (e) {
+    showToast.error("读取设置失败: " + (e instanceof Error ? e.message : String(e)));
   }
   return { syncPlugin: false, autoTheme: true, colorProfile: "teal" };
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {
-  await exec(`echo '${JSON.stringify(settings)}' > ${SETTINGS_FILE}`);
+  try {
+    await exec(`echo '${JSON.stringify(settings)}' > ${SETTINGS_FILE}`);
+  } catch (e) {
+    showToast.error("保存设置失败: " + (e instanceof Error ? e.message : String(e)));
+  }
 }
 
 export async function checkPluginInstalled(): Promise<boolean> {
-  const res = await exec("pm path me.gm.cleaner.plugin 2>/dev/null");
-  return !!(res.stdout && res.stdout.trim());
+  try {
+    const res = await exec("pm path me.gm.cleaner.plugin 2>/dev/null");
+    return !!(res.stdout && res.stdout.trim());
+  } catch {
+    return false;
+  }
 }
 
 interface RedirectRule {
@@ -121,11 +129,22 @@ export async function syncToPlugin(
   injectorRulesMap: Map<string, string[]>,
   injectorStates: Map<string, string>,
 ): Promise<void> {
-  const settings = await getSettings();
+  let settings: Settings;
+  try {
+    settings = await getSettings();
+  } catch (e) {
+    showToast.error("读取设置失败: " + (e instanceof Error ? e.message : String(e)));
+    return;
+  }
   if (!settings.syncPlugin) return;
 
-  const isInstalled = await checkPluginInstalled();
-  if (!isInstalled) return;
+  try {
+    const isInstalled = await checkPluginInstalled();
+    if (!isInstalled) return;
+  } catch (e) {
+    showToast.error("检查插件状态失败: " + (e instanceof Error ? e.message : String(e)));
+    return;
+  }
 
   const isGlobalInjectOn = (globalConfText || "").includes("GLOBAL_INJECT ON");
   const allEnabledApps = new Set<string>();
@@ -234,29 +253,33 @@ export async function syncToPlugin(
   });
 
   // 5. write rule file
-  const jsonStr = JSON.stringify(templates);
-  const findCmd = "pm list packages | grep providers.media.module | cut -d: -f2 | head -n 1";
-  const res = await exec(findCmd);
-  let mpPkg = (res.stdout ? res.stdout.trim() : "") || "com.android.providers.media.module";
+  try {
+    const jsonStr = JSON.stringify(templates);
+    const findCmd = "pm list packages | grep providers.media.module | cut -d: -f2 | head -n 1";
+    const res = await exec(findCmd);
+    let mpPkg = (res.stdout ? res.stdout.trim() : "") || "com.android.providers.media.module";
 
-  const targetDir = `/data/user_de/0/${mpPkg}/files`;
-  const targetPath = `${targetDir}/rule`;
+    const targetDir = `/data/user_de/0/${mpPkg}/files`;
+    const targetPath = `${targetDir}/rule`;
 
-  await exec(`mkdir -p ${targetDir}`);
-  await exec(`echo '${jsonStr.replace(/'/g, "'\\''")}' > ${targetPath}`);
+    await exec(`mkdir -p ${targetDir}`);
+    await exec(`echo '${jsonStr.replace(/'/g, "'\\''")}' > ${targetPath}`);
 
-  const statRes = await exec(`stat -c '%u:%g' ${targetDir} 2>/dev/null`);
-  const ug = statRes.stdout ? statRes.stdout.trim() : "";
-  if (ug) {
-    await exec(`chown ${ug} ${targetPath}`);
-  }
-  await exec(`chmod 644 ${targetPath}`);
+    const statRes = await exec(`stat -c '%u:%g' ${targetDir} 2>/dev/null`);
+    const ug = statRes.stdout ? statRes.stdout.trim() : "";
+    if (ug) {
+      await exec(`chown ${ug} ${targetPath}`);
+    }
+    await exec(`chmod 644 ${targetPath}`);
 
-  // 6. reload feedback
-  const reloadRes = await exec("/data/Namespace-Proxy/reload_rules");
-  if (reloadRes.stdout && reloadRes.stdout.trim().includes("SUCCESS")) {
-    showToast.success(`同步成功：已转换 ${templates.length} 个规则模板，插件已重载`);
-  } else {
-    showToast.error("Reload rules failed:", reloadRes.stderr);
+    // 6. reload feedback
+    const reloadRes = await exec("/data/Namespace-Proxy/reload_rules");
+    if (reloadRes.stdout && reloadRes.stdout.trim().includes("SUCCESS")) {
+      showToast.success(`同步成功：已转换 ${templates.length} 个规则模板，插件已重载`);
+    } else {
+      showToast.error("Reload rules failed: " + reloadRes.stderr);
+    }
+  } catch (e) {
+    showToast.error("同步失败: " + (e instanceof Error ? e.message : String(e)));
   }
 }

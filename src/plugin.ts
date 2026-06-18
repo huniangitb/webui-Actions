@@ -1,6 +1,6 @@
 import { exec, toast } from "kernelsu";
 import type { Settings, AppEntry } from "./types/index";
-
+import {showToast} from "./utils.js";
 const SETTINGS_FILE = "/data/Namespace-Proxy/webui_settings.json";
 
 export async function getSettings(): Promise<Settings> {

@@ -264,12 +264,50 @@ function switchSection(sectionId: string): void {
   if (sectionId === "io") {
     resetIoLogs();
     fetchIoLogs();
+    startLogPolling("io");
     return;
   }
   if (sectionId === "log") {
     const source = (document.getElementById("logSourceSelect") as HTMLSelectElement)?.value;
-    if (source === "internal") resetSysLogs();
-    fetchSysLogs();
+    if (source === "internal") {
+      state.sysState.offset = 0;
+      state.sysState.hasMore = true;
+      fetchSysLogs();
+    }
+    startLogPolling("log");
+    return;
+  }
+  stopLogPolling();
+}
+
+/* ── Log live polling (1s interval) ── */
+
+let logPollTimer: ReturnType<typeof setInterval> | null = null;
+
+function startLogPolling(section: string): void {
+  stopLogPolling();
+  logPollTimer = setInterval(() => {
+    if (section === "io" && state.currentSection === "io") {
+      if (state.ioState.offset > 0) {
+        /* Only refresh from start if less than 200 items shown to avoid perf spikes */
+        state.ioState.offset = 0;
+        state.ioState.hasMore = true;
+        fetchIoLogs();
+      } else {
+        fetchIoLogs();
+      }
+    } else if (section === "log" && state.currentSection === "log") {
+      state.sysState.offset = 0;
+      state.sysState.hasMore = true;
+      fetchSysLogs();
+    }
+  }, 1000);
+}
+
+function stopLogPolling(): void {
+  if (logPollTimer) {
+    clearInterval(logPollTimer);
+    logPollTimer = null;
   }
 }
 

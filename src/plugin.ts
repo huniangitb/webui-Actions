@@ -10,7 +10,7 @@ export async function getSettings(): Promise<Settings> {
   } catch {
     /* ignore */
   }
-  return { syncPlugin: false, autoTheme: true };
+  return { syncPlugin: false, autoTheme: true, colorProfile: "teal" };
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {

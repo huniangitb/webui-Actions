@@ -46,6 +46,7 @@ export interface Suggestion {
 export interface Settings {
   autoTheme: boolean;
   syncPlugin: boolean;
+  colorProfile: string;
 }
 
 export interface PaginationState {

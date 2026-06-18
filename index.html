@@ -313,28 +313,40 @@
                 <span class="mx-modal-title">WebUI 设置</span>
                 <button class="mx-btn-close"></button>
             </div>
-            <div class="mx-modal-body flex-col gap-3">
-                <label class="mx-switch-row mx-card" style="padding:12px; border:1px solid var(--mx-border); box-shadow:none; cursor:pointer;">
-                    <div>
+            <div class="mx-modal-body flex-col gap-2">
+                <label class="mx-switch-row" style="padding:10px 0;">
+                    <div style="flex:1;min-width:0;">
                         <div style="font-weight:600; font-size:14px;">跟随系统深色模式</div>
-                        <div class="text-muted" style="font-size:11px; margin-top:2px;">自动适应设备主题色</div>
+                        <div class="text-muted" style="font-size:11px; margin-top:1px;">自动适应设备主题色</div>
                     </div>
                     <label class="mx-switch">
                         <input type="checkbox" id="autoThemeToggle">
                         <span class="mx-switch-track"><span class="mx-switch-thumb"></span></span>
                     </label>
                 </label>
-                <label class="mx-switch-row mx-card" style="padding:12px; border:1px solid var(--mx-border); box-shadow:none; cursor:pointer;">
-                    <div>
+                <div class="divider" style="margin:0;"></div>
+                <label class="mx-switch-row" style="padding:10px 0;">
+                    <div style="flex:1;min-width:0;">
                         <div style="font-weight:600; font-size:14px;">插件规则同步</div>
-                        <div class="text-muted" style="font-size:11px; margin-top:2px;">同步至 me.gm.cleaner.plugin</div>
+                        <div class="text-muted" style="font-size:11px; margin-top:1px;">同步至 me.gm.cleaner.plugin</div>
                     </div>
                     <label class="mx-switch">
                         <input type="checkbox" id="pluginSyncToggle">
                         <span class="mx-switch-track"><span class="mx-switch-thumb"></span></span>
                     </label>
                 </label>
-                <div id="pluginStatusLabel" class="text-muted" style="font-size: 11px; font-family:var(--mx-font-mono);"></div>
+                <div class="divider" style="margin:0;"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0;">
+                    <div>
+                        <div style="font-weight:600; font-size:14px;">配色方案</div>
+                        <div class="text-muted" style="font-size:11px; margin-top:1px;">切换界面主题色</div>
+                    </div>
+                    <select id="colorProfileSelect" class="mx-select" style="width:110px; padding:6px 28px 6px 8px; font-size:12px;">
+                        <option value="teal">青绿</option>
+                        <option value="ocean">经典蓝</option>
+                    </select>
+                </div>
+                <div id="pluginStatusLabel" class="text-muted" style="font-size: 11px; font-family:var(--mx-font-mono); padding:4px 0;"></div>
             </div>
             <div class="mx-modal-foot">
                 <button class="mx-btn mx-btn-primary w-full" id="btnSaveSettings">保存并应用</button>

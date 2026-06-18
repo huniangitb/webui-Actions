@@ -96,6 +96,24 @@
     --mx-glass-border: rgba(220, 224, 232, 0.6);
 }
 
+/* ── Color Profiles ── */
+
+/* "ocean": Classic blue — original NS-Proxy palette */
+:root[data-color-profile="ocean"] {
+    --mx-primary: #277AF7;
+    --mx-primary-hover: #4599ff;
+    --mx-primary-glow: 0 0 20px rgba(39, 122, 247, 0.15);
+    --mx-primary-subtle: rgba(39, 122, 247, 0.08);
+    --mx-border-focus: #277AF7;
+}
+[data-theme="light"][data-color-profile="ocean"] {
+    --mx-primary: #3482FF;
+    --mx-primary-hover: #1877f2;
+    --mx-primary-glow: 0 0 20px rgba(52, 130, 255, 0.12);
+    --mx-primary-subtle: rgba(52, 130, 255, 0.06);
+    --mx-border-focus: #3482FF;
+}
+
 /* ── Theme transition ── */
 html.theme-transition *,
 html.theme-transition *::before,
@@ -105,6 +123,10 @@ html.theme-transition *::after {
                 border-color 0.45s var(--mx-ease),
                 box-shadow 0.45s var(--mx-ease) !important;
     transition-delay: 0s !important;
+}
+/* Disable scroll-driven animation during theme transition to prevent conflict */
+html.theme-transition .mx-card-head {
+    animation: none !important;
 }
 
 /* ── Reset & Base ── */
@@ -227,7 +249,7 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav {
     border-radius: var(--mx-radius-sm);
     transition: color 0.2s var(--mx-ease), transform 0.2s var(--mx-spring), background 0.2s;
 }
-.mx-btm-item:active { transform: scale(0.92); }
+.mx-btm-item:active { transform: scale(0.88); }
 .mx-btm-item.active { color: var(--mx-primary); }
 .mx-btm-item.active::after {
     content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
@@ -409,11 +431,11 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav {
     border-radius: var(--mx-radius-sm);
     font-size: var(--mx-font-size-sm); font-weight: 600;
     border: none; cursor: pointer;
-    transition: all 0.2s var(--mx-ease);
+    transition: all 0.25s var(--mx-spring);
     font-family: var(--mx-font-sans);
     letter-spacing: 0.01em;
 }
-.mx-btn:active { transform: scale(0.96); }
+.mx-btn:active { transform: scale(0.94); }
 .mx-btn-primary {
     background: var(--mx-primary);
     color: #fff;
@@ -445,19 +467,19 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav {
     border-radius: var(--mx-radius-pill);
     display: flex; align-items: center; justify-content: center;
     background: transparent; border: none; color: var(--mx-t2);
-    cursor: pointer; transition: all 0.2s var(--mx-ease);
+    cursor: pointer; transition: all 0.2s var(--mx-spring);
 }
 @media (hover: hover) { .mx-btn-icon:hover { background: var(--mx-s3); color: var(--mx-t1); } }
-.mx-btn-icon:active { transform: scale(0.9); }
+.mx-btn-icon:active { transform: scale(0.85); }
 
 .mx-btn-close {
     width: 32px; height: 32px; border-radius: 50%;
     background: var(--mx-s3); border: none; color: var(--mx-t2);
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+    cursor: pointer; transition: all 0.2s var(--mx-spring); flex-shrink: 0;
 }
 @media (hover: hover) { .mx-btn-close:hover { background: var(--mx-s4); color: var(--mx-t1); } }
-.mx-btn-close:active { transform: scale(0.9); }
+.mx-btn-close:active { transform: scale(0.85); }
 
 /* ── Badges ── */
 .mx-badge {
@@ -532,7 +554,7 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav {
     color: var(--mx-t2);
     font-size: var(--mx-font-size-sm); font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s var(--mx-ease);
+    transition: all 0.2s var(--mx-spring);
     white-space: nowrap;
     font-family: var(--mx-font-sans);
 }
@@ -624,11 +646,11 @@ body.keyboard-open:not(.modal-open) .mx-bottom-nav {
 }
 .mx-subpage-container.open {
     display: flex;
-    animation: subpageOpen 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: subpageOpen 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 .mx-subpage-container.closing {
     display: flex; pointer-events: none;
-    animation: subpageClose 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: subpageClose 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes subpageOpen {
@@ -970,7 +992,7 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 
 /* ── Card animation ── */
 .mx-anim-card-in {
-    animation: cardIn 0.4s var(--mx-ease) both;
+    animation: cardIn 0.45s var(--mx-spring) both;
     animation-delay: 0.1s;
 }
 @keyframes cardIn {

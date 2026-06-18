@@ -1,6 +1,6 @@
 import { state, CONST, closeModalCleanup } from "./state.js";
 import { run, showToast, ICONS, initIcons, debounce } from "./utils.js";
-import { applyTheme, systemThemeListener, handleManualThemeToggle } from "./theme.js";
+import { applyTheme, systemThemeListener, handleManualThemeToggle, applyColorProfile } from "./theme.js";
 import {
   setupModeToggle,
   addRuleRow,
@@ -285,7 +285,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (appConfig && appConfig.classList.contains("open")) {
       appConfig.classList.remove("open");
       appConfig.classList.add("closing");
-      setTimeout(() => appConfig.classList.remove("closing"), 220);
+      setTimeout(() => appConfig.classList.remove("closing"), 300);
     }
     document.querySelector(".mx-app")!.classList.remove("frozen");
     document.body.classList.remove("modal-open", "keyboard-open");
@@ -350,6 +350,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.currentSettings.autoTheme;
   (document.getElementById("pluginSyncToggle") as HTMLInputElement).checked =
     state.currentSettings.syncPlugin;
+
+  // Initialize color profile
+  const colorProfileSelect = document.getElementById("colorProfileSelect") as HTMLSelectElement | null;
+  if (colorProfileSelect) {
+    colorProfileSelect.value = state.currentSettings.colorProfile || "teal";
+  }
+  if (state.currentSettings.colorProfile) {
+    document.documentElement.setAttribute("data-color-profile", state.currentSettings.colorProfile);
+  }
 
   if (state.currentSettings.autoTheme) {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -432,7 +441,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnSaveSettings")!.onclick = async () => {
     state.currentSettings.autoTheme = (document.getElementById("autoThemeToggle") as HTMLInputElement).checked;
     state.currentSettings.syncPlugin = (document.getElementById("pluginSyncToggle") as HTMLInputElement).checked;
+    const profileSelect = document.getElementById("colorProfileSelect") as HTMLSelectElement | null;
+    if (profileSelect) {
+      state.currentSettings.colorProfile = profileSelect.value;
+    }
     await saveSettings(state.currentSettings);
+    applyColorProfile(state.currentSettings.colorProfile);
     if (state.currentSettings.autoTheme) {
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
       applyTheme(mediaQuery.matches);

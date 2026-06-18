@@ -37,7 +37,7 @@ export const closeModalCleanup = (): void => {
   if (appConfig?.classList.contains("open")) {
     appConfig.classList.remove("open");
     appConfig.classList.add("closing");
-    setTimeout(() => appConfig.classList.remove("closing"), 220);
+    setTimeout(() => appConfig.classList.remove("closing"), 300);
   }
   document.querySelector(".mx-app")?.classList.remove("frozen");
   document.body.classList.remove("modal-open", "keyboard-open");

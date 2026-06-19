@@ -39,6 +39,7 @@ const refreshRateColorStops = [
     { rate: 90, color: [255, 153, 51] },
     { rate: 144, color: [249, 49, 84] }
 ];
+const REFRESH_RATES = [30, 60, 90, 120, 144, 165];
 
 let globalConfig = JSON.parse(JSON.stringify(defaultConfig));
 let maxBrightness = 255;
@@ -60,6 +61,7 @@ let pendingBrightnessValue = null;
 const brightnessSlider = document.getElementById('brightnessSlider');
 const brightnessValue = document.getElementById('brightnessValue');
 const refreshRateValue = document.getElementById('refreshRateValue');
+const refreshRateSelect = document.getElementById('refreshRateSelect');
 const saveButton = document.getElementById('saveButton');
 const resetConfigButton = document.getElementById('resetConfigButton');
 const readNodeButton = document.getElementById('readNodeButton');
@@ -114,17 +116,37 @@ function interpolateColor(color1, color2, factor) { const result = color1.slice(
 const uiToNodeHue = (uiValue) => Math.round(uiValue * (HUE_NODE_MAX / HUE_UI_MAX));
 const nodeToUiHue = (nodeValue) => Math.round(nodeValue * (HUE_UI_MAX / HUE_NODE_MAX));
 
+async function readRefreshRate() {
+    // primary: settings get secure miui_refresh_rate; fallback: settings get system peak_refresh_rate
+    for (const cmd of ['settings get secure miui_refresh_rate', 'settings get system peak_refresh_rate']) {
+        try {
+            const { stdout } = await exec(cmd);
+            const v = parseInt(stdout.trim());
+            if (!isNaN(v) && v > 0) return v;
+        } catch (_) {}
+    }
+    return 60;
+}
+
+async function setRefreshRate(rate) {
+    // primary: settings put secure miui_refresh_rate; fallback: settings put system peak_refresh_rate
+    for (const cmd of [`settings put secure miui_refresh_rate ${rate}`, `settings put system peak_refresh_rate ${rate}`]) {
+        try {
+            await exec(cmd);
+            return true;
+        } catch (_) {}
+    }
+    return false;
+}
+
 async function pollSystemStatus() {
-    try {
-        const { stdout } = await exec(`cat ${KCAL_RED_PATH}`);
-        const newRate = parseInt(stdout.trim().split(/\s+/)[2]) || 60;
-        if (newRate !== lastKnownRefreshRate) {
-            lastKnownRefreshRate = newRate; currentRefreshRate = newRate; updateRefreshRateUI(newRate);
-            currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
-            toast(i18next.t('toast.refreshRateChanged', { rate: newRate }), 'info');
-            await loadConfigAndRender();
-        }
-    } catch (e) {}
+    const newRate = await readRefreshRate();
+    if (newRate !== lastKnownRefreshRate) {
+        lastKnownRefreshRate = newRate; currentRefreshRate = newRate; updateRefreshRateUI(newRate);
+        currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
+        toast(i18next.t('toast.refreshRateChanged', { rate: newRate }), 'info');
+        await loadConfigAndRender();
+    }
     try {
         // 交互时不轮询，防止回跳
         const isUserInteracting = document.activeElement === brightnessSlider || brightnessSlider === document.querySelector(':active');
@@ -225,6 +247,7 @@ function updateKcalEnableUI(enabled) {
 
 function updateRefreshRateUI(rate) {
     refreshRateValue.innerText = `${rate} Hz`;
+    refreshRateSelect.value = rate;
     let color;
     if (rate <= refreshRateColorStops[0].rate) {
         color = refreshRateColorStops[0].color;
@@ -620,17 +643,7 @@ function setupIncrementer(minusBtn, plusBtn, input, slider, step, min, max, isIn
 }
 
 async function fetchInitialSystemState() {
-    try {
-        const { stdout } = await exec(`cat ${KCAL_RED_PATH}`);
-        currentRefreshRate = parseInt(stdout.trim().split(/\s+/)[2]) || 60;
-    } catch (e) {
-        try {
-            const { stdout } = await exec('settings get system peak_refresh_rate');
-            currentRefreshRate = Math.round(parseFloat(stdout.trim())) || 60;
-        } catch (e2) {
-            currentRefreshRate = 60;
-        }
-    }
+    currentRefreshRate = await readRefreshRate();
     updateRefreshRateUI(currentRefreshRate);
     lastKnownRefreshRate = currentRefreshRate;
     try {
@@ -676,6 +689,22 @@ async function init() {
     advancedModeButton.addEventListener('click', () => toggleAdvancedMode(!isAdvancedMode));
     saveAdvColorButton.addEventListener('click', saveConfig);
     resetAdvColorButton.addEventListener('click', resetAdvColor);
+
+    refreshRateSelect.addEventListener('change', async (e) => {
+        const newRate = parseInt(e.target.value);
+        const ok = await setRefreshRate(newRate);
+        if (ok) {
+            currentRefreshRate = newRate;
+            lastKnownRefreshRate = newRate;
+            updateRefreshRateUI(newRate);
+            currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
+            toast(i18next.t('toast.refreshRateChanged', { rate: newRate }), 'info');
+            await loadConfigAndRender();
+        } else {
+            toast(i18next.t('toast.refreshRateReadError'), 'error');
+            updateRefreshRateUI(currentRefreshRate); // 恢复显示
+        }
+    });
 
     for (const color of ['red', 'green', 'blue']) {
         const elements = uiElements[color];

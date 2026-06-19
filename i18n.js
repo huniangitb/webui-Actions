@@ -34,7 +34,6 @@ const resources = {
       "params.whiteValue": "White Value", // Changed from Value to White Value
       "chart.yAxisTitle": "Calculated Value",
       "chart.title": "Color Curve",
-      "chart.logScale": "Log Scale",
       "footer.author": "Author: 囫碾",
       "modals.nodeStatus.title": "Node Status",
       "modals.nodeStatus.close": "Close",
@@ -104,7 +103,6 @@ const resources = {
       "params.whiteValue": "白值", // Changed from 值 to 白值
       "chart.yAxisTitle": "计算值",
       "chart.title": "色彩曲线",
-      "chart.logScale": "对数坐标",
       "footer.author": "作者: 囫碾",
       "modals.nodeStatus.title": "节点状态",
       "modals.nodeStatus.close": "关闭",

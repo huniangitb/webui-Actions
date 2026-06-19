@@ -57,9 +57,6 @@ let isKcalEnabled = true;
 let isBrightnessApplying = false;
 let pendingBrightnessValue = null;
 
-// 图表状态
-let isLogScale = localStorage.getItem('chartScale') === 'linear' ? false : true;
-
 const brightnessSlider = document.getElementById('brightnessSlider');
 const brightnessValue = document.getElementById('brightnessValue');
 const refreshRateValue = document.getElementById('refreshRateValue');
@@ -67,7 +64,6 @@ const saveButton = document.getElementById('saveButton');
 const resetConfigButton = document.getElementById('resetConfigButton');
 const readNodeButton = document.getElementById('readNodeButton');
 const chartCanvas = document.getElementById('colorCurveChart');
-const chartScaleSwitch = document.getElementById('chartScaleSwitch');
 const advancedConfigEditor = document.getElementById('advanced-config-editor');
 const advancedModeButton = document.getElementById('advancedModeButton');
 const wizardButton = document.getElementById('wizardButton');
@@ -252,15 +248,12 @@ function updateRefreshRateUI(rate) {
 
 function calculateChartData(params) {
     const labels = []; const colorData = { red: [], green: [], blue: [] };
-    // 对数模式循环 1-100 (百分比)，常规模式循环 0-255 (数值)
-    const maxIter = isLogScale ? 100 : 255;
-    
-    for (let i = (isLogScale ? 1 : 0); i <= maxIter; i++) {
+
+    for (let i = 0; i <= 255; i++) {
         labels.push(i);
-        // 对数模式需转换百分比到系统亮度，常规模式直接使用索引(最小为1防止log(0))
-        const systemBrightness = isLogScale ? scaleToSystemBrightness(i) : Math.max(1, i);
-        const log_b = Math.log(systemBrightness);
-        
+        const b = Math.max(1, i);
+        const log_b = Math.log(b);
+
         for (const color of ['red', 'green', 'blue']) {
             const { intercept, slope } = params[color];
             colorData[color].push(intercept + (slope * log_b));
@@ -279,28 +272,14 @@ function calculateChartData(params) {
 function getChartScales(isDark) {
     const tickColor = isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
     const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-    
-    const xScale = isLogScale ? {
-        type: 'logarithmic', min: 1, max: 100,
-        ticks: {
-            color: tickColor,
-            callback: (v) => [1, 2, 5, 10, 20, 50, 100].includes(v) ? v + '%' : null,
-            generateTicks: () => [1, 2, 5, 10, 20, 50, 100].map(v => ({ value: v }))
-        }
-    } : {
-        type: 'linear', min: 0, max: 255,
-        ticks: { 
-            color: tickColor, 
-            stepSize: 51, // 均分坐标轴
-            callback: (v) => v 
-        }
-    };
 
-    xScale.title = { display: true, text: i18next.t('status.brightness'), color: tickColor };
-    xScale.grid = { color: gridColor };
-    
     return {
-        x: xScale,
+        x: {
+            type: 'linear', min: 0, max: 255,
+            title: { display: true, text: i18next.t('status.brightness'), color: tickColor },
+            grid: { color: gridColor },
+            ticks: { color: tickColor, stepSize: 51, callback: (v) => v }
+        },
         y: { title: { display: true, text: i18next.t('chart.yAxisTitle'), color: tickColor }, ticks: { color: tickColor }, grid: { color: gridColor } }
     };
 }
@@ -343,12 +322,6 @@ function updateChart() {
     } else { 
         initChart();
     }
-}
-
-function toggleChartScale() {
-    isLogScale = chartScaleSwitch.checked;
-    localStorage.setItem('chartScale', isLogScale ? 'log' : 'linear');
-    updateChart();
 }
 
 async function applyAllKcalSettings(config, useRefreshRate = currentRefreshRate) {
@@ -690,9 +663,7 @@ async function init() {
     nodeStatusModal = new Modal(document.getElementById('nodeStatusModal'));
     wizardModal = new Modal(wizardModalElement);
     
-    // 初始化图表开关状态
-    chartScaleSwitch.checked = isLogScale;
-    
+
     await fetchInitialSystemState();
     currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
     await loadConfigAndRender();
@@ -705,7 +676,6 @@ async function init() {
     advancedModeButton.addEventListener('click', () => toggleAdvancedMode(!isAdvancedMode));
     saveAdvColorButton.addEventListener('click', saveConfig);
     resetAdvColorButton.addEventListener('click', resetAdvColor);
-    chartScaleSwitch.addEventListener('change', toggleChartScale);
 
     for (const color of ['red', 'green', 'blue']) {
         const elements = uiElements[color];

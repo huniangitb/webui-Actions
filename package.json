@@ -8,16 +8,16 @@
     "build": "parcel build index.html --no-source-maps --public-url ./"
   },
   "dependencies": {
-    "chart.js": "^4.4.3",
-    "i18next": "^23.11.5",
-    "i18next-browser-languagedetector": "^7.2.0",
-    "kernelsu": "^3.0.0",
-    "mdb-ui-kit": "^7.3.0"
+    "chart.js": "^4.5.1",
+    "i18next": "^26.3.1",
+    "i18next-browser-languagedetector": "^8.2.1",
+    "kernelsu": "^3.0.2",
+    "mdb-ui-kit": "^9.3.0"
   },
   "devDependencies": {
     "@mdi/js": "^7.4.47",
-    "@parcel/transformer-sass": "^2.12.0",
-    "parcel": "^2.12.0",
-    "sass": "^1.77.4"
+    "@parcel/transformer-sass": "^2.16.4",
+    "parcel": "^2.16.4",
+    "sass": "^1.101.0"
   }
 }

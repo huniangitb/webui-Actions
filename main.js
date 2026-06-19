@@ -39,8 +39,6 @@ const refreshRateColorStops = [
     { rate: 90, color: [255, 153, 51] },
     { rate: 144, color: [249, 49, 84] }
 ];
-const REFRESH_RATES = [30, 60, 90, 120, 144, 165];
-
 let globalConfig = JSON.parse(JSON.stringify(defaultConfig));
 let maxBrightness = 255;
 let currentRefreshRate = 60;
@@ -137,6 +135,38 @@ async function setRefreshRate(rate) {
         } catch (_) {}
     }
     return false;
+}
+
+async function fetchRefreshRateOptions() {
+    // dumpsys display 获取设备支持的刷新率档位, 取整去重
+    try {
+        const { stdout } = await exec("dumpsys display | grep -oE 'fps=[0-9.]+' | sort -u | sed 's/fps=//'");
+        const rates = stdout.trim().split('\n')
+            .map(v => Math.round(parseFloat(v.trim())))
+            .filter(v => !isNaN(v) && v > 0);
+        return [...new Set(rates)].sort((a, b) => a - b);
+    } catch (_) {
+        return [30, 60, 90, 120, 144]; // fallback
+    }
+}
+
+async function populateRefreshRateDropdown() {
+    // 保存当前选中值
+    const prevVal = refreshRateSelect.value;
+    refreshRateSelect.innerHTML = '';
+    const rates = await fetchRefreshRateOptions();
+    rates.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r;
+        opt.textContent = r;
+        refreshRateSelect.appendChild(opt);
+    });
+    // 恢复选中值或匹配最近的有效值
+    if (prevVal && rates.includes(parseInt(prevVal))) {
+        refreshRateSelect.value = prevVal;
+    } else if (rates.length > 0) {
+        refreshRateSelect.value = rates[0];
+    }
 }
 
 async function pollSystemStatus() {
@@ -247,7 +277,12 @@ function updateKcalEnableUI(enabled) {
 
 function updateRefreshRateUI(rate) {
     refreshRateValue.innerText = `${rate} Hz`;
-    refreshRateSelect.value = rate;
+    // 匹配下拉框中最近的刷新率档位
+    const options = Array.from(refreshRateSelect.options).map(o => parseInt(o.value)).filter(v => !isNaN(v));
+    if (options.length > 0) {
+        const nearest = options.reduce((a, b) => Math.abs(b - rate) < Math.abs(a - rate) ? b : a);
+        refreshRateSelect.value = nearest;
+    }
     let color;
     if (rate <= refreshRateColorStops[0].rate) {
         color = refreshRateColorStops[0].color;
@@ -678,6 +713,7 @@ async function init() {
     
 
     await fetchInitialSystemState();
+    await populateRefreshRateDropdown();
     currentConfigPath = `${MODULE_PATH}/${currentRefreshRate}hz.config`;
     await loadConfigAndRender();
 

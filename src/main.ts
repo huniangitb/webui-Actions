@@ -35,7 +35,6 @@ import { initAllCustomSelects } from "./select.js";
 import "../style.css";
 
 // ── Helpers ──
-
 function isVisualMode(toggleName: string): boolean {
   return !!document
     .querySelector(`button[name="${toggleName}"][data-mode="visual"]`)
@@ -74,11 +73,9 @@ function buildPluginStatusLabel(container: HTMLElement, installed: boolean): voi
     container.style.justifyContent = "space-between";
     container.style.alignItems = "center";
     container.style.color = "";
-
     const span = document.createElement("span");
     span.textContent = "状态: 未发现清理插件";
     span.style.color = "var(--mx-red)";
-
     const link = document.createElement("a");
     link.textContent = "去下载";
     link.style.cssText =
@@ -86,14 +83,12 @@ function buildPluginStatusLabel(container: HTMLElement, installed: boolean): voi
     link.onclick = () => {
       run('am start -a android.intent.action.VIEW -d "https://wwbti.lanzoue.com/i3K1v3ofox5a"');
     };
-
     container.appendChild(span);
     container.appendChild(link);
   }
 }
 
 // ── Height lock for WebView keyboard handling ──
-
 function lockInitialHeight(): void {
   const update = (): void => {
     const initialH = window.visualViewport
@@ -103,9 +98,7 @@ function lockInitialHeight(): void {
       document.documentElement.style.setProperty("--initial-vh", `${initialH}px`);
     }
   };
-
   const delayedUpdate = () => setTimeout(update, 200);
-
   update();
   window.addEventListener("load", update);
   window.addEventListener("orientationchange", delayedUpdate);
@@ -116,7 +109,6 @@ function lockInitialHeight(): void {
 lockInitialHeight();
 
 // ── Polling ──
-
 let statusPolling: ReturnType<typeof setInterval> | null = null;
 let appStatusPolling: ReturnType<typeof setInterval> | null = null;
 
@@ -124,7 +116,6 @@ function updateStatusBadge(suffix: string): void {
   const badge = document.getElementById("statusBadge" + suffix);
   const btn = document.getElementById("btnToggleStatus" + suffix);
   if (!badge || !btn) return;
-
   if (state.currentPid) {
     badge.className = "mx-badge mx-badge-success";
     badge.textContent = "RUNNING";
@@ -142,7 +133,6 @@ async function checkStatus(): Promise<void> {
     const pid = (await run("pidof injector")) || (await run("pgrep -x injector"));
     state.currentPid = pid ? pid.split(" ")[0] : null;
     getStatusSuffixes().forEach(updateStatusBadge);
-
     const info = document.getElementById("statusInfo");
     if (info) {
       info.textContent = state.currentPid ? `PID ${state.currentPid}` : "OFFLINE";
@@ -202,7 +192,6 @@ async function refreshAppStatus(): Promise<void> {
 }
 
 // ── Monitor ignore helpers ──
-
 function parseIgnoreToVisual(t: string): void {
   const c = document.getElementById("ignoreBuilderContainer");
   if (!c) return;
@@ -237,7 +226,6 @@ function addIgnoreRow(p: string): void {
 }
 
 // ── Section switching ──
-
 const SECTION_TITLES: Record<string, string> = {
   apps: "应用配置",
   global: "全局规则",
@@ -249,18 +237,14 @@ function switchSection(sectionId: string): void {
   /* Don't re-fetch logs if already on this section — prevents list flicker */
   if (state.currentSection === sectionId) return;
   state.currentSection = sectionId;
-
   document.querySelectorAll(".demo-section").forEach((el) => el.classList.remove("active"));
   document.getElementById(`sec-${sectionId}`)?.classList.add("active");
-
   const selector = ".mx-nav-item, .mx-btm-item";
   document.querySelectorAll<HTMLElement>(selector).forEach((el) =>
     el.classList.toggle("active", el.dataset.section === sectionId),
   );
-
   const breadcrumb = document.getElementById("breadcrumbTitle");
   if (breadcrumb) breadcrumb.textContent = SECTION_TITLES[sectionId] ?? sectionId;
-
   if (sectionId === "io") {
     resetIoLogs();
     fetchIoLogs();
@@ -281,9 +265,7 @@ function switchSection(sectionId: string): void {
 }
 
 /* ── Log live polling (1s interval) ── */
-
 let logPollTimer: ReturnType<typeof setInterval> | null = null;
-
 function startLogPolling(section: string): void {
   stopLogPolling();
   logPollTimer = setInterval(() => {
@@ -312,7 +294,6 @@ function stopLogPolling(): void {
 }
 
 // ── DOMContentLoaded ──
-
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     enableEdgeToEdge(true);
@@ -399,11 +380,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const colorProfileSelect = document.getElementById("colorProfileSelect") as HTMLSelectElement | null;
   if (colorProfileSelect) {
     colorProfileSelect.value = state.currentSettings.colorProfile || "teal";
+    colorProfileSelect.dispatchEvent(new Event("change", { bubbles: true }));
   }
   if (state.currentSettings.colorProfile) {
     document.documentElement.setAttribute("data-color-profile", state.currentSettings.colorProfile);
   }
-
   if (state.currentSettings.autoTheme) {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     applyTheme(mediaQuery.matches);
@@ -464,7 +445,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
   document.getElementById("logoIconMobile")?.addEventListener("click", openAboutModal);
   document.getElementById("logoIconDesktop")?.addEventListener("click", openAboutModal);
-
   document.getElementById("btnJoinQQGroup")?.addEventListener("click", async () => {
     await run(
       'am start -a android.intent.action.VIEW -d "mqqapi://card/show_pslcard?src_type=internal&version=1&card_type=group&uin=1093864387"',
@@ -546,7 +526,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupModeToggle("ignoreModeToggle", "ignoreVisual", "ignoreRaw", "monitorIgnoreContent", parseIgnoreToVisual, generateIgnoreFromVisual);
 
   setupGlobalHandlers();
-
   document.getElementById("btnAppAddRule")!.onclick = () =>
     addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
   document.getElementById("btnCloseAppModal")!.onclick = closeModalCleanup;
@@ -625,7 +604,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 // ── Setup sub-functions (extracted from DOMContentLoaded to reduce nesting) ──
-
 function setupKeyboardHandling(): void {
   if (navigator.virtualKeyboard) {
     navigator.virtualKeyboard.overlaysContent = true;
@@ -638,7 +616,6 @@ function setupKeyboardHandling(): void {
     });
     return;
   }
-
   // Fallback: use visualViewport + resize to detect keyboard
   let isFrameBlocked = false;
   const updateViewportHeight = (): void => {
@@ -657,7 +634,6 @@ function setupKeyboardHandling(): void {
       if (isOpen && window._currentInput) scrollToInputIfKeyboardOpen(window._currentInput);
     });
   };
-
   if (window.visualViewport) {
     window.visualViewport.addEventListener("resize", updateViewportHeight);
     window.visualViewport.addEventListener("scroll", updateViewportHeight);
@@ -671,7 +647,6 @@ function setupSearchBar(): void {
   const appSearch = document.getElementById("appSearch") as HTMLInputElement | null;
   const appFilterWrapper = document.getElementById("appFilterWrapper");
   if (!searchBarWrap || !appSearch || !appFilterWrapper) return;
-
   searchBarWrap.addEventListener("click", () => {
     if (!searchBarWrap.classList.contains("expanded")) {
       searchBarWrap.classList.add("expanded");
@@ -679,15 +654,12 @@ function setupSearchBar(): void {
       appSearch.focus();
     }
   });
-
   appSearch.addEventListener("blur", () => {
     searchBarWrap.classList.remove("expanded");
     appFilterWrapper.classList.remove("collapsed");
     searchBarWrap.classList.toggle("has-text", !!appSearch.value.trim());
   });
-
   appSearch.addEventListener("input", debounce(() => renderAppList(), 250));
-
   const appListContainer = document.getElementById("appListContainer");
   if (appListContainer) {
     appListContainer.addEventListener(
@@ -717,7 +689,6 @@ function setupIoSection(): void {
       }, 500),
     );
   }
-
   const ioContainer = document.getElementById("ioLogContainer");
   if (ioContainer) {
     ioContainer.addEventListener("scroll", () => {
@@ -726,7 +697,6 @@ function setupIoSection(): void {
       }
     });
   }
-
   document.getElementById("btnClearIo")!.onclick = clearIoLogs;
 }
 
@@ -734,20 +704,20 @@ function setupLogSection(): void {
   const logSelect = document.getElementById("logSourceSelect") as HTMLSelectElement | null;
   const logLevelSelect = document.getElementById("logLevelSelect") as HTMLSelectElement | null;
   const logViewer = document.getElementById("logViewer");
-
   const savedLogLevel = localStorage.getItem("sysLogLevel");
   if (savedLogLevel) {
     state.sysState.level = parseInt(savedLogLevel);
-    if (logLevelSelect) logLevelSelect.value = savedLogLevel;
+    if (logLevelSelect) {
+      logLevelSelect.value = savedLogLevel;
+      logLevelSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    }
   }
-
   if (logSelect) {
     logSelect.addEventListener("change", () => {
       if (logSelect.value === "internal") resetSysLogs();
       fetchSysLogs();
     });
   }
-
   if (logLevelSelect) {
     logLevelSelect.addEventListener("change", () => {
       state.sysState.level = parseInt(logLevelSelect.value);
@@ -756,7 +726,6 @@ function setupLogSection(): void {
       fetchSysLogs();
     });
   }
-
   if (logViewer) {
     logViewer.addEventListener("scroll", () => {
       if (
@@ -767,6 +736,5 @@ function setupLogSection(): void {
       }
     });
   }
-
   document.getElementById("btnClearLog")!.onclick = clearSysLogs;
 }

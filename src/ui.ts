@@ -12,7 +12,10 @@ function getSelectById(id: string | null): HTMLSelectElement | null {
 
 function clearSelectValue(id: string | null): void {
   const sel = getSelectById(id);
-  if (sel) sel.value = "";
+  if (sel) {
+    sel.value = "";
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  }
 }
 
 function getSelectValue(id: string | null): string {
@@ -45,6 +48,7 @@ export const addRuleRow = (
     </div>
   </div>
   <button class="mx-btn-icon btn-del flex-shrink-0">${ICONS.DELETE}</button>`;
+
   const select = div.querySelector(".rule-type") as HTMLSelectElement;
   select.value = type;
   select.onchange = (e: Event) => {
@@ -53,6 +57,7 @@ export const addRuleRow = (
       srcWrapper.classList.toggle("hidden", (e.target as HTMLSelectElement).value !== "REDIRECT");
     }
   };
+
   /* Init custom select after adding to DOM so layout is ready */
   requestAnimationFrame(() => initCustomSelect(select));
   div.querySelector(".btn-del")?.addEventListener("click", () => div.remove());
@@ -79,7 +84,6 @@ export const parseConfigTextToVisual = (
   clearSelectValue(monitorSelectId);
   clearSelectValue(sandboxSelectId);
   clearSelectValue(injectSelectId);
-
   if (!text) return;
 
   const selMonitor = getSelectById(monitorSelectId);
@@ -96,10 +100,13 @@ export const parseConfigTextToVisual = (
         addRuleRow(cmd, normalizeToDisplay(parts[1]), "", containerId);
       } else if (cmd === "MONITOR" && selMonitor) {
         selMonitor.value = parts[1];
+        selMonitor.dispatchEvent(new Event("change", { bubbles: true }));
       } else if (cmd === "SANDBOX" && selSandbox) {
         selSandbox.value = parts[1];
+        selSandbox.dispatchEvent(new Event("change", { bubbles: true }));
       } else if (cmd === "GLOBAL_INJECT" && selInject) {
         selInject.value = parts[1];
+        selInject.dispatchEvent(new Event("change", { bubbles: true }));
       }
     }
   });
@@ -112,13 +119,10 @@ export const generateConfigTextFromVisual = (
   injectSelectId: string | null,
 ): string => {
   let res = "";
-
   const injectVal = getSelectValue(injectSelectId);
   if (injectVal) res += `GLOBAL_INJECT ${injectVal}\n`;
-
   const monitorVal = getSelectValue(monitorSelectId);
   if (monitorVal) res += `MONITOR ${monitorVal}\n`;
-
   const sandboxVal = getSelectValue(sandboxSelectId);
   if (sandboxVal) res += `SANDBOX ${sandboxVal}\n`;
 
@@ -126,7 +130,6 @@ export const generateConfigTextFromVisual = (
     const type = (row.querySelector(".rule-type") as HTMLSelectElement).value;
     const target = (row.querySelector(".rule-target") as HTMLInputElement).value.trim();
     if (!target) return;
-
     if (type === "REDIRECT") {
       const source = (row.querySelector(".rule-source") as HTMLInputElement).value.trim();
       if (source) {
@@ -151,12 +154,10 @@ export const setupModeToggle = (
   const visualEl = document.getElementById(visualId)!;
   const rawEl = document.getElementById(rawId)!;
   const contentEl = document.getElementById(contentId) as HTMLTextAreaElement;
-
   buttons.forEach((btn) => {
     btn.addEventListener("click", () => {
       buttons.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-
       if ((btn as HTMLElement).dataset.mode === "visual") {
         parseFunc(contentEl.value);
         rawEl.classList.remove("active");
@@ -173,27 +174,22 @@ export const setupModeToggle = (
 export const updateSuggestionBoxPosition = (input: HTMLInputElement): void => {
   const box = document.getElementById("suggestionBox");
   if (!box || !input || !box.classList.contains("open")) return;
-
   const wrapper = input.closest(".mx-input-wrapper");
   if (!wrapper) return;
-
   if (box.parentNode !== wrapper) {
     wrapper.appendChild(box);
   }
-
   const container =
     input.closest(".overflow-y-auto") ||
     input.closest(".mx-subpage-body") ||
     input.closest(".editor-scroll");
   if (!container) return;
-
   const containerRect = container.getBoundingClientRect();
   const inputRect = input.getBoundingClientRect();
   const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
   const effectiveBottom = Math.min(containerRect.bottom, viewportHeight);
   const spaceBelow = effectiveBottom - inputRect.bottom;
   const spaceAbove = inputRect.top - containerRect.top;
-
   const placeAbove = spaceBelow < 180 && spaceAbove > spaceBelow;
   box.style.top = placeAbove ? "auto" : "100%";
   box.style.bottom = placeAbove ? "100%" : "auto";
@@ -208,37 +204,29 @@ export const centerActiveInput = (input: HTMLElement): void => {
     input.closest(".overflow-y-auto") ||
     input.closest(".mx-subpage-body");
   if (!row || !container) return;
-
   if (container._scrollAnimId) {
     cancelAnimationFrame(container._scrollAnimId);
   }
-
   const duration = 280;
   const startTime = performance.now();
   const startScrollTop = container.scrollTop;
-
   const step = (currentTime: number) => {
     const elapsed = currentTime - startTime;
     const progress = Math.min(elapsed / duration, 1);
     const ease = 1 - Math.pow(1 - progress, 3);
-
     const containerRect = container.getBoundingClientRect();
     const rowRect = row.getBoundingClientRect();
     const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
-
     const idealScrollTop = relativeTop - containerRect.height / 2 + rowRect.height / 2;
     const maxScrollTop = container.scrollHeight - containerRect.height;
     const targetScrollTop = Math.max(0, Math.min(idealScrollTop, maxScrollTop));
-
     container.scrollTop = startScrollTop + (targetScrollTop - startScrollTop) * ease;
-
     if (progress < 1) {
       container._scrollAnimId = requestAnimationFrame(step);
     } else {
       container._scrollAnimId = null;
     }
   };
-
   container._scrollAnimId = requestAnimationFrame(step);
 };
 
@@ -253,7 +241,6 @@ declare global {
 }
 
 // ---- Autocomplete helpers ----
-
 interface ParsedAutocompletePath {
   prefixDir: string;
   searchPrefix: string;
@@ -266,10 +253,8 @@ function parseAutocompletePath(value: string): ParsedAutocompletePath {
     searchPrefix: "",
     displayBase: "/",
   };
-
   const clean = value.replace(/^\/+/, "");
   if (!clean) return result;
-
   const lastSlash = clean.lastIndexOf("/");
   if (lastSlash === -1) {
     result.searchPrefix = clean;
@@ -331,10 +316,8 @@ function buildSuggestionHtml(sugs: Suggestion[]): string {
 }
 
 // ---- Autocomplete setup ----
-
 const setupAutocomplete = (input: HTMLInputElement | null): void => {
   if (!input) return;
-
   let box = document.getElementById("suggestionBox");
   if (!box) {
     box = document.createElement("div");
@@ -342,13 +325,11 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
     box.className = "suggestion-box";
     document.body.appendChild(box);
   }
-
   input.addEventListener(
     "input",
     debounce(async (e: Event) => {
       const val = (e.target as HTMLInputElement).value;
       const { prefixDir, searchPrefix, displayBase } = parseAutocompletePath(val);
-
       try {
         const res = await exec(
           `ls -F -1 "${prefixDir.replace(/\/+/g, "/")}" 2>/dev/null | head -n 30`,
@@ -357,20 +338,16 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
           closeSuggestionBox(box!);
           return;
         }
-
         const sugs: Suggestion[] = res.stdout
           .split("\n")
           .filter((l: string) => l.endsWith("/") && l.startsWith(searchPrefix))
           .map((l: string) => ({ t: displayBase + l, i: ICONS.FOLDER }));
-
         if (sugs.length === 0) {
           closeSuggestionBox(box!);
           return;
         }
-
         const inputPathExists = await checkInputPathExists(val);
         input.classList.toggle("path-exists", inputPathExists);
-
         state.currentSuggestions = sugs;
         state.suggestionBoxHeight = computeSuggestionBoxHeight(sugs, input.getBoundingClientRect().width);
         box!.innerHTML = buildSuggestionHtml(sugs);
@@ -383,10 +360,8 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
       }
     }, 250),
   );
-
   input.addEventListener("keydown", (e: KeyboardEvent) => {
     if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
-
     const inputs = Array.from(
       document.querySelectorAll<HTMLInputElement>(
         ".mx-subpage-container.open .mx-input:not([readonly])",
@@ -394,7 +369,6 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
     );
     const idx = inputs.indexOf(input);
     if (idx === -1) return;
-
     if (e.key === "ArrowUp" && idx > 0) {
       e.preventDefault();
       inputs[idx - 1].focus();
@@ -403,23 +377,19 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
       inputs[idx + 1].focus();
     }
   });
-
   input.addEventListener("focus", () => {
     window._currentInput = input;
     centerActiveInput(input);
-
     const isFirstFocus = !input.hasAttribute("data-has-focused");
     if (isFirstFocus) {
       input.setAttribute("data-has-focused", "true");
     }
-
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));
       }
     }, isFirstFocus ? 400 : 0);
   });
-
   input.addEventListener("blur", () => {
     setTimeout(() => {
       const activeEl = document.activeElement;

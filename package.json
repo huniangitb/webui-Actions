@@ -16,7 +16,9 @@
   },
   "devDependencies": {
     "@mdi/js": "^7.4.47",
+    "@parcel/transformer-sass": "2.16.4",
     "parcel": "^2.16.4",
+    "sass": "^1.101.0",
     "typescript": "^6.0.3"
   }
 }

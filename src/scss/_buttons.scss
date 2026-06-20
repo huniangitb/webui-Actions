@@ -1,0 +1,82 @@
+/* ── Buttons ── */
+.mx-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 6px; padding: 8px 18px;
+    border-radius: var(--mx-radius-sm);
+    font-size: var(--mx-font-size-sm); font-weight: 600;
+    border: none; cursor: pointer;
+    transition: all 0.25s var(--mx-spring);
+    font-family: var(--mx-font-sans);
+    letter-spacing: 0.01em;
+}
+
+.mx-btn:active { transform: scale(0.94); }
+
+.mx-btn-primary {
+    background: var(--mx-primary);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(20, 184, 166, 0.25);
+}
+
+.mx-btn-secondary {
+    background: var(--mx-s3);
+    color: var(--mx-t1);
+    border: 1px solid var(--mx-border);
+}
+
+@media (hover: hover) {
+    .mx-btn-primary:hover {
+        background: var(--mx-primary-hover);
+        box-shadow: 0 4px 16px rgba(20, 184, 166, 0.35);
+        transform: translateY(-1px);
+    }
+    .mx-btn-secondary:hover { background: var(--mx-s4); }
+}
+
+.mx-btn-primary:active { transform: scale(0.96) translateY(0); }
+
+.mx-btn-danger {
+    background: rgba(251, 113, 133, 0.1);
+    color: var(--mx-rose);
+    border: 1px solid rgba(251, 113, 133, 0.2);
+}
+
+.mx-btn-sm { padding: 6px 12px; font-size: var(--mx-font-size-xs); }
+
+.mx-btn-icon {
+    width: 36px; height: 36px; padding: 0;
+    border-radius: var(--mx-radius-pill);
+    display: flex; align-items: center; justify-content: center;
+    background: transparent; border: none; color: var(--mx-t2);
+    cursor: pointer; transition: all 0.2s var(--mx-spring);
+}
+
+@media (hover: hover) { .mx-btn-icon:hover { background: var(--mx-s3); color: var(--mx-t1); } }
+.mx-btn-icon:active { transform: scale(0.85); }
+
+.mx-btn-close {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--mx-s3); border: none; color: var(--mx-t2);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.2s var(--mx-spring); flex-shrink: 0;
+}
+
+@media (hover: hover) { .mx-btn-close:hover { background: var(--mx-s4); color: var(--mx-t1); } }
+.mx-btn-close:active { transform: scale(0.85); }
+
+/* ── Back button (chevron) ── */
+.mx-btn-back {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: none; background: var(--mx-s3); color: var(--mx-t1);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: background 0.2s, transform 0.2s;
+}
+
+.mx-btn-back:hover { background: var(--mx-s4); }
+.mx-btn-back:active { transform: scale(0.9); }
+
+.mx-btn-back::before {
+    content: ""; width: 10px; height: 10px;
+    border-left: 2px solid currentColor; border-bottom: 2px solid currentColor;
+    transform: rotate(45deg); margin-left: 4px;
+}

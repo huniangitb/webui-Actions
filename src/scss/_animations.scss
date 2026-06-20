@@ -1,0 +1,23 @@
+/* ── Animations & Keyframes ── */
+
+/* Ripple effect */
+@keyframes mx-ripple {
+    to { transform: scale(4); opacity: 0; }
+}
+
+/* Spinner */
+@keyframes mx-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Virtual log enter/leave */
+@keyframes vlogEnter {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes vlogLeave {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-4px); }
+}

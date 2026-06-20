@@ -1,0 +1,11 @@
+/* ── Badges ── */
+.mx-badge {
+    padding: 2px 8px; border-radius: 6px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    color: #fff; letter-spacing: 0.5px; white-space: nowrap;
+    font-family: var(--mx-font-mono);
+}
+
+.mx-badge-gray { background: var(--mx-t2); }
+.mx-badge-success { background: var(--mx-green); color: #052E16; }
+.mx-badge-primary { background: var(--mx-primary); }

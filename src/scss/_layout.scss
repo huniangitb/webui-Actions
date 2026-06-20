@@ -1,0 +1,98 @@
+/* ── Mobile Chrome (glass) ── */
+.mx-topbar {
+    padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+    height: calc(56px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+    padding-left: 16px; padding-right: 16px;
+    background: var(--mx-glass-bg);
+    backdrop-filter: blur(var(--mx-glass-blur));
+    -webkit-backdrop-filter: blur(var(--mx-glass-blur));
+    border-bottom: 1px solid var(--mx-glass-border);
+    display: flex; justify-content: space-between; align-items: center;
+    flex-shrink: 0; z-index: 100;
+}
+
+.mx-sidebar { display: none; }
+.mx-desktop-shell { display: none; }
+
+.mx-app {
+    display: flex;
+    height: var(--initial-vh, 100vh);
+    width: 100vw;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative; /* 为绝对定位的底部栏提供稳固的非收缩视口容器 */
+}
+
+.mx-app.frozen { pointer-events: none; user-select: none; }
+
+body.modal-open .mx-desktop-main { opacity: 0.1; pointer-events: none; }
+
+.mx-logo { display: flex; align-items: center; gap: 10px; }
+
+.mx-logo-icon {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, var(--mx-primary), #0EA5E9);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 14px;
+    box-shadow: var(--mx-primary-glow);
+}
+
+.mx-logo-text { font-weight: 700; font-size: var(--mx-font-size-lg); letter-spacing: -0.01em; }
+.mx-topbar-right { display: flex; align-items: center; gap: 6px; }
+
+.mx-desktop-main {
+    display: flex; flex-direction: column; flex: 1; min-height: 0;
+    overflow: hidden; position: relative;
+    padding-bottom: calc(64px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+    background: var(--mx-bg);
+}
+
+/* ── Sections ── */
+.demo-section {
+    display: none; height: 100%; flex-direction: column;
+    padding: 0; overflow: hidden; flex: 1; min-height: 0;
+}
+
+.demo-section.active { display: flex; }
+
+.mx-page-head { display: none; }
+
+/* ── Mobile responsive ── */
+@media (max-width: 767px) {
+    .mx-topbar-right { gap: 4px; }
+    .mx-topbar-right .mx-btn-icon { width: 34px; height: 34px; }
+    .mx-logo-text { font-size: var(--mx-font-size-base); }
+    .demo-section .mx-card { background: transparent; border-radius: 0; border: none; box-shadow: none; }
+}
+
+/* ── Desktop (>=768px) ── */
+@media (min-width: 768px) {
+    .mx-app { flex-direction: row; height: 100vh; }
+    .mx-topbar, .mx-bottom-nav { display: none; }
+
+    .mx-desktop-shell { display: block; position: absolute; top: 0; left: 256px; right: 0; z-index: 50; }
+
+    .mx-desktop-topbar {
+        padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+        height: calc(56px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+        padding-left: 24px; padding-right: 24px;
+        background: var(--mx-glass-bg);
+        backdrop-filter: blur(var(--mx-glass-blur));
+        -webkit-backdrop-filter: blur(var(--mx-glass-blur));
+        display: flex; align-items: center;
+        border-bottom: 1px solid var(--mx-glass-border);
+    }
+
+    .mx-breadcrumb { font-weight: 600; font-size: var(--mx-font-size-base); color: var(--mx-t1); }
+    .mx-breadcrumb-sep { margin: 0 8px; color: var(--mx-t3); }
+
+    .mx-desktop-main { padding-top: calc(56px + env(safe-area-inset-top, 0px)); padding-bottom: 0; }
+    .demo-section { padding: 24px; max-width: 1000px; margin: 0 auto; }
+
+    /* Desktop subpage */
+    .mx-subpage-container { left: 256px; width: calc(100vw - 256px); }
+    .mx-subpage-header { padding-top: calc(16px + env(safe-area-inset-top, 0px)); }
+}

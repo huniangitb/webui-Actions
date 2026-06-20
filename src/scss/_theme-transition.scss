@@ -1,0 +1,30 @@
+/* ── Theme transition ── */
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+    transition: background-color 0.45s var(--mx-ease),
+                color 0.45s var(--mx-ease),
+                border-color 0.45s var(--mx-ease),
+                box-shadow 0.45s var(--mx-ease) !important;
+    transition-delay: 0s !important;
+}
+
+/* Disable scroll-driven animation during theme transition to prevent conflict */
+html.theme-transition .mx-card-head {
+    animation: none !important;
+}
+
+/* ── Shared GPU-level theme transition targets ── */
+.mx-app, .mx-desktop-main, .mx-topbar, .mx-bottom-nav, .mx-sidebar,
+.mx-card, .mx-card-head, .mx-card-body, .mx-card-foot,
+.mx-modal-overlay, .mx-modal, .mx-modal-head, .mx-modal-body, .mx-modal-foot,
+.mx-subpage-container, .mx-subpage-header, .mx-subpage-body, .mx-subpage-footer,
+.mx-desktop-shell, .mx-desktop-topbar,
+.io-item, .io-detail, .sys-log-item, .sys-log-msg, .sys-log-raw,
+.virtual-log-item, .rule-row, .mx-input, .mx-select, .divider, .search-bar-wrap {
+    transition: background-color 0.35s var(--mx-ease),
+                color 0.3s var(--mx-ease),
+                border-color 0.3s var(--mx-ease),
+                box-shadow 0.3s var(--mx-ease),
+                opacity 0.3s var(--mx-ease);
+}

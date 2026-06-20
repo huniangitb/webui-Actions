@@ -1,0 +1,21 @@
+/* ── Fuse Proxy WebUI — Main SCSS Entry ── */
+
+/* ── Partials (must come before @import) ── */
+@use 'tokens';
+@use 'reset';
+@use 'theme-transition';
+@use 'layout';
+@use 'navigation';
+@use 'cards';
+@use 'buttons';
+@use 'forms';
+@use 'modal';
+@use 'badges';
+@use 'toast';
+@use 'animations';
+@use 'components';
+@use 'utilities';
+
+/* External imports */
+@import "https://mui.kernelsu.org/internal/insets.css";
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');

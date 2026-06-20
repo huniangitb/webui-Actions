@@ -32,7 +32,7 @@ import { openBackupModal, showPicker, exportAllLogs, createNewFolder } from "./b
 import { enableEdgeToEdge } from "kernelsu";
 import { initRipple } from "./ripple.js";
 import { initAllCustomSelects } from "./select.js";
-import "../style.css";
+import "./scss/main.scss";
 
 // ── Helpers ──
 function isVisualMode(toggleName: string): boolean {
@@ -627,6 +627,7 @@ function setupKeyboardHandling(): void {
         container.appendChild(spacer);
       }
       const containerHeight = container.clientHeight || 300;
+      // 占位符高度 = 物理键盘高度 + 滚动视口高度的一半，确保有充足的可滚动空白区域
       spacer.style.height = `${kbHeight + containerHeight / 2}px`;
 
       // 强制触发容器的滚动边界重构
@@ -687,12 +688,13 @@ function setupKeyboardHandling(): void {
       if (isOpen && window._currentInput) {
         setTimeout(() => {
           scrollToInputIfKeyboardOpen(window._currentInput!);
-        }, 80);
+        }, 60);
       }
     });
     return;
   }
 
+  // Fallback: use visualViewport + resize to detect keyboard
   let isFrameBlocked = false;
   const updateViewportHeight = (): void => {
     if (isFrameBlocked) return;

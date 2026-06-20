@@ -112,6 +112,39 @@ html.theme-transition .mx-card-head {
 /* ── Reset & Base ── */
 *, *::before, *::after { box-sizing: border-box; }
 * { outline: none; -webkit-tap-highlight-color: transparent; }
+
+/* Hide all native browser scrollbars globally for a cleaner UI */
+* {
+    scrollbar-width: none;      /* Firefox */
+    -ms-overflow-style: none;   /* IE/Edge legacy */
+}
+*::-webkit-scrollbar {
+    display: none;              /* Chrome/Safari/Opera */
+}
+
+/* ── Text Selection ── */
+/* Block selection on all UI chrome, then opt-in on content areas */
+.mx-app, .mx-subpage-container, .mx-modal-overlay {
+    -webkit-user-select: none;
+    user-select: none;
+}
+/* Re-enable selection on form controls */
+input:not([type="checkbox"]):not([type="radio"]),
+textarea, select, .mx-code-editor {
+    -webkit-user-select: text;
+    user-select: text;
+}
+/* Re-enable selection on log detail & useful text content */
+.io-detail, .io-path-box,
+.sys-log-msg, .sys-log-raw,
+.virtual-log-item,
+.app-name, .app-pkg, .mx-label,
+.backup-file-name,
+.suggestion-item,
+.mx-log-viewer {
+    -webkit-user-select: text;
+    user-select: text;
+}
 html {
     background: var(--mx-bg);
     overflow: hidden;
@@ -226,6 +259,7 @@ body.keyboard-open .mx-bottom-nav {
 }
 .btm-icon { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; }
 .btm-icon svg { width: 100%; height: 100%; display: block; }
+.btm-icon.active { color: var(--mx-primary); }
 .btm-label { font-size: 10px; font-weight: 600; letter-spacing: 0.02em; }
 /* ── Sections ── */
 .demo-section {
@@ -669,7 +703,8 @@ body.keyboard-open .mx-bottom-nav {
 }
 /* ── Subpage (app config slide-in) ── */
 .mx-subpage-container {
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
+    position: fixed; top: 0; left: 0; width: 100vw;
+    height: var(--initial-vh, 100vh); /* 锁死子页面整体高度，阻断系统对视窗的瞬间收缩形变 */
     background: var(--mx-bg);
     z-index: 1500;
     display: none; flex-direction: column;
@@ -720,7 +755,8 @@ body.keyboard-open .mx-bottom-nav {
 }
 body.keyboard-open .mx-subpage-body,
 body.keyboard-open .overflow-y-auto {
-    padding-bottom: calc(var(--keyboard-h, 0px) + 30px) !important;
+    /* 扩充安全边距至 90px，配合底栏的平滑上升，留出绝对充裕的底边滚动留白 */
+    padding-bottom: calc(var(--keyboard-h, 0px) + 90px) !important;
 }
 .mx-subpage-footer {
     padding: 16px calc(16px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
@@ -729,6 +765,14 @@ body.keyboard-open .overflow-y-auto {
     -webkit-backdrop-filter: blur(var(--mx-glass-blur));
     border-top: 1px solid var(--mx-glass-border);
     display: flex; gap: 12px; align-items: center;
+    /* 应用平滑缓动过渡，在键盘完全升起时随之轻柔浮动 */
+    transform: translateY(0);
+    transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+    will-change: transform;
+}
+body.keyboard-open .mx-subpage-footer {
+    /* 键盘升起时，底栏精准平移出虚拟键盘的高度 */
+    transform: translateY(calc(-1 * var(--keyboard-h, 0px))) !important;
 }
 .mx-btn-back {
     width: 36px; height: 36px; border-radius: 50%;

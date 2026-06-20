@@ -1,0 +1,29 @@
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; }
+* { outline: none; -webkit-tap-highlight-color: transparent; }
+
+html {
+    background: var(--mx-bg);
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    margin: 0; padding: 0;
+    font-family: var(--mx-font-sans);
+    font-size: var(--mx-font-size-base);
+    background: var(--mx-bg);
+    color: var(--mx-t1);
+    height: 100%; width: 100%;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.5s var(--mx-ease);
+}
+
+body.loaded { opacity: 1; }
+
+body:not(.loaded) .overflow-y-auto,
+body:not(.loaded) .list-scrollable { overflow: hidden !important; }

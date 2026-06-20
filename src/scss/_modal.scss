@@ -1,0 +1,135 @@
+/* ── Modal overlay ── */
+.mx-modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 2000;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; visibility: hidden;
+    transition: opacity 0.3s var(--mx-ease), visibility 0.3s var(--mx-ease), backdrop-filter 0.3s;
+}
+
+.mx-modal-overlay.open { opacity: 1; pointer-events: auto; visibility: visible; }
+
+.mx-modal {
+    background: var(--mx-s2);
+    width: 92%; max-width: 420px;
+    border-radius: 24px;
+    display: flex; flex-direction: column;
+    max-height: 85%;
+    border: 1px solid var(--mx-border);
+    box-shadow: var(--mx-shadow-lg);
+    overflow: hidden;
+    transform: scale(0.95) translate3d(0, 20px, 0);
+    opacity: 0;
+    transition: opacity 0.25s var(--mx-ease), transform 0.35s var(--mx-spring);
+}
+
+.mx-modal.large { max-width: 800px; max-height: 85%; }
+
+.mx-modal-overlay.open .mx-modal {
+    transform: scale(1) translate3d(0, 0, 0);
+    opacity: 1;
+}
+
+.mx-modal-head {
+    padding: 16px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--mx-border);
+    flex-shrink: 0;
+}
+
+.mx-modal-title { font-size: var(--mx-font-size-xl); font-weight: 700; margin: 0; }
+.mx-modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; min-height: 0; }
+
+.mx-modal-foot {
+    padding: 16px 24px;
+    display: flex; gap: 12px;
+    border-top: 1px solid var(--mx-border);
+    flex-shrink: 0;
+    background: var(--mx-s1);
+}
+
+/* ── Subpage (app config slide-in) ── */
+.mx-subpage-container {
+    position: fixed; top: 0; left: 0; width: 100vw;
+    height: var(--initial-vh, 100vh);
+    background: var(--mx-bg);
+    z-index: 1500;
+    display: none; flex-direction: column;
+    box-shadow: -4px 0 32px rgba(0,0,0,0.3);
+}
+
+.mx-subpage-container.open {
+    display: flex;
+    animation: subpageOpen 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mx-subpage-container.closing {
+    display: flex; pointer-events: none;
+    animation: subpageClose 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes subpageOpen {
+    from { opacity: 0; transform: translate3d(100%, 0, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes subpageClose {
+    from { opacity: 1; transform: translate3d(0, 0, 0); }
+    to { opacity: 0; transform: translate3d(100%, 0, 0); }
+}
+
+.mx-subpage-header {
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    padding-bottom: 12px;
+    padding-left: calc(16px + env(safe-area-inset-left, 0px));
+    padding-right: calc(16px + env(safe-area-inset-right, 0px));
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--mx-border);
+    background: var(--mx-glass-bg);
+    backdrop-filter: blur(var(--mx-glass-blur));
+    -webkit-backdrop-filter: blur(var(--mx-glass-blur));
+}
+
+.mx-subpage-header-title { flex: 1; min-width: 0; }
+
+.mx-subpage-header-title h3 {
+    margin: 0; font-size: var(--mx-font-size-lg);
+    font-weight: 700; letter-spacing: -0.01em;
+}
+
+.mx-subpage-header-title span {
+    font-size: var(--mx-font-size-xs);
+    color: var(--mx-t2);
+    font-family: var(--mx-font-mono);
+}
+
+.mx-subpage-body {
+    flex: 1; overflow-y: auto; overscroll-behavior-y: contain;
+    background: var(--mx-bg);
+    padding: 16px calc(16px + env(safe-area-inset-right, 0px)) 16px calc(16px + env(safe-area-inset-left, 0px));
+    transition: padding-bottom 0.28s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+body.keyboard-open .mx-subpage-body,
+body.keyboard-open .overflow-y-auto {
+    padding-bottom: calc(var(--keyboard-h, 0px) + 90px) !important;
+}
+
+.mx-subpage-footer {
+    padding: 16px calc(16px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+    background: var(--mx-glass-bg);
+    backdrop-filter: blur(var(--mx-glass-blur));
+    -webkit-backdrop-filter: blur(var(--mx-glass-blur));
+    border-top: 1px solid var(--mx-glass-border);
+    display: flex; gap: 12px; align-items: center;
+    transform: translateY(0);
+    transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+    will-change: transform;
+}
+
+body.keyboard-open .mx-subpage-footer {
+    transform: translateY(calc(-1 * var(--keyboard-h, 0px))) !important;
+}

@@ -9,6 +9,10 @@ html {
     width: 100%;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Block text selection globally — re-enable on content areas below */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
 }
 
 body {
@@ -27,3 +31,24 @@ body.loaded { opacity: 1; }
 
 body:not(.loaded) .overflow-y-auto,
 body:not(.loaded) .list-scrollable { overflow: hidden !important; }
+
+/* ── Text Selection Opt-in ── */
+/* Re-enable selection on form controls */
+input:not([type="checkbox"]):not([type="radio"]),
+textarea, select, .mx-code-editor {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+}
+/* Re-enable selection on log detail & useful text content */
+.io-detail, .io-path-box,
+.sys-log-msg, .sys-log-raw,
+.virtual-log-item,
+.app-name, .app-pkg, .mx-label,
+.backup-file-name,
+.suggestion-item,
+.mx-log-viewer {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+}

@@ -47,6 +47,15 @@
 .scroll-x::-webkit-scrollbar { display: none; }
 .scroll-x > * { scroll-snap-align: start; scroll-snap-stop: always; }
 
+/* ── Global scrollbar hiding (Android WebView / modern browsers) ── */
+* {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+    display: none;
+}
+
 .text-muted { color: var(--mx-t2); }
 .text-center { text-align: center; }
 .text-truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }

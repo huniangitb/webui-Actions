@@ -112,39 +112,6 @@ html.theme-transition .mx-card-head {
 /* ── Reset & Base ── */
 *, *::before, *::after { box-sizing: border-box; }
 * { outline: none; -webkit-tap-highlight-color: transparent; }
-
-/* Hide all native browser scrollbars globally for a cleaner UI */
-* {
-    scrollbar-width: none;      /* Firefox */
-    -ms-overflow-style: none;   /* IE/Edge legacy */
-}
-*::-webkit-scrollbar {
-    display: none;              /* Chrome/Safari/Opera */
-}
-
-/* ── Text Selection ── */
-/* Block selection on all UI chrome, then opt-in on content areas */
-.mx-app, .mx-subpage-container, .mx-modal-overlay {
-    -webkit-user-select: none;
-    user-select: none;
-}
-/* Re-enable selection on form controls */
-input:not([type="checkbox"]):not([type="radio"]),
-textarea, select, .mx-code-editor {
-    -webkit-user-select: text;
-    user-select: text;
-}
-/* Re-enable selection on log detail & useful text content */
-.io-detail, .io-path-box,
-.sys-log-msg, .sys-log-raw,
-.virtual-log-item,
-.app-name, .app-pkg, .mx-label,
-.backup-file-name,
-.suggestion-item,
-.mx-log-viewer {
-    -webkit-user-select: text;
-    user-select: text;
-}
 html {
     background: var(--mx-bg);
     overflow: hidden;

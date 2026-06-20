@@ -202,11 +202,24 @@ export const centerActiveInput = (input: HTMLElement): void => {
   const row = input.closest(".rule-row") || input.closest(".mx-form-group") || input;
   const container: HTMLElement | null =
     input.closest(".overflow-y-auto") ||
-    input.closest(".mx-subpage-body");
+    input.closest(".mx-subpage-body") ||
+    input.closest(".editor-scroll");
   if (!row || !container) return;
+
+  // Cancel any previous animation
   if (container._scrollAnimId) {
     cancelAnimationFrame(container._scrollAnimId);
   }
+
+  const keyboardOpen = document.body.classList.contains("keyboard-open");
+  if (keyboardOpen) {
+    // When keyboard is open, use native scrollIntoView for reliable results.
+    // Rule rows have scroll-margin-top for clearance from the card head.
+    row.scrollIntoView({ block: "center", behavior: "smooth" });
+    return;
+  }
+
+  // Normal state: smooth-scroll to center the row in the container
   const duration = 280;
   const startTime = performance.now();
   const startScrollTop = container.scrollTop;
@@ -236,7 +249,7 @@ export const debouncedCenterActive = debounce((input: HTMLElement) => {
 
 declare global {
   interface Window {
-    _currentInput: HTMLInputElement | null;
+    _currentInput: HTMLElement | null;
   }
 }
 
@@ -310,7 +323,7 @@ function buildSuggestionHtml(sugs: Suggestion[]): string {
   return sugs
     .map(
       (s) =>
-        `<div class="suggestion-item" onmousedown="event.preventDefault()" onclick="window._currentInput.value='${s.t}';window._currentInput.dispatchEvent(new Event('input'))"><span style="display:flex">${s.i}</span><span style="word-break:break-all;flex:1;line-height:18px;">${s.t}</span></div>`,
+        `<div class="suggestion-item" data-path="${s.t.replace(/"/g, "&quot;")}"><span style="display:flex">${s.i}</span><span style="word-break:break-all;flex:1;line-height:18px;">${s.t}</span></div>`,
     )
     .join("");
 }
@@ -324,6 +337,20 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
     box.id = "suggestionBox";
     box.className = "suggestion-box";
     document.body.appendChild(box);
+    /* Event delegation for suggestion items — safe alternative to onclick= attribute */
+    box.addEventListener("mousedown", (e: MouseEvent) => {
+      const item = (e.target as HTMLElement).closest<HTMLElement>(".suggestion-item");
+      if (item) e.preventDefault(); /* prevent blur on input before click registers */
+    });
+    box.addEventListener("click", (e: MouseEvent) => {
+      const item = (e.target as HTMLElement).closest<HTMLElement>(".suggestion-item");
+      if (!item || !item.dataset.path) return;
+      const cur = window._currentInput;
+      if (cur && "value" in cur) {
+        (cur as HTMLInputElement).value = item.dataset.path;
+        cur.dispatchEvent(new Event("input"));
+      }
+    });
   }
   input.addEventListener(
     "input",

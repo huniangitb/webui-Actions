@@ -44,6 +44,7 @@ export const closeModalCleanup = (): void => {
   document.body.classList.remove("modal-open", "keyboard-open");
   document.documentElement.style.setProperty("--keyboard-h", "0px");
   document.querySelectorAll(".mx-modal-overlay.open").forEach((el) => el.classList.remove("open"));
+  document.querySelector<HTMLElement>(".mx-bottom-nav")?.style.removeProperty("transform");
   state.resumePolling?.();
   window._currentInput = null;
 };

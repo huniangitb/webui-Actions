@@ -526,6 +526,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupModeToggle("ignoreModeToggle", "ignoreVisual", "ignoreRaw", "monitorIgnoreContent", parseIgnoreToVisual, generateIgnoreFromVisual);
 
   setupGlobalHandlers();
+
   document.getElementById("btnAppAddRule")!.onclick = () =>
     addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
   document.getElementById("btnCloseAppModal")!.onclick = closeModalCleanup;
@@ -605,6 +606,76 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // ── Setup sub-functions (extracted from DOMContentLoaded to reduce nesting) ──
 function setupKeyboardHandling(): void {
+  // 预记录页面加载时的初始窗口高度，以此解决 adjustResize 模式下视口缩小导致键盘高度计算为 0 的问题
+  let initialHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
+  window.addEventListener("orientationchange", () => {
+    setTimeout(() => {
+      initialHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    }, 300);
+  });
+
+  const setSpacer = (container: HTMLElement, isOpen: boolean, kbHeight: number) => {
+    document.querySelectorAll('.mx-keyboard-spacer').forEach(el => el.remove());
+
+    if (isOpen && container) {
+      let spacer = container.querySelector('.mx-keyboard-spacer') as HTMLElement | null;
+      if (!spacer) {
+        spacer = document.createElement('div');
+        spacer.className = 'mx-keyboard-spacer';
+        spacer.style.cssText = 'width: 100%; flex-shrink: 0; display: block; background: transparent; pointer-events: none;';
+        container.appendChild(spacer);
+      }
+      const containerHeight = container.clientHeight || 300;
+      spacer.style.height = `${kbHeight + containerHeight / 2}px`;
+
+      // 强制触发容器的滚动边界重构
+      const temp = container.scrollHeight;
+    }
+  };
+
+  const updateSpacers = (isOpen: boolean, kbHeight: number) => {
+    if (!isOpen) {
+      document.querySelectorAll('.mx-keyboard-spacer').forEach(el => el.remove());
+      return;
+    }
+    const activeEl = document.activeElement as HTMLElement | null;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.classList.contains('mx-input'))) {
+      const container = activeEl.closest('.overflow-y-auto, .editor-scroll, .mx-subpage-body') as HTMLElement | null;
+      if (container) {
+        setSpacer(container, true, kbHeight);
+      }
+    }
+  };
+
+  // 当用户点击或触碰任何输入框时，立即以预估高度或上次计算高度，同步阻塞地插入占位符
+  document.addEventListener('focusin', (e) => {
+    const target = e.target as HTMLElement;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.classList.contains('mx-input'))) {
+      const container = target.closest('.overflow-y-auto, .editor-scroll, .mx-subpage-body') as HTMLElement | null;
+      if (container) {
+        const lastKbHeight = parseFloat(document.documentElement.style.getPropertyValue('--keyboard-h')) || 280;
+        setSpacer(container, true, lastKbHeight);
+
+        setTimeout(() => {
+          if (window._currentInput === target) {
+            scrollToInputIfKeyboardOpen(target);
+          }
+        }, 80);
+      }
+    }
+  });
+
+  document.addEventListener('focusout', () => {
+    setTimeout(() => {
+      const activeEl = document.activeElement;
+      const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.classList.contains('mx-input'));
+      if (!isInput) {
+        document.querySelectorAll('.mx-keyboard-spacer').forEach(el => el.remove());
+      }
+    }, 80);
+  });
+
   if (navigator.virtualKeyboard) {
     navigator.virtualKeyboard.overlaysContent = true;
     navigator.virtualKeyboard.addEventListener("geometrychange", (e: Event) => {
@@ -612,11 +683,16 @@ function setupKeyboardHandling(): void {
       const isOpen = height > 0;
       document.body.classList.toggle("keyboard-open", isOpen);
       document.documentElement.style.setProperty("--keyboard-h", `${height}px`);
-      if (isOpen && window._currentInput) scrollToInputIfKeyboardOpen(window._currentInput);
+      updateSpacers(isOpen, height);
+      if (isOpen && window._currentInput) {
+        setTimeout(() => {
+          scrollToInputIfKeyboardOpen(window._currentInput!);
+        }, 80);
+      }
     });
     return;
   }
-  // Fallback: use visualViewport + resize to detect keyboard
+
   let isFrameBlocked = false;
   const updateViewportHeight = (): void => {
     if (isFrameBlocked) return;
@@ -624,16 +700,23 @@ function setupKeyboardHandling(): void {
     window.requestAnimationFrame(() => {
       isFrameBlocked = false;
       const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-      const keyboardHeight = window.innerHeight - vh;
+      // 用初始总高度减去当前的可用高度，得出精准的、不为零的虚拟键盘物理像素值
+      const keyboardHeight = initialHeight - vh;
       const isOpen = keyboardHeight > 80;
       document.body.classList.toggle("keyboard-open", isOpen);
       document.documentElement.style.setProperty(
         "--keyboard-h",
         isOpen ? `${keyboardHeight}px` : "0px",
       );
-      if (isOpen && window._currentInput) scrollToInputIfKeyboardOpen(window._currentInput);
+      updateSpacers(isOpen, isOpen ? keyboardHeight : 0);
+      if (isOpen && window._currentInput) {
+        setTimeout(() => {
+          scrollToInputIfKeyboardOpen(window._currentInput!);
+        }, 80);
+      }
     });
   };
+
   if (window.visualViewport) {
     window.visualViewport.addEventListener("resize", updateViewportHeight);
     window.visualViewport.addEventListener("scroll", updateViewportHeight);
@@ -647,6 +730,7 @@ function setupSearchBar(): void {
   const appSearch = document.getElementById("appSearch") as HTMLInputElement | null;
   const appFilterWrapper = document.getElementById("appFilterWrapper");
   if (!searchBarWrap || !appSearch || !appFilterWrapper) return;
+
   searchBarWrap.addEventListener("click", () => {
     if (!searchBarWrap.classList.contains("expanded")) {
       searchBarWrap.classList.add("expanded");
@@ -654,12 +738,15 @@ function setupSearchBar(): void {
       appSearch.focus();
     }
   });
+
   appSearch.addEventListener("blur", () => {
     searchBarWrap.classList.remove("expanded");
     appFilterWrapper.classList.remove("collapsed");
     searchBarWrap.classList.toggle("has-text", !!appSearch.value.trim());
   });
+
   appSearch.addEventListener("input", debounce(() => renderAppList(), 250));
+
   const appListContainer = document.getElementById("appListContainer");
   if (appListContainer) {
     appListContainer.addEventListener(

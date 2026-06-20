@@ -192,9 +192,15 @@ export async function exportAllLogs(): Promise<void> {
 
 export async function backupConfig(): Promise<void> {
   const nameInput = document.getElementById("backupFileNameInput") as HTMLInputElement | null;
-  const name = nameInput ? nameInput.value.trim() : "";
+  let name = nameInput ? nameInput.value.trim() : "";
   if (!name) {
     showToast.warning("请输入备份文件名");
+    return;
+  }
+  /* Sanitize: only allow safe filename characters to prevent shell injection */
+  name = name.replace(/[^a-zA-Z0-9_.\-]/g, "_");
+  if (!name) {
+    showToast.warning("文件名包含非法字符");
     return;
   }
   const targetTar = `${currentPath}/${name.endsWith(".tar") ? name : name + ".tar"}`;

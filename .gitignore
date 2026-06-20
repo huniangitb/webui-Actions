@@ -3,3 +3,16 @@ dist/
 .cache/
 package-lock.json
 *.log
+
+# Build cache
+.parcel-cache/
+
+# Yarn zero-install cache
+.yarn/
+
+# AtomCode personal AI configuration
+.atomcode/
+
+# npm/yarn personal config
+.npmrc
+.yarnrc.yml

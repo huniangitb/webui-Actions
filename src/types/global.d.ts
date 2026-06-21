@@ -74,3 +74,8 @@ interface VirtualKeyboard {
 interface Navigator {
   virtualKeyboard?: VirtualKeyboard;
 }
+
+// Global window property for tracking current input element
+interface Window {
+  _currentInput: HTMLElement | null;
+}

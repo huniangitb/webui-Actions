@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "start": "parcel index.html",
-    "build": "parcel build index.html --no-source-maps --public-url ./ --no-cache",
+    "build": "rm -rf dist && parcel build index.html --no-source-maps --public-url ./ --no-cache",
     "typecheck": "tsc --noEmit",
     "check": "tsc --noEmit && parcel build index.html --no-source-maps --public-url ./ --no-cache"
   },

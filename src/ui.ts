@@ -5,6 +5,11 @@ import { prepare, layout } from "@chenglou/pretext";
 import type { Suggestion } from "./types/index";
 import { initCustomSelect } from "./select.js";
 
+// 触摸手势检测参数
+let startX = 0;
+let startY = 0;
+let isScrolling = false;
+
 function getSelectById(id: string | null): HTMLSelectElement | null {
   if (!id) return null;
   return document.getElementById(id) as HTMLSelectElement | null;
@@ -58,7 +63,6 @@ export const addRuleRow = (
     }
   };
 
-  /* Init custom select after adding to DOM so layout is ready */
   requestAnimationFrame(() => initCustomSelect(select));
   div.querySelector(".btn-del")?.addEventListener("click", () => div.remove());
   setupAutocomplete(div.querySelectorAll(".mx-input")[0] as HTMLInputElement);
@@ -205,21 +209,14 @@ export const centerActiveInput = (input: HTMLElement): void => {
     input.closest(".mx-subpage-body") ||
     input.closest(".editor-scroll");
   if (!row || !container) return;
-
-  // Cancel any previous animation
   if (container._scrollAnimId) {
     cancelAnimationFrame(container._scrollAnimId);
   }
-
   const keyboardOpen = document.body.classList.contains("keyboard-open");
   if (keyboardOpen) {
-    // When keyboard is open, use native scrollIntoView for reliable results.
-    // Rule rows have scroll-margin-top for clearance from the card head.
     row.scrollIntoView({ block: "center", behavior: "smooth" });
     return;
   }
-
-  // Normal state: smooth-scroll to center the row in the container
   const duration = 280;
   const startTime = performance.now();
   const startScrollTop = container.scrollTop;
@@ -247,13 +244,6 @@ export const debouncedCenterActive = debounce((input: HTMLElement) => {
   centerActiveInput(input);
 }, 80);
 
-declare global {
-  interface Window {
-    _currentInput: HTMLElement | null;
-  }
-}
-
-// ---- Autocomplete helpers ----
 interface ParsedAutocompletePath {
   prefixDir: string;
   searchPrefix: string;
@@ -328,7 +318,6 @@ function buildSuggestionHtml(sugs: Suggestion[]): string {
     .join("");
 }
 
-// ---- Autocomplete setup ----
 const setupAutocomplete = (input: HTMLInputElement | null): void => {
   if (!input) return;
   let box = document.getElementById("suggestionBox");
@@ -337,25 +326,76 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
     box.id = "suggestionBox";
     box.className = "suggestion-box";
     document.body.appendChild(box);
-    /* Event delegation for suggestion items — safe alternative to onclick= attribute */
-    box.addEventListener("mousedown", (e: MouseEvent) => {
-      const item = (e.target as HTMLElement).closest<HTMLElement>(".suggestion-item");
-      if (item) e.preventDefault(); /* prevent blur on input before click registers */
-    });
-    box.addEventListener("click", (e: MouseEvent) => {
+  }
+
+  // 保证事件处理器有且仅绑定一次
+  if (box.dataset.initialized !== "true") {
+    box.dataset.initialized = "true";
+
+    // 1. 拦截指针按压：开启临时选择交互锁，并标记初始触控点坐标
+    box.addEventListener("pointerdown", (e: PointerEvent) => {
       const item = (e.target as HTMLElement).closest<HTMLElement>(".suggestion-item");
       if (!item || !item.dataset.path) return;
-      const cur = window._currentInput;
-      if (cur && "value" in cur) {
-        (cur as HTMLInputElement).value = item.dataset.path;
-        cur.dispatchEvent(new Event("input"));
+
+      box!.dataset.interacting = "true";
+      isScrolling = false;
+      startX = e.clientX;
+      startY = e.clientY;
+    });
+
+    // 2. 指针滑动侦测：5px 位移检测，判定是点击补全还是原生滚动列表
+    box.addEventListener("pointermove", (e: PointerEvent) => {
+      if (box!.dataset.interacting !== "true") return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        isScrolling = true;
       }
     });
+
+    // 3. 指针松开结算：
+    //   - 非滑动时：直接执行补全与建议框关闭，释放锁定。
+    //   - 判定为滑动时：不执行补全，延迟 100ms 快速归还状态。
+    box.addEventListener("pointerup", (e: PointerEvent) => {
+      if (box!.dataset.interacting !== "true") return;
+
+      const item = (e.target as HTMLElement).closest<HTMLElement>(".suggestion-item");
+      if (item && item.dataset.path && !isScrolling) {
+        // 纯粹轻点：填充路径并强制夺回焦点
+        const cur = window._currentInput as HTMLInputElement | null;
+        if (cur) {
+          cur.value = item.dataset.path;
+          cur.dispatchEvent(new Event("input"));
+          cur.focus();
+        }
+        box!.classList.remove("open");
+        state.currentSuggestions = [];
+        box!.dataset.interacting = "false";
+      } else {
+        // 用户滚动：不修改内容，快速释放锁
+        setTimeout(() => {
+          box!.dataset.interacting = "false";
+        }, 100);
+      }
+    });
+
+    box.addEventListener("pointercancel", () => {
+      setTimeout(() => {
+        box!.dataset.interacting = "false";
+      }, 100);
+      isScrolling = false;
+    });
   }
+
   input.addEventListener(
     "input",
     debounce(async (e: Event) => {
       const val = (e.target as HTMLInputElement).value;
+
+      // 实时路径高亮检测及样式更新
+      const inputPathExists = await checkInputPathExists(val);
+      input.classList.toggle("path-exists", inputPathExists);
+
       const { prefixDir, searchPrefix, displayBase } = parseAutocompletePath(val);
       try {
         const res = await exec(
@@ -373,8 +413,7 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
           closeSuggestionBox(box!);
           return;
         }
-        const inputPathExists = await checkInputPathExists(val);
-        input.classList.toggle("path-exists", inputPathExists);
+
         state.currentSuggestions = sugs;
         state.suggestionBoxHeight = computeSuggestionBoxHeight(sugs, input.getBoundingClientRect().width);
         box!.innerHTML = buildSuggestionHtml(sugs);
@@ -387,6 +426,7 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
       }
     }, 250),
   );
+
   input.addEventListener("keydown", (e: KeyboardEvent) => {
     if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
     const inputs = Array.from(
@@ -404,6 +444,7 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
       inputs[idx + 1].focus();
     }
   });
+
   input.addEventListener("focus", () => {
     window._currentInput = input;
     centerActiveInput(input);
@@ -417,11 +458,16 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
       }
     }, isFirstFocus ? 400 : 0);
   });
+
   input.addEventListener("blur", () => {
     setTimeout(() => {
+      // 锁定状态拦截：若建议框正处于操作期间，禁止强行关闭
+      const suggestionBox = document.getElementById("suggestionBox");
+      if (suggestionBox && suggestionBox.dataset.interacting === "true") {
+        return;
+      }
       const activeEl = document.activeElement;
       if (!activeEl || !activeEl.classList.contains("mx-input")) {
-        const suggestionBox = document.getElementById("suggestionBox");
         if (suggestionBox) {
           suggestionBox.classList.remove("open");
           state.currentSuggestions = [];

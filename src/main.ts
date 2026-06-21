@@ -34,7 +34,9 @@ import { initRipple } from "./ripple.js";
 import { initAllCustomSelects } from "./select.js";
 import "./scss/main.scss";
 
-// ── Helpers ──
+// 是否从自动补全框内部发起的触控滚动行为标记
+let touchStartInSuggestions = false;
+
 function isVisualMode(toggleName: string): boolean {
   return !!document
     .querySelector(`button[name="${toggleName}"][data-mode="visual"]`)
@@ -47,7 +49,11 @@ function getStatusSuffixes(): readonly string[] {
 
 function closeSuggestionsOnScroll(): void {
   if (!state.isUserTouching) return;
+  // 核心防御点 ── 若本次屏幕触摸起源于补全框内部，则其滑动期间丢出的滚动，无条件免疫关闭！
+  if (touchStartInSuggestions) return;
+
   const box = document.getElementById("suggestionBox");
+  if (box && box.dataset.interacting === "true") return;
   if (box && box.classList.contains("open")) {
     box.classList.remove("open");
     state.currentSuggestions = [];
@@ -88,7 +94,6 @@ function buildPluginStatusLabel(container: HTMLElement, installed: boolean): voi
   }
 }
 
-// ── Height lock for WebView keyboard handling ──
 function lockInitialHeight(): void {
   const update = (): void => {
     const initialH = window.visualViewport
@@ -108,7 +113,6 @@ function lockInitialHeight(): void {
 }
 lockInitialHeight();
 
-// ── Polling ──
 let statusPolling: ReturnType<typeof setInterval> | null = null;
 let appStatusPolling: ReturnType<typeof setInterval> | null = null;
 
@@ -191,7 +195,6 @@ async function refreshAppStatus(): Promise<void> {
   }
 }
 
-// ── Monitor ignore helpers ──
 function parseIgnoreToVisual(t: string): void {
   const c = document.getElementById("ignoreBuilderContainer");
   if (!c) return;
@@ -225,7 +228,6 @@ function addIgnoreRow(p: string): void {
   document.getElementById("ignoreBuilderContainer")?.appendChild(div);
 }
 
-// ── Section switching ──
 const SECTION_TITLES: Record<string, string> = {
   apps: "应用配置",
   global: "全局规则",
@@ -234,7 +236,6 @@ const SECTION_TITLES: Record<string, string> = {
 };
 
 function switchSection(sectionId: string): void {
-  /* Don't re-fetch logs if already on this section — prevents list flicker */
   if (state.currentSection === sectionId) return;
   state.currentSection = sectionId;
   document.querySelectorAll(".demo-section").forEach((el) => el.classList.remove("active"));
@@ -264,14 +265,13 @@ function switchSection(sectionId: string): void {
   stopLogPolling();
 }
 
-/* ── Log live polling (1s interval) ── */
 let logPollTimer: ReturnType<typeof setInterval> | null = null;
+
 function startLogPolling(section: string): void {
   stopLogPolling();
   logPollTimer = setInterval(() => {
     if (section === "io" && state.currentSection === "io") {
       if (state.ioState.offset > 0) {
-        /* Only refresh from start if less than 200 items shown to avoid perf spikes */
         state.ioState.offset = 0;
         state.ioState.hasMore = true;
         fetchIoLogs();
@@ -293,7 +293,6 @@ function stopLogPolling(): void {
   }
 }
 
-// ── DOMContentLoaded ──
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     enableEdgeToEdge(true);
@@ -304,7 +303,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   initRipple();
   initAllCustomSelects();
 
-  // Handle browser back for modals
   window.addEventListener("popstate", () => {
     const appConfig = document.getElementById("appConfigSubpage");
     if (appConfig && appConfig.classList.contains("open")) {
@@ -320,7 +318,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     window._currentInput = null;
   });
 
-  // ResizeObserver for re-centering input in open keyboard
   const ro = new ResizeObserver(() => {
     if (window._currentInput && document.activeElement === window._currentInput) {
       scrollToInputIfKeyboardOpen(window._currentInput);
@@ -328,15 +325,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   document.querySelectorAll(".mx-subpage-body, .overflow-y-auto").forEach((el) => ro.observe(el));
 
-  // Keyboard handling
   setupKeyboardHandling();
 
-  // Touch tracking
-  document.addEventListener("touchstart", () => { state.isUserTouching = true; }, { passive: true });
-  document.addEventListener("touchend", () => { state.isUserTouching = false; }, { passive: true });
-  document.addEventListener("touchcancel", () => { state.isUserTouching = false; }, { passive: true });
+  // ── 重构全局多指/单指触碰源头追踪器 ──
+  document.addEventListener("touchstart", (e: TouchEvent) => {
+    state.isUserTouching = true;
+    const target = e.target as HTMLElement;
+    const box = document.getElementById("suggestionBox");
+    // 溯源：记录并锁定当前触控周期是否在建议框内发起
+    touchStartInSuggestions = !!(box && (target === box || box.contains(target)));
+  }, { passive: true });
 
-  // Scroll handling
+  document.addEventListener("touchend", () => {
+    state.isUserTouching = false;
+    touchStartInSuggestions = false;
+  }, { passive: true });
+
+  document.addEventListener("touchcancel", () => {
+    state.isUserTouching = false;
+    touchStartInSuggestions = false;
+  }, { passive: true });
+
   window.addEventListener(
     "scroll",
     () => {
@@ -346,7 +355,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     true,
   );
 
-  // Click outside suggestions
   document.addEventListener("click", (e: MouseEvent) => {
     const box = document.getElementById("suggestionBox");
     if (box && box.classList.contains("open")) {
@@ -369,14 +377,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 150);
   });
 
-  // Load settings
   state.currentSettings = await getSettings();
   (document.getElementById("autoThemeToggle") as HTMLInputElement).checked =
     state.currentSettings.autoTheme;
   (document.getElementById("pluginSyncToggle") as HTMLInputElement).checked =
     state.currentSettings.syncPlugin;
 
-  // Initialize color profile
   const colorProfileSelect = document.getElementById("colorProfileSelect") as HTMLSelectElement | null;
   if (colorProfileSelect) {
     colorProfileSelect.value = state.currentSettings.colorProfile || "teal";
@@ -393,18 +399,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     applyTheme(state.isDarkMode);
   }
 
-  // Theme toggles
   document.getElementById("btnThemeToggleMobile")!.onclick = handleManualThemeToggle;
   document.getElementById("btnThemeToggleDesktop")!.onclick = handleManualThemeToggle;
 
-  // Navigation
   document.querySelectorAll<HTMLElement>(".mx-nav-item, .mx-btm-item").forEach((btn) => {
     if (btn.id !== "btnBackupDesktop") {
       btn.onclick = () => switchSection(btn.dataset.section ?? "");
     }
   });
 
-  // App filter
   document.querySelectorAll("#appFilterGroup button").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll("#appFilterGroup button").forEach((b) => b.classList.remove("active"));
@@ -414,20 +417,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  // Search bar
   setupSearchBar();
-
-  // IO search
   setupIoSection();
-
-  // Logs
   setupLogSection();
 
-  // Status toggle
   document.getElementById("btnToggleStatusMobile")!.onclick = toggleStatus;
   document.getElementById("btnToggleStatusDesktop")!.onclick = toggleStatus;
 
-  // Settings modal
   const openSettings = async (): Promise<void> => {
     history.pushState({ modalOpen: true }, "");
     const isInstalled = await checkPluginInstalled();
@@ -438,7 +434,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnSettingsMobile")!.onclick = openSettings;
   document.getElementById("btnSettingsDesktop")!.onclick = openSettings;
 
-  // About modal
   const openAboutModal = (): void => {
     history.pushState({ modalOpen: true }, "");
     document.getElementById("aboutModal")?.classList.add("open");
@@ -451,7 +446,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
   });
 
-  // Backup
   const btnBackupMobile = document.getElementById("btnBackupMobile");
   if (btnBackupMobile) btnBackupMobile.onclick = openBackupModal;
   const btnBackupDesktop = document.getElementById("btnBackupDesktop");
@@ -461,7 +455,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnMenuImport")!.addEventListener("click", () => showPicker("import"));
   document.getElementById("btnBackupNewFolder")!.addEventListener("click", createNewFolder);
 
-  // Save settings
   document.getElementById("btnSaveSettings")!.onclick = async () => {
     state.currentSettings.autoTheme = (document.getElementById("autoThemeToggle") as HTMLInputElement).checked;
     state.currentSettings.syncPlugin = (document.getElementById("pluginSyncToggle") as HTMLInputElement).checked;
@@ -480,7 +473,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
 
-  // Monitor ignore
   document.getElementById("btnMonitorIgnore")!.onclick = async () => {
     const content = await run(`cat ${CONST.MONITOR_IGNORE_CONF} 2>/dev/null`);
     (document.getElementById("monitorIgnoreContent") as HTMLTextAreaElement).value = content;
@@ -503,7 +495,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
-  // Mode toggles
   setupModeToggle(
     "globalModeToggle",
     "globalVisual",
@@ -526,7 +517,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupModeToggle("ignoreModeToggle", "ignoreVisual", "ignoreRaw", "monitorIgnoreContent", parseIgnoreToVisual, generateIgnoreFromVisual);
 
   setupGlobalHandlers();
-
   document.getElementById("btnAppAddRule")!.onclick = () =>
     addRuleRow("REDIRECT", "", "", "appRuleBuilderContainer");
   document.getElementById("btnCloseAppModal")!.onclick = closeModalCleanup;
@@ -534,7 +524,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     btn.addEventListener("click", closeModalCleanup);
   });
 
-  // Save app config
   document.getElementById("btnSaveAppConfig")!.onclick = async () => {
     try {
       const isVisual = isVisualMode("appModeToggle");
@@ -568,7 +557,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
-  // Delete app config
   document.getElementById("btnDeleteAppConfig")!.onclick = async () => {
     if (!confirm("确定清除配置吗?")) return;
     const dir =
@@ -586,7 +574,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     showToast.success("配置已清除");
   };
 
-  // Wrap openAppConfig to stop polling
   const originalOpenAppConfig = window.openAppConfig;
   window.openAppConfig = (pkg: string) => {
     stopPolling();
@@ -604,11 +591,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   requestAnimationFrame(() => document.body.classList.add("loaded"));
 });
 
-// ── Setup sub-functions (extracted from DOMContentLoaded to reduce nesting) ──
 function setupKeyboardHandling(): void {
-  // 预记录页面加载时的初始窗口高度，以此解决 adjustResize 模式下视口缩小导致键盘高度计算为 0 的问题
   let initialHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-
   window.addEventListener("orientationchange", () => {
     setTimeout(() => {
       initialHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
@@ -617,7 +601,6 @@ function setupKeyboardHandling(): void {
 
   const setSpacer = (container: HTMLElement, isOpen: boolean, kbHeight: number) => {
     document.querySelectorAll('.mx-keyboard-spacer').forEach(el => el.remove());
-
     if (isOpen && container) {
       let spacer = container.querySelector('.mx-keyboard-spacer') as HTMLElement | null;
       if (!spacer) {
@@ -627,10 +610,7 @@ function setupKeyboardHandling(): void {
         container.appendChild(spacer);
       }
       const containerHeight = container.clientHeight || 300;
-      // 占位符高度 = 物理键盘高度 + 滚动视口高度的一半，确保有充足的可滚动空白区域
       spacer.style.height = `${kbHeight + containerHeight / 2}px`;
-
-      // 强制触发容器的滚动边界重构
       const temp = container.scrollHeight;
     }
   };
@@ -649,7 +629,6 @@ function setupKeyboardHandling(): void {
     }
   };
 
-  // 当用户点击或触碰任何输入框时，立即以预估高度或上次计算高度，同步阻塞地插入占位符
   document.addEventListener('focusin', (e) => {
     const target = e.target as HTMLElement;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.classList.contains('mx-input'))) {
@@ -657,7 +636,6 @@ function setupKeyboardHandling(): void {
       if (container) {
         const lastKbHeight = parseFloat(document.documentElement.style.getPropertyValue('--keyboard-h')) || 280;
         setSpacer(container, true, lastKbHeight);
-
         setTimeout(() => {
           if (window._currentInput === target) {
             scrollToInputIfKeyboardOpen(target);
@@ -694,7 +672,6 @@ function setupKeyboardHandling(): void {
     return;
   }
 
-  // Fallback: use visualViewport + resize to detect keyboard
   let isFrameBlocked = false;
   const updateViewportHeight = (): void => {
     if (isFrameBlocked) return;
@@ -702,7 +679,6 @@ function setupKeyboardHandling(): void {
     window.requestAnimationFrame(() => {
       isFrameBlocked = false;
       const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-      // 用初始总高度减去当前的可用高度，得出精准的、不为零的虚拟键盘物理像素值
       const keyboardHeight = initialHeight - vh;
       const isOpen = keyboardHeight > 80;
       document.body.classList.toggle("keyboard-open", isOpen);
@@ -732,7 +708,6 @@ function setupSearchBar(): void {
   const appSearch = document.getElementById("appSearch") as HTMLInputElement | null;
   const appFilterWrapper = document.getElementById("appFilterWrapper");
   if (!searchBarWrap || !appSearch || !appFilterWrapper) return;
-
   searchBarWrap.addEventListener("click", () => {
     if (!searchBarWrap.classList.contains("expanded")) {
       searchBarWrap.classList.add("expanded");
@@ -740,15 +715,12 @@ function setupSearchBar(): void {
       appSearch.focus();
     }
   });
-
   appSearch.addEventListener("blur", () => {
     searchBarWrap.classList.remove("expanded");
     appFilterWrapper.classList.remove("collapsed");
     searchBarWrap.classList.toggle("has-text", !!appSearch.value.trim());
   });
-
   appSearch.addEventListener("input", debounce(() => renderAppList(), 250));
-
   const appListContainer = document.getElementById("appListContainer");
   if (appListContainer) {
     appListContainer.addEventListener(
@@ -826,4 +798,17 @@ function setupLogSection(): void {
     });
   }
   document.getElementById("btnClearLog")!.onclick = clearSysLogs;
+
+  window.addEventListener(
+    "scroll",
+    (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.id === "suggestionBox" || document.getElementById("suggestionBox")?.contains(target))) {
+        return;
+      }
+      closeSuggestionsOnScroll();
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+    },
+    true,
+  );
 }

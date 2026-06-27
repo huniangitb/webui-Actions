@@ -10,6 +10,9 @@ const _iconCache = new Set<string>();
 const iconQueue = new Set<HTMLImageElement>();
 let isIconQueueRunning = false;
 
+// DOM node cache: pkg -> element (avoids destroying/recreating on filter switch)
+const _itemNodeCache = new Map<string, HTMLElement>();
+
 const processIconQueue = async (): Promise<void> => {
   if (isIconQueueRunning) return;
   isIconQueueRunning = true;
@@ -143,12 +146,13 @@ function buildAppMap(
         state.injectorStates.get(exactKey) || state.injectorStates.get(info.packageName) || "ON";
       const ruleText = (ruleFilesMap.get(exactKey) as string) || "";
       const hasRulesFile = ruleFilesMap.has(exactKey);
+      const hasInlineRules = (state.injectorRulesMap.get(exactKey)?.length ?? 0) > 0;
       const isEnabled = ruleFilesMap.get(`${exactKey}_enabled`)
         ? true
         : ruleFilesMap.get(`${exactKey}_disabled`)
           ? false
-          : stateVal === "ON" && hasRulesFile;
-      if (hasRulesFile || stateVal === "OFF") isConfiguredAny = true;
+          : stateVal === "ON" && (hasRulesFile || hasInlineRules);
+      if (hasRulesFile || stateVal === "OFF" || hasInlineRules) isConfiguredAny = true;
       appUsers[uid] = {
         isEnabled,
         text: ruleText,
@@ -179,10 +183,12 @@ export const loadData = async (): Promise<void> => {
     overlay.style.pointerEvents = "auto";
   }
   try {
-    state.activeMounts = await fetchActiveMounts();
-    await fetchInjectedApps();
-
-    const userRes = await run("pm list users");
+    const results = await Promise.all([
+      fetchActiveMounts().then((m) => { state.activeMounts = m; }),
+      fetchInjectedApps(),
+      run("pm list users"),
+    ]);
+    const userRes = results[2] as string;
     state.activeUsers = [];
     if (userRes) {
       for (const m of userRes.matchAll(/UserInfo\{(\d+):/g)) {
@@ -218,18 +224,32 @@ export const loadData = async (): Promise<void> => {
     }
 
     const ruleFilesMap = new Map<string, string | boolean>();
+    const batchCmds: string[] = [];
+    const batchKeys: string[] = [];
     for (const uid of state.activeUsers) {
       const dir = uid === 0 ? `${CONST.BASE_DIR}/App-rules` : `${CONST.BASE_DIR}/App-rules-${uid}`;
-      const lsRes = await run(`ls -1 ${dir} 2>/dev/null`);
-      if (lsRes) {
-        const files = lsRes.split("\n").filter((f) => f.endsWith(".conf") || f.endsWith(".conf.disabled"));
-        for (const file of files) {
-          const isDisabled = file.endsWith(".conf.disabled");
-          const pkg = file.replace(/\.conf(\.disabled)?$/, "");
-          ruleFilesMap.set(`${pkg}:${uid}`, await run(`cat ${dir}/${file} 2>/dev/null`));
-          if (isDisabled) ruleFilesMap.set(`${pkg}:${uid}_disabled`, true);
-          else ruleFilesMap.set(`${pkg}:${uid}_enabled`, true);
-        }
+      batchCmds.push(`for f in ${dir}/*.conf ${dir}/*.conf.disabled; do [ -f "$f" ] && echo "===FILE:$f===" && cat "$f"; done 2>/dev/null`);
+      batchKeys.push(dir);
+    }
+    const batchResults = await Promise.all(batchCmds.map((cmd) => run(cmd)));
+    for (let bi = 0; bi < batchResults.length; bi++) {
+      const res = batchResults[bi];
+      if (!res) continue;
+      const dir = batchKeys[bi];
+      const blocks = res.split("===FILE:");
+      for (const block of blocks) {
+        if (!block) continue;
+        const endIdx = block.indexOf("===");
+        if (endIdx === -1) continue;
+        const filePath = block.substring(0, endIdx);
+        const content = block.substring(endIdx + 3);
+        const fileName = filePath.split("/").pop() ?? "";
+        const isDisabled = fileName.endsWith(".conf.disabled");
+        const pkg = fileName.replace(/\.conf(\.disabled)?$/, "");
+        const uid = dir.endsWith("-0") ? 0 : parseInt(dir.split("-").pop() ?? "0");
+        ruleFilesMap.set(`${pkg}:${uid}`, content);
+        if (isDisabled) ruleFilesMap.set(`${pkg}:${uid}_disabled`, true);
+        else ruleFilesMap.set(`${pkg}:${uid}_enabled`, true);
       }
     }
 
@@ -357,6 +377,26 @@ function renderInjectedStr(pkg: string): string {
   return `<span style="font-size:10px;margin-left:6px;padding:2px 6px;background:var(--mx-s3);border-radius:4px;font-family:var(--mx-font-mono);flex-shrink:0;">PID ${inj.pid} ${flags.join(" ")}</span>`;
 }
 
+function buildAppItemHtml(app: AppEntry): string {
+  const badgesHTML = renderBadges(app, app.packageName);
+  const injStr = renderInjectedStr(app.packageName);
+  const isCached = _iconCache.has(app.packageName);
+  const iconSrc = isCached ? `ksu://icon/${app.packageName}` : TRANSPARENT_SPACER;
+  const dataSrc = isCached ? "" : `ksu://icon/${app.packageName}`;
+  const escapedPkg = app.packageName.replace(/'/g, "\\'");
+
+  return `<div class="app-item" data-pkg="${app.packageName}" onclick="window.openAppConfig('${escapedPkg}')">
+    <img class="app-icon${isCached ? " icon-loaded" : ""}" src="${iconSrc}" data-src="${dataSrc}" onerror="window.onIconError(this)" data-fallback="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2365676b'><path d='M17.6,9.48l1.84-3.18c0.16-0.31,0.04-0.69-0.26-0.85c-0.31-0.16-0.69-0.04-0.85,0.26L16.4,9c-1.35-0.6-2.85-0.95-4.4-0.95S8.95,8.4,7.6,9L5.67,5.71C5.51,5.41,5.13,5.29,4.83,5.45C4.52,5.61,4.4,6,4.56,6.3L6.4,9.48C3.3,11.25,1.28,14.44,1,18.15h22C22.72,14.44,20.7,11.25,17.6,9.48z M7,15.25c-0.69,0-1.25-0.56-1.25-1.25S6.31,12.75,7,12.75s1.25,0.56,1.25,1.25S7.69,15.25,7,15.25z M17,15.25c-0.69,0-1.25-0.56-1.25-1.25s0.56-1.25,1.25-1.25s1.25,0.56,1.25,1.25S17.69,15.25,17,15.25z'/></svg>" onload="window.onIconLoaded(this)" data-pkg="${app.packageName}" />
+    <div class="app-info">
+      <div class="app-name" style="display:flex;align-items:center;">
+        <span style="overflow:hidden;text-overflow:ellipsis;">${app.appLabel}</span><span class="inj-str">${injStr}</span>
+      </div>
+      <div class="app-pkg">${app.packageName}</div>
+    </div>
+    <div class="app-badges">${badgesHTML}</div>
+  </div>`;
+}
+
 export function renderAppList(): void {
   const listEl = document.getElementById("appList");
   if (!listEl) return;
@@ -380,40 +420,28 @@ export function renderAppList(): void {
 
   if (items.length === 0) {
     listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--mx-t2);">无匹配应用</div>';
+    if (listObserver) { listObserver.disconnect(); listObserver = null; }
     return;
   }
 
-  isTransitioningOut = false;
-  loadedIconsInBatch = 0;
-  targetIconCount = Math.min(items.length, 6);
-  if (targetIconCount === 0) {
-    hideSpinnerOverlay();
+  for (const app of items) {
+    if (!_itemNodeCache.has(app.packageName)) {
+      const temp = document.createElement("div");
+      temp.innerHTML = buildAppItemHtml(app);
+      const node = temp.firstElementChild as HTMLElement;
+      if (node) _itemNodeCache.set(app.packageName, node);
+    }
   }
 
-  const finalHTML = items
-    .map((app) => {
-      const badgesHTML = renderBadges(app, app.packageName);
-      const injStr = renderInjectedStr(app.packageName);
-      const isCached = _iconCache.has(app.packageName);
-      const iconSrc = isCached ? `ksu://icon/${app.packageName}` : TRANSPARENT_SPACER;
-      const dataSrc = isCached ? "" : `ksu://icon/${app.packageName}`;
-      const escapedPkg = app.packageName.replace(/'/g, "\\'");
+  const fragment = document.createDocumentFragment();
+  for (const app of items) {
+    const node = _itemNodeCache.get(app.packageName);
+    if (node) fragment.appendChild(node);
+  }
+  listEl.innerHTML = "";
+  listEl.appendChild(fragment);
 
-      return `<div class="app-item" data-pkg="${app.packageName}" onclick="window.openAppConfig('${escapedPkg}')">
-        <img class="app-icon${isCached ? " icon-loaded" : ""}" src="${iconSrc}" data-src="${dataSrc}" onerror="window.onIconError(this)" data-fallback="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2365676b'><path d='M17.6,9.48l1.84-3.18c0.16-0.31,0.04-0.69-0.26-0.85c-0.31-0.16-0.69-0.04-0.85,0.26L16.4,9c-1.35-0.6-2.85-0.95-4.4-0.95S8.95,8.4,7.6,9L5.67,5.71C5.51,5.41,5.13,5.29,4.83,5.45C4.52,5.61,4.4,6,4.56,6.3L6.4,9.48C3.3,11.25,1.28,14.44,1,18.15h22C22.72,14.44,20.7,11.25,17.6,9.48z M7,15.25c-0.69,0-1.25-0.56-1.25-1.25S6.31,12.75,7,12.75s1.25,0.56,1.25,1.25S7.69,15.25,7,15.25z M17,15.25c-0.69,0-1.25-0.56-1.25-1.25s0.56-1.25,1.25-1.25s1.25,0.56,1.25,1.25S17.69,15.25,17,15.25z'/></svg>" onload="window.onIconLoaded(this)" data-pkg="${app.packageName}" />
-        <div class="app-info">
-          <div class="app-name" style="display:flex;align-items:center;">
-            <span style="overflow:hidden;text-overflow:ellipsis;">${app.appLabel}</span><span class="inj-str">${injStr}</span>
-          </div>
-          <div class="app-pkg">${app.packageName}</div>
-        </div>
-        <div class="app-badges">${badgesHTML}</div>
-      </div>`;
-    })
-    .join("");
-
-  listEl.innerHTML = finalHTML;
-  initListObserver();
+  if (!listObserver) initListObserver();
   for (const el of listEl.querySelectorAll<HTMLElement>(".app-item")) {
     listObserver?.observe(el);
   }

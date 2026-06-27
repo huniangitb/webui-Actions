@@ -1,5 +1,5 @@
 import { state, CONST } from "./state.js";
-import { run, showToast, ICONS, normalizeToDisplay, normalizeToConfig, debounce } from "./utils.js";
+import { run, showToast, ICONS, normalizeToDisplay, normalizeToConfig, debounce, quoteArgIfSpaced, splitLineRespectingQuotes } from "./utils.js";
 import { exec } from "kernelsu";
 import { prepare, layout } from "@chenglou/pretext";
 import type { Suggestion } from "./types/index";
@@ -95,7 +95,7 @@ export const parseConfigTextToVisual = (
   const selInject = getSelectById(injectSelectId);
 
   text.split("\n").forEach((line) => {
-    const parts = line.trim().split(/\s+/);
+    const parts = splitLineRespectingQuotes(line.trim());
     const cmd = parts[0];
     if (cmd === "REDIRECT" && parts.length >= 3) {
       addRuleRow("REDIRECT", normalizeToDisplay(parts[1]), normalizeToDisplay(parts.slice(2).join(" ")), containerId);
@@ -137,10 +137,10 @@ export const generateConfigTextFromVisual = (
     if (type === "REDIRECT") {
       const source = (row.querySelector(".rule-source") as HTMLInputElement).value.trim();
       if (source) {
-        res += `REDIRECT ${normalizeToConfig(target, true)} ${normalizeToConfig(source, false)}\n`;
+        res += `REDIRECT ${quoteArgIfSpaced(normalizeToConfig(target, true))} ${quoteArgIfSpaced(normalizeToConfig(source, false))}\n`;
       }
     } else if (type === "HIDE" || type === "RO" || type === "ALLOW") {
-      res += `${type} ${normalizeToConfig(target, true)}\n`;
+      res += `${type} ${quoteArgIfSpaced(normalizeToConfig(target, true))}\n`;
     }
   });
   return res.trim();
@@ -214,7 +214,7 @@ export const centerActiveInput = (input: HTMLElement): void => {
   }
   const keyboardOpen = document.body.classList.contains("keyboard-open");
   if (keyboardOpen) {
-    row.scrollIntoView({ block: "center", behavior: "smooth" });
+    row.scrollIntoView({ block: "nearest" });
     return;
   }
   const duration = 280;
@@ -273,21 +273,6 @@ function closeSuggestionBox(box: HTMLElement): void {
   box.classList.remove("open");
   state.currentSuggestions = [];
   state.suggestionBoxHeight = 0;
-}
-
-async function checkInputPathExists(val: string): Promise<boolean> {
-  if (!val.trim()) return false;
-  const fullPath = val.startsWith("/")
-    ? CONST.PATH_PREFIX_REAL + val
-    : CONST.PATH_PREFIX_REAL + "/" + val;
-  try {
-    const checkRes = await exec(
-      `test -d "${fullPath.replace(/\/+/g, "/")}" 2>/dev/null && echo yes`,
-    );
-    return checkRes.stdout?.trim() === "yes";
-  } catch {
-    return false;
-  }
 }
 
 const FONT_STYLE = "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
@@ -391,21 +376,23 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
     "input",
     debounce(async (e: Event) => {
       const val = (e.target as HTMLInputElement).value;
-
-      // 实时路径高亮检测及样式更新
-      const inputPathExists = await checkInputPathExists(val);
-      input.classList.toggle("path-exists", inputPathExists);
+      if (!val.trim()) { input.classList.remove("path-exists"); closeSuggestionBox(box!); return; }
 
       const { prefixDir, searchPrefix, displayBase } = parseAutocompletePath(val);
       try {
-        const res = await exec(
-          `ls -F -1 "${prefixDir.replace(/\/+/g, "/")}" 2>/dev/null | head -n 30`,
-        );
-        if (!res || !res.stdout) {
+        const safeDir = prefixDir.replace(/\/+/g, "/");
+        const fullPath = (CONST.PATH_PREFIX_REAL + "/" + val.replace(/^\/+/, "")).replace(/\/+/g, "/");
+        const [dirRes, pathRes] = await Promise.all([
+          exec(`if [ -d "${safeDir}" ]; then ls -F -1 "${safeDir}" 2>/dev/null | head -n 30; else echo "__NOTDIR__"; fi`),
+          exec(`test -d "${fullPath}" && echo "EXISTS"`),
+        ]);
+        const pathExists = pathRes.stdout?.trim() === "EXISTS";
+        input.classList.toggle("path-exists", pathExists);
+        if (!dirRes || !dirRes.stdout || dirRes.stdout.trim() === "__NOTDIR__") {
           closeSuggestionBox(box!);
           return;
         }
-        const sugs: Suggestion[] = res.stdout
+        const sugs: Suggestion[] = dirRes.stdout
           .split("\n")
           .filter((l: string) => l.endsWith("/") && l.startsWith(searchPrefix))
           .map((l: string) => ({ t: displayBase + l, i: ICONS.FOLDER }));

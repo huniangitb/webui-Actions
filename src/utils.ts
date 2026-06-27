@@ -213,3 +213,32 @@ export const normalizeToConfig = (path: string | null | undefined, isTarget: boo
   if (path.startsWith("/")) return path;
   return (prefix + "/" + path).replace(/\/+/g, "/");
 };
+
+export const quoteArgIfSpaced = (arg: string): string => {
+  let s = arg.trim();
+  if (s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1);
+  if (s.includes(" ")) return `"${s}"`;
+  return s;
+};
+
+export const splitLineRespectingQuotes = (line: string): string[] => {
+  const result: string[] = [];
+  let i = 0;
+  while (i < line.length) {
+    while (i < line.length && line[i] === " ") i++;
+    if (i >= line.length) break;
+    if (line[i] === '"') {
+      i++;
+      let end = line.indexOf('"', i);
+      if (end === -1) end = line.length;
+      result.push(line.substring(i, end));
+      i = end + 1;
+    } else {
+      let j = i;
+      while (j < line.length && line[j] !== " ") j++;
+      result.push(line.substring(i, j));
+      i = j;
+    }
+  }
+  return result;
+};

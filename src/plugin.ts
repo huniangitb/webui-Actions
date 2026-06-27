@@ -1,6 +1,6 @@
 import { exec, toast } from "kernelsu";
 import type { Settings, AppEntry } from "./types/index";
-import {showToast} from "./utils.js";
+import {showToast, splitLineRespectingQuotes} from "./utils.js";
 const SETTINGS_FILE = "/data/Namespace-Proxy/webui_settings.json";
 
 export async function getSettings(): Promise<Settings> {
@@ -71,7 +71,7 @@ function parseRules(text: string | undefined): ParsedRules {
   if (!text) return { redirects, hides, ros, allows, sandboxState };
 
   for (const line of text.split("\n")) {
-    const parts = line.trim().split(/\s+/);
+    const parts = splitLineRespectingQuotes(line.trim());
     const directive = parts[0];
     const hasPath = parts.length >= 2;
     if (!directive) continue;

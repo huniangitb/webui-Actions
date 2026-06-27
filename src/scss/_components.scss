@@ -10,7 +10,6 @@
     transition: opacity 0.4s var(--mx-ease),
                 transform 0.5s var(--mx-spring),
                 background 0.2s var(--mx-ease);
-    will-change: transform, opacity;
 }
 
 .app-item:last-child { border-bottom: none; }
@@ -24,7 +23,6 @@
     flex-shrink: 0; margin-right: 14px;
     opacity: 0; transform: scale(0.65);
     transition: opacity 0.4s var(--mx-ease), transform 0.5s var(--mx-spring);
-    will-change: transform, opacity;
 }
 
 .app-item.show .app-icon.icon-loaded { opacity: 1; transform: scale(1); }
@@ -70,10 +68,6 @@
 .rule-inputs { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .mx-input-wrapper { position: relative; width: 100%; min-width: 0; }
 .btn-del { width: 32px !important; height: 32px !important; flex-shrink: 0; }
-
-body.keyboard-open:not(.modal-open) .overflow-y-auto {
-    max-height: calc(100% - var(--keyboard-h, 0px));
-}
 
 #appRuleBuilderContainer, #globalRuleBuilderContainer { margin-top: 4px; padding-bottom: 68px; }
 
@@ -221,6 +215,7 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
     font-size: var(--mx-font-size-xs);
     resize: none;
     line-height: 1.6;
+    virtual-keyboard-policy: manual;
 }
 
 .editor-pane { display: none; height: 100%; flex-direction: column; }
@@ -236,7 +231,6 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
     z-index: 1000;
     overflow-y: auto;
     width: 100%; max-height: 240px;
-    will-change: transform, opacity;
     opacity: 0; visibility: hidden;
     transform: translateY(4px);
     transition: opacity 0.2s var(--mx-ease),
@@ -265,7 +259,7 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
 @media (hover: hover) { .suggestion-item:hover { background: var(--mx-primary-subtle); } }
 
 /* ── Virtual log items ── */
-.virtual-log-item { will-change: transform; backface-visibility: hidden; }
+.virtual-log-item { backface-visibility: hidden; }
 
 .vlog-enter {
     animation: vlogEnter 0.2s var(--mx-ease) both;
@@ -354,11 +348,4 @@ body.keyboard-open:not(.modal-open) .overflow-y-auto {
     pointer-events: none;
 }
 
-/* ── Keyboard Spacer Styles ── */
-.mx-keyboard-spacer {
-    width: 100%;
-    background: transparent;
-    pointer-events: none;
-    flex-shrink: 0;
-    display: block;
-}
+

@@ -7,7 +7,7 @@
     z-index: 2000;
     display: flex; align-items: center; justify-content: center;
     opacity: 0; pointer-events: none; visibility: hidden;
-    transition: opacity 0.3s var(--mx-ease), visibility 0.3s var(--mx-ease), backdrop-filter 0.3s;
+    transition: opacity 0.3s var(--mx-ease), visibility 0.3s var(--mx-ease);
 }
 
 .mx-modal-overlay.open { opacity: 1; pointer-events: auto; visibility: visible; }
@@ -110,12 +110,6 @@
     flex: 1; overflow-y: auto; overscroll-behavior-y: contain;
     background: var(--mx-bg);
     padding: 16px calc(16px + env(safe-area-inset-right, 0px)) 16px calc(16px + env(safe-area-inset-left, 0px));
-    transition: padding-bottom 0.28s cubic-bezier(0.1, 0.9, 0.2, 1);
-}
-
-body.keyboard-open .mx-subpage-body,
-body.keyboard-open .overflow-y-auto {
-    padding-bottom: calc(var(--keyboard-h, 0px) + 90px) !important;
 }
 
 .mx-subpage-footer {
@@ -125,11 +119,4 @@ body.keyboard-open .overflow-y-auto {
     -webkit-backdrop-filter: blur(var(--mx-glass-blur));
     border-top: 1px solid var(--mx-glass-border);
     display: flex; gap: 12px; align-items: center;
-    transform: translateY(0);
-    transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
-    will-change: transform;
-}
-
-body.keyboard-open .mx-subpage-footer {
-    transform: translateY(calc(-1 * var(--keyboard-h, 0px))) !important;
 }

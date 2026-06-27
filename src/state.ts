@@ -29,11 +29,7 @@ export const state: AppState = {
 };
 
 export const closeModalCleanup = (): void => {
-  const historyState = history.state as Record<string, unknown> | null;
-  if (historyState?.modalOpen) {
-    history.back();
-    return;
-  }
+  // 无论历史状态如何，先关闭 UI
   const appConfig = document.getElementById("appConfigSubpage");
   if (appConfig?.classList.contains("open")) {
     appConfig.classList.remove("open");
@@ -47,6 +43,12 @@ export const closeModalCleanup = (): void => {
   document.querySelector<HTMLElement>(".mx-bottom-nav")?.style.removeProperty("transform");
   state.resumePolling?.();
   window._currentInput = null;
+
+  // 再清理历史状态（如果有 pushState 的标记）
+  const historyState = history.state as Record<string, unknown> | null;
+  if (historyState?.modalOpen) {
+    history.back();
+  }
 };
 
 export const CONST = {

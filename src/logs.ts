@@ -554,11 +554,19 @@ function renderSysEntry(entry: SysLogEntry): string {
 export const fetchSysLogs = async (): Promise<void> => {
   const source = (document.getElementById("logSourceSelect") as HTMLSelectElement).value;
   const viewer = document.getElementById("logViewer") as HTMLElement;
+  const zygiskEl = document.getElementById("zygiskViewer") as HTMLElement;
   if (source === "zygisk") {
-    viewer.textContent = (await run("logcat -d -s Zygisk_NSProxy NamespaceProxy_Injector")) || "无 Zygisk 日志";
-    viewer.scrollTop = viewer.scrollHeight;
+    if (state.sysState.loading) return;
+    state.sysState.loading = true;
+    viewer.style.display = "none";
+    zygiskEl.style.display = "";
+    zygiskEl.textContent = (await run("logcat -d -s Zygisk_NSProxy NamespaceProxy_Injector")) || "无 Zygisk 日志";
+    zygiskEl.scrollTop = zygiskEl.scrollHeight;
+    state.sysState.loading = false;
     return;
   }
+  viewer.style.display = "";
+  zygiskEl.style.display = "none";
   if (state.sysState.loading || !state.sysState.hasMore) return;
   state.sysState.loading = true;
   try {

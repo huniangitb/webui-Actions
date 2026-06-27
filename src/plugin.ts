@@ -163,9 +163,8 @@ export async function syncToPlugin(
     }
 
     if (isGlobalInjectOn) {
-      const stateVal = injectorStates.get(pkg);
       const state0 = injectorStates.get(`${pkg}:0`);
-      if (stateVal !== "OFF" && state0 !== "OFF") {
+      if (state0 !== "OFF") {
         isPkgEnabled = true;
       }
     }

@@ -2,9 +2,13 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
     <meta name="theme-color" id="themeColorMeta">
     <title>Fuse Proxy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="https://mui.kernelsu.org/internal/insets.css" media="print" onload="this.media='all'">
     <script>
       (function() {
         var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -86,6 +90,7 @@
                             </div>
                             <div class="app-filter-wrapper" id="appFilterWrapper">
                                 <div class="mx-pill-group w-full" id="appFilterGroup" style="margin:0; flex:1;">
+                                    <div class="pill-slider" id="pillSlider"></div>
                                     <button class="active" data-filter="filterUser">用户</button>
                                     <button data-filter="filterSystem">系统</button>
                                     <button data-filter="filterBound">已配置App</button>
@@ -191,6 +196,7 @@
                     </div>
                     <div class="mx-card-body p-0 flex-col-full relative" style="background: var(--mx-bg);">
                         <div id="logViewer" class="mx-log-viewer flex-col p-0 overflow-y-auto h-full"></div>
+                        <div id="zygiskViewer" class="mx-log-viewer flex-col p-0 overflow-y-auto h-full" style="display:none; white-space:pre-wrap; font:11px/18px monospace; padding:8px;"></div>
                         <div id="sysLoadingIndicator" class="loading-overlay hidden">加载中...</div>
                     </div>
                 </div>

@@ -37,6 +37,24 @@ import "./scss/main.scss";
 // 是否从自动补全框内部发起的触控滚动行为标记
 let touchStartInSuggestions = false;
 
+// Cached DOM references for frequently queried elements
+const domCache = {
+  sections: null as NodeListOf<HTMLElement> | null,
+  navItems: null as NodeListOf<HTMLElement> | null,
+  getSections(): NodeListOf<HTMLElement> {
+    if (!this.sections) this.sections = document.querySelectorAll(".demo-section");
+    return this.sections;
+  },
+  getNavItems(): NodeListOf<HTMLElement> {
+    if (!this.navItems) this.navItems = document.querySelectorAll<HTMLElement>(".mx-nav-item, .mx-btm-item");
+    return this.navItems;
+  },
+  invalidate(): void {
+    this.sections = null;
+    this.navItems = null;
+  },
+};
+
 function isVisualMode(toggleName: string): boolean {
   return !!document
     .querySelector(`button[name="${toggleName}"][data-mode="visual"]`)
@@ -100,16 +118,17 @@ function lockInitialHeight(): void {
       ? window.visualViewport.height
       : window.innerHeight;
     if (initialH > 100) {
-      document.documentElement.style.setProperty("--initial-vh", `${initialH}px`);
+      const current = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--initial-vh")) || 0;
+      if (initialH > current) {
+        document.documentElement.style.setProperty("--initial-vh", `${initialH}px`);
+      }
     }
   };
-  const delayedUpdate = () => setTimeout(update, 200);
   update();
-  window.addEventListener("load", update);
-  window.addEventListener("orientationchange", delayedUpdate);
-  setTimeout(update, 100);
-  setTimeout(update, 300);
-  setTimeout(update, 600);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", update);
+  }
+  window.addEventListener("orientationchange", () => setTimeout(update, 200));
 }
 lockInitialHeight();
 
@@ -169,6 +188,24 @@ export function stopPolling(): void {
   }
 }
 state.suspendPolling = stopPolling;
+
+let isPageVisible = true;
+
+function handleVisibilityChange(): void {
+  if (document.hidden) {
+    isPageVisible = false;
+    stopPolling();
+    stopLogPolling();
+  } else {
+    isPageVisible = true;
+    if (state.currentSection === "io" || state.currentSection === "log") {
+      startLogPolling(state.currentSection);
+    }
+    startPolling();
+  }
+}
+
+document.addEventListener("visibilitychange", handleVisibilityChange);
 
 async function toggleStatus(): Promise<void> {
   if (state.currentPid) {
@@ -238,10 +275,10 @@ const SECTION_TITLES: Record<string, string> = {
 function switchSection(sectionId: string): void {
   if (state.currentSection === sectionId) return;
   state.currentSection = sectionId;
-  document.querySelectorAll(".demo-section").forEach((el) => el.classList.remove("active"));
+  domCache.getSections().forEach((el) => el.classList.remove("active"));
   document.getElementById(`sec-${sectionId}`)?.classList.add("active");
   const selector = ".mx-nav-item, .mx-btm-item";
-  document.querySelectorAll<HTMLElement>(selector).forEach((el) =>
+  domCache.getNavItems().forEach((el) =>
     el.classList.toggle("active", el.dataset.section === sectionId),
   );
   const breadcrumb = document.getElementById("breadcrumbTitle");
@@ -279,8 +316,6 @@ function startLogPolling(section: string): void {
         fetchIoLogs();
       }
     } else if (section === "log" && state.currentSection === "log") {
-      state.sysState.offset = 0;
-      state.sysState.hasMore = true;
       fetchSysLogs();
     }
   }, 1000);
@@ -304,18 +339,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   initAllCustomSelects();
 
   window.addEventListener("popstate", () => {
-    const appConfig = document.getElementById("appConfigSubpage");
-    if (appConfig && appConfig.classList.contains("open")) {
-      appConfig.classList.remove("open");
-      appConfig.classList.add("closing");
-      setTimeout(() => appConfig.classList.remove("closing"), 300);
-    }
-    document.querySelector(".mx-app")!.classList.remove("frozen");
-    document.body.classList.remove("modal-open", "keyboard-open");
-    document.documentElement.style.setProperty("--keyboard-h", "0px");
-    document.querySelectorAll(".mx-modal-overlay.open").forEach((el) => el.classList.remove("open"));
+    closeModalCleanup();
     startPolling();
-    window._currentInput = null;
   });
 
   const ro = new ResizeObserver(() => {
@@ -348,9 +373,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   window.addEventListener(
     "scroll",
-    () => {
+    (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.id === "suggestionBox" || document.getElementById("suggestionBox")?.contains(target))) {
+        return;
+      }
       closeSuggestionsOnScroll();
-      if (window.scrollY !== 0) window.scrollTo(0, 0);
     },
     true,
   );
@@ -402,24 +430,49 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnThemeToggleMobile")!.onclick = handleManualThemeToggle;
   document.getElementById("btnThemeToggleDesktop")!.onclick = handleManualThemeToggle;
 
-  document.querySelectorAll<HTMLElement>(".mx-nav-item, .mx-btm-item").forEach((btn) => {
+  domCache.getNavItems().forEach((btn) => {
     if (btn.id !== "btnBackupDesktop") {
       btn.onclick = () => switchSection(btn.dataset.section ?? "");
     }
   });
+
+  function positionPillSlider(): void {
+    const group = document.getElementById("appFilterGroup");
+    const slider = document.getElementById("pillSlider");
+    const active = group?.querySelector("button.active") as HTMLElement | null;
+    if (!group || !slider || !active) return;
+    const groupRect = group.getBoundingClientRect();
+    const btnRect = active.getBoundingClientRect();
+    slider.style.left = `${btnRect.left - groupRect.left}px`;
+    slider.style.width = `${btnRect.width}px`;
+  }
 
   document.querySelectorAll("#appFilterGroup button").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll("#appFilterGroup button").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       state.currentAppFilter = (btn as HTMLElement).dataset.filter ?? "filterUser";
+      positionPillSlider();
       renderAppList();
     });
   });
 
+  positionPillSlider();
+
   setupSearchBar();
   setupIoSection();
   setupLogSection();
+
+  // Event delegation for app list clicks
+  const appListEl = document.getElementById("appList");
+  if (appListEl) {
+    appListEl.addEventListener("click", (e: MouseEvent) => {
+      const item = (e.target as HTMLElement).closest<HTMLElement>(".app-item");
+      if (item?.dataset.pkg) {
+        window.openAppConfig(item.dataset.pkg);
+      }
+    });
+  }
 
   document.getElementById("btnToggleStatusMobile")!.onclick = toggleStatus;
   document.getElementById("btnToggleStatusDesktop")!.onclick = toggleStatus;
@@ -592,55 +645,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function setupKeyboardHandling(): void {
-  let initialHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  window.addEventListener("orientationchange", () => {
-    setTimeout(() => {
-      initialHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    }, 300);
-  });
-
-  const setSpacer = (container: HTMLElement, isOpen: boolean, kbHeight: number) => {
-    document.querySelectorAll('.mx-keyboard-spacer').forEach(el => el.remove());
-    if (isOpen && container) {
-      let spacer = container.querySelector('.mx-keyboard-spacer') as HTMLElement | null;
-      if (!spacer) {
-        spacer = document.createElement('div');
-        spacer.className = 'mx-keyboard-spacer';
-        spacer.style.cssText = 'width: 100%; flex-shrink: 0; display: block; background: transparent; pointer-events: none;';
-        container.appendChild(spacer);
-      }
-      const containerHeight = container.clientHeight || 300;
-      spacer.style.height = `${kbHeight + containerHeight / 2}px`;
-      const temp = container.scrollHeight;
-    }
-  };
-
-  const updateSpacers = (isOpen: boolean, kbHeight: number) => {
-    if (!isOpen) {
-      document.querySelectorAll('.mx-keyboard-spacer').forEach(el => el.remove());
-      return;
-    }
-    const activeEl = document.activeElement as HTMLElement | null;
-    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.classList.contains('mx-input'))) {
-      const container = activeEl.closest('.overflow-y-auto, .editor-scroll, .mx-subpage-body') as HTMLElement | null;
-      if (container) {
-        setSpacer(container, true, kbHeight);
-      }
-    }
-  };
-
   document.addEventListener('focusin', (e) => {
     const target = e.target as HTMLElement;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.classList.contains('mx-input'))) {
-      const container = target.closest('.overflow-y-auto, .editor-scroll, .mx-subpage-body') as HTMLElement | null;
-      if (container) {
-        const lastKbHeight = parseFloat(document.documentElement.style.getPropertyValue('--keyboard-h')) || 280;
-        setSpacer(container, true, lastKbHeight);
-        setTimeout(() => {
-          if (window._currentInput === target) {
-            scrollToInputIfKeyboardOpen(target);
-          }
-        }, 80);
+      window._currentInput = target;
+      if (navigator.virtualKeyboard) {
+        (navigator.virtualKeyboard as unknown as { show(): void }).show();
       }
     }
   });
@@ -649,10 +659,10 @@ function setupKeyboardHandling(): void {
     setTimeout(() => {
       const activeEl = document.activeElement;
       const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.classList.contains('mx-input'));
-      if (!isInput) {
-        document.querySelectorAll('.mx-keyboard-spacer').forEach(el => el.remove());
+      if (!isInput && navigator.virtualKeyboard) {
+        (navigator.virtualKeyboard as unknown as { hide(): void }).hide();
       }
-    }, 80);
+    }, 100);
   });
 
   if (navigator.virtualKeyboard) {
@@ -660,17 +670,24 @@ function setupKeyboardHandling(): void {
     navigator.virtualKeyboard.addEventListener("geometrychange", (e: Event) => {
       const { height } = (e.target as unknown as VirtualKeyboard).boundingRect;
       const isOpen = height > 0;
-      document.body.classList.toggle("keyboard-open", isOpen);
-      document.documentElement.style.setProperty("--keyboard-h", `${height}px`);
-      updateSpacers(isOpen, height);
-      if (isOpen && window._currentInput) {
-        setTimeout(() => {
-          scrollToInputIfKeyboardOpen(window._currentInput!);
-        }, 60);
-      }
+      requestAnimationFrame(() => {
+        document.body.classList.toggle("keyboard-open", isOpen);
+        document.documentElement.style.setProperty("--keyboard-h", `${height}px`);
+        if (isOpen && window._currentInput) {
+          scrollToInputIfKeyboardOpen(window._currentInput);
+        }
+      });
     });
     return;
   }
+
+  // Fallback: no VirtualKeyboard API
+  let initialHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  window.addEventListener("orientationchange", () => {
+    setTimeout(() => {
+      initialHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    }, 300);
+  });
 
   let isFrameBlocked = false;
   const updateViewportHeight = (): void => {
@@ -686,7 +703,6 @@ function setupKeyboardHandling(): void {
         "--keyboard-h",
         isOpen ? `${keyboardHeight}px` : "0px",
       );
-      updateSpacers(isOpen, isOpen ? keyboardHeight : 0);
       if (isOpen && window._currentInput) {
         setTimeout(() => {
           scrollToInputIfKeyboardOpen(window._currentInput!);
@@ -798,17 +814,4 @@ function setupLogSection(): void {
     });
   }
   document.getElementById("btnClearLog")!.onclick = clearSysLogs;
-
-  window.addEventListener(
-    "scroll",
-    (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (target && (target.id === "suggestionBox" || document.getElementById("suggestionBox")?.contains(target))) {
-        return;
-      }
-      closeSuggestionsOnScroll();
-      if (window.scrollY !== 0) window.scrollTo(0, 0);
-    },
-    true,
-  );
 }

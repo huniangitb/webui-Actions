@@ -21,6 +21,7 @@
     font-size: var(--mx-font-size-base);
     font-family: var(--mx-font-sans);
     transition: box-shadow 0.2s var(--mx-ease);
+    virtual-keyboard-policy: manual;
 }
 
 .mx-input::placeholder { color: var(--mx-t3); }
@@ -155,6 +156,7 @@
 /* ── Pill group (segmented control) ── */
 .mx-pill-group {
     display: flex;
+    position: relative;
     background: var(--mx-s3);
     border-radius: var(--mx-radius-pill);
     padding: 3px; gap: 3px;
@@ -168,15 +170,26 @@
     color: var(--mx-t2);
     font-size: var(--mx-font-size-sm); font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s var(--mx-spring);
+    transition: color 0.2s var(--mx-spring);
     white-space: nowrap;
     font-family: var(--mx-font-sans);
+    position: relative;
+    z-index: 1;
 }
 
 .mx-pill-group button.active {
-    background: var(--mx-s2);
+    background: transparent;
     color: var(--mx-t1);
+}
+
+.pill-slider {
+    position: absolute;
+    top: 3px; bottom: 3px;
+    background: var(--mx-s2);
+    border-radius: var(--mx-radius-pill);
     box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    transition: left 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94), width 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 0;
 }
 
 /* ── Switch ── */

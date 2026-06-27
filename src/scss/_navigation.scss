@@ -12,9 +12,6 @@
     transform: translateZ(0);
 }
 
-body.keyboard-open .mx-bottom-nav {
-    display: none !important;
-}
 
 .mx-bottom-nav-items {
     display: flex; list-style: none; margin: 0; padding: 4px 8px; height: 64px; gap: 4px;

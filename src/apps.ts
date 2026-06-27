@@ -210,6 +210,10 @@ export const loadData = async (): Promise<void> => {
         const secMatch = tLine.match(/^\[(.*?)\](?:\s+(ON|OFF))?/);
         if (secMatch) {
           currentSection = secMatch[1];
+          // 确保 app section key 始终带 :uid，默认不加则追加 :0
+          if (currentSection !== "GLOBAL" && !currentSection.includes(":")) {
+            currentSection = `${currentSection}:0`;
+          }
           if (currentSection !== "GLOBAL") {
             state.injectorStates.set(currentSection, secMatch[2] || "ON");
           }
@@ -246,7 +250,8 @@ export const loadData = async (): Promise<void> => {
         const fileName = filePath.split("/").pop() ?? "";
         const isDisabled = fileName.endsWith(".conf.disabled");
         const pkg = fileName.replace(/\.conf(\.disabled)?$/, "");
-        const uid = dir.endsWith("-0") ? 0 : parseInt(dir.split("-").pop() ?? "0");
+        // batchCmds 按 state.activeUsers 顺序构建，bi 即对应 activeUsers 的索引
+        const uid = bi < state.activeUsers.length ? state.activeUsers[bi] : 0;
         ruleFilesMap.set(`${pkg}:${uid}`, content);
         if (isDisabled) ruleFilesMap.set(`${pkg}:${uid}_disabled`, true);
         else ruleFilesMap.set(`${pkg}:${uid}_enabled`, true);

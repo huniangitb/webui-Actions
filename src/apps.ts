@@ -570,7 +570,22 @@ export function switchAppUser(uid: number): void {
 }
 
 export async function flushInjectorConf(): Promise<void> {
-  // 读现有文件，只替换 [GLOBAL] 段内容，保留所有非 GLOBAL 段不变
+  if (state.currentSettings.useLogCtl) {
+    // log_ctl 模式：用 set-rule 逐个更新 GLOBAL 规则，不直接写文件
+    const rules = state.globalConfText.trim().split("\n").filter(l => l.trim());
+    for (const rule of rules) {
+      const parts = rule.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        const type = parts[0];
+        const value = parts.slice(1).join(" ");
+        await logctl.setRule("GLOBAL", type, value);
+      }
+    }
+    await logctl.reloadConfig();
+    return;
+  }
+
+  // 直接文件模式：读现有文件，只替换 [GLOBAL] 段内容，保留所有非 GLOBAL 段不变
   const existing = await run(`cat ${CONST.INJECTOR_CONF} 2>/dev/null`);
   const lines = existing ? existing.split("\n") : [];
 

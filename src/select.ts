@@ -3,7 +3,6 @@
  * Dropdown is appended to document.body to avoid overflow clipping.
  * Keeps the native select hidden and syncs value bidirectionally.
  */
-
 interface CustomSelectOption {
   value: string;
   label: string;
@@ -45,7 +44,7 @@ function positionDropdown(trigger: HTMLElement, dropdown: HTMLElement): void {
   const maxH = Math.min(240, Math.max(spaceBelow, spaceAbove) - 4);
   dropdown.style.maxHeight = `${maxH}px`;
   dropdown.style.minWidth = `${rect.width}px`;
-
+  
   /* Measure longest option text to size dropdown width, capped at 360px / 80vw */
   const viewportCap = Math.min(window.innerWidth - 32, 360);
   let maxW = rect.width;
@@ -63,10 +62,9 @@ function positionDropdown(trigger: HTMLElement, dropdown: HTMLElement): void {
   }
   const capped = Math.min(maxW, viewportCap);
   dropdown.style.width = `${capped}px`;
-
+  
   /* Keep within viewport horizontally */
   dropdown.style.left = `${Math.min(rect.left, window.innerWidth - capped - 8)}px`;
-
   if (spaceBelow < 160 && spaceAbove > spaceBelow) {
     dropdown.style.top = "";
     dropdown.style.bottom = `${window.innerHeight - rect.top + 4}px`;
@@ -101,8 +99,7 @@ export function initCustomSelect(nativeSelect: HTMLSelectElement, _options?: Cus
     </span>
   `;
 
-  /* Match trigger width to original select width.
-     offsetWidth works for visible elements; fallback to inline style if hidden (e.g. inside modals). */
+  /* Match trigger width to original select width */
   let selectWidth = nativeSelect.offsetWidth;
   if (selectWidth <= 0 && nativeSelect.style.width) {
     selectWidth = parseFloat(nativeSelect.style.width) || 0;
@@ -118,6 +115,9 @@ export function initCustomSelect(nativeSelect: HTMLSelectElement, _options?: Cus
   dropdown.style.position = "fixed";
   dropdown.style.display = "none";
 
+  // 在 nativeSelect 上增加隐藏引用，协助 VirtualScroller 卸载行时彻底销毁无用 DOM 下拉框
+  (nativeSelect as any)._customDropdown = dropdown;
+
   function renderOptions(): void {
     const currentVal = nativeSelect.value;
     dropdown.innerHTML = getOptions()
@@ -127,6 +127,8 @@ export function initCustomSelect(nativeSelect: HTMLSelectElement, _options?: Cus
       )
       .join("");
   }
+
+  // 初始执行一次渲染
   renderOptions();
 
   /* Option click */
@@ -190,4 +192,12 @@ export function initCustomSelect(nativeSelect: HTMLSelectElement, _options?: Cus
 
 export function initAllCustomSelects(container: HTMLElement | Document = document): void {
   container.querySelectorAll<HTMLSelectElement>("select.mx-select").forEach((el) => initCustomSelect(el));
+}
+
+export function destroyCustomSelect(nativeSelect: HTMLSelectElement): void {
+  const dropdown = (nativeSelect as any)._customDropdown;
+  if (dropdown) {
+    dropdown.remove();
+    (nativeSelect as any)._customDropdown = null;
+  }
 }

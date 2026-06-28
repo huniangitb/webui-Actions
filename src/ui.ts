@@ -4,17 +4,31 @@ import { exec } from "kernelsu";
 import { prepare, layout } from "@chenglou/pretext";
 import type { Suggestion } from "./types/index";
 import { initCustomSelect } from "./select.js";
-
+import { VirtualScroller } from "./virtual-list.js";
+import type { RuleItem } from "./virtual-list.js";
 // 触摸手势检测参数
 let startX = 0;
 let startY = 0;
 let isScrolling = false;
-
+// ── VirtualScroller 实例注册表 ──
+const _virtualScrollers = new Map<string, VirtualScroller>();
+function _getOrCreateVS(containerId: string): VirtualScroller | null {
+  let vs = _virtualScrollers.get(containerId);
+  if (vs) return vs;
+  const container = document.getElementById(containerId);
+  if (!container) return null;
+  vs = new VirtualScroller(container);
+  _virtualScrollers.set(containerId, vs);
+  return vs;
+}
+function _destroyVS(containerId: string): void {
+  const vs = _virtualScrollers.get(containerId);
+  if (vs) { vs.destroy(); _virtualScrollers.delete(containerId); }
+}
 function getSelectById(id: string | null): HTMLSelectElement | null {
   if (!id) return null;
   return document.getElementById(id) as HTMLSelectElement | null;
 }
-
 function clearSelectValue(id: string | null): void {
   const sel = getSelectById(id);
   if (sel) {
@@ -22,20 +36,18 @@ function clearSelectValue(id: string | null): void {
     sel.dispatchEvent(new Event("change", { bubbles: true }));
   }
 }
-
 function getSelectValue(id: string | null): string {
   const sel = getSelectById(id);
   return sel?.value ?? "";
 }
-
-export const addRuleRow = (
+/**
+ * 创建一条规则 DOM 元素（游离态，未插入文档）。
+ */
+export const buildRuleRow = (
   type: string,
   target: string,
   source: string,
-  containerId: string,
-): void => {
-  const container = document.getElementById(containerId);
-  if (!container) return;
+): HTMLDivElement => {
   const div = document.createElement("div");
   div.className = "rule-row";
   div.innerHTML = `<select class="mx-select rule-type" style="width:95px; font-size:12px;">
@@ -53,7 +65,6 @@ export const addRuleRow = (
     </div>
   </div>
   <button class="mx-btn-icon btn-del flex-shrink-0">${ICONS.DELETE}</button>`;
-
   const select = div.querySelector(".rule-type") as HTMLSelectElement;
   select.value = type;
   select.onchange = (e: Event) => {
@@ -62,14 +73,29 @@ export const addRuleRow = (
       srcWrapper.classList.toggle("hidden", (e.target as HTMLSelectElement).value !== "REDIRECT");
     }
   };
-
-  requestAnimationFrame(() => initCustomSelect(select));
-  div.querySelector(".btn-del")?.addEventListener("click", () => div.remove());
-  setupAutocomplete(div.querySelectorAll(".mx-input")[0] as HTMLInputElement);
-  setupAutocomplete(div.querySelectorAll(".mx-input")[1] as HTMLInputElement);
-  container.appendChild(div);
+  return div;
 };
-
+/** 旧接口：创建一条规则并直接追加到容器尾部 */
+export const addRuleRow = (
+  type: string,
+  target: string,
+  source: string,
+  containerId: string,
+): void => {
+  const vs = _virtualScrollers.get(containerId);
+  if (vs) {
+    vs.addItem({ type, target, source });
+    return;
+  }
+  // Fallback：无 VirtualScroller 时使用传统方式
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const row = buildRuleRow(type, target, source);
+  row.querySelector(".btn-del")!.addEventListener("click", () => row.remove());
+  container.appendChild(row);
+  // 仅首次调用初始化事件委托
+  setupContainerAutocomplete(container);
+};
 export const parseConfigTextToVisual = (
   text: string | null | undefined,
   containerId: string,
@@ -77,45 +103,64 @@ export const parseConfigTextToVisual = (
   sandboxSelectId: string,
   injectSelectId: string | null,
 ): void => {
+  // 核心改动：每次渲染解析配置前，彻底将旧的 VirtualScroller 销毁以重新挂载 offsetTop
+  _destroyVS(containerId);
+
   const container = document.getElementById(containerId);
   if (container) {
     const box = document.getElementById("suggestionBox");
     if (box && container.contains(box)) {
       document.body.appendChild(box);
     }
-    container.innerHTML = "";
   }
   clearSelectValue(monitorSelectId);
   clearSelectValue(sandboxSelectId);
   clearSelectValue(injectSelectId);
-  if (!text) return;
-
+  // 解析规则行文本，构造 RuleItem[]
+  const items: RuleItem[] = [];
   const selMonitor = getSelectById(monitorSelectId);
   const selSandbox = getSelectById(sandboxSelectId);
   const selInject = getSelectById(injectSelectId);
-
-  text.split("\n").forEach((line) => {
-    const parts = splitLineRespectingQuotes(line.trim());
-    const cmd = parts[0];
-    if (cmd === "REDIRECT" && parts.length >= 3) {
-      addRuleRow("REDIRECT", normalizeToDisplay(parts[1]), normalizeToDisplay(parts.slice(2).join(" ")), containerId);
-    } else if (parts.length >= 2) {
-      if (cmd === "HIDE" || cmd === "RO" || cmd === "ALLOW") {
-        addRuleRow(cmd, normalizeToDisplay(parts[1]), "", containerId);
-      } else if (cmd === "MONITOR" && selMonitor) {
-        selMonitor.value = parts[1];
-        selMonitor.dispatchEvent(new Event("change", { bubbles: true }));
-      } else if (cmd === "SANDBOX" && selSandbox) {
-        selSandbox.value = parts[1];
-        selSandbox.dispatchEvent(new Event("change", { bubbles: true }));
-      } else if (cmd === "GLOBAL_INJECT" && selInject) {
-        selInject.value = parts[1];
-        selInject.dispatchEvent(new Event("change", { bubbles: true }));
+  if (text) {
+    for (const line of text.split("\n")) {
+      const parts = splitLineRespectingQuotes(line.trim());
+      const cmd = parts[0];
+      if (cmd === "REDIRECT" && parts.length >= 3) {
+        items.push({ type: "REDIRECT", target: normalizeToDisplay(parts[1]), source: normalizeToDisplay(parts.slice(2).join(" ")) });
+      } else if (parts.length >= 2) {
+        if (cmd === "HIDE" || cmd === "RO" || cmd === "ALLOW") {
+          items.push({ type: cmd, target: normalizeToDisplay(parts[1]), source: "" });
+        } else if (cmd === "MONITOR" && selMonitor) {
+          selMonitor.value = parts[1];
+          selMonitor.dispatchEvent(new Event("change", { bubbles: true }));
+        } else if (cmd === "SANDBOX" && selSandbox) {
+          selSandbox.value = parts[1];
+          selSandbox.dispatchEvent(new Event("change", { bubbles: true }));
+        } else if (cmd === "GLOBAL_INJECT" && selInject) {
+          selInject.value = parts[1];
+          selInject.dispatchEvent(new Event("change", { bubbles: true }));
+        }
       }
     }
-  });
+  }
+  // 通过 VirtualScroller 或传统方式渲染
+  const vs = _getOrCreateVS(containerId);
+  if (vs) {
+    vs.setItems(items);
+    setupContainerAutocomplete(document.getElementById(containerId)!);
+  } else if (container) {
+    // Fallback：直接 DOM
+    container.innerHTML = "";
+    const fragment = document.createDocumentFragment();
+    for (const item of items) {
+      const row = buildRuleRow(item.type, item.target, item.source);
+      row.querySelector(".btn-del")!.addEventListener("click", () => row.remove());
+      fragment.appendChild(row);
+    }
+    if (items.length > 0) container.appendChild(fragment);
+    setupContainerAutocomplete(container);
+  }
 };
-
 export const generateConfigTextFromVisual = (
   containerId: string,
   monitorSelectId: string,
@@ -129,23 +174,40 @@ export const generateConfigTextFromVisual = (
   if (monitorVal) res += `MONITOR ${monitorVal}\n`;
   const sandboxVal = getSelectValue(sandboxSelectId);
   if (sandboxVal) res += `SANDBOX ${sandboxVal}\n`;
-
-  document.querySelectorAll(`#${containerId} .rule-row`).forEach((row) => {
-    const type = (row.querySelector(".rule-type") as HTMLSelectElement).value;
-    const target = (row.querySelector(".rule-target") as HTMLInputElement).value.trim();
-    if (!target) return;
-    if (type === "REDIRECT") {
-      const source = (row.querySelector(".rule-source") as HTMLInputElement).value.trim();
-      if (source) {
-        res += `REDIRECT ${quoteArgIfSpaced(normalizeToConfig(target, true))} ${quoteArgIfSpaced(normalizeToConfig(source, false))}\n`;
+  // 优先从 VirtualScroller 获取当前最新的内部实体数据
+  const vs = _virtualScrollers.get(containerId);
+  if (vs) {
+    const items = vs.getCurrentData();
+    for (const item of items) {
+      const target = item.target.trim();
+      if (!target) continue;
+      if (item.type === "REDIRECT") {
+        const source = item.source.trim();
+        if (source) {
+          res += `REDIRECT ${quoteArgIfSpaced(normalizeToConfig(target, true))} ${quoteArgIfSpaced(normalizeToConfig(source, false))}\n`;
+        }
+      } else if (item.type === "HIDE" || item.type === "RO" || item.type === "ALLOW") {
+        res += `${item.type} ${quoteArgIfSpaced(normalizeToConfig(target, true))}\n`;
       }
-    } else if (type === "HIDE" || type === "RO" || type === "ALLOW") {
-      res += `${type} ${quoteArgIfSpaced(normalizeToConfig(target, true))}\n`;
     }
-  });
+  } else {
+    // Fallback：从 DOM 读取
+    document.querySelectorAll(`#${containerId} .rule-row`).forEach((row) => {
+      const type = (row.querySelector(".rule-type") as HTMLSelectElement).value;
+      const target = (row.querySelector(".rule-target") as HTMLInputElement).value.trim();
+      if (!target) return;
+      if (type === "REDIRECT") {
+        const source = (row.querySelector(".rule-source") as HTMLInputElement).value.trim();
+        if (source) {
+          res += `REDIRECT ${quoteArgIfSpaced(normalizeToConfig(target, true))} ${quoteArgIfSpaced(normalizeToConfig(source, false))}\n`;
+        }
+      } else if (type === "HIDE" || type === "RO" || type === "ALLOW") {
+        res += `${type} ${quoteArgIfSpaced(normalizeToConfig(target, true))}\n`;
+      }
+    });
+  }
   return res.trim();
 };
-
 export const setupModeToggle = (
   groupName: string,
   visualId: string,
@@ -174,7 +236,6 @@ export const setupModeToggle = (
     });
   });
 };
-
 export const updateSuggestionBoxPosition = (input: HTMLInputElement): void => {
   const box = document.getElementById("suggestionBox");
   if (!box || !input || !box.classList.contains("open")) return;
@@ -200,7 +261,6 @@ export const updateSuggestionBoxPosition = (input: HTMLInputElement): void => {
   box.style.marginTop = placeAbove ? "0px" : "4px";
   box.style.marginBottom = placeAbove ? "4px" : "0px";
 };
-
 export const centerActiveInput = (input: HTMLElement): void => {
   if (!input) return;
   const row = input.closest(".rule-row") || input.closest(".mx-form-group") || input;
@@ -239,17 +299,14 @@ export const centerActiveInput = (input: HTMLElement): void => {
   };
   container._scrollAnimId = requestAnimationFrame(step);
 };
-
 export const debouncedCenterActive = debounce((input: HTMLElement) => {
   centerActiveInput(input);
 }, 80);
-
 interface ParsedAutocompletePath {
   prefixDir: string;
   searchPrefix: string;
   displayBase: string;
 }
-
 function parseAutocompletePath(value: string): ParsedAutocompletePath {
   const result: ParsedAutocompletePath = {
     prefixDir: CONST.PATH_PREFIX_REAL + "/",
@@ -268,17 +325,14 @@ function parseAutocompletePath(value: string): ParsedAutocompletePath {
   }
   return result;
 }
-
 function closeSuggestionBox(box: HTMLElement): void {
   box.classList.remove("open");
   state.currentSuggestions = [];
   state.suggestionBoxHeight = 0;
 }
-
 const FONT_STYLE = "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const HORIZONTAL_PADDING = 24;
 const ICON_AND_GAP = 16 + 8;
-
 function computeSuggestionBoxHeight(sugs: Suggestion[], inputRectWidth: number): number {
   let totalHeight = 2;
   const availTextWidth = inputRectWidth - HORIZONTAL_PADDING - ICON_AND_GAP;
@@ -293,7 +347,6 @@ function computeSuggestionBoxHeight(sugs: Suggestion[], inputRectWidth: number):
   }
   return totalHeight;
 }
-
 function buildSuggestionHtml(sugs: Suggestion[]): string {
   return sugs
     .map(
@@ -302,9 +355,10 @@ function buildSuggestionHtml(sugs: Suggestion[]): string {
     )
     .join("");
 }
-
-const setupAutocomplete = (input: HTMLInputElement | null): void => {
-  if (!input) return;
+const _navInputsCache = new Map<string, HTMLInputElement[]>();
+const setupContainerAutocomplete = (container: HTMLElement): void => {
+  if (container.dataset.autocompleteDelegated === "true") return;
+  container.dataset.autocompleteDelegated = "true";
   let box = document.getElementById("suggestionBox");
   if (!box) {
     box = document.createElement("div");
@@ -312,23 +366,16 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
     box.className = "suggestion-box";
     document.body.appendChild(box);
   }
-
-  // 保证事件处理器有且仅绑定一次
   if (box.dataset.initialized !== "true") {
     box.dataset.initialized = "true";
-
-    // 1. 拦截指针按压：开启临时选择交互锁，并标记初始触控点坐标
     box.addEventListener("pointerdown", (e: PointerEvent) => {
       const item = (e.target as HTMLElement).closest<HTMLElement>(".suggestion-item");
       if (!item || !item.dataset.path) return;
-
       box!.dataset.interacting = "true";
       isScrolling = false;
       startX = e.clientX;
       startY = e.clientY;
     });
-
-    // 2. 指针滑动侦测：5px 位移检测，判定是点击补全还是原生滚动列表
     box.addEventListener("pointermove", (e: PointerEvent) => {
       if (box!.dataset.interacting !== "true") return;
       const dx = e.clientX - startX;
@@ -337,16 +384,10 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
         isScrolling = true;
       }
     });
-
-    // 3. 指针松开结算：
-    //   - 非滑动时：直接执行补全与建议框关闭，释放锁定。
-    //   - 判定为滑动时：不执行补全，延迟 100ms 快速归还状态。
     box.addEventListener("pointerup", (e: PointerEvent) => {
       if (box!.dataset.interacting !== "true") return;
-
       const item = (e.target as HTMLElement).closest<HTMLElement>(".suggestion-item");
       if (item && item.dataset.path && !isScrolling) {
-        // 纯粹轻点：填充路径并强制夺回焦点
         const cur = window._currentInput as HTMLInputElement | null;
         if (cur) {
           cur.value = item.dataset.path;
@@ -357,109 +398,106 @@ const setupAutocomplete = (input: HTMLInputElement | null): void => {
         state.currentSuggestions = [];
         box!.dataset.interacting = "false";
       } else {
-        // 用户滚动：不修改内容，快速释放锁
-        setTimeout(() => {
-          box!.dataset.interacting = "false";
-        }, 100);
+        setTimeout(() => { box!.dataset.interacting = "false"; }, 100);
       }
     });
-
     box.addEventListener("pointercancel", () => {
-      setTimeout(() => {
-        box!.dataset.interacting = "false";
-      }, 100);
+      setTimeout(() => { box!.dataset.interacting = "false"; }, 100);
       isScrolling = false;
     });
   }
-
-  input.addEventListener(
-    "input",
-    debounce(async (e: Event) => {
-      const val = (e.target as HTMLInputElement).value;
-      if (!val.trim()) { input.classList.remove("path-exists"); closeSuggestionBox(box!); return; }
-
-      const { prefixDir, searchPrefix, displayBase } = parseAutocompletePath(val);
-      try {
-        const safeDir = prefixDir.replace(/\/+/g, "/");
-        const fullPath = (CONST.PATH_PREFIX_REAL + "/" + val.replace(/^\/+/, "")).replace(/\/+/g, "/");
-        const [dirRes, pathRes] = await Promise.all([
-          exec(`if [ -d "${safeDir}" ]; then ls -F -1 "${safeDir}" 2>/dev/null | head -n 30; else echo "__NOTDIR__"; fi`),
-          exec(`test -d "${fullPath}" && echo "EXISTS"`),
-        ]);
-        const pathExists = pathRes.stdout?.trim() === "EXISTS";
-        input.classList.toggle("path-exists", pathExists);
-        if (!dirRes || !dirRes.stdout || dirRes.stdout.trim() === "__NOTDIR__") {
-          closeSuggestionBox(box!);
-          return;
-        }
-        const sugs: Suggestion[] = dirRes.stdout
-          .split("\n")
-          .filter((l: string) => l.endsWith("/") && l.startsWith(searchPrefix))
-          .map((l: string) => ({ t: displayBase + l, i: ICONS.FOLDER }));
-        if (sugs.length === 0) {
-          closeSuggestionBox(box!);
-          return;
-        }
-
-        state.currentSuggestions = sugs;
-        state.suggestionBoxHeight = computeSuggestionBoxHeight(sugs, input.getBoundingClientRect().width);
-        box!.innerHTML = buildSuggestionHtml(sugs);
-        box!.classList.add("open");
-        window.requestAnimationFrame(() => {
-          updateSuggestionBoxPosition(input);
-        });
-      } catch {
-        closeSuggestionBox(box!);
+  const handleInput = debounce(async (e: Event) => {
+    const input = (e.target as HTMLElement).closest<HTMLInputElement>(".mx-input");
+    if (!input) return;
+    const b = document.getElementById("suggestionBox")!;
+    const val = input.value;
+    if (!val.trim()) { input.classList.remove("path-exists"); closeSuggestionBox(b); return; }
+    const { prefixDir, searchPrefix, displayBase } = parseAutocompletePath(val);
+    try {
+      const safeDir = prefixDir.replace(/\/+/g, "/");
+      const fullPath = (CONST.PATH_PREFIX_REAL + "/" + val.replace(/^\/+/, "")).replace(/\/+/g, "/");
+      const [dirRes, pathRes] = await Promise.all([
+        exec(`if [ -d "${safeDir}" ]; then ls -F -1 "${safeDir}" 2>/dev/null | head -n 30; else echo "__NOTDIR__"; fi`),
+        exec(`test -d "${fullPath}" && echo "EXISTS"`),
+      ]);
+      const pathExists = pathRes.stdout?.trim() === "EXISTS";
+      input.classList.toggle("path-exists", pathExists);
+      if (!dirRes || !dirRes.stdout || dirRes.stdout.trim() === "__NOTDIR__") {
+        closeSuggestionBox(b);
+        return;
       }
-    }, 250),
-  );
-
-  input.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
-    const inputs = Array.from(
-      document.querySelectorAll<HTMLInputElement>(
-        ".mx-subpage-container.open .mx-input:not([readonly])",
-      ),
-    );
+      const sugs: Suggestion[] = dirRes.stdout
+        .split("\n")
+        .filter((l: string) => l.endsWith("/") && l.startsWith(searchPrefix))
+        .map((l: string) => ({ t: displayBase + l, i: ICONS.FOLDER }));
+      if (sugs.length === 0) { closeSuggestionBox(b); return; }
+      state.currentSuggestions = sugs;
+      state.suggestionBoxHeight = computeSuggestionBoxHeight(sugs, input.getBoundingClientRect().width);
+      b.innerHTML = buildSuggestionHtml(sugs);
+      b.classList.add("open");
+      requestAnimationFrame(() => updateSuggestionBoxPosition(input));
+    } catch {
+      closeSuggestionBox(b);
+    }
+  }, 250);
+  container.addEventListener("input", handleInput);
+  container.addEventListener("keydown", (e: Event) => {
+    const ke = e as KeyboardEvent;
+    if (ke.key !== "ArrowUp" && ke.key !== "ArrowDown") return;
+    const input = (e.target as HTMLElement).closest<HTMLInputElement>(".mx-input");
+    if (!input) return;
+    const subpage = input.closest<HTMLElement>(".mx-subpage-container.open");
+    if (!subpage) return;
+    const key = subpage.id;
+    if (!key) return;
+    let inputs = _navInputsCache.get(key);
+    if (!inputs) {
+      inputs = Array.from(subpage.querySelectorAll<HTMLInputElement>(".mx-input:not([readonly])"));
+      _navInputsCache.set(key, inputs);
+    }
     const idx = inputs.indexOf(input);
     if (idx === -1) return;
-    if (e.key === "ArrowUp" && idx > 0) {
-      e.preventDefault();
+    if (ke.key === "ArrowUp" && idx > 0) {
+      ke.preventDefault();
       inputs[idx - 1].focus();
-    } else if (e.key === "ArrowDown" && idx < inputs.length - 1) {
-      e.preventDefault();
+    } else if (ke.key === "ArrowDown" && idx < inputs.length - 1) {
+      ke.preventDefault();
       inputs[idx + 1].focus();
     }
   });
-
-  input.addEventListener("focus", () => {
+  container.addEventListener("focusin", (e: FocusEvent) => {
+    const input = (e.target as HTMLElement).closest<HTMLInputElement>(".mx-input");
+    if (!input) return;
     window._currentInput = input;
     centerActiveInput(input);
     const isFirstFocus = !input.hasAttribute("data-has-focused");
-    if (isFirstFocus) {
-      input.setAttribute("data-has-focused", "true");
-    }
+    if (isFirstFocus) input.setAttribute("data-has-focused", "true");
     setTimeout(() => {
       if (document.activeElement === input) {
         input.dispatchEvent(new Event("input"));
       }
     }, isFirstFocus ? 400 : 0);
   });
-
-  input.addEventListener("blur", () => {
+  container.addEventListener("focusout", (e: FocusEvent) => {
+    const input = (e.target as HTMLElement).closest<HTMLInputElement>(".mx-input");
+    if (!input) return;
     setTimeout(() => {
-      // 锁定状态拦截：若建议框正处于操作期间，禁止强行关闭
-      const suggestionBox = document.getElementById("suggestionBox");
-      if (suggestionBox && suggestionBox.dataset.interacting === "true") {
-        return;
-      }
+      const sb = document.getElementById("suggestionBox");
+      if (sb && sb.dataset.interacting === "true") return;
       const activeEl = document.activeElement;
       if (!activeEl || !activeEl.classList.contains("mx-input")) {
-        if (suggestionBox) {
-          suggestionBox.classList.remove("open");
-          state.currentSuggestions = [];
-        }
+        if (sb) { sb.classList.remove("open"); state.currentSuggestions = []; }
       }
     }, 150);
   });
+  if (!container.hasAttribute("data-nav-observer")) {
+    container.setAttribute("data-nav-observer", "true");
+    new MutationObserver(() => {
+      const sub = container.closest<HTMLElement>(".mx-subpage-container.open");
+      if (sub && sub.id) _navInputsCache.delete(sub.id);
+    }).observe(container, { childList: true, subtree: false });
+  }
+};
+export const destroyVirtualScroller = (containerId: string): void => {
+  _destroyVS(containerId);
 };

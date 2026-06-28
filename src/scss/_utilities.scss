@@ -47,13 +47,38 @@
 .scroll-x::-webkit-scrollbar { display: none; }
 .scroll-x > * { scroll-snap-align: start; scroll-snap-stop: always; }
 
-/* ── Global scrollbar hiding (Android WebView / modern browsers) ── */
+/* ── Global: scrollbar hidden by default, shown only after JS init ── */
+/* (body.loaded is set by JS after modules fully initialize) */
 * {
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
 *::-webkit-scrollbar {
     display: none;
+}
+body.loaded .overflow-y-auto::-webkit-scrollbar,
+body.loaded .list-scrollable::-webkit-scrollbar {
+    display: block;
+    width: 4px;
+}
+body.loaded .overflow-y-auto::-webkit-scrollbar-track,
+body.loaded .list-scrollable::-webkit-scrollbar-track {
+    background: transparent;
+}
+body.loaded .overflow-y-auto::-webkit-scrollbar-thumb,
+body.loaded .list-scrollable::-webkit-scrollbar-thumb {
+    background: var(--mx-border);
+    border-radius: 4px;
+}
+body.loaded .overflow-y-auto::-webkit-scrollbar-thumb:hover,
+body.loaded .list-scrollable::-webkit-scrollbar-thumb:hover {
+    background: var(--mx-t3);
+}
+/* Firefox & legacy IE — hide globally, show on opt-in after loaded */
+body.loaded .overflow-y-auto,
+body.loaded .list-scrollable {
+    scrollbar-width: thin;
+    scrollbar-color: var(--mx-border) transparent;
 }
 
 .text-muted { color: var(--mx-t2); }

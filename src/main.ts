@@ -18,14 +18,9 @@ import {
 } from "./apps.js";
 import { setupGlobalHandlers, renderGlobalRules } from "./global.js";
 import {
-  initIoLogs,
-  initSysLogs,
-  fetchIoLogs,
-  fetchSysLogs,
-  resetIoLogs,
-  clearIoLogs,
-  resetSysLogs,
-  clearSysLogs,
+  initIoLogs, resetIoLogs, fetchIoLogs, clearIoLogs,
+  initSysLogs, resetSysLogs, fetchSysLogs, clearSysLogs,
+  ioVirtualList, sysVirtualList,
 } from "./logs.js";
 import { getSettings, saveSettings, checkPluginInstalled, syncToPlugin } from "./plugin.js";
 import { openBackupModal, showPicker, exportAllLogs, createNewFolder } from "./backup.js";
@@ -410,6 +405,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.currentSettings.autoTheme;
   (document.getElementById("pluginSyncToggle") as HTMLInputElement).checked =
     state.currentSettings.syncPlugin;
+  (document.getElementById("useLogCtlToggle") as HTMLInputElement).checked =
+    state.currentSettings.useLogCtl;
 
   const colorProfileSelect = document.getElementById("colorProfileSelect") as HTMLSelectElement | null;
   if (colorProfileSelect) {
@@ -511,6 +508,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnSaveSettings")!.onclick = async () => {
     state.currentSettings.autoTheme = (document.getElementById("autoThemeToggle") as HTMLInputElement).checked;
     state.currentSettings.syncPlugin = (document.getElementById("pluginSyncToggle") as HTMLInputElement).checked;
+    state.currentSettings.useLogCtl = (document.getElementById("useLogCtlToggle") as HTMLInputElement).checked;
     const profileSelect = document.getElementById("colorProfileSelect") as HTMLSelectElement | null;
     if (profileSelect) {
       state.currentSettings.colorProfile = profileSelect.value;
@@ -521,7 +519,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
       applyTheme(mediaQuery.matches);
     }
-    showToast.success("设置已保存");
+    showToast.success(
+      `设置已保存 (规则模式: ${state.currentSettings.useLogCtl ? "log_ctl" : "文件直读"})`,
+    );
     closeModalCleanup();
     await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
@@ -601,7 +601,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         await run(`rm -f ${dir}/${state.currentBindingPkg}.conf`);
       }
       await flushInjectorConf();
-      showToast.success("配置已保存");
+      const mode = state.currentSettings.useLogCtl ? "log_ctl" : "文件";
+      showToast.success(`配置已保存 (${mode}模式)`);
       closeModalCleanup();
       await loadData();
       await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
@@ -769,8 +770,16 @@ function setupIoSection(): void {
   const ioContainer = document.getElementById("ioLogContainer");
   if (ioContainer) {
     ioContainer.addEventListener("scroll", () => {
-      if (ioContainer.scrollTop + ioContainer.clientHeight >= ioContainer.scrollHeight - 50) {
-        fetchIoLogs();
+      if (ioVirtualList) {
+        // Use actual loaded content bottom instead of estimated scrollHeight
+        if (ioContainer.scrollTop + ioContainer.clientHeight >= ioVirtualList.getLastLoadedBottom() - 60) {
+          fetchIoLogs();
+        }
+      } else {
+        // Fallback when VirtualLogList not yet initialized
+        if (ioContainer.scrollTop + ioContainer.clientHeight >= ioContainer.scrollHeight - 50) {
+          fetchIoLogs();
+        }
       }
     });
   }
@@ -807,6 +816,13 @@ function setupLogSection(): void {
     logViewer.addEventListener("scroll", () => {
       if (
         logSelect?.value === "internal" &&
+        sysVirtualList &&
+        logViewer.scrollTop + logViewer.clientHeight >= sysVirtualList.getLastLoadedBottom() - 60
+      ) {
+        fetchSysLogs();
+      } else if (
+        logSelect?.value === "internal" &&
+        !sysVirtualList &&
         logViewer.scrollTop + logViewer.clientHeight >= logViewer.scrollHeight - 50
       ) {
         fetchSysLogs();

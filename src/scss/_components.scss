@@ -1,4 +1,12 @@
 /* ── App list ── */
+#appList {
+    overflow-x: hidden;
+}
+/* Only show vertical scrollbar after app list has finished loading */
+#appListContainer:not(.app-list-loaded) {
+    overflow-y: hidden !important;
+}
+
 .app-item {
     display: flex; align-items: center;
     padding: 14px 16px;
@@ -152,6 +160,7 @@
 .sys-log-header { display: flex; align-items: center; gap: 8px; height: 18px; overflow: hidden; }
 .sys-log-time { font-size: var(--mx-font-size-xs); color: var(--mx-t2); font-family: var(--mx-font-mono); flex-shrink: 0; }
 .sys-log-tag { font-size: var(--mx-font-size-xs); color: var(--mx-primary); font-weight: 600; flex: 1; }
+.sys-log-app { font-size: var(--mx-font-size-xs); color: var(--mx-primary); font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .sys-log-msg {
     font-size: var(--mx-font-size-xs);

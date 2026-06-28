@@ -36,6 +36,7 @@ export interface SysLogEntry {
   timeStr: string | null;
   tag: string | null;
   msg: string;
+  appName?: string;
 }
 
 export interface Suggestion {
@@ -47,6 +48,7 @@ export interface Settings {
   autoTheme: boolean;
   syncPlugin: boolean;
   colorProfile: string;
+  useLogCtl: boolean;
 }
 
 export interface PaginationState {

@@ -2,6 +2,7 @@ import { state, CONST } from "./state.js";
 import { run, showToast, ICONS } from "./utils.js";
 import { prepare, layout } from "@chenglou/pretext";
 import type { IoLogEntry, SysLogEntry, VirtualLogEntry, VirtualLogOptions } from "./types/index";
+import { extractApiData, logCount } from "./logctl.js";
 
 // ── Helpers ──
 
@@ -40,6 +41,8 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   private entries: VirtualLogEntry[];
   private prefixHeights: number[];
   private totalHeight: number;
+  /** Total number of log entries expected (from log-count API), 0 = unknown */
+  private _expectedTotal = 0;
   private visibleStart: number;
   private visibleEnd: number;
   private isDirty: boolean;
@@ -80,6 +83,20 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     this.contentEl.style.position = "relative";
   }
 
+  /** Set total expected log count from log-count API for stable scrollbar sizing */
+  setExpectedTotal(total: number): void {
+    this._expectedTotal = total;
+    this._recalcTotalHeight();
+    this.contentEl.style.height = this.totalHeight + "px";
+  }
+
+  /** Bottom Y position of the last loaded (not estimated) item */
+  getLastLoadedBottom(): number {
+    const n = this.entries.length;
+    if (n === 0) return this.totalHeight;
+    return this.prefixHeights[n - 1] + this.entries[n - 1].height;
+  }
+
   append(entryList: E[]): void {
     const availWidth = this.container.clientWidth - this.padding * 2 - this.textWidthOffset;
     const safeAvailWidth = Math.max(availWidth, 100);
@@ -112,6 +129,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     this.entries = [];
     this.prefixHeights = [];
     this._contentHashes.clear();
+    this._expectedTotal = 0;
     this._recalcTotalHeight();
     this.isDirty = true;
     this.container.scrollTop = 0;
@@ -205,6 +223,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     this.isDirty = true;
     this.visibleStart = 0;
     this.visibleEnd = 0;
+    this.container.scrollTop = 0;
     this._scheduleRender();
 
     /* 4. Remove stale DOM nodes after fade-out completes */
@@ -253,13 +272,33 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   }
 
   private _recalcTotalHeight(): void {
+    const avgHeight = this._calcAvgEntryHeight();
     this.prefixHeights = [];
     let currentY = this.padding;
     for (let i = 0; i < this.entries.length; i++) {
       this.prefixHeights.push(currentY);
       currentY += this.entries[i].height + this.gap;
     }
-    this.totalHeight = this.entries.length > 0 ? currentY - this.gap + this.padding : 0;
+    // Add estimated height for expected-but-not-yet-loaded entries,
+    // ensuring the scrollbar stays stable as pages are appended
+    const loadedCount = this.entries.length;
+    if (this._expectedTotal > loadedCount) {
+      currentY += (this._expectedTotal - loadedCount) * (avgHeight + this.gap);
+    }
+    this.totalHeight = this.entries.length > 0 || this._expectedTotal > 0
+      ? currentY - this.gap + this.padding
+      : 0;
+  }
+
+  /** Average height of loaded entries (used for unloaded estimate) */
+  private _calcAvgEntryHeight(): number {
+    if (this.entries.length === 0) {
+      const cHeight = typeof this.chromeHeight === "function" ? DEFAULT_CHROME_HEIGHT : this.chromeHeight;
+      return this.estimatedLineHeight + cHeight;
+    }
+    let sum = 0;
+    for (const e of this.entries) sum += e.height;
+    return sum / this.entries.length;
   }
 
   private _isActive(): boolean {
@@ -394,9 +433,10 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
       el.style.height = `${this.entries[idx].height}px`;
       el.dataset.hc = "1";
     }
+    /* Always recalculate totalHeight after measurement to keep scrollbar accurate */
+    this._recalcTotalHeight();
+    this.contentEl.style.height = this.totalHeight + "px";
     if (changed && firstIdx >= 0) {
-      this._recalcTotalHeight();
-      this.contentEl.style.height = this.totalHeight + "px";
       const repositionFrom = Math.min(firstIdx, this.visibleStart);
       this._updateNodePositions(repositionFrom, this.visibleEnd);
     }
@@ -427,7 +467,12 @@ function parseTimestamp(rawTs: string): string {
 interface ParsedLogMeta { pkg: string; op: string; details: string; }
 function parseLogMeta(rawDetails: string): ParsedLogMeta {
   const m = rawDetails.match(/^\[(.*?)\] \[(.*?)\] (.*)$/);
-  return m ? { pkg: m[1], op: m[2], details: m[3] } : { pkg: "未知", op: "INFO", details: rawDetails };
+  if (m) {
+    // Strip trailing (uid) from package name, e.g. "com.tencent.mobileqq(10232)" → "com.tencent.mobileqq"
+    const pkg = m[1].replace(/\(\d+\)$/, "");
+    return { pkg, op: m[2], details: m[3] };
+  }
+  return { pkg: "未知", op: "INFO", details: rawDetails };
 }
 function resolveAppName(pkg: string): string {
   return state.appMap.has(pkg) ? state.appMap.get(pkg)!.appLabel : pkg;
@@ -435,7 +480,7 @@ function resolveAppName(pkg: string): string {
 
 // ── IO log state & functions ──
 
-let ioVirtualList: VirtualLogList<IoLogEntry> | null = null;
+export let ioVirtualList: VirtualLogList<IoLogEntry> | null = null;
 let _lastIoRaw = "";
 
 export const initIoLogs = (): void => {
@@ -452,7 +497,12 @@ export const initIoLogs = (): void => {
 
 export const resetIoLogs = (): void => { ioVirtualList?.clear(); _lastIoRaw = ""; state.ioState.offset = 0; state.ioState.hasMore = true; };
 
-export const clearIoLogs = async (): Promise<void> => { await run(`${CONST.LOG_CTL} clear-io`); showToast.info("监控记录已清理"); resetIoLogs(); fetchIoLogs(); };
+export const clearIoLogs = async (): Promise<void> => {
+  await run(`${CONST.LOG_CTL} clear-io api`);
+  showToast.info("监控记录已清理");
+  resetIoLogs();
+  fetchIoLogs();
+};
 
 function renderIoEntry(entry: IoLogEntry): string {
   /* Structured display for path redirect: two separate bordered boxes */
@@ -466,33 +516,44 @@ function renderIoEntry(entry: IoLogEntry): string {
   return `<div class="io-item"><div class="io-header"><span class="io-time">${ICONS.CLOCK}<span>${entry.timeStr}</span><span class="io-app">${entry.appName}</span></span><span class="io-op op-${entry.op}">${entry.op}</span></div><div class="io-detail">${entry.details}</div></div>`;
 }
 
-interface StreamedResult { dataLines: string[]; hasMore: boolean; }
-function parseStreamedResult(raw: string): StreamedResult {
-  const lines = raw.split("\n");
-  const last = lines[lines.length - 1];
-  if (last.startsWith("DONE|")) return { dataLines: lines.slice(0, -1), hasMore: parseInt(last.split("|")[2]) > 0 };
-  if (last === "OK") return { dataLines: lines.slice(0, -1), hasMore: false };
-  return { dataLines: lines, hasMore: false };
-}
-
 function sortIoEntries(a: IoLogEntry, b: IoLogEntry): number { return b.timeStr.localeCompare(a.timeStr); }
 
 export const fetchIoLogs = async (): Promise<void> => {
   if (state.ioState.loading || !state.ioState.hasMore) return;
   state.ioState.loading = true;
   try {
-    const res = await run(`${CONST.LOG_CTL} search-io "${state.ioState.term}" ${CONST.PAGE_LIMIT} ${state.ioState.offset} api`);
+    const counts = await logCount();
+    const dynamicLimit = counts && counts.io > 0 ? Math.min(counts.io, 1000) : 500;
+    // On first load, set expected total for stable scrollbar sizing
+    if (state.ioState.offset === 0 && counts?.io && ioVirtualList) {
+      ioVirtualList.setExpectedTotal(counts.io);
+    }
+    const raw = await run(`${CONST.LOG_CTL} search-io "${state.ioState.term}" ${dynamicLimit} ${state.ioState.offset} api`);
+    const data = extractApiData(raw);
+    const res = data?.raw ?? "";
     if (!res) {
       state.ioState.hasMore = false;
       if (state.ioState.offset === 0) ioVirtualList?.clear();
     } else {
       if (res === _lastIoRaw && state.ioState.offset > 0) { state.ioState.hasMore = false; return; }
       _lastIoRaw = res;
-      const { dataLines, hasMore } = parseStreamedResult(res);
-      state.ioState.hasMore = hasMore;
+      const dataLines = res.split("\n");
+      state.ioState.hasMore = (data?.done?.remaining ?? 0) > 0;
       if (dataLines.length > 0) {
+        const prevOffset = state.ioState.offset;
         state.ioState.offset += dataLines.length;
-        ioVirtualList ? ioVirtualList.replaceSorted(dataLines, parseIoLines, sortIoEntries) : (document.getElementById("ioLogList")!.innerHTML = renderIoLegacy(dataLines));
+        if (ioVirtualList) {
+          if (prevOffset === 0) {
+            // 首次加载 — 替换全部内容
+            ioVirtualList.replaceSorted(dataLines, parseIoLines, sortIoEntries);
+          } else {
+            // 续页加载 — 追加到末尾（offset>0 表示后面还有更旧的日志）
+            const parsed = parseIoLines(dataLines).sort(sortIoEntries);
+            ioVirtualList.append(parsed);
+          }
+        } else {
+          (document.getElementById("ioLogList")!.innerHTML = renderIoLegacy(dataLines));
+        }
       } else if (state.ioState.offset === 0) ioVirtualList?.clear();
     }
   } catch { state.ioState.hasMore = false; } finally { state.ioState.loading = false; }
@@ -521,7 +582,7 @@ function renderIoLegacy(lines: string[]): string {
 
 // ── Sys log state & functions ──
 
-let sysVirtualList: VirtualLogList<SysLogEntry> | null = null;
+export let sysVirtualList: VirtualLogList<SysLogEntry> | null = null;
 let _lastSysRaw = "";
 
 function sortSysEntries(a: SysLogEntry, b: SysLogEntry): number { return (b.timeStr ?? "").localeCompare(a.timeStr ?? ""); }
@@ -539,13 +600,20 @@ export const resetSysLogs = (): void => { sysVirtualList?.clear(); _lastSysRaw =
 
 export const clearSysLogs = async (): Promise<void> => {
   const src = (document.getElementById("logSourceSelect") as HTMLSelectElement)?.value;
-  await run(src === "zygisk" ? "logcat -c" : `${CONST.LOG_CTL} clear-sys`);
+  if (src === "zygisk") {
+    await run("logcat -c");
+  } else {
+    await run(`${CONST.LOG_CTL} clear-sys api`);
+  }
   showToast.info("日志已清空");
   if (src === "internal") resetSysLogs();
   fetchSysLogs();
 };
 
 function renderSysEntry(entry: SysLogEntry): string {
+  if (entry.appName) {
+    return `<div class="sys-log-item"><div class="sys-log-header"><span class="sys-log-time">${entry.timeStr}</span><span class="sys-log-app">${entry.appName}</span></div><div class="sys-log-msg">${entry.msg}</div></div>`;
+  }
   if (entry.tag) return `<div class="sys-log-item"><div class="sys-log-header"><span class="sys-log-time">${entry.timeStr}</span><span class="sys-log-tag">[${entry.tag}]</span></div><div class="sys-log-msg">${entry.msg}</div></div>`;
   if (entry.timeStr) return `<div class="sys-log-item"><div class="sys-log-header"><span class="sys-log-time">${entry.timeStr}</span></div><div class="sys-log-msg">${entry.msg}</div></div>`;
   return `<div class="sys-log-raw">${entry.msg}</div>`;
@@ -571,24 +639,64 @@ export const fetchSysLogs = async (): Promise<void> => {
   state.sysState.loading = true;
   try {
     const levelArg = state.sysState.level > -1 ? `--level ${state.sysState.level}` : "";
-    const res = await run(`${CONST.LOG_CTL} search-sys ${levelArg} "" ${CONST.PAGE_LIMIT} ${state.sysState.offset} api`);
+    const counts = await logCount();
+    const dynamicLimit = counts && counts.sys > 0 ? Math.min(counts.sys, 1000) : 500;
+    // On first load, set expected total for stable scrollbar sizing
+    if (state.sysState.offset === 0 && counts?.sys && sysVirtualList) {
+      sysVirtualList.setExpectedTotal(counts.sys);
+    }
+    const raw = await run(`${CONST.LOG_CTL} search-sys ${levelArg} "" ${dynamicLimit} ${state.sysState.offset} api`);
+    const data = extractApiData(raw);
+    const res = data?.raw ?? "";
     if (!res) { state.sysState.hasMore = false; return; }
     if (res === _lastSysRaw && state.sysState.offset > 0) { state.sysState.hasMore = false; return; }
     _lastSysRaw = res;
-    const { dataLines, hasMore } = parseStreamedResult(res);
-    state.sysState.hasMore = hasMore;
+    const dataLines = res.split("\n");
+    state.sysState.hasMore = (data?.done?.remaining ?? 0) > 0;
     if (dataLines.length > 0) {
+      const prevOffset = state.sysState.offset;
       state.sysState.offset += dataLines.length;
-      if (sysVirtualList) sysVirtualList.replaceSorted(dataLines, parseSysLines, sortSysEntries);
+      if (sysVirtualList) {
+        if (prevOffset === 0) {
+          // 首次加载 — 替换全部内容
+          sysVirtualList.replaceSorted(dataLines, parseSysLines, sortSysEntries);
+        } else {
+          // 续页加载 — 追加到末尾
+          const parsed = parseSysLines(dataLines).sort(sortSysEntries);
+          sysVirtualList.append(parsed);
+        }
+      }
     }
   } catch { state.sysState.hasMore = false; } finally { state.sysState.loading = false; }
 };
+
+/**
+ * Extract package name from a sys log tag like "com.tencent.mobileqq(10123)".
+ * Returns the package name portion, or null if it doesn't look like a package.
+ */
+function extractPkgFromTag(tag: string): string | null {
+  const m = tag.match(/^([a-zA-Z0-9_.]+)\(\d+\)$/);
+  return m && m[1].includes(".") ? m[1] : null;
+}
+
+/**
+ * Strip trailing "(uid)" from a tag for clean display.
+ */
+function stripUidSuffix(tag: string): string {
+  return tag.replace(/\(\d+\)$/, "");
+}
 
 function parseSysLines(lines: string[]): SysLogEntry[] {
   return lines.map((line: string) => {
     const mTag = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\|\[(.*?)\](.*)$/);
     const mSim = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(.*)$/);
-    if (mTag) return { text: mTag[3], timeStr: mTag[1], tag: mTag[2], msg: mTag[3] };
+    if (mTag) {
+      const rawTag = mTag[2];
+      const pkg = extractPkgFromTag(rawTag);
+      const appName = pkg ? resolveAppName(pkg) : undefined;
+      const displayTag = pkg ? stripUidSuffix(rawTag) : rawTag;
+      return { text: mTag[3], timeStr: mTag[1], tag: displayTag, msg: mTag[3], appName };
+    }
     if (mSim) return { text: mSim[2], timeStr: mSim[1], tag: null, msg: mSim[2] };
     return { text: line, timeStr: null, tag: null, msg: line };
   });

@@ -3,6 +3,7 @@ import { run, showToast } from "./utils.js";
 import { listPackages, getPackagesInfo } from "kernelsu";
 import { parseConfigTextToVisual } from "./ui.js";
 import type { AppEntry, PackageInfo } from "./types/index";
+import * as logctl from "./logctl.js";
 
 const TRANSPARENT_SPACER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
@@ -82,6 +83,8 @@ function hideSpinnerOverlay(): void {
   }
   state.isAppListReady = true;
   state.isInitialLoad = false;
+  // Mark app list container as ready so scrollbar can appear
+  document.getElementById("appListContainer")?.classList.add("app-list-loaded");
   initListObserver();
   const listEl = document.getElementById("appList");
   if (listEl) {
@@ -107,23 +110,11 @@ export const fetchActiveMounts = async (): Promise<Set<string>> => {
 
 export const fetchInjectedApps = async (): Promise<void> => {
   try {
+    const result = await logctl.listInjected();
     state.injectedApps.clear();
-    const res = await run(`${CONST.LOG_CTL} list-injected api`);
-    if (res) {
-      res.split("\n").forEach((l) => {
-        if (l.startsWith("APP|")) {
-          const p = l.split("|");
-          if (p.length >= 7) {
-            state.injectedApps.set(p[1], {
-              pid: p[2],
-              uid: p[3],
-              redirect: p[4],
-              hide: p[5],
-              ro: p[6],
-            });
-          }
-        }
-      });
+    // result.apps contains InjectedAppInfo with pkg/pid/uid/redirect/hide/ro
+    for (const [pkg, info] of result.apps) {
+      state.injectedApps.set(pkg, info);
     }
   } catch {
     /* ignore */
@@ -197,64 +188,131 @@ export const loadData = async (): Promise<void> => {
     }
     if (state.activeUsers.length === 0) state.activeUsers.push(0);
 
-    const injectorConf = await run(`cat ${CONST.INJECTOR_CONF} 2>/dev/null`);
     state.globalConfText = "";
     state.injectorStates.clear();
     state.injectorRulesMap.clear();
+    /** When useLogCtl, also holds app_rule files from get-config --static response */
+    let staticAppRules: logctl.StaticConfigAppRuleFile[] | null = null;
 
-    if (injectorConf) {
-      let currentSection = "";
-      for (const line of injectorConf.split("\n")) {
-        const tLine = line.trim();
-        if (!tLine) continue;
-        const secMatch = tLine.match(/^\[(.*?)\](?:\s+(ON|OFF))?/);
-        if (secMatch) {
-          currentSection = secMatch[1];
-          // 确保 app section key 始终带 :uid，默认不加则追加 :0
-          if (currentSection !== "GLOBAL" && !currentSection.includes(":")) {
-            currentSection = `${currentSection}:0`;
-          }
-          if (currentSection !== "GLOBAL") {
-            state.injectorStates.set(currentSection, secMatch[2] || "ON");
-          }
-          if (!state.injectorRulesMap.has(currentSection)) {
-            state.injectorRulesMap.set(currentSection, []);
-          }
-        } else if (currentSection) {
-          state.injectorRulesMap.get(currentSection)!.push(tLine);
+    if (state.currentSettings.useLogCtl) {
+      // ── log_ctl API mode ──
+
+      // 1) Parse get-config --static for app entries + app rule files
+      const parsed = await logctl.getConfigStaticParsed();
+      if (parsed && parsed.apps) {
+        staticAppRules = parsed.app_rules || null;
+        // Populate app inject states
+        for (const app of parsed.apps) {
+          const key = `${app.pkg}:${app.user_id}`;
+          state.injectorStates.set(key, app.inject_enable);
         }
       }
-      state.globalConfText = (state.injectorRulesMap.get("GLOBAL") || []).join("\n") || "";
+
+      // 2) Fetch global rules via dedicated get-global-rules API
+      const globalRules = await logctl.getGlobalRules();
+      if (globalRules) {
+        const globalLines: string[] = [];
+        const sw = globalRules.switches;
+        const isOn = (v: unknown) => v && v !== "false" && v !== false;
+        if (isOn(sw?.global_inject)) globalLines.push(`GLOBAL_INJECT ON`);
+        if (isOn(sw?.monitor)) globalLines.push(`MONITOR ON`);
+        if (isOn(sw?.sandbox)) globalLines.push(`SANDBOX ON`);
+        if (isOn(sw?.fuse_direct)) globalLines.push(`FUSE_DIRECT ON`);
+        for (const r of globalRules.ro_rules || []) globalLines.push(`RO ${r}`);
+        for (const r of globalRules.hide_rules || []) globalLines.push(`HIDE ${r}`);
+        for (const r of globalRules.redirect_rules || []) globalLines.push(`REDIRECT ${r}`);
+        for (const r of globalRules.allow_rules || []) globalLines.push(`ALLOW ${r}`);
+
+        state.globalConfText = globalLines.join("\n");
+        state.injectorRulesMap.set("GLOBAL", globalLines);
+      } else if (parsed?.global) {
+        // Fallback: reconstruct from get-config --static data
+        const globalLines: string[] = [];
+        const sw = parsed.global.switches;
+        if (sw?.global_inject) globalLines.push(`GLOBAL_INJECT ${sw.global_inject}`);
+        if (sw?.monitor) globalLines.push(`MONITOR ${sw.monitor}`);
+        if (sw?.sandbox) globalLines.push(`SANDBOX ${sw.sandbox}`);
+        if (sw?.fuse_direct) globalLines.push(`FUSE_DIRECT ${sw.fuse_direct}`);
+        for (const r of parsed.global.ro_rules || []) globalLines.push(`RO ${r}`);
+        for (const r of parsed.global.hide_rules || []) globalLines.push(`HIDE ${r}`);
+        for (const r of parsed.global.redirect_rules || []) globalLines.push(`REDIRECT ${r}`);
+        for (const r of parsed.global.allow_rules || []) globalLines.push(`ALLOW ${r}`);
+
+        state.globalConfText = globalLines.join("\n");
+        state.injectorRulesMap.set("GLOBAL", globalLines);
+      }
+    } else {
+      // ── Direct file mode: parse injector.conf as INI text ──
+      const injectorConf = await run(`cat ${CONST.INJECTOR_CONF} 2>/dev/null`);
+      if (injectorConf) {
+        let currentSection = "";
+        for (const line of injectorConf.split("\n")) {
+          const tLine = line.trim();
+          if (!tLine) continue;
+          const secMatch = tLine.match(/^\[(.*?)\](?:\s+(ON|OFF))?/);
+          if (secMatch) {
+            currentSection = secMatch[1];
+            // 确保 app section key 始终带 :uid，默认不加则追加 :0
+            if (currentSection !== "GLOBAL" && !currentSection.includes(":")) {
+              currentSection = `${currentSection}:0`;
+            }
+            if (currentSection !== "GLOBAL") {
+              state.injectorStates.set(currentSection, secMatch[2] || "ON");
+            }
+            if (!state.injectorRulesMap.has(currentSection)) {
+              state.injectorRulesMap.set(currentSection, []);
+            }
+          } else if (currentSection) {
+            state.injectorRulesMap.get(currentSection)!.push(tLine);
+          }
+        }
+        state.globalConfText = (state.injectorRulesMap.get("GLOBAL") || []).join("\n") || "";
+      }
     }
 
     const ruleFilesMap = new Map<string, string | boolean>();
-    const batchCmds: string[] = [];
-    const batchKeys: string[] = [];
-    for (const uid of state.activeUsers) {
-      const dir = uid === 0 ? `${CONST.BASE_DIR}/App-rules` : `${CONST.BASE_DIR}/App-rules-${uid}`;
-      batchCmds.push(`for f in ${dir}/*.conf ${dir}/*.conf.disabled; do [ -f "$f" ] && echo "===FILE:$f===" && cat "$f"; done 2>/dev/null`);
-      batchKeys.push(dir);
-    }
-    const batchResults = await Promise.all(batchCmds.map((cmd) => run(cmd)));
-    for (let bi = 0; bi < batchResults.length; bi++) {
-      const res = batchResults[bi];
-      if (!res) continue;
-      const dir = batchKeys[bi];
-      const blocks = res.split("===FILE:");
-      for (const block of blocks) {
-        if (!block) continue;
-        const endIdx = block.indexOf("===");
-        if (endIdx === -1) continue;
-        const filePath = block.substring(0, endIdx);
-        const content = block.substring(endIdx + 3);
-        const fileName = filePath.split("/").pop() ?? "";
-        const isDisabled = fileName.endsWith(".conf.disabled");
-        const pkg = fileName.replace(/\.conf(\.disabled)?$/, "");
-        // batchCmds 按 state.activeUsers 顺序构建，bi 即对应 activeUsers 的索引
-        const uid = bi < state.activeUsers.length ? state.activeUsers[bi] : 0;
-        ruleFilesMap.set(`${pkg}:${uid}`, content);
-        if (isDisabled) ruleFilesMap.set(`${pkg}:${uid}_disabled`, true);
-        else ruleFilesMap.set(`${pkg}:${uid}_enabled`, true);
+
+    if (staticAppRules) {
+      // ── log_ctl API mode: use app_rules from get-config --static ──
+      for (const ar of staticAppRules) {
+        const isDisabled = ar.file.endsWith(".conf.disabled");
+        const fileName = ar.file.replace(/\.conf(\.disabled)?$/, "");
+        const uidStr = ar.user_dir === "App-rules" ? "0" : ar.user_dir.replace("App-rules-", "");
+        const uid = parseInt(uidStr, 10) || 0;
+        ruleFilesMap.set(`${fileName}:${uid}`, ar.content);
+        if (isDisabled) ruleFilesMap.set(`${fileName}:${uid}_disabled`, true);
+        else ruleFilesMap.set(`${fileName}:${uid}_enabled`, true);
+      }
+    } else {
+      // ── Direct file mode: read App-rules directories ──
+      const batchCmds: string[] = [];
+      const batchKeys: string[] = [];
+      for (const uid of state.activeUsers) {
+        const dir = uid === 0 ? `${CONST.BASE_DIR}/App-rules` : `${CONST.BASE_DIR}/App-rules-${uid}`;
+        batchCmds.push(`for f in ${dir}/*.conf ${dir}/*.conf.disabled; do [ -f "$f" ] && echo "===FILE:$f===" && cat "$f"; done 2>/dev/null`);
+        batchKeys.push(dir);
+      }
+      const batchResults = await Promise.all(batchCmds.map((cmd) => run(cmd)));
+      for (let bi = 0; bi < batchResults.length; bi++) {
+        const res = batchResults[bi];
+        if (!res) continue;
+        const dir = batchKeys[bi];
+        const blocks = res.split("===FILE:");
+        for (const block of blocks) {
+          if (!block) continue;
+          const endIdx = block.indexOf("===");
+          if (endIdx === -1) continue;
+          const filePath = block.substring(0, endIdx);
+          const content = block.substring(endIdx + 3);
+          const fileName = filePath.split("/").pop() ?? "";
+          const isDisabled = fileName.endsWith(".conf.disabled");
+          const pkg = fileName.replace(/\.conf(\.disabled)?$/, "");
+          // batchCmds 按 state.activeUsers 顺序构建，bi 即对应 activeUsers 的索引
+          const uid = bi < state.activeUsers.length ? state.activeUsers[bi] : 0;
+          ruleFilesMap.set(`${pkg}:${uid}`, content);
+          if (isDisabled) ruleFilesMap.set(`${pkg}:${uid}_disabled`, true);
+          else ruleFilesMap.set(`${pkg}:${uid}_enabled`, true);
+        }
       }
     }
 
@@ -512,15 +570,62 @@ export function switchAppUser(uid: number): void {
 }
 
 export async function flushInjectorConf(): Promise<void> {
-  let r = `[GLOBAL]\n${state.globalConfText.trim() ? state.globalConfText.trim() + "\n" : ""}`;
-  state.injectorStates.forEach((s, k) => {
-    if (k === "GLOBAL") return;
-    r += `[${k}] ${s}\n`;
-    const il = state.injectorRulesMap.get(k) || [];
-    if (il.length > 0) r += il.join("\n") + "\n";
+  // 读现有文件，只替换 [GLOBAL] 段内容，保留所有非 GLOBAL 段不变
+  const existing = await run(`cat ${CONST.INJECTOR_CONF} 2>/dev/null`);
+  const lines = existing ? existing.split("\n") : [];
+
+  // 找到 [GLOBAL] 段的起止行索引
+  let globalStart = -1;
+  let globalEnd = lines.length;
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (/^\[.*?\]/.test(t)) {
+      if (/^\[GLOBAL\]/.test(t)) {
+        globalStart = i;
+      } else if (globalStart >= 0) {
+        globalEnd = i;
+        break;
+      }
+    }
+  }
+
+  // 构造新的 [GLOBAL] 段
+  const newGlobal: string[] = ["[GLOBAL]"];
+  if (state.globalConfText.trim()) {
+    for (const gl of state.globalConfText.trim().split("\n")) {
+      const trimmed = gl.trim();
+      if (trimmed) newGlobal.push(trimmed);
+    }
+  }
+
+  // 组装结果：替换 GLOBAL 段，保留其他所有行
+  const result: string[] = [];
+  if (globalStart >= 0) {
+    result.push(...lines.slice(0, globalStart));
+    result.push(...newGlobal);
+    result.push(...lines.slice(globalEnd));
+  } else {
+    // 文件里没有 [GLOBAL]，在最前面插入
+    result.push(...newGlobal, ...lines);
+  }
+
+  // 更新 app 的 ON/OFF 状态行（injectorStates 中的变更）
+  state.injectorStates.forEach((onoff, key) => {
+    if (key === "GLOBAL") return;
+    const pattern = `[${key}]`;
+    for (let i = 0; i < result.length; i++) {
+      if (new RegExp(`^\\s*\\${pattern}`).test(result[i])) {
+        result[i] = `[${key}] ${onoff}`;
+        break;
+      }
+    }
   });
-  const escaped = r.trim().replace(/'/g, "'\\''");
+
+  const escaped = result.join("\n").trim().replace(/'/g, "'\\''");
   await run(`echo '${escaped}' > ${CONST.INJECTOR_CONF}`);
+  if (state.currentSettings.useLogCtl) {
+    await logctl.reloadConfig();
+  }
 }
 
 window.openAppConfig = openAppConfig;

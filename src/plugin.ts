@@ -10,7 +10,7 @@ export async function getSettings(): Promise<Settings> {
   } catch (e) {
     showToast.error("读取设置失败: " + (e instanceof Error ? e.message : String(e)));
   }
-  return { syncPlugin: false, autoTheme: true, colorProfile: "teal" };
+  return { syncPlugin: false, autoTheme: true, colorProfile: "teal", useLogCtl: true };
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {

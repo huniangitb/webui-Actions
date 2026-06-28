@@ -33,7 +33,8 @@ export const setupGlobalHandlers = (): void => {
         state.globalConfText = (document.getElementById("globalRuleContent") as HTMLTextAreaElement).value;
       }
       await flushInjectorConf();
-      showToast.success("全局规则已保存");
+      const mode = state.currentSettings.useLogCtl ? "log_ctl" : "文件";
+      showToast.success(`全局规则已保存 (${mode}模式)`);
       await loadData();
       await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     } catch {

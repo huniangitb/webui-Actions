@@ -2,13 +2,16 @@ import { state, CONST } from "./state.js";
 import { run, showToast, ICONS } from "./utils.js";
 import { prepare, layout } from "@chenglou/pretext";
 import type { IoLogEntry, SysLogEntry, VirtualLogEntry, VirtualLogOptions } from "./types/index";
-import { extractApiData, logCount } from "./logctl.js";
+import { extractApiData, cachedLogCount } from "./logctl.js";
 
 // ── Helpers ──
 
-/** Build a fast content hash from an entry for dedup comparison */
+/** Build a fast content hash from an entry for dedup comparison.
+ *  纳入 timeStr，使"msg 相同但时间不同"的日志条目不被误判为重复
+ *  （如 [injector] 配置广播每 30s 重复一次，msg 完全相同但时间戳不同）。 */
 function entryHash<E extends IoLogEntry | SysLogEntry>(e: E): string {
-  return (e as IoLogEntry).text ?? (e as SysLogEntry).text ?? "";
+  const t = e.timeStr ?? "";
+  return `${t}|${e.text}`;
 }
 
 // ── VirtualLogList default constants ──
@@ -49,9 +52,15 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   private _ticking: boolean;
   private _resizeObserver: ResizeObserver | null;
   private _contentHashes: Set<string>;
-  /** DOM node cache keyed by data-index for per-item transitions */
   private _renderedNodes: Map<number, HTMLElement>;
+  /** 缓存池：存放松出可视区但尚未销毁的 DOM 节点，滚动回来时直接复用 */
+  private _nodeCache: HTMLElement[] = [];
+  private static readonly MAX_CACHE = 50;
   private _leaveDuration = 200;
+  /** Incremented on every prefixHeights rebuild to detect layout changes */
+  private _layoutVersion = 0;
+  /** Snapshots _layoutVersion at the last full render to detect stale early-return */
+  private _lastRenderLayoutVersion = -1;
 
   constructor(containerEl: HTMLElement, contentEl: HTMLElement, options: VirtualLogOptions<E> = {}) {
     this.container = containerEl;
@@ -77,7 +86,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     this._renderedNodes = new Map();
     this._onScroll = this._onScroll.bind(this);
     this._onResize = this._onResize.bind(this);
-    this.container.addEventListener("scroll", this._onScroll);
+    this.container.addEventListener("scroll", this._onScroll, { passive: true });
     this._resizeObserver = new ResizeObserver(this._onResize);
     this._resizeObserver.observe(this.container);
     this.contentEl.style.position = "relative";
@@ -99,12 +108,16 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
 
   append(entryList: E[]): void {
     const availWidth = this.container.clientWidth - this.padding * 2 - this.textWidthOffset;
+    // 容器未就绪时用 100px 兜底，Pretext 计算结果会偏高而非偏低，
+    // 后续 _correctHeights 测量实际 DOM 高度后收缩修正，视觉跳动最小
     const safeAvailWidth = Math.max(availWidth, 100);
     for (const entry of entryList) {
+      const hash = entryHash(entry);
+      if (this._contentHashes.has(hash)) continue;  // skip duplicate
       let h = this.estimatedLineHeight;
       let prep: object | null = null;
       const cHeight = typeof this.chromeHeight === "function" ? this.chromeHeight(entry) : this.chromeHeight;
-      if ((entry as IoLogEntry).text || (entry as SysLogEntry).text) {
+      if (safeAvailWidth > 0 && ((entry as IoLogEntry).text || (entry as SysLogEntry).text)) {
         try {
           prep = prepare(entry.text ?? "", this.font);
           const { height } = layout(prep as object, safeAvailWidth, this.lineHeight);
@@ -115,15 +128,23 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
       } else {
         h = cHeight;
       }
-      this._contentHashes.add(entryHash(entry));
+      this._contentHashes.add(hash);
       this.entries.push({ height: h, prepared: prep, data: entry });
     }
     this._recalcTotalHeight();
     this.isDirty = true;
-    this._render();
+    this._scheduleRender();
   }
 
   private _fadeOutTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** 清空节点缓存池，销毁所有缓存的 DOM */
+  private _clearCache(): void {
+    for (const el of this._nodeCache) {
+      if (el?.parentNode) el.parentNode.removeChild(el);
+    }
+    this._nodeCache = [];
+  }
 
   clear(): void {
     this.entries = [];
@@ -138,12 +159,17 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
 
   private _fadeOutAndClear(delayClear = false): void {
     const nodes = Array.from(this._renderedNodes.values());
+    this._clearCache();  // 清除缓存，下次渲染全部重建
     if (nodes.length === 0) {
       this._renderedNodes.clear();
       this.contentEl.innerHTML = this.onEmpty || "";
       return;
     }
-    for (const el of nodes) el.classList.add("vlog-leave");
+    // 所有节点渐隐后清除
+    for (const el of nodes) {
+      el.style.transition = 'opacity 0.2s ease';
+      el.style.opacity = '0';
+    }
     if (this._fadeOutTimer) clearTimeout(this._fadeOutTimer);
     this._fadeOutTimer = setTimeout(() => {
       this._fadeOutTimer = null;
@@ -162,6 +188,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
 
     /* 1. Build new entries with Pretext heights (dedup by content hash) */
     const availWidth = this.container.clientWidth - this.padding * 2 - this.textWidthOffset;
+    // 容器未就绪时用 100px 兜底，Pretext 计算结果会偏高而非偏低
     const safeAvailWidth = Math.max(availWidth, 100);
     const newEntries: VirtualLogEntry[] = [];
     const newHashes = new Set<string>();
@@ -174,7 +201,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
       let h = this.estimatedLineHeight;
       let prep: object | null = null;
       const cHeight = typeof this.chromeHeight === "function" ? this.chromeHeight(data) : this.chromeHeight;
-      if ((data as IoLogEntry).text || (data as SysLogEntry).text) {
+      if (safeAvailWidth > 0 && ((data as IoLogEntry).text || (data as SysLogEntry).text)) {
         try {
           prep = prepare(data.text ?? "", this.font);
           const { height } = layout(prep as object, safeAvailWidth, this.lineHeight);
@@ -193,7 +220,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     for (const [hash, idx] of oldHashIdx) {
       if (!newHashes.has(hash)) {
         const el = this._renderedNodes.get(idx);
-        if (el) { el.classList.add("vlog-leave"); staleNodes.push(el); }
+        if (el) { el.style.transition = 'opacity 0.2s ease'; el.style.opacity = '0'; staleNodes.push(el); }
       }
     }
 
@@ -208,7 +235,11 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
         newEntries[i].height = oldHeight;
         const el = this._renderedNodes.get(oldIdx);
         if (el) {
-          el.dataset.hc = "1";
+          // 同步 DOM 节点到新索引，避免 _render 缓存查找按旧 vlogIdx 错误命中
+          el.dataset.vlogIdx = String(i);
+          // 重置 hc 标记，让 _correctHeights 重新测量复用节点的真实高度
+          delete el.dataset.hc;
+          el.style.height = '';
           survivingNodes.set(i, el);
         }
       }
@@ -221,9 +252,10 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
 
     this._recalcTotalHeight();
     this.isDirty = true;
-    this.visibleStart = 0;
-    this.visibleEnd = 0;
-    this.container.scrollTop = 0;
+    // 重置视口范围标记以强制 _render 重新计算可见区间；
+    // 不再强制 scrollTop = 0，保留用户当前滚动位置，避免刷新日志时跳到顶部
+    this.visibleStart = -1;
+    this.visibleEnd = -1;
     this._scheduleRender();
 
     /* 4. Remove stale DOM nodes after fade-out completes */
@@ -235,6 +267,8 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
         }
       }, this._leaveDuration);
     }
+    // 清除旧缓存（replace 是数据替换，之前的缓存已失效）
+    this._clearCache();
   }
 
   replaceSorted(
@@ -269,6 +303,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
   destroy(): void {
     this.container.removeEventListener("scroll", this._onScroll);
     if (this._resizeObserver) { this._resizeObserver.disconnect(); this._resizeObserver = null; }
+    this._clearCache();
   }
 
   private _recalcTotalHeight(): void {
@@ -288,6 +323,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     this.totalHeight = this.entries.length > 0 || this._expectedTotal > 0
       ? currentY - this.gap + this.padding
       : 0;
+    this._layoutVersion++;
   }
 
   /** Average height of loaded entries (used for unloaded estimate) */
@@ -321,6 +357,14 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     if (!this._isActive()) return;
     const scrollTop = this.container.scrollTop;
     const viewHeight = this.container.clientHeight;
+
+    // 容器刚由 display:none 切换过来时 clientHeight 可能为 0，
+    // 此时跳过渲染，调度下一帧重试，避免瞬态空白
+    if (viewHeight <= 0) {
+      this._scheduleRender();
+      return;
+    }
+
     this.contentEl.style.height = this.totalHeight + "px";
 
     if (this.entries.length === 0) {
@@ -339,9 +383,16 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     const renderEnd = Math.min(this.entries.length, endIdx + this.buffer);
 
     if (this.visibleStart === renderStart && this.visibleEnd === renderEnd && !this.isDirty) {
-      this._updateNodePositions(renderStart, renderEnd);
+      // 视口范围未变但布局版本已变（被 _correctHeights 递增），
+      // 需要将最新位置同步到 DOM，避免因位置未更新导致条目漂出可视区
+      if (this._lastRenderLayoutVersion !== this._layoutVersion) {
+        this._updateNodePositions(renderStart, renderEnd);
+        this._lastRenderLayoutVersion = this._layoutVersion;
+      }
       return;
     }
+
+    this._lastRenderLayoutVersion = this._layoutVersion;
 
     const oldStart = this.visibleStart;
     const oldEnd = this.visibleEnd;
@@ -353,55 +404,95 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     const wanted = new Set<number>();
     for (let i = renderStart; i < renderEnd; i++) wanted.add(i);
 
-    // 1. Fade-out nodes no longer in range
-    const toRemove: number[] = [];
+    // 1. 将滚出可视区的节点移入缓存池，避免销毁重建
+    const toCache: number[] = [];
     for (const [idx, el] of this._renderedNodes) {
       if (!wanted.has(idx)) {
-        el.classList.add("vlog-leave");
-        toRemove.push(idx);
+        // CSS transition: opacity 0.2s 自动处理渐隐
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 0.2s ease';
+        el.dataset.vlogFade = 'out';
+        toCache.push(idx);
       }
     }
-    if (toRemove.length > 0) {
+    for (const idx of toCache) {
+      const el = this._renderedNodes.get(idx);
+      if (el) {
+        this._renderedNodes.delete(idx);
+        this._nodeCache.push(el);
+      }
+    }
+    // 限制缓存大小，超出的真正移除
+    while (this._nodeCache.length > VirtualLogList.MAX_CACHE) {
+      const stale = this._nodeCache.shift();
+      if (stale?.parentNode) stale.parentNode.removeChild(stale);
+    }
+    // 200ms 后从 DOM 移除已缓存的渐隐节点（但缓存引用保留，可复用）
+    if (toCache.length > 0) {
       setTimeout(() => {
-        for (const idx of toRemove) {
+        for (const idx of toCache) {
           const el = this._renderedNodes.get(idx);
-          if (el?.parentNode) el.parentNode.removeChild(el);
-          this._renderedNodes.delete(idx);
+          // 如果节点没有被重新放入 _renderedNodes（即还在缓存中未被复用），从 DOM 移除
+          if (!el) {
+            const cached = this._nodeCache.find(n => n.dataset && n.dataset.vlogIdx === String(idx));
+            if (cached?.parentNode) cached.parentNode.removeChild(cached);
+          }
         }
       }, this._leaveDuration);
     }
 
-    // 2. Add / update nodes in range
+    // 2. 添加 / 更新可视区内的节点
     let y = this.prefixHeights[renderStart];
-    let insertBefore = this.contentEl.firstChild;
+    // 跳过仍在渐隐中的旧节点，新节点插入到它们前面
+    let insertBefore: Node | null = this.contentEl.firstChild;
+    while (insertBefore && insertBefore instanceof HTMLElement && insertBefore.dataset.vlogFade === 'out') {
+      insertBefore = insertBefore.nextSibling;
+    }
     let hasNewNodes = false;
     for (let i = renderStart; i < renderEnd; i++) {
       const entry = this.entries[i];
       const existing = this._renderedNodes.get(i);
 
       if (existing) {
-        existing.style.top = `${y}px`;
+        existing.style.transform = `translateY(${y}px)`;
         existing.style.height = `${entry.height}px`;
       } else {
-        const content = this.prepareFn
-          ? this.prepareFn(entry.data as E)
-          : ((entry.data as IoLogEntry).text ?? "");
-        const el = document.createElement("div");
-        el.className = "virtual-log-item vlog-enter";
-        /* No fixed height initially — let DOM size naturally for measurement */
-        el.style.cssText = `position:absolute;left:${this.padding}px;right:${this.padding}px;top:${y}px;`;
-        el.innerHTML = content;
+        // 先从缓存池找可用节点（按新索引 vlogIdx 匹配）
+        const cacheIdx = this._nodeCache.findIndex(n => n.dataset && n.dataset.vlogIdx === String(i));
+        let el: HTMLElement;
+        if (cacheIdx >= 0) {
+          el = this._nodeCache.splice(cacheIdx, 1)[0];
+          delete el.dataset.vlogFade;
+          el.style.opacity = '0';
+          el.style.transition = 'opacity 0.2s ease';
+          el.style.transform = `translateY(${y}px)`;
+          // 下一帧触发渐显
+          requestAnimationFrame(() => { el.style.opacity = '1'; });
+        } else {
+          const content = this.prepareFn
+            ? this.prepareFn(entry.data as E)
+            : ((entry.data as IoLogEntry).text ?? "");
+          el = document.createElement("div");
+          el.className = "virtual-log-item";
+          el.dataset.vlogIdx = String(i);
+          /* 初始透明度 0，CSS transition 自动渐显 */
+          el.style.cssText = `position:absolute;left:${this.padding}px;right:${this.padding}px;opacity:0;transition:opacity 0.2s ease;transform:translateY(${y}px);`;
+          el.innerHTML = content;
+          // 下一帧触发渐显
+          requestAnimationFrame(() => { el.style.opacity = '1'; });
+        }
         this._renderedNodes.set(i, el);
         this.contentEl.insertBefore(el, insertBefore);
-        hasNewNodes = true;
-        setTimeout(() => el.classList.remove("vlog-enter"), 300);
+        if (!el.dataset.hc) {
+          hasNewNodes = true;
+        }
       }
       y += entry.height + this.gap;
       const node = this._renderedNodes.get(i);
       if (node) insertBefore = node.nextSibling ?? null;
     }
 
-    /* Post-render: measure actual heights and correct */
+    /* Post-render: measure actual heights and correct (仅对全新节点) */
     if (hasNewNodes) this._correctHeights();
   }
 
@@ -410,7 +501,7 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
     for (let i = from; i < to; i++) {
       const el = this._renderedNodes.get(i);
       if (el) {
-        el.style.top = `${y}px`;
+        el.style.transform = `translateY(${y}px)`;
         el.style.height = `${this.entries[i].height}px`;
       }
       y += this.entries[i].height + this.gap;
@@ -419,12 +510,24 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
 
   /** Measure actual rendered height of newly created items and correct entry heights */
   private _correctHeights(): void {
-    let changed = false;
-    let firstIdx = -1;
+    // Phase 0: 清除固定高度限制，使 offsetHeight 读取到自然流真实高度
     for (const [idx, el] of this._renderedNodes) {
       if (el.dataset.hc === "1") continue;
-      /* Read natural content height (no fixed height was set on new nodes) */
-      const natural = el.offsetHeight;
+      el.style.height = '';
+    }
+
+    // Phase 1: 批量读取所有 offsetHeight（只有一次强制布局，此时节点无固定高度）
+    const measurements: Array<{ idx: number; natural: number }> = [];
+    for (const [idx, el] of this._renderedNodes) {
+      if (el.dataset.hc === "1") continue;
+      measurements.push({ idx, natural: el.offsetHeight });
+    }
+
+    // Phase 2: 用实际 DOM 高度校正 entry 高度
+    let changed = false;
+    let firstIdx = -1;
+    for (const { idx, natural } of measurements) {
+      const el = this._renderedNodes.get(idx)!;
       if (natural > 0 && natural !== this.entries[idx].height) {
         this.entries[idx].height = natural;
         if (firstIdx < 0 || idx < firstIdx) firstIdx = idx;
@@ -433,12 +536,19 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
       el.style.height = `${this.entries[idx].height}px`;
       el.dataset.hc = "1";
     }
+
     /* Always recalculate totalHeight after measurement to keep scrollbar accurate */
     this._recalcTotalHeight();
     this.contentEl.style.height = this.totalHeight + "px";
     if (changed && firstIdx >= 0) {
-      const repositionFrom = Math.min(firstIdx, this.visibleStart);
-      this._updateNodePositions(repositionFrom, this.visibleEnd);
+      // Reposition ALL rendered nodes, not just [visibleStart, visibleEnd),
+      // because buffer-zone nodes also shift when prefixHeights changes
+      let minIdx = firstIdx, maxIdx = firstIdx;
+      for (const idx of this._renderedNodes.keys()) {
+        if (idx < minIdx) minIdx = idx;
+        if (idx > maxIdx) maxIdx = idx;
+      }
+      this._updateNodePositions(minIdx, maxIdx + 1);
     }
   }
 
@@ -456,11 +566,20 @@ class VirtualLogList<E extends IoLogEntry | SysLogEntry = IoLogEntry | SysLogEnt
 // ── Shared parsing helpers ──
 
 function parseTimestamp(rawTs: string): string {
+  // Unix 秒级时间戳 → "M/d HH:mm:ss"
   if (/^\d+$/.test(rawTs)) {
     const d = new Date(parseInt(rawTs) * 1000);
-    return !isNaN(d.getTime()) ? d.toLocaleTimeString("zh-CN", { hour12: false }) : "--:--:--";
+    if (isNaN(d.getTime())) return "--:--:--";
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    const ss = String(d.getSeconds()).padStart(2, "0");
+    return `${month}/${day} ${hh}:${mm}:${ss}`;
   }
-  if (rawTs.includes(" ")) { const dt = rawTs.split(" "); return dt[1] || dt[0]; }
+  // "YYYY-MM-DD HH:mm:ss" → 去掉年份
+  const m = rawTs.match(/^\d{4}-(\d{2})-(\d{2}) (\d{2}:\d{2}:\d{2})$/);
+  if (m) return `${parseInt(m[1])}/${parseInt(m[2])} ${m[3]}`;
   return rawTs;
 }
 
@@ -482,6 +601,63 @@ function resolveAppName(pkg: string): string {
 
 export let ioVirtualList: VirtualLogList<IoLogEntry> | null = null;
 let _lastIoRaw = "";
+
+// ── 前端过滤兜底（monitor_ignore.conf）──
+// 后端 log_monitor 已按规则过滤写入缓冲区前的日志，前端再做一次同样规则的过滤，
+// 让用户改了规则后即时生效（不必 clear-io 清空缓冲），并兜底后端遗漏。
+// 规则行格式（与 monitor_ignore.conf 一致）：
+//   - 纯包名（含 .）→ 命中条目的 pkg/appName 即丢弃
+//   - 以 / 开头 → 路径前缀匹配条目 details 的路径
+let _ioIgnorePkgs: Set<string> = new Set();
+let _ioIgnorePaths: string[] = [];
+let _ioIgnoreLoaded: boolean = false;
+
+async function loadIoIgnoreRules(): Promise<void> {
+  try {
+    const content = await run(`cat ${CONST.MONITOR_IGNORE_CONF} 2>/dev/null`);
+    _ioIgnorePkgs = new Set();
+    _ioIgnorePaths = [];
+    for (const raw of content.split("\n")) {
+      const line = raw.trim();
+      if (!line || line.startsWith("#")) continue;
+      if (line.startsWith("/")) {
+        _ioIgnorePaths.push(line);
+      } else if (line.includes(".")) {
+        _ioIgnorePkgs.add(line);
+      }
+    }
+  } catch {
+    _ioIgnorePkgs = new Set();
+    _ioIgnorePaths = [];
+  }
+  _ioIgnoreLoaded = true;
+}
+
+/** 按前端过滤规则筛选 IO 日志条目，返回应保留的子集 */
+function filterIoEntries(entries: IoLogEntry[]): IoLogEntry[] {
+  if (_ioIgnorePkgs.size === 0 && _ioIgnorePaths.length === 0) return entries;
+  return entries.filter((e) => {
+    // pkg 匹配：appName 实际是 resolveAppName(pkg) 的结果，原始 pkg 已丢失，
+    // 但当无应用映射时 appName === pkg，故对 appName 双向比对（pkg 集合与应用名集合）
+    if (_ioIgnorePkgs.has(e.appName)) return false;
+    // 路径前缀匹配：details 形如 "/path" 或 "/src -> /dst"，取首段路径前缀比对
+    if (_ioIgnorePaths.length > 0) {
+      const detailPath = e.details.split(" -> ")[0];
+      for (const p of _ioIgnorePaths) {
+        if (detailPath.startsWith(p)) return false;
+      }
+    }
+    return true;
+  });
+}
+
+/** 重新加载过滤规则并刷新 IO 日志（保存 monitor_ignore.conf 后调用） */
+export const refreshIoIgnore = async (): Promise<void> => {
+  _ioIgnoreLoaded = false;
+  await loadIoIgnoreRules();
+  resetIoLogs();
+  fetchIoLogs();
+};
 
 export const initIoLogs = (): void => {
   const container = document.getElementById("ioLogContainer") as HTMLElement | null;
@@ -522,7 +698,9 @@ export const fetchIoLogs = async (): Promise<void> => {
   if (state.ioState.loading || !state.ioState.hasMore) return;
   state.ioState.loading = true;
   try {
-    const counts = await logCount();
+    // 首屏加载前端过滤规则（monitor_ignore.conf），续页复用已加载的规则
+    if (!_ioIgnoreLoaded) await loadIoIgnoreRules();
+    const counts = await cachedLogCount();
     const dynamicLimit = counts && counts.io > 0 ? Math.min(counts.io, 1000) : 500;
     // On first load, set expected total for stable scrollbar sizing
     if (state.ioState.offset === 0 && counts?.io && ioVirtualList) {
@@ -544,12 +722,17 @@ export const fetchIoLogs = async (): Promise<void> => {
         state.ioState.offset += dataLines.length;
         if (ioVirtualList) {
           if (prevOffset === 0) {
-            // 首次加载 — 替换全部内容
-            ioVirtualList.replaceSorted(dataLines, parseIoLines, sortIoEntries);
+            // 首次加载 — 替换全部内容（解析后应用前端过滤）
+            const filtered = filterIoEntries(parseIoLines(dataLines));
+            if (filtered.length > 0) {
+              ioVirtualList.replace(filtered.sort(sortIoEntries));
+            } else {
+              ioVirtualList.clear();
+            }
           } else {
             // 续页加载 — 追加到末尾（offset>0 表示后面还有更旧的日志）
-            const parsed = parseIoLines(dataLines).sort(sortIoEntries);
-            ioVirtualList.append(parsed);
+            const parsed = filterIoEntries(parseIoLines(dataLines)).sort(sortIoEntries);
+            if (parsed.length > 0) ioVirtualList.append(parsed);
           }
         } else {
           (document.getElementById("ioLogList")!.innerHTML = renderIoLegacy(dataLines));
@@ -639,7 +822,7 @@ export const fetchSysLogs = async (): Promise<void> => {
   state.sysState.loading = true;
   try {
     const levelArg = state.sysState.level > -1 ? `--level ${state.sysState.level}` : "";
-    const counts = await logCount();
+    const counts = await cachedLogCount();
     const dynamicLimit = counts && counts.sys > 0 ? Math.min(counts.sys, 1000) : 500;
     // On first load, set expected total for stable scrollbar sizing
     if (state.sysState.offset === 0 && counts?.sys && sysVirtualList) {
@@ -688,16 +871,27 @@ function stripUidSuffix(tag: string): string {
 
 function parseSysLines(lines: string[]): SysLogEntry[] {
   return lines.map((line: string) => {
+    // New format with LOG_SYS:<level>: prefix (e.g. "2026-07-04 11:14:55|LOG_SYS:1:[fuse_daemon] ...")
+    const mLogSys = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\|LOG_SYS:(\d+):\[(.*?)\](.*)$/);
+    // Old format without level prefix (e.g. "2026-07-04 11:14:55|[injector] ...")
     const mTag = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\|\[(.*?)\](.*)$/);
     const mSim = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(.*)$/);
+    if (mLogSys) {
+      const rawTag = mLogSys[3];
+      const level = parseInt(mLogSys[2], 10);
+      const pkg = extractPkgFromTag(rawTag);
+      const appName = pkg ? resolveAppName(pkg) : undefined;
+      const displayTag = pkg ? stripUidSuffix(rawTag) : rawTag;
+      return { text: mLogSys[4], timeStr: parseTimestamp(mLogSys[1]), tag: displayTag, msg: mLogSys[4], appName, level };
+    }
     if (mTag) {
       const rawTag = mTag[2];
       const pkg = extractPkgFromTag(rawTag);
       const appName = pkg ? resolveAppName(pkg) : undefined;
       const displayTag = pkg ? stripUidSuffix(rawTag) : rawTag;
-      return { text: mTag[3], timeStr: mTag[1], tag: displayTag, msg: mTag[3], appName };
+      return { text: mTag[3], timeStr: parseTimestamp(mTag[1]), tag: displayTag, msg: mTag[3], appName };
     }
-    if (mSim) return { text: mSim[2], timeStr: mSim[1], tag: null, msg: mSim[2] };
+    if (mSim) return { text: mSim[2], timeStr: parseTimestamp(mSim[1]), tag: null, msg: mSim[2] };
     return { text: line, timeStr: null, tag: null, msg: line };
   });
 }

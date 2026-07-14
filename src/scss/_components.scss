@@ -268,15 +268,10 @@
 @media (hover: hover) { .suggestion-item:hover { background: var(--mx-primary-subtle); } }
 
 /* ── Virtual log items ── */
-.virtual-log-item { backface-visibility: hidden; }
-
-.vlog-enter {
-    animation: vlogEnter 0.2s var(--mx-ease) both;
-}
-
-.vlog-leave {
-    animation: vlogLeave 0.2s var(--mx-ease) both;
-    pointer-events: none;
+.virtual-log-item {
+  backface-visibility: hidden;
+  contain: layout style paint;
+  transition: opacity 0.2s ease;
 }
 
 /* ── Backup file browser ── */

@@ -259,14 +259,26 @@ export class VirtualScroller {
   }
 
   private _findScrollParent(el: HTMLElement): HTMLElement | null {
+    // 先检查元素自身是否可滚动
+    if (this._isScrollable(el)) return el;
+    // 再逐级检查父级
     let parent = el.parentElement;
     while (parent) {
-      const style = getComputedStyle(parent);
-      const ov = style.overflow + style.overflowY;
-      if (ov.includes("auto") || ov.includes("scroll")) return parent;
+      if (this._isScrollable(parent)) return parent;
       parent = parent.parentElement;
     }
     return null;
+  }
+
+  /** 判断元素是否可滚动(计算样式 + CSS 类名双重检测) */
+  private _isScrollable(el: HTMLElement): boolean {
+    const style = getComputedStyle(el);
+    const ov = style.overflow + style.overflowY;
+    if (ov.includes("auto") || ov.includes("scroll")) return true;
+    // body:not(.loaded) 时 overflow-y-auto 被 !important 覆盖为 hidden,
+    // 但类名仍存在,作为回退检测
+    if (el.classList.contains("overflow-y-auto") || el.classList.contains("list-scrollable")) return true;
+    return false;
   }
 
   /** 递归计算静态顶距，避免 offsetTop 的上下文定位错位 */

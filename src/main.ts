@@ -1,5 +1,5 @@
 import { state, CONST, closeModalCleanup } from "./state.js";
-import { run, showToast, ICONS, initIcons, debounce } from "./utils.js";
+import { run, showToast, ICONS, initIcons, debounce, throttle } from "./utils.js";
 import { applyTheme, systemThemeListener, handleManualThemeToggle, applyColorProfile } from "./theme.js";
 import {
   setupModeToggle,
@@ -18,11 +18,11 @@ import {
 } from "./apps.js";
 import { setupGlobalHandlers, renderGlobalRules } from "./global.js";
 import {
-  initIoLogs, resetIoLogs, fetchIoLogs, clearIoLogs,
+  initIoLogs, resetIoLogs, fetchIoLogs, clearIoLogs, refreshIoIgnore,
   initSysLogs, resetSysLogs, fetchSysLogs, clearSysLogs,
   ioVirtualList, sysVirtualList,
 } from "./logs.js";
-import { getSettings, saveSettings, checkPluginInstalled, syncToPlugin } from "./plugin.js";
+import { getSettings, saveSettings } from "./plugin.js";
 import { openBackupModal, showPicker, exportAllLogs, createNewFolder } from "./backup.js";
 import { enableEdgeToEdge } from "kernelsu";
 import { initRipple } from "./ripple.js";
@@ -79,33 +79,6 @@ function scrollToInputIfKeyboardOpen(input: HTMLElement): void {
   }
 }
 
-function buildPluginStatusLabel(container: HTMLElement, installed: boolean): void {
-  if (installed) {
-    container.textContent = "状态: 发现清理插件 (已就绪)";
-    container.style.color = "var(--mx-green)";
-    container.style.display = "";
-    container.style.justifyContent = "";
-    container.style.alignItems = "";
-  } else {
-    container.innerHTML = "";
-    container.style.display = "flex";
-    container.style.justifyContent = "space-between";
-    container.style.alignItems = "center";
-    container.style.color = "";
-    const span = document.createElement("span");
-    span.textContent = "状态: 未发现清理插件";
-    span.style.color = "var(--mx-red)";
-    const link = document.createElement("a");
-    link.textContent = "去下载";
-    link.style.cssText =
-      "margin-left:auto;color:var(--mx-primary);text-decoration:none;font-size:11px;cursor:pointer;";
-    link.onclick = () => {
-      run('am start -a android.intent.action.VIEW -d "https://wwbti.lanzoue.com/i3K1v3ofox5a"');
-    };
-    container.appendChild(span);
-    container.appendChild(link);
-  }
-}
 
 function lockInitialHeight(): void {
   const update = (): void => {
@@ -202,6 +175,33 @@ function handleVisibilityChange(): void {
 
 document.addEventListener("visibilitychange", handleVisibilityChange);
 
+/** Fast status polling timer used right after manual toggle */
+let _fastStatusTimer: ReturnType<typeof setInterval> | null = null;
+
+function _clearFastStatusPolling(): void {
+  if (_fastStatusTimer) {
+    clearInterval(_fastStatusTimer);
+    _fastStatusTimer = null;
+  }
+}
+
+/** Start rapid 200ms status checks after a manual toggle, reverting to normal after 5s */
+function _startFastStatusPolling(): void {
+  _clearFastStatusPolling();
+  if (statusPolling) {
+    clearInterval(statusPolling);
+    statusPolling = null;
+  }
+  checkStatus();
+  _fastStatusTimer = setInterval(checkStatus, 200);
+  setTimeout(() => {
+    _clearFastStatusPolling();
+    if (!statusPolling) {
+      statusPolling = setInterval(checkStatus, 1500);
+    }
+  }, 5000);
+}
+
 async function toggleStatus(): Promise<void> {
   if (state.currentPid) {
     await run(`kill -15 ${state.currentPid}`);
@@ -211,7 +211,7 @@ async function toggleStatus(): Promise<void> {
     showToast.info("启动服务...");
     setTimeout(loadData, 1000);
   }
-  setTimeout(checkStatus, 500);
+  _startFastStatusPolling();
 }
 
 async function refreshAppStatus(): Promise<void> {
@@ -271,7 +271,11 @@ function switchSection(sectionId: string): void {
   if (state.currentSection === sectionId) return;
   state.currentSection = sectionId;
   domCache.getSections().forEach((el) => el.classList.remove("active"));
-  document.getElementById(`sec-${sectionId}`)?.classList.add("active");
+  const targetSection = document.getElementById(`sec-${sectionId}`);
+  targetSection?.classList.add("active");
+  // 强制同步布局，确保刚由 display:none 切换过来的 section 立即有正确尺寸，
+  // 避免下游 VirtualLogList.replace() 等异步路径读到 clientWidth=0
+  if (targetSection) void targetSection.offsetHeight;
   const selector = ".mx-nav-item, .mx-btm-item";
   domCache.getNavItems().forEach((el) =>
     el.classList.toggle("active", el.dataset.section === sectionId),
@@ -279,8 +283,6 @@ function switchSection(sectionId: string): void {
   const breadcrumb = document.getElementById("breadcrumbTitle");
   if (breadcrumb) breadcrumb.textContent = SECTION_TITLES[sectionId] ?? sectionId;
   if (sectionId === "io") {
-    resetIoLogs();
-    fetchIoLogs();
     startLogPolling("io");
     return;
   }
@@ -403,8 +405,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   state.currentSettings = await getSettings();
   (document.getElementById("autoThemeToggle") as HTMLInputElement).checked =
     state.currentSettings.autoTheme;
-  (document.getElementById("pluginSyncToggle") as HTMLInputElement).checked =
-    state.currentSettings.syncPlugin;
   (document.getElementById("useLogCtlToggle") as HTMLInputElement).checked =
     state.currentSettings.useLogCtl;
 
@@ -474,11 +474,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnToggleStatusMobile")!.onclick = toggleStatus;
   document.getElementById("btnToggleStatusDesktop")!.onclick = toggleStatus;
 
-  const openSettings = async (): Promise<void> => {
+  const openSettings = (): void => {
     history.pushState({ modalOpen: true }, "");
-    const isInstalled = await checkPluginInstalled();
-    const lbl = document.getElementById("pluginStatusLabel");
-    if (lbl) buildPluginStatusLabel(lbl, isInstalled);
     document.getElementById("settingsModal")?.classList.add("open");
   };
   document.getElementById("btnSettingsMobile")!.onclick = openSettings;
@@ -507,7 +504,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("btnSaveSettings")!.onclick = async () => {
     state.currentSettings.autoTheme = (document.getElementById("autoThemeToggle") as HTMLInputElement).checked;
-    state.currentSettings.syncPlugin = (document.getElementById("pluginSyncToggle") as HTMLInputElement).checked;
     state.currentSettings.useLogCtl = (document.getElementById("useLogCtlToggle") as HTMLInputElement).checked;
     const profileSelect = document.getElementById("colorProfileSelect") as HTMLSelectElement | null;
     if (profileSelect) {
@@ -523,7 +519,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       `设置已保存 (规则模式: ${state.currentSettings.useLogCtl ? "log_ctl" : "文件直读"})`,
     );
     closeModalCleanup();
-    await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
   };
 
   document.getElementById("btnMonitorIgnore")!.onclick = async () => {
@@ -543,6 +538,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       await run(`echo '${content.trim()}' > ${CONST.MONITOR_IGNORE_CONF}`);
       showToast.success("过滤配置已保存");
       closeModalCleanup();
+      // 重新加载过滤规则并刷新 IO 日志，让新规则即时生效（前端兜底过滤）
+      refreshIoIgnore();
     } catch {
       showToast.error("保存失败");
     }
@@ -605,7 +602,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast.success(`配置已保存 (${mode}模式)`);
       closeModalCleanup();
       await loadData();
-      await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     } catch {
       showToast.error("保存失败");
     }
@@ -624,7 +620,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await flushInjectorConf();
     closeModalCleanup();
     await loadData();
-    await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     showToast.success("配置已清除");
   };
 
@@ -640,7 +635,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   initIoLogs();
   initSysLogs();
-  loadData();
+  loadData().then(() => fetchIoLogs());
   startPolling();
   requestAnimationFrame(() => document.body.classList.add("loaded"));
 });
@@ -769,19 +764,18 @@ function setupIoSection(): void {
   }
   const ioContainer = document.getElementById("ioLogContainer");
   if (ioContainer) {
-    ioContainer.addEventListener("scroll", () => {
+    const throttledFetchIo = throttle(() => {
       if (ioVirtualList) {
-        // Use actual loaded content bottom instead of estimated scrollHeight
         if (ioContainer.scrollTop + ioContainer.clientHeight >= ioVirtualList.getLastLoadedBottom() - 60) {
           fetchIoLogs();
         }
       } else {
-        // Fallback when VirtualLogList not yet initialized
         if (ioContainer.scrollTop + ioContainer.clientHeight >= ioContainer.scrollHeight - 50) {
           fetchIoLogs();
         }
       }
-    });
+    }, 500);
+    ioContainer.addEventListener("scroll", throttledFetchIo);
   }
   document.getElementById("btnClearIo")!.onclick = clearIoLogs;
 }
@@ -813,7 +807,7 @@ function setupLogSection(): void {
     });
   }
   if (logViewer) {
-    logViewer.addEventListener("scroll", () => {
+    const throttledFetchSys = throttle(() => {
       if (
         logSelect?.value === "internal" &&
         sysVirtualList &&
@@ -827,7 +821,8 @@ function setupLogSection(): void {
       ) {
         fetchSysLogs();
       }
-    });
+    }, 500);
+    logViewer.addEventListener("scroll", throttledFetchSys);
   }
   document.getElementById("btnClearLog")!.onclick = clearSysLogs;
 }

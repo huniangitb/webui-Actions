@@ -37,6 +37,7 @@ export interface SysLogEntry {
   tag: string | null;
   msg: string;
   appName?: string;
+  level?: number;  // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR (从 LOG_SYS:<level>: 前缀解析)
 }
 
 export interface Suggestion {
@@ -46,7 +47,6 @@ export interface Suggestion {
 
 export interface Settings {
   autoTheme: boolean;
-  syncPlugin: boolean;
   colorProfile: string;
   useLogCtl: boolean;
 }

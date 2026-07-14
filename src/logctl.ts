@@ -131,13 +131,19 @@ export interface GlobalRulesCounts {
   hide: number;
   ro: number;
   redirect: number;
+  allow: number;
+}
+
+export interface RedirectRuleItem {
+  virtual_prefix: string;
+  real_target: string;
 }
 
 export interface GlobalRulesData {
   switches: GlobalRulesSwitches;
   hide_rules: string[];
   ro_rules: string[];
-  redirect_rules: string[];
+  redirect_rules: RedirectRuleItem[];
   allow_rules?: string[];
   fuse_extra_args: string;
   counts: GlobalRulesCounts;
@@ -195,7 +201,13 @@ async function logCtlJson(...args: string[]): Promise<LogCtlResponse | null> {
   try {
     const raw = await run(cmd);
     if (!raw) return null;
-    return JSON.parse(raw) as LogCtlResponse;
+    const parsed = JSON.parse(raw);
+    // New format: C backend outputs data JSON directly (no envelope)
+    if (parsed && typeof parsed === "object" && parsed.status === "ok") {
+      return parsed as LogCtlResponse;
+    }
+    // Old format compatibility wrapper
+    return { status: "ok", data: parsed, command: "", timestamp: 0 };
   } catch {
     return null;
   }
@@ -236,17 +248,15 @@ export function extractApiRaw(raw: string): string {
   if (!raw) return "";
   try {
     const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object" && parsed.status === "ok") {
-      const data = parsed.data;
-      if (data && typeof data.raw === "string") {
-        return data.raw;
-      }
-      if (typeof data === "string") {
-        return data;
-      }
-      if (typeof data === "object" && data !== null) {
-        return JSON.stringify(data);
-      }
+    if (parsed && typeof parsed === "object") {
+      // Support two shapes:
+      //   New: data is the entire response (no status envelope)
+      //   Old: {"status":"ok","data":<data>}
+      const data = parsed.status === "ok" ? parsed.data : parsed;
+      if (!data) return raw;
+      if (typeof data.raw === "string") return data.raw;
+      if (typeof data === "string") return data;
+      if (typeof data === "object") return JSON.stringify(data);
     }
     return raw;
   } catch {
@@ -265,10 +275,12 @@ export function extractApiData(raw: string): LogCtlDataResult | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    if (parsed?.status !== "ok") return null;
-    const data = parsed.data;
+    if (!parsed || typeof parsed !== "object") return null;
+    // Support two shapes:
+    //   New: {"raw":"...","done":{...}} at top level (no envelope)
+    //   Old: {"status":"ok","data":{"raw":"...","done":{...}}}
+    const data = parsed.status === "ok" ? parsed.data : parsed;
     if (!data || typeof data !== "object") return null;
-    // Shape: {"raw":"...","done":{"total":N,"remaining":N}}
     const rawText = typeof data.raw === "string" ? data.raw : "";
     const doneObj = data.done;
     const done =
@@ -557,8 +569,39 @@ export async function checkLogCtlAvailable(): Promise<boolean> {
   if (!res) return false;
   try {
     const parsed = JSON.parse(res);
-    return parsed.status === "ok";
+    return !!(parsed && typeof parsed === "object");
   } catch {
     return false;
   }
+}
+
+// ── Cached log-count ──
+//
+// logCount() spawns a `log_ctl log-count api` process on EVERY call, which
+// triggers IPC with the injector.  The injector's processing time scales with
+// the number of rules, so calling this at high frequency (polling every 1 s +
+// scroll events) causes unnecessary CPU spikes.
+//
+// This cache eliminates the majority of redundant calls.
+
+const LOG_COUNT_TTL = 4_000; // ms — refresh at most once per interval
+let _cachedLogCountData: LogCountData | null = null;
+let _cachedLogCountTime = 0;
+
+/**
+ * Cached version of logCount() — only calls `log_ctl log-count api` at most
+ * once every `LOG_COUNT_TTL` ms.  Returns the cached value for subsequent
+ * calls within the TTL window.
+ *
+ * TTL is safe because the count only drives dynamic-limit and scrollbar sizing;
+ * it does not affect log content correctness.
+ */
+export async function cachedLogCount(): Promise<LogCountData | null> {
+  const now = Date.now();
+  if (now - _cachedLogCountTime < LOG_COUNT_TTL && _cachedLogCountData !== null) {
+    return _cachedLogCountData;
+  }
+  _cachedLogCountData = await logCount();
+  _cachedLogCountTime = Date.now();
+  return _cachedLogCountData;
 }

@@ -48,6 +48,23 @@ export const debounce = <T extends (...args: any[]) => void>(
   };
 };
 
+// ── Throttle ──
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const throttle = <T extends (...args: any[]) => void>(
+  func: T,
+  wait: number,
+): ((...args: Parameters<T>) => void) => {
+  let lastTime = 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return function (this: any, ...args: Parameters<T>): void {
+    const now = Date.now();
+    if (now - lastTime >= wait) {
+      lastTime = now;
+      func.apply(this, args);
+    }
+  };
+};
+
 // ── Toast ──
 
 type ToastType = "success" | "warning" | "error" | "info";

@@ -2,7 +2,6 @@ import { state } from "./state.js";
 import { showToast } from "./utils.js";
 import { addRuleRow, parseConfigTextToVisual, generateConfigTextFromVisual } from "./ui.js";
 import { loadData, flushInjectorConf } from "./apps.js";
-import { syncToPlugin } from "./plugin.js";
 
 export const renderGlobalRules = (): void => {
   const contentEl = document.getElementById("globalRuleContent") as HTMLTextAreaElement | null;
@@ -36,7 +35,6 @@ export const setupGlobalHandlers = (): void => {
       const mode = state.currentSettings.useLogCtl ? "log_ctl" : "文件";
       showToast.success(`全局规则已保存 (${mode}模式)`);
       await loadData();
-      await syncToPlugin(state.appMap, state.globalConfText, state.injectorRulesMap, state.injectorStates);
     } catch {
       showToast.error("保存失败");
     }

@@ -18,6 +18,7 @@
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
     transform: translateZ(0);
+    contain: layout style paint;
     scroll-behavior: smooth;
 }
 

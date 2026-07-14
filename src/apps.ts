@@ -220,8 +220,12 @@ export const loadData = async (): Promise<void> => {
         if (isOn(sw?.fuse_direct)) globalLines.push(`FUSE_DIRECT ON`);
         for (const r of globalRules.ro_rules || []) globalLines.push(`RO ${r}`);
         for (const r of globalRules.hide_rules || []) globalLines.push(`HIDE ${r}`);
-        for (const r of globalRules.redirect_rules || []) globalLines.push(`REDIRECT ${r}`);
+        for (const r of globalRules.redirect_rules || []) {
+          if (typeof r === "string") globalLines.push(`REDIRECT ${r}`);
+          else globalLines.push(`REDIRECT ${r.virtual_prefix} ${r.real_target}`);
+        }
         for (const r of globalRules.allow_rules || []) globalLines.push(`ALLOW ${r}`);
+        if (globalRules.fuse_extra_args) globalLines.push(`FUSE_EXTRA_ARGS ${globalRules.fuse_extra_args}`);
 
         state.globalConfText = globalLines.join("\n");
         state.injectorRulesMap.set("GLOBAL", globalLines);
